@@ -12,13 +12,27 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppTransportRouteImport } from './routes/_app.transport'
+import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
 import { Route as AppStaffRouteImport } from './routes/_app.staff'
+import { Route as AppLibraryRouteImport } from './routes/_app.library'
+import { Route as AppDisciplineRouteImport } from './routes/_app.discipline'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppClinicRouteImport } from './routes/_app.clinic'
 import { Route as AppClassesRouteImport } from './routes/_app.classes'
+import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
+import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
+import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
+import { Route as AppFinancePaymentsRouteImport } from './routes/_app.finance.payments'
+import { Route as AppFinanceInvoicesRouteImport } from './routes/_app.finance.invoices'
+import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
+import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
+import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
+import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -34,6 +48,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTransportRoute = AppTransportRouteImport.update({
+  id: '/transport',
+  path: '/transport',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTimetableRoute = AppTimetableRouteImport.update({
+  id: '/timetable',
+  path: '/timetable',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppStudentsRoute = AppStudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -44,14 +68,59 @@ const AppStaffRoute = AppStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLibraryRoute = AppLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDisciplineRoute = AppDisciplineRouteImport.update({
+  id: '/discipline',
+  path: '/discipline',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppClinicRoute = AppClinicRouteImport.update({
+  id: '/clinic',
+  path: '/clinic',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppClassesRoute = AppClassesRouteImport.update({
   id: '/classes',
   path: '/classes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBoardingRoute = AppBoardingRouteImport.update({
+  id: '/boarding',
+  path: '/boarding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAttendanceRoute = AppAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnnouncementsRoute = AppAnnouncementsRouteImport.update({
+  id: '/announcements',
+  path: '/announcements',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinancePaymentsRoute = AppFinancePaymentsRouteImport.update({
+  id: '/finance/payments',
+  path: '/finance/payments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceInvoicesRoute = AppFinanceInvoicesRouteImport.update({
+  id: '/finance/invoices',
+  path: '/finance/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceFeesRoute = AppFinanceFeesRouteImport.update({
+  id: '/finance/fees',
+  path: '/finance/fees',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
@@ -69,77 +138,176 @@ const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
   path: '/admin/activity',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsSubjectsRoute = AppAcademicsSubjectsRouteImport.update({
+  id: '/academics/subjects',
+  path: '/academics/subjects',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsResultsRoute = AppAcademicsResultsRouteImport.update({
+  id: '/academics/results',
+  path: '/academics/results',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
+  id: '/academics/exams',
+  path: '/academics/exams',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/announcements': typeof AppAnnouncementsRoute
+  '/attendance': typeof AppAttendanceRoute
+  '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
+  '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
+  '/discipline': typeof AppDisciplineRoute
+  '/library': typeof AppLibraryRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
+  '/timetable': typeof AppTimetableRoute
+  '/transport': typeof AppTransportRoute
+  '/academics/exams': typeof AppAcademicsExamsRoute
+  '/academics/results': typeof AppAcademicsResultsRoute
+  '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
+  '/finance/fees': typeof AppFinanceFeesRoute
+  '/finance/invoices': typeof AppFinanceInvoicesRoute
+  '/finance/payments': typeof AppFinancePaymentsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/announcements': typeof AppAnnouncementsRoute
+  '/attendance': typeof AppAttendanceRoute
+  '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
+  '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
+  '/discipline': typeof AppDisciplineRoute
+  '/library': typeof AppLibraryRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
+  '/timetable': typeof AppTimetableRoute
+  '/transport': typeof AppTransportRoute
+  '/academics/exams': typeof AppAcademicsExamsRoute
+  '/academics/results': typeof AppAcademicsResultsRoute
+  '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
+  '/finance/fees': typeof AppFinanceFeesRoute
+  '/finance/invoices': typeof AppFinanceInvoicesRoute
+  '/finance/payments': typeof AppFinancePaymentsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/announcements': typeof AppAnnouncementsRoute
+  '/_app/attendance': typeof AppAttendanceRoute
+  '/_app/boarding': typeof AppBoardingRoute
   '/_app/classes': typeof AppClassesRoute
+  '/_app/clinic': typeof AppClinicRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/discipline': typeof AppDisciplineRoute
+  '/_app/library': typeof AppLibraryRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
+  '/_app/timetable': typeof AppTimetableRoute
+  '/_app/transport': typeof AppTransportRoute
+  '/_app/academics/exams': typeof AppAcademicsExamsRoute
+  '/_app/academics/results': typeof AppAcademicsResultsRoute
+  '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
+  '/_app/finance/fees': typeof AppFinanceFeesRoute
+  '/_app/finance/invoices': typeof AppFinanceInvoicesRoute
+  '/_app/finance/payments': typeof AppFinancePaymentsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
+    | '/announcements'
+    | '/attendance'
+    | '/boarding'
     | '/classes'
+    | '/clinic'
     | '/dashboard'
+    | '/discipline'
+    | '/library'
     | '/staff'
     | '/students'
+    | '/timetable'
+    | '/transport'
+    | '/academics/exams'
+    | '/academics/results'
+    | '/academics/subjects'
     | '/admin/activity'
     | '/admin/roles'
     | '/admin/settings'
+    | '/finance/fees'
+    | '/finance/invoices'
+    | '/finance/payments'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/announcements'
+    | '/attendance'
+    | '/boarding'
     | '/classes'
+    | '/clinic'
     | '/dashboard'
+    | '/discipline'
+    | '/library'
     | '/staff'
     | '/students'
+    | '/timetable'
+    | '/transport'
+    | '/academics/exams'
+    | '/academics/results'
+    | '/academics/subjects'
     | '/admin/activity'
     | '/admin/roles'
     | '/admin/settings'
+    | '/finance/fees'
+    | '/finance/invoices'
+    | '/finance/payments'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/login'
+    | '/_app/announcements'
+    | '/_app/attendance'
+    | '/_app/boarding'
     | '/_app/classes'
+    | '/_app/clinic'
     | '/_app/dashboard'
+    | '/_app/discipline'
+    | '/_app/library'
     | '/_app/staff'
     | '/_app/students'
+    | '/_app/timetable'
+    | '/_app/transport'
+    | '/_app/academics/exams'
+    | '/_app/academics/results'
+    | '/_app/academics/subjects'
     | '/_app/admin/activity'
     | '/_app/admin/roles'
     | '/_app/admin/settings'
+    | '/_app/finance/fees'
+    | '/_app/finance/invoices'
+    | '/_app/finance/payments'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +339,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/transport': {
+      id: '/_app/transport'
+      path: '/transport'
+      fullPath: '/transport'
+      preLoaderRoute: typeof AppTransportRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/timetable': {
+      id: '/_app/timetable'
+      path: '/timetable'
+      fullPath: '/timetable'
+      preLoaderRoute: typeof AppTimetableRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/students': {
       id: '/_app/students'
       path: '/students'
@@ -185,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStaffRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/library': {
+      id: '/_app/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof AppLibraryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/discipline': {
+      id: '/_app/discipline'
+      path: '/discipline'
+      fullPath: '/discipline'
+      preLoaderRoute: typeof AppDisciplineRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -192,11 +388,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/clinic': {
+      id: '/_app/clinic'
+      path: '/clinic'
+      fullPath: '/clinic'
+      preLoaderRoute: typeof AppClinicRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/classes': {
       id: '/_app/classes'
       path: '/classes'
       fullPath: '/classes'
       preLoaderRoute: typeof AppClassesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/boarding': {
+      id: '/_app/boarding'
+      path: '/boarding'
+      fullPath: '/boarding'
+      preLoaderRoute: typeof AppBoardingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/attendance': {
+      id: '/_app/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AppAttendanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/announcements': {
+      id: '/_app/announcements'
+      path: '/announcements'
+      fullPath: '/announcements'
+      preLoaderRoute: typeof AppAnnouncementsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/payments': {
+      id: '/_app/finance/payments'
+      path: '/finance/payments'
+      fullPath: '/finance/payments'
+      preLoaderRoute: typeof AppFinancePaymentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/invoices': {
+      id: '/_app/finance/invoices'
+      path: '/finance/invoices'
+      fullPath: '/finance/invoices'
+      preLoaderRoute: typeof AppFinanceInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/fees': {
+      id: '/_app/finance/fees'
+      path: '/finance/fees'
+      fullPath: '/finance/fees'
+      preLoaderRoute: typeof AppFinanceFeesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/settings': {
@@ -220,27 +465,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminActivityRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/subjects': {
+      id: '/_app/academics/subjects'
+      path: '/academics/subjects'
+      fullPath: '/academics/subjects'
+      preLoaderRoute: typeof AppAcademicsSubjectsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/results': {
+      id: '/_app/academics/results'
+      path: '/academics/results'
+      fullPath: '/academics/results'
+      preLoaderRoute: typeof AppAcademicsResultsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/exams': {
+      id: '/_app/academics/exams'
+      path: '/academics/exams'
+      fullPath: '/academics/exams'
+      preLoaderRoute: typeof AppAcademicsExamsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAnnouncementsRoute: typeof AppAnnouncementsRoute
+  AppAttendanceRoute: typeof AppAttendanceRoute
+  AppBoardingRoute: typeof AppBoardingRoute
   AppClassesRoute: typeof AppClassesRoute
+  AppClinicRoute: typeof AppClinicRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDisciplineRoute: typeof AppDisciplineRoute
+  AppLibraryRoute: typeof AppLibraryRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
+  AppTimetableRoute: typeof AppTimetableRoute
+  AppTransportRoute: typeof AppTransportRoute
+  AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
+  AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
+  AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
+  AppFinanceFeesRoute: typeof AppFinanceFeesRoute
+  AppFinanceInvoicesRoute: typeof AppFinanceInvoicesRoute
+  AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnnouncementsRoute: AppAnnouncementsRoute,
+  AppAttendanceRoute: AppAttendanceRoute,
+  AppBoardingRoute: AppBoardingRoute,
   AppClassesRoute: AppClassesRoute,
+  AppClinicRoute: AppClinicRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDisciplineRoute: AppDisciplineRoute,
+  AppLibraryRoute: AppLibraryRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
+  AppTimetableRoute: AppTimetableRoute,
+  AppTransportRoute: AppTransportRoute,
+  AppAcademicsExamsRoute: AppAcademicsExamsRoute,
+  AppAcademicsResultsRoute: AppAcademicsResultsRoute,
+  AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
+  AppFinanceFeesRoute: AppFinanceFeesRoute,
+  AppFinanceInvoicesRoute: AppFinanceInvoicesRoute,
+  AppFinancePaymentsRoute: AppFinancePaymentsRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
