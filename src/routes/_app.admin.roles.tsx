@@ -99,7 +99,7 @@ function RolesPage() {
   );
 }
 
-function UserRow({ user, onAdd, onRemove }: any) {
+function UserRow({ user, onAdd, onRemove }: { user: any; onAdd: (role: string) => void; onRemove: (id: string) => void }) {
   const [pick, setPick] = useState("");
   return (
     <TableRow>
