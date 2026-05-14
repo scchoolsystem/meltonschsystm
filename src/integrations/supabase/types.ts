@@ -44,6 +44,141 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          audience: string
+          body: string
+          created_at: string
+          id: string
+          pinned: boolean
+          posted_by: string | null
+          title: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          created_at?: string
+          id?: string
+          pinned?: boolean
+          posted_by?: string | null
+          title: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          created_at?: string
+          id?: string
+          pinned?: boolean
+          posted_by?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      attendance_records: {
+        Row: {
+          class_id: string | null
+          created_at: string
+          date: string
+          id: string
+          recorded_by: string | null
+          remarks: string | null
+          status: string
+          student_id: string
+        }
+        Insert: {
+          class_id?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          recorded_by?: string | null
+          remarks?: string | null
+          status?: string
+          student_id: string
+        }
+        Update: {
+          class_id?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          recorded_by?: string | null
+          remarks?: string | null
+          status?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      book_loans: {
+        Row: {
+          book_id: string
+          borrowed_on: string
+          created_at: string
+          due_on: string
+          id: string
+          returned_on: string | null
+          staff_id: string | null
+          status: string
+          student_id: string | null
+        }
+        Insert: {
+          book_id: string
+          borrowed_on?: string
+          created_at?: string
+          due_on?: string
+          id?: string
+          returned_on?: string | null
+          staff_id?: string | null
+          status?: string
+          student_id?: string | null
+        }
+        Update: {
+          book_id?: string
+          borrowed_on?: string
+          created_at?: string
+          due_on?: string
+          id?: string
+          returned_on?: string | null
+          staff_id?: string | null
+          status?: string
+          student_id?: string | null
+        }
+        Relationships: []
+      }
+      books: {
+        Row: {
+          author: string | null
+          category: string | null
+          copies_available: number
+          copies_total: number
+          created_at: string
+          id: string
+          isbn: string | null
+          shelf: string | null
+          title: string
+        }
+        Insert: {
+          author?: string | null
+          category?: string | null
+          copies_available?: number
+          copies_total?: number
+          created_at?: string
+          id?: string
+          isbn?: string | null
+          shelf?: string | null
+          title: string
+        }
+        Update: {
+          author?: string | null
+          category?: string | null
+          copies_available?: number
+          copies_total?: number
+          created_at?: string
+          id?: string
+          isbn?: string | null
+          shelf?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       classes: {
         Row: {
           capacity: number
@@ -74,6 +209,303 @@ export type Database = {
           name?: string
           stream?: string | null
           year?: number
+        }
+        Relationships: []
+      }
+      clinic_visits: {
+        Row: {
+          attended_by: string | null
+          created_at: string
+          diagnosis: string | null
+          id: string
+          referred_to: string | null
+          student_id: string
+          symptoms: string
+          treatment: string | null
+          visit_date: string
+        }
+        Insert: {
+          attended_by?: string | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          referred_to?: string | null
+          student_id: string
+          symptoms: string
+          treatment?: string | null
+          visit_date?: string
+        }
+        Update: {
+          attended_by?: string | null
+          created_at?: string
+          diagnosis?: string | null
+          id?: string
+          referred_to?: string | null
+          student_id?: string
+          symptoms?: string
+          treatment?: string | null
+          visit_date?: string
+        }
+        Relationships: []
+      }
+      discipline_records: {
+        Row: {
+          action_taken: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          incident_date: string
+          reported_by: string | null
+          severity: string
+          student_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          incident_date?: string
+          reported_by?: string | null
+          severity?: string
+          student_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          incident_date?: string
+          reported_by?: string | null
+          severity?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      dorm_assignments: {
+        Row: {
+          assigned_on: string
+          bed_no: string | null
+          created_at: string
+          dormitory_id: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          assigned_on?: string
+          bed_no?: string | null
+          created_at?: string
+          dormitory_id: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          assigned_on?: string
+          bed_no?: string | null
+          created_at?: string
+          dormitory_id?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      dormitories: {
+        Row: {
+          capacity: number
+          created_at: string
+          gender: string
+          id: string
+          matron_id: string | null
+          name: string
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          gender: string
+          id?: string
+          matron_id?: string | null
+          name: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          gender?: string
+          id?: string
+          matron_id?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      exam_results: {
+        Row: {
+          created_at: string
+          exam_id: string
+          grade: string | null
+          id: string
+          recorded_by: string | null
+          remarks: string | null
+          score: number
+          student_id: string
+          subject_id: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          grade?: string | null
+          id?: string
+          recorded_by?: string | null
+          remarks?: string | null
+          score: number
+          student_id: string
+          subject_id: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          grade?: string | null
+          id?: string
+          recorded_by?: string | null
+          remarks?: string | null
+          score?: number
+          student_id?: string
+          subject_id?: string
+        }
+        Relationships: []
+      }
+      exams: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: string
+          term: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: string
+          term: string
+          year?: number
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: string
+          term?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      fee_structures: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          level: string
+          name: string
+          term: string
+          year: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          level: string
+          name: string
+          term: string
+          year?: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          level?: string
+          name?: string
+          term?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string | null
+          fee_structure_id: string | null
+          id: string
+          invoice_no: string
+          paid: number
+          status: string
+          student_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date?: string | null
+          fee_structure_id?: string | null
+          id?: string
+          invoice_no: string
+          paid?: number
+          status?: string
+          student_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string | null
+          fee_structure_id?: string | null
+          id?: string
+          invoice_no?: string
+          paid?: number
+          status?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          method: string
+          paid_on: string
+          receipt_no: string
+          received_by: string | null
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          method?: string
+          paid_on?: string
+          receipt_no: string
+          received_by?: string | null
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          method?: string
+          paid_on?: string
+          receipt_no?: string
+          received_by?: string | null
+          reference?: string | null
         }
         Relationships: []
       }
@@ -216,6 +648,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subjects: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          level: string
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          level: string
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          level?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      timetable_slots: {
+        Row: {
+          class_id: string
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          room: string | null
+          start_time: string
+          subject_id: string
+          teacher_id: string | null
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          room?: string | null
+          start_time: string
+          subject_id: string
+          teacher_id?: string | null
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          room?: string | null
+          start_time?: string
+          subject_id?: string
+          teacher_id?: string | null
+        }
+        Relationships: []
+      }
+      transport_assignments: {
+        Row: {
+          assigned_on: string
+          created_at: string
+          id: string
+          pickup_point: string | null
+          route_id: string
+          student_id: string
+        }
+        Insert: {
+          assigned_on?: string
+          created_at?: string
+          id?: string
+          pickup_point?: string | null
+          route_id: string
+          student_id: string
+        }
+        Update: {
+          assigned_on?: string
+          created_at?: string
+          id?: string
+          pickup_point?: string | null
+          route_id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      transport_routes: {
+        Row: {
+          capacity: number
+          created_at: string
+          driver_name: string | null
+          driver_phone: string | null
+          id: string
+          monthly_fee: number
+          name: string
+          vehicle_reg: string | null
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          id?: string
+          monthly_fee?: number
+          name: string
+          vehicle_reg?: string | null
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          id?: string
+          monthly_fee?: number
+          name?: string
+          vehicle_reg?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
