@@ -6,7 +6,8 @@ import { useRouter } from "@tanstack/react-router";
 type AppRole =
   | "super_admin" | "principal" | "deputy_principal" | "class_teacher"
   | "subject_teacher" | "hod" | "admission_officer" | "bursar"
-  | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff";
+  | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff"
+  | "teacher" | "nurse" | "matron" | "transport_officer";
 
 interface AuthCtx {
   session: Session | null;

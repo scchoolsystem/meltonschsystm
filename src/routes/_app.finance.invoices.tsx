@@ -103,7 +103,7 @@ function PayDialog({ invoiceId, balance, onDone }: { invoiceId: string; balance:
   const [f, setF] = useState({ amount: balance, method: "cash", reference: "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("payments").insert({ invoice_id: invoiceId, ...f }); if (error) throw error;
+      const { error } = await supabase.from("payments").insert({ invoice_id: invoiceId, ...f } as any); if (error) throw error;
     },
     onSuccess: () => { toast.success("Payment recorded"); onDone(); },
     onError: (e: any) => toast.error(e.message),
