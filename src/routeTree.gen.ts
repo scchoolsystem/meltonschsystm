@@ -16,6 +16,9 @@ import { Route as AppStudentsRouteImport } from './routes/_app.students'
 import { Route as AppStaffRouteImport } from './routes/_app.staff'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppClassesRouteImport } from './routes/_app.classes'
+import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
+import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
+import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -51,6 +54,21 @@ const AppClassesRoute = AppClassesRouteImport.update({
   path: '/classes',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
+  id: '/admin/roles',
+  path: '/admin/roles',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,6 +77,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
+  '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/settings': typeof AppAdminSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -67,6 +88,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
+  '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/settings': typeof AppAdminSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,12 +101,33 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
+  '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/roles': typeof AppAdminRolesRoute
+  '/_app/admin/settings': typeof AppAdminSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/classes' | '/dashboard' | '/staff' | '/students'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/classes'
+    | '/dashboard'
+    | '/staff'
+    | '/students'
+    | '/admin/activity'
+    | '/admin/roles'
+    | '/admin/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/classes' | '/dashboard' | '/staff' | '/students'
+  to:
+    | '/'
+    | '/login'
+    | '/classes'
+    | '/dashboard'
+    | '/staff'
+    | '/students'
+    | '/admin/activity'
+    | '/admin/roles'
+    | '/admin/settings'
   id:
     | '__root__'
     | '/'
@@ -92,6 +137,9 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/staff'
     | '/_app/students'
+    | '/_app/admin/activity'
+    | '/_app/admin/roles'
+    | '/_app/admin/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -151,6 +199,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClassesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/settings': {
+      id: '/_app/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AppAdminSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/roles': {
+      id: '/_app/admin/roles'
+      path: '/admin/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof AppAdminRolesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/activity': {
+      id: '/_app/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AppAdminActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -159,6 +228,9 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
+  AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminRolesRoute: typeof AppAdminRolesRoute
+  AppAdminSettingsRoute: typeof AppAdminSettingsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -166,6 +238,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
+  AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminRolesRoute: AppAdminRolesRoute,
+  AppAdminSettingsRoute: AppAdminSettingsRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
