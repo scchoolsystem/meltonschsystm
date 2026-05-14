@@ -2,6 +2,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, UserCog,
   Settings, Activity, LogOut, Sun, Moon, ChevronDown,
+  ClipboardCheck, AlertTriangle, Library, Home, Bus, Stethoscope,
+  Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -19,6 +21,29 @@ const mainItems = [
   { title: "Students", url: "/students", icon: GraduationCap },
   { title: "Staff", url: "/staff", icon: UserCog },
   { title: "Classes", url: "/classes", icon: BookOpen },
+  { title: "Announcements", url: "/announcements", icon: Megaphone },
+];
+
+const academicItems = [
+  { title: "Subjects", url: "/academics/subjects", icon: BookText },
+  { title: "Exams", url: "/academics/exams", icon: FileText },
+  { title: "Results", url: "/academics/results", icon: Award },
+  { title: "Timetable", url: "/timetable", icon: CalendarDays },
+];
+
+const operationsItems = [
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
+  { title: "Discipline", url: "/discipline", icon: AlertTriangle },
+  { title: "Library", url: "/library", icon: Library },
+  { title: "Boarding", url: "/boarding", icon: Home },
+  { title: "Transport", url: "/transport", icon: Bus },
+  { title: "Clinic", url: "/clinic", icon: Stethoscope },
+];
+
+const financeItems = [
+  { title: "Fee Structures", url: "/finance/fees", icon: Wallet },
+  { title: "Invoices", url: "/finance/invoices", icon: Receipt },
+  { title: "Payments", url: "/finance/payments", icon: Receipt },
 ];
 
 const adminItems = [
@@ -67,6 +92,45 @@ export function AppSidebar() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Academics</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {academicItems.map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Operations</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {operationsItems.map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Finance</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {financeItems.map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
         </SidebarGroup>
 
         {isAdmin && (
