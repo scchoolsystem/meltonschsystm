@@ -14,16 +14,260 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity: string | null
+          entity_id: string | null
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      classes: {
+        Row: {
+          capacity: number
+          class_teacher_id: string | null
+          created_at: string
+          id: string
+          level: string
+          name: string
+          stream: string | null
+          year: number
+        }
+        Insert: {
+          capacity?: number
+          class_teacher_id?: string | null
+          created_at?: string
+          id?: string
+          level: string
+          name: string
+          stream?: string | null
+          year?: number
+        }
+        Update: {
+          capacity?: number
+          class_teacher_id?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          name?: string
+          stream?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      staff: {
+        Row: {
+          created_at: string
+          department: string | null
+          email: string | null
+          employee_no: string
+          first_name: string
+          hire_date: string
+          id: string
+          last_name: string
+          phone: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_no: string
+          first_name: string
+          hire_date?: string
+          id?: string
+          last_name: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employee_no?: string
+          first_name?: string
+          hire_date?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          address: string | null
+          admission_no: string
+          admitted_on: string
+          class_id: string | null
+          created_at: string
+          date_of_birth: string | null
+          first_name: string
+          gender: string | null
+          id: string
+          last_name: string
+          medical_notes: string | null
+          parent_email: string | null
+          parent_name: string | null
+          parent_phone: string | null
+          photo_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          admission_no: string
+          admitted_on?: string
+          class_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name: string
+          gender?: string | null
+          id?: string
+          last_name: string
+          medical_notes?: string | null
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_phone?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          admission_no?: string
+          admitted_on?: string
+          class_id?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          first_name?: string
+          gender?: string | null
+          id?: string
+          last_name?: string
+          medical_notes?: string | null
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_phone?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "super_admin"
+        | "principal"
+        | "deputy_principal"
+        | "class_teacher"
+        | "subject_teacher"
+        | "hod"
+        | "admission_officer"
+        | "bursar"
+        | "librarian"
+        | "sports"
+        | "boarding"
+        | "parent"
+        | "student"
+        | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +394,23 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "super_admin",
+        "principal",
+        "deputy_principal",
+        "class_teacher",
+        "subject_teacher",
+        "hod",
+        "admission_officer",
+        "bursar",
+        "librarian",
+        "sports",
+        "boarding",
+        "parent",
+        "student",
+        "staff",
+      ],
+    },
   },
 } as const
