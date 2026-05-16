@@ -122,11 +122,45 @@ export const admitStudent = createServerFn({ method: "POST" })
       student_id: student.id,
     });
 
+    // Auto-assign class-based fee invoices for the current term
+    if (data.class_id) {
+      try { await supabaseAdmin.rpc("assign_class_fees", { _student: student.id } as any); } catch {}
+    }
+
+    // Auto-link parent by email/phone match (if any existing parent account matches)
+    try {
+      if (data.parent_email || data.parent_phone) {
+        const { data: matches } = await supabaseAdmin.rpc("find_parent_match", {
+          _email: data.parent_email || "", _phone: data.parent_phone || "",
+        });
+        const list = (matches ?? []) as Array<{ student_id: string; method: string }>;
+        // find any parent user already linked to a matching student record (cross-link to this new student)
+        for (const m of list) {
+          const { data: existing } = await supabaseAdmin
+            .from("parent_student_links").select("parent_user_id")
+            .eq("student_id", m.student_id).limit(1).maybeSingle();
+          if (existing?.parent_user_id) {
+            await supabaseAdmin.from("parent_student_links").upsert({
+              parent_user_id: existing.parent_user_id,
+              student_id: student.id, link_method: m.method, verified: true,
+              linked_by: context.userId,
+            } as any, { onConflict: "parent_user_id,student_id" } as any);
+          }
+        }
+      }
+    } catch {}
+
+    // re-fetch to surface the auto-generated parent_auth_code
+    const { data: full } = await supabaseAdmin
+      .from("students").select("id, admission_no, unique_id, first_name, last_name, parent_auth_code")
+      .eq("id", student.id).maybeSingle();
+
     return {
-      student,
+      student: full ?? student,
       uniqueId: acct.uniqueId,
       password: acct.password,
       syntheticEmail: acct.syntheticEmail,
+      parentAuthCode: (full as any)?.parent_auth_code ?? null,
     };
   });
 
