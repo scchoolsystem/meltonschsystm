@@ -29,6 +29,7 @@ interface ClassRow { id: string; name: string }
 interface Student {
   id: string; admission_no: string; first_name: string; last_name: string;
   gender: string | null; class_id: string | null; status: string;
+  lifecycle_status: string; parent_auth_code: string | null;
   parent_phone: string | null;
   classes?: { name: string } | null;
 }
