@@ -39,8 +39,10 @@ const operationsItems = [
   { title: "Discipline", url: "/discipline", icon: AlertTriangle },
   { title: "Library", url: "/library", icon: Library },
   { title: "Boarding", url: "/boarding", icon: Home },
+  { title: "Kitchen", url: "/kitchen", icon: BookOpen },
   { title: "Transport", url: "/transport", icon: Bus },
   { title: "Clinic", url: "/clinic", icon: Stethoscope },
+  { title: "Security", url: "/security", icon: AlertTriangle },
 ];
 
 const financeItems = [
