@@ -52,21 +52,54 @@ function ControlRoom() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
-      email: signupEmail,
-      password: signupPw,
-      options: {
-        data: { full_name: signupName },
-        emailRedirectTo: `${window.location.origin}/sys/control-room`,
-      },
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    // Auto-confirm is enabled — sign in immediately
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: signupEmail, password: signupPw });
-    if (signInErr) return toast.error(signInErr.message);
-    toast.success("Super admin account created. Signed in.");
-    navigate({ to: "/dashboard" });
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: signupEmail,
+        password: signupPw,
+        options: {
+          data: { full_name: signupName },
+          emailRedirectTo: `${window.location.origin}/sys/control-room`,
+        },
+      });
+
+      if (error) {
+        const alreadyExists = /already registered|already exists/i.test(error.message);
+
+        if (!alreadyExists) {
+          toast.error(error.message);
+          return;
+        }
+
+        const { error: existingSignInError } = await supabase.auth.signInWithPassword({
+          email: signupEmail,
+          password: signupPw,
+        });
+
+        if (existingSignInError) {
+          toast.error("Admin account already exists. Use the original password on the Sign in tab.");
+          return;
+        }
+
+        toast.success("Existing admin account detected. Signed in.");
+        navigate({ to: "/dashboard" });
+        return;
+      }
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: signupEmail,
+        password: signupPw,
+      });
+
+      if (signInErr) {
+        toast.error(signInErr.message);
+        return;
+      }
+
+      toast.success("Super admin account created. Signed in.");
+      navigate({ to: "/dashboard" });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -117,7 +150,7 @@ function ControlRoom() {
                 <form onSubmit={handleSignUp} className="space-y-3">
                   <p className="text-[11px] text-zinc-500">
                     Only works once — the very first account becomes super_admin.
-                    Subsequent accounts default to staff.
+                    If the admin already exists, using the same email + password here will sign you in.
                   </p>
                   <div>
                     <Label htmlFor="adm-fn">Full name</Label>
