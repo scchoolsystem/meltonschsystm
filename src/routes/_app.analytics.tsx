@@ -1,0 +1,196 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+  LineChart, Line, PieChart, Pie, Cell, Legend,
+} from "recharts";
+import { TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles } from "lucide-react";
+
+export const Route = createFileRoute("/_app/analytics")({ component: Analytics });
+
+const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
+
+function Analytics() {
+  const { data: kpis } = useQuery({
+    queryKey: ["analytics-kpis"],
+    queryFn: async () => {
+      const [students, staff, invoices, attendance] = await Promise.all([
+        supabase.from("students").select("id,status,gender,class_id", { count: "exact" }),
+        supabase.from("staff").select("id", { count: "exact", head: true }),
+        supabase.from("invoices").select("amount,paid,status"),
+        supabase.from("attendance_records").select("status,date").gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
+      ]);
+      const totalInvoiced = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
+      const totalPaid = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.paid), 0);
+      const defaulters = (invoices.data ?? []).filter((r: any) => r.status !== "paid").length;
+      return {
+        students: students.count ?? 0,
+        staff: staff.count ?? 0,
+        totalInvoiced, totalPaid, collection: totalInvoiced ? (totalPaid / totalInvoiced) * 100 : 0,
+        defaulters,
+        attendance: attendance.data ?? [],
+        genders: students.data ?? [],
+      };
+    },
+  });
+
+  const { data: results = [] } = useQuery({
+    queryKey: ["analytics-results"],
+    queryFn: async () => (await supabase.from("exam_results")
+      .select("score,subject_id,subjects(code)").limit(2000)).data ?? [],
+  });
+
+  const { data: weakStudents = [] } = useQuery({
+    queryKey: ["analytics-weak"],
+    queryFn: async () => {
+      const { data } = await supabase.from("exam_results")
+        .select("student_id,score,students(first_name,last_name,admission_no)").limit(2000);
+      const agg = new Map<string, { name: string; admno: string; total: number; n: number }>();
+      (data ?? []).forEach((r: any) => {
+        const k = r.student_id; const cur = agg.get(k) ?? { name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`, admno: r.students?.admission_no ?? "", total: 0, n: 0 };
+        cur.total += Number(r.score); cur.n += 1; agg.set(k, cur);
+      });
+      return [...agg.entries()].map(([id, v]) => ({ id, ...v, mean: v.total / v.n }))
+        .filter(s => s.mean < 50).sort((a, b) => a.mean - b.mean).slice(0, 10);
+    },
+  });
+
+  // Subject performance
+  const subjectAvg = (() => {
+    const m = new Map<string, { code: string; total: number; n: number }>();
+    (results as any[]).forEach((r) => {
+      const code = r.subjects?.code ?? "—";
+      const cur = m.get(code) ?? { code, total: 0, n: 0 };
+      cur.total += Number(r.score); cur.n += 1; m.set(code, cur);
+    });
+    return [...m.values()].map(v => ({ code: v.code, mean: +(v.total / v.n).toFixed(1) })).sort((a, b) => b.mean - a.mean);
+  })();
+
+  // Attendance trend (last 30 days)
+  const attTrend = (() => {
+    const m = new Map<string, { date: string; present: number; absent: number }>();
+    (kpis?.attendance ?? []).forEach((r: any) => {
+      const cur = m.get(r.date) ?? { date: r.date, present: 0, absent: 0 };
+      if (r.status === "present") cur.present++; else cur.absent++;
+      m.set(r.date, cur);
+    });
+    return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
+  })();
+
+  const genderMix = (() => {
+    const m = new Map<string, number>();
+    (kpis?.genders ?? []).forEach((s: any) => { const g = s.gender || "Unknown"; m.set(g, (m.get(g) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Analytics & Intelligence</h1>
+          <p className="text-sm text-muted-foreground">Real-time insights across the school</p>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<GraduationCap className="w-4 h-4" />} label="Students" value={kpis?.students ?? 0} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Staff" value={kpis?.staff ?? 0} />
+        <Kpi icon={<Wallet className="w-4 h-4" />} label="Fee Collection"
+          value={`${(kpis?.collection ?? 0).toFixed(0)}%`}
+          sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Defaulters" value={kpis?.defaulters ?? 0} />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Subject performance (avg score)</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer>
+              <BarChart data={subjectAvg.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="code" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Bar dataKey="mean" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Attendance trend (30 days)</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer>
+              <LineChart data={attTrend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} />
+                <Line type="monotone" dataKey="absent" stroke="#ef4444" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Student gender mix</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={genderMix} dataKey="value" nameKey="name" outerRadius={90} label>
+                  {genderMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" /> AI insights — students at risk
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {weakStudents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No struggling students detected — great work!</p>
+            ) : (
+              <ul className="text-sm space-y-1.5">
+                {weakStudents.map((s: any) => (
+                  <li key={s.id} className="flex items-center justify-between border-b pb-1.5">
+                    <div>
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-xs text-muted-foreground">{s.admno}</div>
+                    </div>
+                    <Badge variant="destructive">{s.mean.toFixed(1)} avg</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: any; sub?: string }) {
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
+        <div className="text-2xl font-bold mt-1">{value}</div>
+        {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+}
