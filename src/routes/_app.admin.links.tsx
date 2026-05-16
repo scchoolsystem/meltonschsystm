@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { resolvePendingLink } from "@/lib/parent-link.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Check, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/admin/links")({
@@ -17,9 +19,12 @@ export const Route = createFileRoute("/_app/admin/links")({
 
 function LinksPage() {
   const { isAdmin } = useAuth();
+  const resolveFn = useServerFn(resolvePendingLink);
   const [parentLinks, setParentLinks] = useState<any[]>([]);
   const [studentLinks, setStudentLinks] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [pending, setPending] = useState<any[]>([]);
+  const [pendingChoice, setPendingChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   // forms
@@ -30,16 +35,28 @@ function LinksPage() {
   const [sStu, setSStu] = useState("");
 
   async function load() {
-    const [pl, sl, st] = await Promise.all([
+    const [pl, sl, st, pq] = await Promise.all([
       supabase.from("parent_student_links").select("*, students(first_name,last_name,admission_no)").order("created_at", { ascending: false }),
       supabase.from("student_user_links").select("*, students(first_name,last_name,admission_no)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, first_name, last_name, admission_no").order("admission_no").limit(500),
+      supabase.from("pending_parent_links").select("*").eq("status", "pending").order("created_at", { ascending: false }),
     ]);
     setParentLinks(pl.data ?? []);
     setStudentLinks(sl.data ?? []);
     setStudents(st.data ?? []);
+    setPending(pq.data ?? []);
   }
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+
+  async function resolve(pending_id: string, decision: "approve" | "reject") {
+    try {
+      const student_id = decision === "approve" ? pendingChoice[pending_id] : undefined;
+      if (decision === "approve" && !student_id) return toast.error("Pick a student to approve");
+      await resolveFn({ data: { pending_id, decision, student_id } });
+      toast.success(decision === "approve" ? "Approved & linked" : "Rejected");
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  }
 
   async function linkParent() {
     if (!pUid || !pStu) return toast.error("Enter both fields");
@@ -86,11 +103,55 @@ function LinksPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="parents">
+      <Tabs defaultValue="pending">
         <TabsList>
+          <TabsTrigger value="pending">
+            Pending requests {pending.length > 0 && <Badge variant="secondary" className="ml-2">{pending.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="parents">Parent ↔ Student</TabsTrigger>
           <TabsTrigger value="students">Student account ↔ Student record</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Parent link requests</CardTitle>
+              <CardDescription>
+                Parents whose email/phone didn't match any student record on signup. Approve by selecting the correct child.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pending.length === 0 && <p className="text-sm text-muted-foreground">No pending requests.</p>}
+              {pending.map((p) => (
+                <div key={p.id} className="rounded-md border p-3 space-y-2">
+                  <div className="text-sm">
+                    <div className="font-medium">Parent UID: <span className="font-mono text-xs">{p.parent_user_id}</span></div>
+                    <div className="text-xs text-muted-foreground">
+                      Email: {p.parent_email ?? "—"} · Phone: {p.parent_phone ?? "—"}
+                      {p.attempted_code && <> · Tried code: <span className="font-mono">{p.attempted_code}</span></>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <select
+                      value={pendingChoice[p.id] ?? ""}
+                      onChange={(e) => setPendingChoice({ ...pendingChoice, [p.id]: e.target.value })}
+                      className="flex-1 min-w-[200px] h-9 rounded-md border bg-transparent px-3 text-sm"
+                    >
+                      <option value="">Match to student…</option>
+                      {students.map((s) => <option key={s.id} value={s.id}>{s.admission_no} — {s.first_name} {s.last_name}</option>)}
+                    </select>
+                    <Button size="sm" onClick={() => resolve(p.id, "approve")}>
+                      <Check className="w-3.5 h-3.5 mr-1" />Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => resolve(p.id, "reject")}>
+                      <X className="w-3.5 h-3.5 mr-1" />Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="parents" className="space-y-4">
           <Card>
