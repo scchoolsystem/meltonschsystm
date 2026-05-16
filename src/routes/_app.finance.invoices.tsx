@@ -104,6 +104,31 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
+function StkButton({ invoiceId, balance }: { invoiceId: string; balance: number }) {
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState(balance);
+  const stk = useServerFn(mpesaStkPush);
+  const m = useMutation({
+    mutationFn: async () => stk({ data: { invoice_id: invoiceId, phone, amount: Math.round(amount) } }),
+    onSuccess: () => { toast.success("STK push sent. Ask payer to enter M-Pesa PIN."); setOpen(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" variant="ghost"><Smartphone className="w-3 h-3 mr-1" />M-Pesa</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>M-Pesa STK Push</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div><Label>Phone (07.. or 2547..)</Label><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0712345678" /></div>
+          <div><Label>Amount (KES)</Label><Input type="number" min={1} max={balance} value={amount} onChange={e => setAmount(+e.target.value)} /></div>
+          <DialogFooter><Button onClick={() => m.mutate()} disabled={!phone || m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Send STK</Button></DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PayDialog({ invoiceId, balance, onDone }: { invoiceId: string; balance: number; onDone: () => void }) {
   const [f, setF] = useState({ amount: balance, method: "cash", reference: "" });
   const m = useMutation({
