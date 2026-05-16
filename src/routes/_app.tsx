@@ -31,7 +31,10 @@ function AppLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 border-b flex items-center px-4 gap-3 bg-card/60 backdrop-blur sticky top-0 z-10">
             <SidebarTrigger />
-            <div className="text-sm text-muted-foreground">School Management</div>
+            <div className="hidden md:block"><GlobalSearch /></div>
+            <div className="ml-auto flex items-center gap-1">
+              <NotificationsBell />
+            </div>
           </header>
           <main className="flex-1 overflow-auto">
             <Outlet />
