@@ -58,6 +58,27 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     };
     const schoolHealth = Math.round((indices.academicHealth + indices.financeStability + indices.attendanceStability + indices.disciplineRisk) / 4);
 
+    // Governance metrics
+    const polRows = policies.data ?? [];
+    const governance = {
+      totalPolicies: polRows.length,
+      locked: polRows.filter((p) => p.classification === "locked").length,
+      restricted: polRows.filter((p) => p.classification === "restricted").length,
+      editable: polRows.filter((p) => p.classification === "editable").length,
+      overrides7d: (overrides.data ?? []).length,
+      edits30d: (edits.data ?? []).length,
+      pendingParentLinks: (pendingLinks.data ?? []).length,
+      lifecycleChanges30d: (lifecycle.data ?? []).length,
+    };
+    const recentOverrides = (overrides.data ?? []).slice(0, 8).map((o) => ({
+      actor: String(o.actor_id ?? "").slice(0, 8),
+      resource: o.resource, field: o.field, reason: o.reason,
+      at: o.created_at,
+    }));
+    const topOverrideActors = Array.from(ovMap.entries())
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([id, n]) => ({ actor: id.slice(0, 8), count: n }));
+
     return {
       counts: {
         activeStudents: activeStudents.length,
@@ -67,6 +88,10 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
         overrideAlerts: overrideAbuse.length,
       },
       indices: { ...indices, schoolHealth },
+      governance,
+      recentOverrides,
+      topOverrideActors,
+      persistedAlerts: alertsRow.data ?? [],
       alerts: [
         ...absentees.slice(0, 10).map(([id, v]) => ({
           category: "attendance", severity: "warn",
@@ -83,6 +108,10 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
         ...(overdue.length > 0 ? [{
           category: "finance", severity: "warn",
           title: `${overdue.length} overdue invoices`, body: "Send reminders or escalate to bursar",
+        }] : []),
+        ...(governance.pendingParentLinks > 0 ? [{
+          category: "governance", severity: "info",
+          title: `${governance.pendingParentLinks} pending parent links`, body: "Resolve in Admin → Parent Links",
         }] : []),
       ],
     };
