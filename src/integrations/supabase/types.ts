@@ -349,6 +349,9 @@ export type Database = {
           score: number
           student_id: string
           subject_id: string
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           created_at?: string
@@ -360,6 +363,9 @@ export type Database = {
           score: number
           student_id: string
           subject_id: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           created_at?: string
@@ -371,6 +377,9 @@ export type Database = {
           score?: number
           student_id?: string
           subject_id?: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: []
       }
