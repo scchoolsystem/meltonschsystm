@@ -65,11 +65,8 @@ export function LifecycleActions({
           <Button size="icon" variant="ghost"><MoreHorizontal className="w-4 h-4" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {STATES[kind].filter(s => s.value !== currentStatus).map((s, i) => (
-            <>
-              {i > 0 && s.value === "archived" && <DropdownMenuSeparator />}
-              <DropdownMenuItem key={s.value} onSelect={() => setOpen(s.value)}>{s.label}</DropdownMenuItem>
-            </>
+          {STATES[kind].filter(s => s.value !== currentStatus).map((s) => (
+            <DropdownMenuItem key={s.value} onSelect={() => setOpen(s.value)}>{s.label}</DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
