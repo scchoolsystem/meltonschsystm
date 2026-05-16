@@ -1,13 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Safaricom Daraja STK callback. No signature is provided by Safaricom; we accept
-// only well-formed callbacks and rely on the AccountReference matching an existing
-// invoice. Failed/cancelled transactions are logged but not inserted as payments.
+// Safaricom Daraja STK callback. Requires a shared-secret token in the URL
+// (configured when registering the callback URL with Safaricom) to prevent
+// unauthenticated payment injection.
 export const Route = createFileRoute("/api/public/mpesa-callback")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const expected = process.env.MPESA_CALLBACK_TOKEN;
+        if (!expected) {
+          return new Response("Callback not configured", { status: 503 });
+        }
+        const url = new URL(request.url);
+        const provided =
+          url.searchParams.get("token") ||
+          request.headers.get("x-callback-token") ||
+          "";
+        if (provided !== expected) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
         let payload: any;
         try {
           payload = await request.json();
