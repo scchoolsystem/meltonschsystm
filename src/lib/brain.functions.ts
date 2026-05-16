@@ -8,12 +8,19 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     const { data: ok } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
     if (!ok) throw new Error("Admin only");
 
-    const [students, invoices, attend, disc, overrides] = await Promise.all([
+    const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
+    const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
+    const [students, invoices, attend, disc, overrides, policies, edits, alertsRow, pendingLinks, lifecycle] = await Promise.all([
       supabaseAdmin.from("students").select("id, lifecycle_status, class_id"),
       supabaseAdmin.from("invoices").select("id, student_id, amount, paid, status, due_date"),
       supabaseAdmin.from("attendance_records").select("student_id, status, date").gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
       supabaseAdmin.from("discipline_records").select("student_id, severity, incident_date").gte("incident_date", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)),
-      supabaseAdmin.from("override_log").select("actor_id, created_at").gte("created_at", new Date(Date.now() - 7 * 864e5).toISOString()),
+      supabaseAdmin.from("override_log").select("actor_id, resource, field, reason, created_at").gte("created_at", since7).order("created_at", { ascending: false }),
+      supabaseAdmin.from("field_policies").select("resource, field, classification, required_level"),
+      supabaseAdmin.from("field_edit_audit").select("actor_id, resource, field, override_used, created_at").gte("created_at", since30),
+      supabaseAdmin.from("smart_alerts").select("id, category, severity, title, body, resolved, created_at").eq("resolved", false).order("created_at", { ascending: false }).limit(20),
+      supabaseAdmin.from("pending_parent_links").select("id, status").eq("status", "pending"),
+      supabaseAdmin.from("lifecycle_events").select("target_type, to_status, created_at").gte("created_at", since30),
     ]);
 
     const activeStudents = (students.data ?? []).filter((s) => s.lifecycle_status === "active");
