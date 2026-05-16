@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { mpesaStkPush } from "@/lib/finance.functions";
 import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -50,12 +52,15 @@ function Page() {
                   <TableCell className="text-right font-mono">KES {Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono">KES {Number(r.paid).toLocaleString()}</TableCell>
                   <TableCell><Badge variant="outline" className={r.status === 'paid' ? 'bg-success/15 text-success border-success/30' : r.status === 'partial' ? 'bg-warning/15' : ''}>{r.status}</Badge></TableCell>
-                  <TableCell>
+                  <TableCell className="space-x-2">
                     {can && r.status !== 'paid' && (
-                      <Dialog open={openPay === r.id} onOpenChange={v => setOpenPay(v ? r.id : null)}>
-                        <DialogTrigger asChild><Button size="sm" variant="outline">Pay</Button></DialogTrigger>
-                        <PayDialog invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} onDone={() => { setOpenPay(null); qc.invalidateQueries({ queryKey: ["invoices"] }); }} />
-                      </Dialog>
+                      <>
+                        <Dialog open={openPay === r.id} onOpenChange={v => setOpenPay(v ? r.id : null)}>
+                          <DialogTrigger asChild><Button size="sm" variant="outline">Pay</Button></DialogTrigger>
+                          <PayDialog invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} onDone={() => { setOpenPay(null); qc.invalidateQueries({ queryKey: ["invoices"] }); }} />
+                        </Dialog>
+                        <StkButton invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} />
+                      </>
                     )}
                   </TableCell>
                 </TableRow>
@@ -96,6 +101,31 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
         <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue</Button></DialogFooter>
       </form>
     </DialogContent>
+  );
+}
+
+function StkButton({ invoiceId, balance }: { invoiceId: string; balance: number }) {
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState(balance);
+  const stk = useServerFn(mpesaStkPush);
+  const m = useMutation({
+    mutationFn: async () => stk({ data: { invoice_id: invoiceId, phone, amount: Math.round(amount) } }),
+    onSuccess: () => { toast.success("STK push sent. Ask payer to enter M-Pesa PIN."); setOpen(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" variant="ghost"><Smartphone className="w-3 h-3 mr-1" />M-Pesa</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>M-Pesa STK Push</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div><Label>Phone (07.. or 2547..)</Label><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="0712345678" /></div>
+          <div><Label>Amount (KES)</Label><Input type="number" min={1} max={balance} value={amount} onChange={e => setAmount(+e.target.value)} /></div>
+          <DialogFooter><Button onClick={() => m.mutate()} disabled={!phone || m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Send STK</Button></DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

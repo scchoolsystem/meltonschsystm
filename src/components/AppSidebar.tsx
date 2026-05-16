@@ -43,6 +43,7 @@ const operationsItems = [
 const financeItems = [
   { title: "Fee Structures", url: "/finance/fees", icon: Wallet },
   { title: "Invoices", url: "/finance/invoices", icon: Receipt },
+  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt },
   { title: "Payments", url: "/finance/payments", icon: Receipt },
 ];
 
