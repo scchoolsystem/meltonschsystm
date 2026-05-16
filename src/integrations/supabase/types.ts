@@ -446,6 +446,72 @@ export type Database = {
         }
         Relationships: []
       }
+      gate_passes: {
+        Row: {
+          actual_return: string | null
+          authorized_by: string | null
+          created_at: string
+          exit_time: string
+          expected_return: string | null
+          id: string
+          reason: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          actual_return?: string | null
+          authorized_by?: string | null
+          created_at?: string
+          exit_time?: string
+          expected_return?: string | null
+          id?: string
+          reason: string
+          status?: string
+          student_id: string
+        }
+        Update: {
+          actual_return?: string | null
+          authorized_by?: string | null
+          created_at?: string
+          exit_time?: string
+          expected_return?: string | null
+          id?: string
+          reason?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
+      incident_reports: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          incident_date: string
+          location: string
+          reported_by: string | null
+          severity: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          incident_date?: string
+          location: string
+          reported_by?: string | null
+          severity?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          incident_date?: string
+          location?: string
+          reported_by?: string | null
+          severity?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
@@ -479,6 +545,66 @@ export type Database = {
           paid?: number
           status?: string
           student_id?: string
+        }
+        Relationships: []
+      }
+      kitchen_stock: {
+        Row: {
+          created_at: string
+          id: string
+          item: string
+          low_threshold: number
+          quantity: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item: string
+          low_threshold?: number
+          quantity?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item?: string
+          low_threshold?: number
+          quantity?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      meal_plans: {
+        Row: {
+          created_at: string
+          id: string
+          meal: string
+          meal_date: string
+          menu: string
+          posted_by: string | null
+          served_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meal: string
+          meal_date?: string
+          menu: string
+          posted_by?: string | null
+          served_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meal?: string
+          meal_date?: string
+          menu?: string
+          posted_by?: string | null
+          served_count?: number
         }
         Relationships: []
       }
