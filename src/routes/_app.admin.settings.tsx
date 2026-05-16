@@ -44,6 +44,7 @@ function SettingsPage() {
   });
 
   const [form, setForm] = useState<Partial<SchoolSettings>>({});
+  const [uploading, setUploading] = useState(false);
   useEffect(() => { if (data) setForm(data); }, [data]);
 
   const save = useMutation({
@@ -96,7 +97,46 @@ function SettingsPage() {
           <div><Label>Email</Label><Input type="email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} /></div>
           <div><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} /></div>
           <div className="md:col-span-2"><Label>Address</Label><Input value={form.address ?? ""} onChange={(e) => set("address", e.target.value)} /></div>
-          <div><Label>Logo URL</Label><Input value={form.logo_url ?? ""} onChange={(e) => set("logo_url", e.target.value)} placeholder="https://…" /></div>
+          <div className="md:col-span-2">
+            <Label>School Logo</Label>
+            <div className="flex items-center gap-4 mt-1">
+              {form.logo_url ? (
+                <img src={form.logo_url} alt="Logo preview" className="w-16 h-16 rounded-lg object-cover border" />
+              ) : (
+                <div className="w-16 h-16 rounded-lg border border-dashed grid place-items-center text-xs text-muted-foreground">No logo</div>
+              )}
+              <div className="flex-1 space-y-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploading(true);
+                    try {
+                      const ext = file.name.split(".").pop() ?? "png";
+                      const path = `school-logo/${Date.now()}.${ext}`;
+                      const { error: upErr } = await supabase.storage.from("profile-photos").upload(path, file, { upsert: true, contentType: file.type });
+                      if (upErr) throw upErr;
+                      const { data: pub } = supabase.storage.from("profile-photos").getPublicUrl(path);
+                      set("logo_url", pub.publicUrl);
+                      toast.success("Logo uploaded — click Save changes");
+                    } catch (err: any) {
+                      toast.error(err.message ?? "Upload failed");
+                    } finally {
+                      setUploading(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                {uploading && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</p>}
+                {form.logo_url && !uploading && (
+                  <button type="button" onClick={() => set("logo_url", null)} className="text-xs text-destructive hover:underline">Remove logo</button>
+                )}
+              </div>
+            </div>
+          </div>
           <div>
             <Label>Primary Color</Label>
             <div className="flex gap-2 items-center">
