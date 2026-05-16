@@ -137,6 +137,28 @@ export function AppSidebar() {
           </SidebarMenu></SidebarGroupContent>
         </SidebarGroup>
 
+        {(isStudent || isParent) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>My Portal</SidebarGroupLabel>
+            <SidebarGroupContent><SidebarMenu>
+              {isStudent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/student"}>
+                    <Link to="/portal/student"><User className="w-4 h-4" /><span>Student Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {isParent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/parent"}>
+                    <Link to="/portal/parent"><Users2 className="w-4 h-4" /><span>Parent Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu></SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {isAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
