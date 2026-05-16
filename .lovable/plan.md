@@ -1,377 +1,98 @@
-&nbsp;
+# Multi-Tenant ERP — erp.smartdev.co.ke
 
-SYSTEM STATUS:
+Convert the current single-tenant ERP into a multi-tenant SaaS where each of your 20 schools lives at its own subdomain (e.g. `greenfield.erp.smartdev.co.ke`), shares the same codebase, but has fully isolated data.
 
-This is a FULL ENTERPRISE SCHOOL ERP (Phases 1–6 core + Phase 7 governance + Intelligence Layer upgrade)
-
-DO NOT RESET OR REBUILD EXISTING SYSTEM
-
-ONLY EXTEND AND UPGRADE
-
-========================================================
-
-PART 1 — CORE ERP (PHASES 1–6 CONFIRMED)
-
-========================================================
-
-Includes fully working modules:
-
-- Authentication (Unique ID + Email login + Setup admin)
-
-- User management (students, staff, parents, roles)
-
-- Academics (classes, subjects, exams, results, report cards)
-
-- Timetable system (clash-free scheduling engine)
-
-- Finance system (fees, invoices, payments, receipts, MPESA hooks)
-
-- Attendance + discipline tracking
-
-- Library system
-
-- Boarding system
-
-- Kitchen system
-
-- Clinic system
-
-- Security system
-
-- Transport system
-
-- Digital ID system (QR + printable cards)
-
-- Parent + Student portals
-
-========================================================
-
-PART 2 — UNIVERSAL GOVERNANCE ENGINE (PHASE 7)
-
-========================================================
-
-A. USER LIFECYCLE SYSTEM
-
-Statuses:
-
-- active
-
-- suspended
-
-- expelled
-
-- transferred
-
-- archived (soft delete only)
-
-Rules:
-
-- NO hard deletes anywhere
-
-- All changes logged in lifecycle_events
-
-- Suspended users cannot log in
-
-- Expelled users are read-only (admin/principal only)
+Existing data is **never wiped** — it is migrated into a default "School 1" derived from current `school_settings`.
 
 ---
 
-B. UNIVERSAL PERMISSION ENGINE
+## Phase 1 — Tenancy foundation (this batch)
 
-Replace ALL edit logic with:
+### 1.1 Schema
+- New `schools` table: `id, slug (unique), name, motto, primary_color, logo_url, email, phone, address, academic_year, current_term, status (active/suspended), created_at`.
+- New `school_members` table: `(user_id, school_id, default)` — lets one super-admin belong to many schools; everyone else belongs to one.
+- Add nullable `school_id uuid` to every tenant table (~30): `students, staff, classes, subjects, exams, exam_results, attendance_records, invoices, payments, fee_structures, class_fee_components, announcements, books, book_loans, dormitories, dorm_assignments, clinic_visits, discipline_records, gate_passes, incident_reports, kitchen_stock, meal_plans, transport_routes, transport_assignments, timetable_slots, smart_alerts, lifecycle_events, field_edit_audit, override_log, activity_logs, user_credentials, parent_student_links, student_user_links, pending_parent_links, profiles, user_roles, unique_id_counters`.
+- Backfill: create one row in `schools` from current `school_settings` (slug = `school-1`); set every existing row's `school_id` to that id.
+- Make `school_id` `NOT NULL` after backfill. Add indexes `(school_id)` and composite `(school_id, ...)` where useful.
+- `unique_id_counters` keyed by `(school_id, category, year)` so STU/STF codes restart per school.
 
-can_edit(user, resource, field, record)
+### 1.2 Helpers (SECURITY DEFINER)
+- `current_user_school()` → uuid of the user's active school (from `school_members` + subdomain claim in JWT).
+- `belongs_to_school(_school uuid)` → boolean.
+- Super-admin keeps cross-school access.
 
-Role hierarchy:
+### 1.3 RLS rewrite
+Every existing policy gets an additional `AND school_id = current_user_school()` clause. Super-admin bypass preserved. No table loses RLS.
 
-- super_admin (100)
-
-- principal (90)
-
-- deputy_principal (80)
-
-- academic_master (75)
-
-- exams_admin / bursar (70)
-
-- hod (60)
-
-- senior_teacher (55)
-
-- class_teacher (50)
-
-- subject_teacher (40)
-
-- staff (30)
-
-- student (10)
-
-- parent (5)
-
-Field types:
-
-- editable
-
-- restricted
-
-- locked
-
-Rules:
-
-- locked fields require override ONLY
-
-- no direct bypass anywhere
+### 1.4 Triggers
+- `BEFORE INSERT` stamp trigger on every tenant table sets `school_id = current_user_school()` if null.
+- `BEFORE UPDATE` guard prevents changing `school_id` (anti-tenant-jumping).
 
 ---
 
-C. OVERRIDE SYSTEM
+## Phase 2 — App wiring
 
-- Super admin: full override
+### 2.1 Tenant resolver
+- New `src/lib/tenant.ts`: parses `window.location.hostname`, extracts subdomain, resolves to a `schools` row (cached in React Query).
+- New `TenantProvider` in `__root.tsx` wraps the app; exposes `useSchool()`.
+- Login flow: after sign-in, verify the user has a `school_members` row matching the current subdomain — else sign out and show "Wrong school portal" page.
+- Apply the school's branding (`primary_color`, `logo_url`, name) at the layout level.
 
-- Principal: academic + discipline + general override
+### 2.2 Server functions
+- Audit every `createServerFn` that touches tenant data; insert/update calls rely on the BEFORE-INSERT trigger, but explicit `.eq('school_id', school.id)` is added to admin queries for clarity.
+- `lookup_login_email` becomes school-scoped (unique-ID + subdomain → synthetic_email).
+- `assign_class_fees`, `next_unique_id`, `find_parent_match` updated for tenancy.
 
-- Department heads: module-scoped override only
-
-All overrides require:
-
-- reason
-
-- audit log entry (override_log + field_edit_audit)
-
----
-
-D. AUTO USER CREATION ENGINE
-
-On ANY user creation:
-
-Automatically:
-
-- Generate Unique ID (STU/STF/PAR/ADM/etc.)
-
-- Generate strong password
-
-- Assign role + department/class
-
-- Auto-link parent ↔ student via email/phone match
-
-- If no match → generate Parent Auth Code (PRN-YYYY-XXXXX)
+### 2.3 Super-admin console
+- New `/admin/schools` route (super-admin only): list schools, create new school (slug + name), suspend, switch active school.
 
 ---
 
-E. EMAIL AUTOMATION (FALLBACK SAFE)
+## Phase 3 — Governance reinforcement (3-tier edits)
 
-- If email system enabled + domain configured:
+The infrastructure already exists (`field_policies`, `field_edit_audit`, `override_log`, `role_level()`, `can_edit()`, `LockedFieldGate`). Phase 3 ensures it is applied consistently:
 
-  send credentials, invoices, receipts automatically
-
-- Else:
-
-  show secure admin popup (fallback mode)
-
-System must NOT depend on email being active.
-
----
-
-F. PARENT LINKING SYSTEM
-
-Priority:
-
-1. email match
-
-2. phone match
-
-3. parent auth code
-
-4. admin override
+- Default policies seeded per school for sensitive fields (grades, fees, lifecycle, identity).
+- Tier mapping:
+  - **Normal users** (teacher/staff, level < 50): read + own-scope edits only.
+  - **HOD/Admin** (level 50–80): department-scoped edits, restricted fields require justification.
+  - **Super Admin** (level ≥ 90): full override with mandatory reason → `override_log`.
+- All edits flow through `field_edit_audit` (already wired); add missing trigger wrappers on `students`, `staff`, `invoices`, `exam_results`.
 
 ---
 
-G. FEES SYSTEM (CLASS-BASED)
+## Phase 4 — DNS & domain
 
-- Fees assigned per CLASS, not per student
+You handle DNS at your registrar:
+- Wildcard A record: `*.erp.smartdev.co.ke` → `185.158.133.1`
+- Root A record: `erp.smartdev.co.ke` → `185.158.133.1`
 
-- Auto-generate invoices on:
-
-  - admission
-
-  - term start
-
-Components:
-
-- tuition
-
-- boarding
-
-- transport
-
-- meals
+Then in Lovable → Project Settings → Domains, add each subdomain you want to activate (`greenfield.erp.smartdev.co.ke`, `school2.erp.smartdev.co.ke`, …). Lovable issues a separate cert per subdomain — wildcard SSL is not auto-provisioned, so each school must be added individually (one-time, ~1 min each).
 
 ---
 
-H. PAYMENT AUTOMATION
+## Technical notes
 
-On payment:
+- **Migration order matters**: add nullable column → backfill → set NOT NULL → enable trigger → rewrite RLS. Done in one transaction per table group to avoid downtime.
+- **No data loss**: all current rows go to `school-1`; you (current super_admin) become `school_members` for school-1 plus a global super-admin row.
+- **Tenant isolation is enforced at the DB layer (RLS)** — even a bug in the frontend cannot leak School A data to School B.
+- **Performance**: indexes on `school_id` keep queries fast; existing FK-less design stays.
+- **Rollback**: each phase is reversible until Phase 1.4 triggers go live.
 
-- update invoice status
+## What this plan does NOT include
 
-- generate receipt
-
-- update finance dashboard
-
-- send receipt (if email enabled)
-
----
-
-I. AUDIT SYSTEM (GLOBAL)
-
-Log ALL:
-
-- edits
-
-- overrides
-
-- payments
-
-- transfers
-
-- suspensions
-
-- role changes
-
-Fields:
-
-user_id, role, action, before, after, timestamp, reason
+- Per-school billing/subscription (can add later).
+- Cross-school reporting dashboard for you as SaaS owner (can add later).
+- Per-school email sender domains.
+- Auto-onboarding wizard for new schools (after Phase 1, you create schools via SQL or the super-admin console in Phase 2).
 
 ---
 
-J. SUPER ADMIN RULE
+## Order of execution
 
-Super admin can:
+1. **Phase 1** migration (single supabase--migration call, large) → I'll ask you to approve it.
+2. **Phase 2** code wiring (TenantProvider, server-fn updates, super-admin console).
+3. **Phase 3** governance polish.
+4. **Phase 4** you add the DNS records and subdomains.
 
-- see ALL data
-
-- override EVERYTHING
-
-- access ALL logs
-
-- bypass restrictions
-
-========================================================
-
-PART 3 — NEXT BRAIN LAYER (INTELLIGENCE ENGINE)
-
-========================================================
-
-THIS IS THE NEW UPGRADE LAYER ON TOP OF ERP
-
----
-
-A. SCHOOL INTELLIGENCE CORE
-
-System becomes predictive, not just record-based:
-
-- predicts student performance trends
-
-- detects failing students early
-
-- flags attendance risks
-
-- predicts fee default risk
-
-- detects discipline escalation patterns
-
----
-
-B. SMART ALERT ENGINE
-
-Auto-generate alerts for:
-
-- declining grades
-
-- unpaid fees risk
-
-- absenteeism spikes
-
-- teacher workload imbalance
-
-- timetable overload conflicts
-
-Alerts go to:
-
-- class teacher
-
-- HOD
-
-- principal
-
-- super admin
-
----
-
-C. AUTO-DECISION SUPPORT SYSTEM
-
-System suggests:
-
-- class reshuffling for balance
-
-- exam intervention groups
-
-- fee reminder timing optimization
-
-- teacher workload redistribution
-
-Human approves, system suggests.
-
----
-
-D. ANALYTICS BRAIN DASHBOARD
-
-New super dashboard:
-
-Shows:
-
-- school health score
-
-- academic performance index
-
-- financial stability index
-
-- attendance stability index
-
-- discipline risk index
-
----
-
-E. ANOMALY DETECTION ENGINE
-
-Flags:
-
-- fake attendance patterns
-
-- suspicious fee edits
-
-- abnormal grade changes
-
-- repeated overrides by same user
-
-- irregular timetable usage
-
----
-
-F. SMART AUTOMATION TRIGGERS
-
-System auto-runs:
-
-- fee reminders
-
-- report card generation alerts
-
-- performance summaries
-
-- parent notifications
-
-- weekly school report to principal
-
----
-
-END OF SYSTEM
+Approve this plan and I'll begin with the Phase 1 migration.
