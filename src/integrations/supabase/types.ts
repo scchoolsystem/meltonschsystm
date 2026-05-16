@@ -473,6 +473,30 @@ export type Database = {
         }
         Relationships: []
       }
+      parent_student_links: {
+        Row: {
+          created_at: string
+          id: string
+          parent_user_id: string
+          relationship: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parent_user_id: string
+          relationship?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parent_user_id?: string
+          relationship?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -611,6 +635,27 @@ export type Database = {
           status?: string
           unique_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      student_user_links: {
+        Row: {
+          created_at: string
+          id: string
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          student_id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -882,6 +927,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_student_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -890,7 +936,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_parent_of: { Args: { _student_id: string }; Returns: boolean }
+      is_student: { Args: { _student_id: string }; Returns: boolean }
       lookup_login_email: { Args: { _unique_id: string }; Returns: string }
+      my_children_ids: { Args: never; Returns: string[] }
       next_unique_id: { Args: { _category: string }; Returns: string }
     }
     Enums: {
