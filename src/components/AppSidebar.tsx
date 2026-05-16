@@ -90,8 +90,12 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shrink-0">
-            <GraduationCap className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shrink-0 overflow-hidden">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <GraduationCap className="w-4 h-4" />
+            )}
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
