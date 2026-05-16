@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", url: "/analytics", icon: Activity },
   { title: "Students", url: "/students", icon: GraduationCap },
   { title: "Staff", url: "/staff", icon: UserCog },
   { title: "Classes", url: "/classes", icon: BookOpen },
@@ -32,6 +33,7 @@ const academicItems = [
   { title: "Results", url: "/academics/results", icon: Award },
   { title: "Report Cards", url: "/academics/report-cards", icon: FileText },
   { title: "Timetable", url: "/timetable", icon: CalendarDays },
+  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays },
 ];
 
 const operationsItems = [
