@@ -132,12 +132,14 @@ function StudentsPage() {
                     <TableHead>Class</TableHead>
                     <TableHead>Gender</TableHead>
                     <TableHead>Parent Phone</TableHead>
+                    {canEdit && <TableHead>Parent Code</TableHead>}
                     <TableHead>Status</TableHead>
+                    {canEdit && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canEdit ? 8 : 6} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
                   )}
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
@@ -146,7 +148,13 @@ function StudentsPage() {
                       <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="capitalize">{s.gender ?? "—"}</TableCell>
                       <TableCell>{s.parent_phone ?? "—"}</TableCell>
-                      <TableCell><StatusBadge status={s.status} /></TableCell>
+                      {canEdit && <TableCell className="font-mono text-xs">{s.parent_auth_code ?? "—"}</TableCell>}
+                      <TableCell><StatusBadge status={s.lifecycle_status ?? s.status} /></TableCell>
+                      {canEdit && (
+                        <TableCell className="text-right">
+                          <LifecycleActions kind="student" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="students" />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
