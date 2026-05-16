@@ -81,7 +81,7 @@ export function AppSidebar() {
   const { data: settings } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
-      const { data } = await supabase.from("school_settings").select("school_name, motto").limit(1).maybeSingle();
+      const { data } = await supabase.from("school_settings").select("school_name, motto, logo_url").limit(1).maybeSingle();
       return data;
     },
   });
