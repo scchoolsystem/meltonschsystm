@@ -118,9 +118,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
     let inserted = 0;
     for (let i = 0; i < inserts.length; i += 50) {
       const chunk = inserts.slice(i, i + 50);
-      const { error, count } = await supabase.from("timetable_slots").insert(chunk).select("*", { count: "exact", head: true });
+      const { error, data: rows } = await supabase.from("timetable_slots").insert(chunk).select("id");
       if (error) conflicts.push(error.message);
-      else inserted += count ?? chunk.length;
+      else inserted += rows?.length ?? 0;
     }
 
     return { ok: true, inserted, conflicts, totalPlanned: inserts.length };
