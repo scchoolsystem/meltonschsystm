@@ -28,6 +28,7 @@ import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
+import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
 import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
 import { Route as AppIdsVerifyRouteImport } from './routes/_app.ids.verify'
@@ -145,6 +146,11 @@ const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   id: '/api/public/mpesa-callback',
   path: '/api/public/mpesa-callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppTimetableGenerateRoute = AppTimetableGenerateRouteImport.update({
+  id: '/generate',
+  path: '/generate',
+  getParentRoute: () => AppTimetableRoute,
 } as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
   id: '/portal/student',
@@ -278,7 +284,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
-  '/timetable': typeof AppTimetableRoute
+  '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
@@ -300,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/ids/verify': typeof AppIdsVerifyRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -321,7 +328,7 @@ export interface FileRoutesByTo {
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
-  '/timetable': typeof AppTimetableRoute
+  '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
@@ -343,6 +350,7 @@ export interface FileRoutesByTo {
   '/ids/verify': typeof AppIdsVerifyRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -366,7 +374,7 @@ export interface FileRoutesById {
   '/_app/security': typeof AppSecurityRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
-  '/_app/timetable': typeof AppTimetableRoute
+  '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/_app/ids/verify': typeof AppIdsVerifyRoute
   '/_app/portal/parent': typeof AppPortalParentRoute
   '/_app/portal/student': typeof AppPortalStudentRoute
+  '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -433,6 +442,7 @@ export interface FileRouteTypes {
     | '/ids/verify'
     | '/portal/parent'
     | '/portal/student'
+    | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -476,6 +486,7 @@ export interface FileRouteTypes {
     | '/ids/verify'
     | '/portal/parent'
     | '/portal/student'
+    | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -520,6 +531,7 @@ export interface FileRouteTypes {
     | '/_app/ids/verify'
     | '/_app/portal/parent'
     | '/_app/portal/student'
+    | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
@@ -669,6 +681,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/mpesa-callback'
       preLoaderRoute: typeof ApiPublicMpesaCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/timetable/generate': {
+      id: '/_app/timetable/generate'
+      path: '/generate'
+      fullPath: '/timetable/generate'
+      preLoaderRoute: typeof AppTimetableGenerateRouteImport
+      parentRoute: typeof AppTimetableRoute
     }
     '/_app/portal/student': {
       id: '/_app/portal/student'
@@ -834,6 +853,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppTimetableRouteChildren {
+  AppTimetableGenerateRoute: typeof AppTimetableGenerateRoute
+}
+
+const AppTimetableRouteChildren: AppTimetableRouteChildren = {
+  AppTimetableGenerateRoute: AppTimetableGenerateRoute,
+}
+
+const AppTimetableRouteWithChildren = AppTimetableRoute._addFileChildren(
+  AppTimetableRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAnnouncementsRoute: typeof AppAnnouncementsRoute
   AppAttendanceRoute: typeof AppAttendanceRoute
@@ -847,7 +878,7 @@ interface AppRouteChildren {
   AppSecurityRoute: typeof AppSecurityRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
-  AppTimetableRoute: typeof AppTimetableRoute
+  AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
   AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
@@ -887,7 +918,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSecurityRoute: AppSecurityRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
-  AppTimetableRoute: AppTimetableRoute,
+  AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
   AppAcademicsMarksRoute: AppAcademicsMarksRoute,
@@ -927,3 +958,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
