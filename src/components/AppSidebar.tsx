@@ -78,6 +78,13 @@ export function AppSidebar() {
   const isParent = hasRole("parent");
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const { data: settings } = useQuery({
+    queryKey: ["school-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_settings").select("school_name, motto").limit(1).maybeSingle();
+      return data;
+    },
+  });
 
   return (
     <Sidebar collapsible="icon">
@@ -88,8 +95,8 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <div className="font-bold text-sm truncate">Greenfield Academy</div>
-              <div className="text-[10px] text-sidebar-foreground/60 truncate">School ERP</div>
+              <div className="font-bold text-sm truncate">{settings?.school_name ?? "School ERP"}</div>
+              <div className="text-[10px] text-sidebar-foreground/60 truncate">{settings?.motto ?? "School ERP"}</div>
             </div>
           )}
         </div>
