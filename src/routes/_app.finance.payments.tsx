@@ -1,10 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_app/finance/payments")({ component: Page });
 
@@ -23,9 +24,9 @@ function Page() {
       <Card><CardHeader /><CardContent>
         {isLoading ? <div className="h-40 grid place-items-center"><Loader2 className="animate-spin" /></div> : (
           <Table>
-            <TableHeader><TableRow><TableHead>Receipt</TableHead><TableHead>Date</TableHead><TableHead>Invoice</TableHead><TableHead>Student</TableHead><TableHead>Method</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Receipt</TableHead><TableHead>Date</TableHead><TableHead>Invoice</TableHead><TableHead>Student</TableHead><TableHead>Method</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead><TableHead /></TableRow></TableHeader>
             <TableBody>
-              {data.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No payments yet.</TableCell></TableRow>}
+              {data.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No payments yet.</TableCell></TableRow>}
               {(data as any[]).map(p => (
                 <TableRow key={p.id}>
                   <TableCell className="font-mono text-xs">{p.receipt_no}</TableCell>
@@ -35,6 +36,11 @@ function Page() {
                   <TableCell className="capitalize">{p.method}</TableCell>
                   <TableCell className="text-xs">{p.reference ?? "—"}</TableCell>
                   <TableCell className="text-right font-mono">KES {Number(p.amount).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to="/finance/receipt/$id" params={{ id: p.id }}><Printer className="w-3 h-3" /></Link>
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
