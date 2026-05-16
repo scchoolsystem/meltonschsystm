@@ -47,6 +47,7 @@ const financeItems = [
 ];
 
 const adminItems = [
+  { title: "Users & Credentials", url: "/admin/users", icon: Users },
   { title: "User Roles", url: "/admin/roles", icon: Users },
   { title: "Activity Log", url: "/admin/activity", icon: Activity },
   { title: "Settings", url: "/admin/settings", icon: Settings },
