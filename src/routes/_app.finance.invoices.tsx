@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { mpesaStkPush } from "@/lib/finance.functions";
 import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -50,12 +52,15 @@ function Page() {
                   <TableCell className="text-right font-mono">KES {Number(r.amount).toLocaleString()}</TableCell>
                   <TableCell className="text-right font-mono">KES {Number(r.paid).toLocaleString()}</TableCell>
                   <TableCell><Badge variant="outline" className={r.status === 'paid' ? 'bg-success/15 text-success border-success/30' : r.status === 'partial' ? 'bg-warning/15' : ''}>{r.status}</Badge></TableCell>
-                  <TableCell>
+                  <TableCell className="space-x-2">
                     {can && r.status !== 'paid' && (
-                      <Dialog open={openPay === r.id} onOpenChange={v => setOpenPay(v ? r.id : null)}>
-                        <DialogTrigger asChild><Button size="sm" variant="outline">Pay</Button></DialogTrigger>
-                        <PayDialog invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} onDone={() => { setOpenPay(null); qc.invalidateQueries({ queryKey: ["invoices"] }); }} />
-                      </Dialog>
+                      <>
+                        <Dialog open={openPay === r.id} onOpenChange={v => setOpenPay(v ? r.id : null)}>
+                          <DialogTrigger asChild><Button size="sm" variant="outline">Pay</Button></DialogTrigger>
+                          <PayDialog invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} onDone={() => { setOpenPay(null); qc.invalidateQueries({ queryKey: ["invoices"] }); }} />
+                        </Dialog>
+                        <StkButton invoiceId={r.id} balance={Number(r.amount) - Number(r.paid)} />
+                      </>
                     )}
                   </TableCell>
                 </TableRow>
