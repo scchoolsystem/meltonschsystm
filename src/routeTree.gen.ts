@@ -24,12 +24,15 @@ import { Route as AppClassesRouteImport } from './routes/_app.classes'
 import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
+import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
+import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
 import { Route as AppFinancePaymentsRouteImport } from './routes/_app.finance.payments'
 import { Route as AppFinanceInvoicesRouteImport } from './routes/_app.finance.invoices'
 import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
+import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
@@ -109,6 +112,16 @@ const AppAnnouncementsRoute = AppAnnouncementsRouteImport.update({
   path: '/announcements',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
+  id: '/portal/student',
+  path: '/portal/student',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPortalParentRoute = AppPortalParentRouteImport.update({
+  id: '/portal/parent',
+  path: '/portal/parent',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFinancePaymentsRoute = AppFinancePaymentsRouteImport.update({
   id: '/finance/payments',
   path: '/finance/payments',
@@ -137,6 +150,11 @@ const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   id: '/admin/roles',
   path: '/admin/roles',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminLinksRoute = AppAdminLinksRouteImport.update({
+  id: '/admin/links',
+  path: '/admin/links',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
@@ -179,12 +197,15 @@ export interface FileRoutesByFullPath {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/links': typeof AppAdminLinksRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
+  '/portal/parent': typeof AppPortalParentRoute
+  '/portal/student': typeof AppPortalStudentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -205,12 +226,15 @@ export interface FileRoutesByTo {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/links': typeof AppAdminLinksRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
+  '/portal/parent': typeof AppPortalParentRoute
+  '/portal/student': typeof AppPortalStudentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -233,12 +257,15 @@ export interface FileRoutesById {
   '/_app/academics/results': typeof AppAcademicsResultsRoute
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/finance/fees': typeof AppFinanceFeesRoute
   '/_app/finance/invoices': typeof AppFinanceInvoicesRoute
   '/_app/finance/payments': typeof AppFinancePaymentsRoute
+  '/_app/portal/parent': typeof AppPortalParentRoute
+  '/_app/portal/student': typeof AppPortalStudentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -261,12 +288,15 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/links'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
     | '/finance/invoices'
     | '/finance/payments'
+    | '/portal/parent'
+    | '/portal/student'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,12 +317,15 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/links'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
     | '/finance/invoices'
     | '/finance/payments'
+    | '/portal/parent'
+    | '/portal/student'
   id:
     | '__root__'
     | '/'
@@ -314,12 +347,15 @@ export interface FileRouteTypes {
     | '/_app/academics/results'
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
+    | '/_app/admin/links'
     | '/_app/admin/roles'
     | '/_app/admin/settings'
     | '/_app/admin/users'
     | '/_app/finance/fees'
     | '/_app/finance/invoices'
     | '/_app/finance/payments'
+    | '/_app/portal/parent'
+    | '/_app/portal/student'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -435,6 +471,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnnouncementsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/portal/student': {
+      id: '/_app/portal/student'
+      path: '/portal/student'
+      fullPath: '/portal/student'
+      preLoaderRoute: typeof AppPortalStudentRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/portal/parent': {
+      id: '/_app/portal/parent'
+      path: '/portal/parent'
+      fullPath: '/portal/parent'
+      preLoaderRoute: typeof AppPortalParentRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/finance/payments': {
       id: '/_app/finance/payments'
       path: '/finance/payments'
@@ -475,6 +525,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/roles'
       fullPath: '/admin/roles'
       preLoaderRoute: typeof AppAdminRolesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/links': {
+      id: '/_app/admin/links'
+      path: '/admin/links'
+      fullPath: '/admin/links'
+      preLoaderRoute: typeof AppAdminLinksRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/activity': {
@@ -525,12 +582,15 @@ interface AppRouteChildren {
   AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppFinanceFeesRoute: typeof AppFinanceFeesRoute
   AppFinanceInvoicesRoute: typeof AppFinanceInvoicesRoute
   AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
+  AppPortalParentRoute: typeof AppPortalParentRoute
+  AppPortalStudentRoute: typeof AppPortalStudentRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -550,12 +610,15 @@ const AppRouteChildren: AppRouteChildren = {
   AppAcademicsResultsRoute: AppAcademicsResultsRoute,
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppFinanceFeesRoute: AppFinanceFeesRoute,
   AppFinanceInvoicesRoute: AppFinanceInvoicesRoute,
   AppFinancePaymentsRoute: AppFinancePaymentsRoute,
+  AppPortalParentRoute: AppPortalParentRoute,
+  AppPortalStudentRoute: AppPortalStudentRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -568,13 +631,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
