@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { lookupLoginEmail } from "@/lib/auth-admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
