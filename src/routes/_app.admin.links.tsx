@@ -35,16 +35,28 @@ function LinksPage() {
   const [sStu, setSStu] = useState("");
 
   async function load() {
-    const [pl, sl, st] = await Promise.all([
+    const [pl, sl, st, pq] = await Promise.all([
       supabase.from("parent_student_links").select("*, students(first_name,last_name,admission_no)").order("created_at", { ascending: false }),
       supabase.from("student_user_links").select("*, students(first_name,last_name,admission_no)").order("created_at", { ascending: false }),
       supabase.from("students").select("id, first_name, last_name, admission_no").order("admission_no").limit(500),
+      supabase.from("pending_parent_links").select("*").eq("status", "pending").order("created_at", { ascending: false }),
     ]);
     setParentLinks(pl.data ?? []);
     setStudentLinks(sl.data ?? []);
     setStudents(st.data ?? []);
+    setPending(pq.data ?? []);
   }
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+
+  async function resolve(pending_id: string, decision: "approve" | "reject") {
+    try {
+      const student_id = decision === "approve" ? pendingChoice[pending_id] : undefined;
+      if (decision === "approve" && !student_id) return toast.error("Pick a student to approve");
+      await resolveFn({ data: { pending_id, decision, student_id } });
+      toast.success(decision === "approve" ? "Approved & linked" : "Rejected");
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  }
 
   async function linkParent() {
     if (!pUid || !pStu) return toast.error("Enter both fields");
