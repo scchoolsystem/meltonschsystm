@@ -16,7 +16,9 @@ import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
 import { Route as AppStaffRouteImport } from './routes/_app.staff'
+import { Route as AppSecurityRouteImport } from './routes/_app.security'
 import { Route as AppLibraryRouteImport } from './routes/_app.library'
+import { Route as AppKitchenRouteImport } from './routes/_app.kitchen'
 import { Route as AppDisciplineRouteImport } from './routes/_app.discipline'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppClinicRouteImport } from './routes/_app.clinic'
@@ -82,9 +84,19 @@ const AppStaffRoute = AppStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSecurityRoute = AppSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLibraryRoute = AppLibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKitchenRoute = AppKitchenRouteImport.update({
+  id: '/kitchen',
+  path: '/kitchen',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDisciplineRoute = AppDisciplineRouteImport.update({
@@ -249,7 +261,9 @@ export interface FileRoutesByFullPath {
   '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
+  '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
+  '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRoute
@@ -288,7 +302,9 @@ export interface FileRoutesByTo {
   '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
+  '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
+  '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRoute
@@ -329,7 +345,9 @@ export interface FileRoutesById {
   '/_app/clinic': typeof AppClinicRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/discipline': typeof AppDisciplineRoute
+  '/_app/kitchen': typeof AppKitchenRoute
   '/_app/library': typeof AppLibraryRoute
+  '/_app/security': typeof AppSecurityRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRoute
@@ -370,7 +388,9 @@ export interface FileRouteTypes {
     | '/clinic'
     | '/dashboard'
     | '/discipline'
+    | '/kitchen'
     | '/library'
+    | '/security'
     | '/staff'
     | '/students'
     | '/timetable'
@@ -409,7 +429,9 @@ export interface FileRouteTypes {
     | '/clinic'
     | '/dashboard'
     | '/discipline'
+    | '/kitchen'
     | '/library'
+    | '/security'
     | '/staff'
     | '/students'
     | '/timetable'
@@ -449,7 +471,9 @@ export interface FileRouteTypes {
     | '/_app/clinic'
     | '/_app/dashboard'
     | '/_app/discipline'
+    | '/_app/kitchen'
     | '/_app/library'
+    | '/_app/security'
     | '/_app/staff'
     | '/_app/students'
     | '/_app/timetable'
@@ -537,11 +561,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStaffRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/security': {
+      id: '/_app/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof AppSecurityRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/library': {
       id: '/_app/library'
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof AppLibraryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/kitchen': {
+      id: '/_app/kitchen'
+      path: '/kitchen'
+      fullPath: '/kitchen'
+      preLoaderRoute: typeof AppKitchenRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/discipline': {
@@ -765,7 +803,9 @@ interface AppRouteChildren {
   AppClinicRoute: typeof AppClinicRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDisciplineRoute: typeof AppDisciplineRoute
+  AppKitchenRoute: typeof AppKitchenRoute
   AppLibraryRoute: typeof AppLibraryRoute
+  AppSecurityRoute: typeof AppSecurityRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
   AppTimetableRoute: typeof AppTimetableRoute
@@ -802,7 +842,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppClinicRoute: AppClinicRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDisciplineRoute: AppDisciplineRoute,
+  AppKitchenRoute: AppKitchenRoute,
   AppLibraryRoute: AppLibraryRoute,
+  AppSecurityRoute: AppSecurityRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
   AppTimetableRoute: AppTimetableRoute,
