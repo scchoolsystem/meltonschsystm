@@ -4,6 +4,7 @@ import {
   Settings, Activity, LogOut, Sun, Moon, ChevronDown,
   ClipboardCheck, AlertTriangle, Library, Home, Bus, Stethoscope,
   Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award, User, Users2, Link2,
+  QrCode, ScanLine,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -45,6 +46,11 @@ const financeItems = [
   { title: "Invoices", url: "/finance/invoices", icon: Receipt },
   { title: "Bulk Generate", url: "/finance/generate", icon: Receipt },
   { title: "Payments", url: "/finance/payments", icon: Receipt },
+];
+
+const idItems = [
+  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode },
+  { title: "Verify ID", url: "/ids/verify", icon: ScanLine },
 ];
 
 const adminItems = [
@@ -129,6 +135,19 @@ export function AppSidebar() {
           <SidebarGroupLabel>Finance</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
             {financeItems.map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Digital IDs</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {idItems.map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
