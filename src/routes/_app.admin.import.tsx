@@ -30,10 +30,22 @@ function parseCSV(text: string): Record<string, string>[] {
 }
 
 function ImportPage() {
+  const { isAdmin } = useAuth();
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null);
+
+  if (!isAdmin) {
+    return (
+      <div className="p-6">
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          <ShieldAlert className="w-10 h-10 mx-auto mb-2 opacity-40" />
+          Super admin only.
+        </CardContent></Card>
+      </div>
+    );
+  }
 
   const onFile = async (f: File) => {
     const t = await f.text();
