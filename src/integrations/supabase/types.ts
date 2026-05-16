@@ -179,6 +179,36 @@ export type Database = {
         }
         Relationships: []
       }
+      class_fee_components: {
+        Row: {
+          amount: number
+          class_id: string
+          component: string
+          created_at: string
+          id: string
+          term: string
+          year: number
+        }
+        Insert: {
+          amount?: number
+          class_id: string
+          component: string
+          created_at?: string
+          id?: string
+          term: string
+          year?: number
+        }
+        Update: {
+          amount?: number
+          class_id?: string
+          component?: string
+          created_at?: string
+          id?: string
+          term?: string
+          year?: number
+        }
+        Relationships: []
+      }
       classes: {
         Row: {
           capacity: number
@@ -446,6 +476,72 @@ export type Database = {
         }
         Relationships: []
       }
+      field_edit_audit: {
+        Row: {
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          field: string | null
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          override_used: boolean
+          resource: string
+          resource_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          field?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          override_used?: boolean
+          resource: string
+          resource_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          field?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          override_used?: boolean
+          resource?: string
+          resource_id?: string
+        }
+        Relationships: []
+      }
+      field_policies: {
+        Row: {
+          classification: string
+          field: string
+          id: string
+          notes: string | null
+          required_level: number
+          resource: string
+        }
+        Insert: {
+          classification?: string
+          field: string
+          id?: string
+          notes?: string | null
+          required_level?: number
+          resource: string
+        }
+        Update: {
+          classification?: string
+          field?: string
+          id?: string
+          notes?: string | null
+          required_level?: number
+          resource?: string
+        }
+        Relationships: []
+      }
       gate_passes: {
         Row: {
           actual_return: string | null
@@ -578,6 +674,39 @@ export type Database = {
         }
         Relationships: []
       }
+      lifecycle_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_status: string | null
+          id: string
+          reason: string | null
+          target_id: string
+          target_type: string
+          to_status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          target_id: string
+          target_type: string
+          to_status: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          reason?: string | null
+          target_id?: string
+          target_type?: string
+          to_status?: string
+        }
+        Relationships: []
+      }
       meal_plans: {
         Row: {
           created_at: string
@@ -608,27 +737,72 @@ export type Database = {
         }
         Relationships: []
       }
+      override_log: {
+        Row: {
+          actor_id: string
+          created_at: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          reason: string
+          resource: string
+          resource_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason: string
+          resource: string
+          resource_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason?: string
+          resource?: string
+          resource_id?: string
+        }
+        Relationships: []
+      }
       parent_student_links: {
         Row: {
           created_at: string
           id: string
+          link_method: string
+          linked_by: string | null
           parent_user_id: string
           relationship: string
           student_id: string
+          verified: boolean
         }
         Insert: {
           created_at?: string
           id?: string
+          link_method?: string
+          linked_by?: string | null
           parent_user_id: string
           relationship?: string
           student_id: string
+          verified?: boolean
         }
         Update: {
           created_at?: string
           id?: string
+          link_method?: string
+          linked_by?: string | null
           parent_user_id?: string
           relationship?: string
           student_id?: string
+          verified?: boolean
         }
         Relationships: []
       }
@@ -668,29 +842,77 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_parent_links: {
+        Row: {
+          attempted_code: string | null
+          created_at: string
+          id: string
+          parent_email: string | null
+          parent_phone: string | null
+          parent_user_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          attempted_code?: string | null
+          created_at?: string
+          id?: string
+          parent_email?: string | null
+          parent_phone?: string | null
+          parent_user_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          attempted_code?: string | null
+          created_at?: string
+          id?: string
+          parent_email?: string | null
+          parent_phone?: string | null
+          parent_user_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           avatar_url: string | null
           created_at: string
           full_name: string
           id: string
           phone: string | null
+          status: string
+          status_reason: string | null
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string
           id: string
           phone?: string | null
+          status?: string
+          status_reason?: string | null
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string
           id?: string
           phone?: string | null
+          status?: string
+          status_reason?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -749,6 +971,48 @@ export type Database = {
         }
         Relationships: []
       }
+      smart_alerts: {
+        Row: {
+          body: string | null
+          category: string
+          created_at: string
+          id: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          subject_id: string | null
+          subject_type: string | null
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          category: string
+          created_at?: string
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          title: string
+        }
+        Update: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          subject_id?: string | null
+          subject_type?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           created_at: string
@@ -759,10 +1023,15 @@ export type Database = {
           hire_date: string
           id: string
           last_name: string
+          lifecycle_changed_at: string | null
+          lifecycle_changed_by: string | null
+          lifecycle_reason: string | null
+          lifecycle_status: string
           phone: string | null
           photo_url: string | null
           role: Database["public"]["Enums"]["app_role"]
           status: string
+          transferred_to: string | null
           unique_id: string | null
           user_id: string | null
         }
@@ -775,10 +1044,15 @@ export type Database = {
           hire_date?: string
           id?: string
           last_name: string
+          lifecycle_changed_at?: string | null
+          lifecycle_changed_by?: string | null
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
           phone?: string | null
           photo_url?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          transferred_to?: string | null
           unique_id?: string | null
           user_id?: string | null
         }
@@ -791,10 +1065,15 @@ export type Database = {
           hire_date?: string
           id?: string
           last_name?: string
+          lifecycle_changed_at?: string | null
+          lifecycle_changed_by?: string | null
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
           phone?: string | null
           photo_url?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          transferred_to?: string | null
           unique_id?: string | null
           user_id?: string | null
         }
@@ -833,12 +1112,19 @@ export type Database = {
           gender: string | null
           id: string
           last_name: string
+          lifecycle_changed_at: string | null
+          lifecycle_changed_by: string | null
+          lifecycle_reason: string | null
+          lifecycle_status: string
           medical_notes: string | null
+          national_id: string | null
+          parent_auth_code: string | null
           parent_email: string | null
           parent_name: string | null
           parent_phone: string | null
           photo_url: string | null
           status: string
+          transferred_to: string | null
           unique_id: string | null
           updated_at: string
         }
@@ -853,12 +1139,19 @@ export type Database = {
           gender?: string | null
           id?: string
           last_name: string
+          lifecycle_changed_at?: string | null
+          lifecycle_changed_by?: string | null
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
           medical_notes?: string | null
+          national_id?: string | null
+          parent_auth_code?: string | null
           parent_email?: string | null
           parent_name?: string | null
           parent_phone?: string | null
           photo_url?: string | null
           status?: string
+          transferred_to?: string | null
           unique_id?: string | null
           updated_at?: string
         }
@@ -873,12 +1166,19 @@ export type Database = {
           gender?: string | null
           id?: string
           last_name?: string
+          lifecycle_changed_at?: string | null
+          lifecycle_changed_by?: string | null
+          lifecycle_reason?: string | null
+          lifecycle_status?: string
           medical_notes?: string | null
+          national_id?: string | null
+          parent_auth_code?: string | null
           parent_email?: string | null
           parent_name?: string | null
           parent_phone?: string | null
           photo_url?: string | null
           status?: string
+          transferred_to?: string | null
           unique_id?: string | null
           updated_at?: string
         }
@@ -1089,7 +1389,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_class_fees: {
+        Args: { _student: string; _term?: string; _year?: number }
+        Returns: number
+      }
+      can_edit: {
+        Args: { _field: string; _resource: string; _user: string }
+        Returns: {
+          allowed: boolean
+          classification: string
+          required_level: number
+          requires_override: boolean
+        }[]
+      }
       current_student_id: { Args: never; Returns: string }
+      find_parent_match: {
+        Args: { _email: string; _phone: string }
+        Returns: {
+          method: string
+          student_id: string
+        }[]
+      }
+      generate_parent_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1103,6 +1424,7 @@ export type Database = {
       lookup_login_email: { Args: { _unique_id: string }; Returns: string }
       my_children_ids: { Args: never; Returns: string[] }
       next_unique_id: { Args: { _category: string }; Returns: string }
+      role_level: { Args: { _user: string }; Returns: number }
     }
     Enums: {
       app_role:
