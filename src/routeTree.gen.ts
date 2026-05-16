@@ -40,10 +40,13 @@ import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
+import { Route as AppAcademicsReportCardsRouteImport } from './routes/_app.academics.report-cards'
+import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
+import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -199,6 +202,16 @@ const AppAcademicsResultsRoute = AppAcademicsResultsRouteImport.update({
   path: '/academics/results',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsReportCardsRoute = AppAcademicsReportCardsRouteImport.update({
+  id: '/academics/report-cards',
+  path: '/academics/report-cards',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsMarksRoute = AppAcademicsMarksRouteImport.update({
+  id: '/academics/marks',
+  path: '/academics/marks',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
   id: '/academics/exams',
   path: '/academics/exams',
@@ -219,6 +232,12 @@ const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
   path: '/finance/receipt/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsReportCardStudentIdExamIdRoute =
+  AppAcademicsReportCardStudentIdExamIdRouteImport.update({
+    id: '/academics/report-card/$studentId/$examId',
+    path: '/academics/report-card/$studentId/$examId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -236,6 +255,8 @@ export interface FileRoutesByFullPath {
   '/timetable': typeof AppTimetableRoute
   '/transport': typeof AppTransportRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
+  '/academics/marks': typeof AppAcademicsMarksRoute
+  '/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
@@ -255,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -272,6 +294,8 @@ export interface FileRoutesByTo {
   '/timetable': typeof AppTimetableRoute
   '/transport': typeof AppTransportRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
+  '/academics/marks': typeof AppAcademicsMarksRoute
+  '/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
@@ -291,6 +315,7 @@ export interface FileRoutesByTo {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -310,6 +335,8 @@ export interface FileRoutesById {
   '/_app/timetable': typeof AppTimetableRoute
   '/_app/transport': typeof AppTransportRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
+  '/_app/academics/marks': typeof AppAcademicsMarksRoute
+  '/_app/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/_app/academics/results': typeof AppAcademicsResultsRoute
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
@@ -329,6 +356,7 @@ export interface FileRoutesById {
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/_app/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -348,6 +376,8 @@ export interface FileRouteTypes {
     | '/timetable'
     | '/transport'
     | '/academics/exams'
+    | '/academics/marks'
+    | '/academics/report-cards'
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
@@ -367,6 +397,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/academics/report-card/$studentId/$examId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -384,6 +415,8 @@ export interface FileRouteTypes {
     | '/timetable'
     | '/transport'
     | '/academics/exams'
+    | '/academics/marks'
+    | '/academics/report-cards'
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
@@ -403,6 +436,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/academics/report-card/$studentId/$examId'
   id:
     | '__root__'
     | '/'
@@ -421,6 +455,8 @@ export interface FileRouteTypes {
     | '/_app/timetable'
     | '/_app/transport'
     | '/_app/academics/exams'
+    | '/_app/academics/marks'
+    | '/_app/academics/report-cards'
     | '/_app/academics/results'
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
@@ -440,6 +476,7 @@ export interface FileRouteTypes {
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
+    | '/_app/academics/report-card/$studentId/$examId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -668,6 +705,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAcademicsResultsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/report-cards': {
+      id: '/_app/academics/report-cards'
+      path: '/academics/report-cards'
+      fullPath: '/academics/report-cards'
+      preLoaderRoute: typeof AppAcademicsReportCardsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/marks': {
+      id: '/_app/academics/marks'
+      path: '/academics/marks'
+      fullPath: '/academics/marks'
+      preLoaderRoute: typeof AppAcademicsMarksRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/academics/exams': {
       id: '/_app/academics/exams'
       path: '/academics/exams'
@@ -696,6 +747,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceReceiptIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/report-card/$studentId/$examId': {
+      id: '/_app/academics/report-card/$studentId/$examId'
+      path: '/academics/report-card/$studentId/$examId'
+      fullPath: '/academics/report-card/$studentId/$examId'
+      preLoaderRoute: typeof AppAcademicsReportCardStudentIdExamIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -713,6 +771,8 @@ interface AppRouteChildren {
   AppTimetableRoute: typeof AppTimetableRoute
   AppTransportRoute: typeof AppTransportRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
+  AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
+  AppAcademicsReportCardsRoute: typeof AppAcademicsReportCardsRoute
   AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
@@ -731,6 +791,7 @@ interface AppRouteChildren {
   AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
   AppIdsStaffIdRoute: typeof AppIdsStaffIdRoute
   AppIdsStudentIdRoute: typeof AppIdsStudentIdRoute
+  AppAcademicsReportCardStudentIdExamIdRoute: typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -747,6 +808,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppTimetableRoute: AppTimetableRoute,
   AppTransportRoute: AppTransportRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
+  AppAcademicsMarksRoute: AppAcademicsMarksRoute,
+  AppAcademicsReportCardsRoute: AppAcademicsReportCardsRoute,
   AppAcademicsResultsRoute: AppAcademicsResultsRoute,
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
@@ -765,6 +828,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
   AppIdsStaffIdRoute: AppIdsStaffIdRoute,
   AppIdsStudentIdRoute: AppIdsStudentIdRoute,
+  AppAcademicsReportCardStudentIdExamIdRoute:
+    AppAcademicsReportCardStudentIdExamIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
