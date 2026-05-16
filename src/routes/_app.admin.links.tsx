@@ -19,9 +19,12 @@ export const Route = createFileRoute("/_app/admin/links")({
 
 function LinksPage() {
   const { isAdmin } = useAuth();
+  const resolveFn = useServerFn(resolvePendingLink);
   const [parentLinks, setParentLinks] = useState<any[]>([]);
   const [studentLinks, setStudentLinks] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [pending, setPending] = useState<any[]>([]);
+  const [pendingChoice, setPendingChoice] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   // forms
