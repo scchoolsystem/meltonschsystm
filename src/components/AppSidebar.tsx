@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, UserCog,
   Settings, Activity, LogOut, Sun, Moon, ChevronDown,
   ClipboardCheck, AlertTriangle, Library, Home, Bus, Stethoscope,
-  Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award,
+  Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award, User, Users2, Link2,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -48,6 +48,7 @@ const financeItems = [
 
 const adminItems = [
   { title: "Users & Credentials", url: "/admin/users", icon: Users },
+  { title: "Portal Links", url: "/admin/links", icon: Link2 },
   { title: "User Roles", url: "/admin/roles", icon: Users },
   { title: "Activity Log", url: "/admin/activity", icon: Activity },
   { title: "Settings", url: "/admin/settings", icon: Settings },
@@ -56,7 +57,9 @@ const adminItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { isAdmin, fullName, user, signOut, roles } = useAuth();
+  const { isAdmin, fullName, user, signOut, roles, hasRole } = useAuth();
+  const isStudent = hasRole("student");
+  const isParent = hasRole("parent");
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
 
@@ -133,6 +136,28 @@ export function AppSidebar() {
             ))}
           </SidebarMenu></SidebarGroupContent>
         </SidebarGroup>
+
+        {(isStudent || isParent) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>My Portal</SidebarGroupLabel>
+            <SidebarGroupContent><SidebarMenu>
+              {isStudent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/student"}>
+                    <Link to="/portal/student"><User className="w-4 h-4" /><span>Student Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {isParent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/parent"}>
+                    <Link to="/portal/parent"><Users2 className="w-4 h-4" /><span>Parent Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu></SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {isAdmin && (
           <SidebarGroup>
