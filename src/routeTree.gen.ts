@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
@@ -63,6 +64,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SysControlRoomRoute = SysControlRoomRouteImport.update({
+  id: '/sys/control-room',
+  path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransportRoute = AppTransportRouteImport.update({
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRoute
   '/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -316,6 +323,7 @@ export interface FileRoutesByTo {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRoute
   '/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -360,6 +368,7 @@ export interface FileRoutesById {
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRoute
   '/_app/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
   '/_app/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -404,6 +413,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/report-cards'
@@ -446,6 +456,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/report-cards'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/_app/students'
     | '/_app/timetable'
     | '/_app/transport'
+    | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
     | '/_app/academics/report-cards'
@@ -519,6 +531,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
 }
 
@@ -543,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sys/control-room': {
+      id: '/sys/control-room'
+      path: '/sys/control-room'
+      fullPath: '/sys/control-room'
+      preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/transport': {
@@ -901,6 +921,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
 }
 export const routeTree = rootRouteImport
