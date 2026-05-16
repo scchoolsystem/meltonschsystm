@@ -54,10 +54,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Greenfield Academy ERP — School Management System" },
+      { title: "Smartdev ERP — School Management System" },
       { name: "description", content: "Enterprise school management system for primary and secondary education." },
-      { property: "og:title", content: "Greenfield Academy ERP — School Management System" },
-      { name: "twitter:title", content: "Greenfield Academy ERP — School Management System" },
+      { property: "og:title", content: "Smartdev ERP — School Management System" },
+      { name: "twitter:title", content: "Smartdev ERP — School Management System" },
       { property: "og:description", content: "Enterprise school management system for primary and secondary education." },
       { name: "twitter:description", content: "Enterprise school management system for primary and secondary education." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/04f181e7-866d-414b-990d-9962022de31b/id-preview-a01000e5--f309e728-b842-4544-acc9-c77e22be313b.lovable.app-1778775615073.png" },
