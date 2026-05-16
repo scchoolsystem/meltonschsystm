@@ -1,11 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { redeemParentCode, autoLinkParent } from "@/lib/parent-link.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/portal/parent")({
   component: ParentPortal,
@@ -48,11 +53,7 @@ function ParentPortal() {
   }, [activeId]);
 
   if (loading) return <div className="p-6 text-muted-foreground">Loading…</div>;
-  if (children.length === 0) return (
-    <div className="p-6"><Card><CardContent className="py-12 text-center text-muted-foreground">
-      No children linked to your account. Please contact the school admin.
-    </CardContent></Card></div>
-  );
+  if (children.length === 0) return <LinkChildPanel onLinked={() => window.location.reload()} />;
 
   const active = children.find(c => c.id === activeId);
   const totalDue = data.invoices.reduce((s: number, i: any) => s + Number(i.amount) - Number(i.paid), 0);
@@ -155,6 +156,58 @@ function ParentPortal() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function LinkChildPanel({ onLinked }: { onLinked: () => void }) {
+  const redeem = useServerFn(redeemParentCode);
+  const auto = useServerFn(autoLinkParent);
+  const { user } = useAuth();
+  const [code, setCode] = useState("");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function tryAuto() {
+    setBusy(true);
+    try {
+      const r = await auto({ data: { email, phone } });
+      if (r.linked > 0) { toast.success(`Linked to ${r.linked} child(ren)`); onLinked(); }
+      else toast.message("No automatic match found. Submitted request to school admin for review.");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  }
+  async function tryCode() {
+    if (!code.trim()) return;
+    setBusy(true);
+    try {
+      await redeem({ data: { code: code.trim() } });
+      toast.success("Linked successfully");
+      onLinked();
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Link your child</h1>
+        <p className="text-sm text-muted-foreground mt-1">Connect your account to your child's school record.</p>
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Option 1 — Auto-match by contact</CardTitle><CardDescription>We'll check if your email or phone matches a registered parent contact.</CardDescription></CardHeader>
+        <CardContent className="space-y-3">
+          <Input placeholder="Your email" value={email} onChange={e => setEmail(e.target.value)} />
+          <Input placeholder="Your phone (as on school record)" value={phone} onChange={e => setPhone(e.target.value)} />
+          <Button onClick={tryAuto} disabled={busy}>Find my child</Button>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Option 2 — Parent code (PRN-…)</CardTitle><CardDescription>Enter the code printed on the admission slip.</CardDescription></CardHeader>
+        <CardContent className="flex gap-2">
+          <Input placeholder="PRN-2026-XXXXX" value={code} onChange={e => setCode(e.target.value.toUpperCase())} className="font-mono" />
+          <Button onClick={tryCode} disabled={busy}>Link</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
