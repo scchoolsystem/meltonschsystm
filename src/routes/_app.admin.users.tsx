@@ -193,7 +193,7 @@ function UsersPage() {
 
 function CreateDialog({
   onDone, createFn,
-}: { onDone: (c: { uniqueId: string; password: string }) => void; createFn: ReturnType<typeof useServerFn<typeof createAccount>> }) {
+}: { onDone: (c: { uniqueId: string; password: string }) => void; createFn: (args: { data: { full_name: string; role: string; email?: string } }) => Promise<{ uniqueId: string; password: string }> }) {
   const [form, setForm] = useState({ full_name: "", role: "staff", email: "" });
   const [busy, setBusy] = useState(false);
 
