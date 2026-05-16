@@ -157,6 +157,7 @@ export const createStaff = createServerFn({ method: "POST" })
       role: data.role,
       user_id: acct.userId,
       unique_id: acct.uniqueId,
+      photo_url: data.photo_url || null,
     };
     if (data.email) insertPayload.email = data.email;
     if (data.phone) insertPayload.phone = data.phone;

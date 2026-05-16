@@ -135,9 +135,6 @@ function AddStaffDialog({ settings, onDone }: { settings: any; onDone: () => voi
         photo_url = await uploadPhotoDataUrl(supabase, photo, "staff", `${form.first_name}-${form.last_name}`.toLowerCase().replace(/\s+/g, "-"));
       }
       const res = await create({ data: { ...form, photo_url } as any });
-      if (photo_url) {
-        await supabase.from("staff").update({ photo_url }).eq("id", res.staff.id);
-      }
       return { ...res, photo_url: photo_url ?? null };
     },
     onSuccess: (res) => {
