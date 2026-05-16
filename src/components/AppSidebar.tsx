@@ -62,9 +62,11 @@ const idItems = [
 ];
 
 const adminItems = [
+  { title: "School Brain", url: "/admin/brain", icon: Activity },
   { title: "Users & Credentials", url: "/admin/users", icon: Users },
   { title: "Portal Links", url: "/admin/links", icon: Link2 },
   { title: "User Roles", url: "/admin/roles", icon: Users },
+  { title: "Field Permissions", url: "/admin/permissions", icon: Settings },
   { title: "CSV Import", url: "/admin/import", icon: FileText },
   { title: "Activity Log", url: "/admin/activity", icon: Activity },
   { title: "Settings", url: "/admin/settings", icon: Settings },
