@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Loader2 } from "lucide-react";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import { NotificationsBell } from "@/components/NotificationsBell";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_app")({
