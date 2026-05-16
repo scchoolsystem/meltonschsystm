@@ -62,7 +62,11 @@ function ControlRoom() {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Super admin account created. Check your inbox to confirm, then sign in.");
+    // Auto-confirm is enabled — sign in immediately
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email: signupEmail, password: signupPw });
+    if (signInErr) return toast.error(signInErr.message);
+    toast.success("Super admin account created. Signed in.");
+    navigate({ to: "/dashboard" });
   }
 
   return (
