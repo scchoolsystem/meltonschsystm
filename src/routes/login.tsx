@@ -24,6 +24,13 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   // Hidden trigger: 5 clicks on the logo unlocks admin link
   const [clicks, setClicks] = useState(0);
+  const { data: settings } = useQuery({
+    queryKey: ["school-settings-login"],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_settings").select("school_name, motto, logo_url").limit(1).maybeSingle();
+      return data;
+    },
+  });
 
   useEffect(() => {
     if (!loading && session) navigate({ to: "/dashboard" });
