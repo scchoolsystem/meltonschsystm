@@ -53,6 +53,14 @@ function StudentsPage() {
     },
   });
 
+  const { data: settings } = useQuery({
+    queryKey: ["school-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_settings").select("school_name, academic_year, current_term").limit(1).maybeSingle();
+      return data;
+    },
+  });
+
   const filtered = useMemo(() => {
     const t = q.toLowerCase();
     return students.filter((s) =>
@@ -90,7 +98,7 @@ function StudentsPage() {
               <DialogTrigger asChild>
                 <Button><Plus className="w-4 h-4 mr-2" />Admit Student</Button>
               </DialogTrigger>
-              <AdmitStudentDialog classes={classes} onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["students"] }); }} />
+              <AdmitStudentDialog classes={classes} settings={settings} onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["students"] }); }} />
             </Dialog>
           )}
         </div>
@@ -153,7 +161,7 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className={map[status] ?? ""}>{status}</Badge>;
 }
 
-function AdmitStudentDialog({ classes, onDone }: { classes: ClassRow[]; onDone: () => void }) {
+function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]; settings: any; onDone: () => void }) {
   const [form, setForm] = useState({
     first_name: "", last_name: "", gender: "", class_id: "",
     parent_name: "", parent_phone: "", parent_email: "", date_of_birth: "",
@@ -164,6 +172,10 @@ function AdmitStudentDialog({ classes, onDone }: { classes: ClassRow[]; onDone: 
       if (!payload.class_id) delete payload.class_id;
       if (!payload.gender) delete payload.gender;
       if (!payload.date_of_birth) delete payload.date_of_birth;
+      // Auto-issue unique STU ID synced with settings
+      const { data: uid, error: uidErr } = await supabase.rpc("next_unique_id", { _category: "STU" });
+      if (uidErr) throw uidErr;
+      payload.unique_id = uid;
       const { error } = await supabase.from("students").insert(payload);
       if (error) throw error;
     },
@@ -172,7 +184,14 @@ function AdmitStudentDialog({ classes, onDone }: { classes: ClassRow[]; onDone: 
   });
   return (
     <DialogContent className="max-w-lg">
-      <DialogHeader><DialogTitle>Admit New Student</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>Admit New Student</DialogTitle>
+        {settings && (
+          <p className="text-xs text-muted-foreground">
+            {settings.school_name} · {settings.current_term ?? "Term"} {settings.academic_year ?? ""}
+          </p>
+        )}
+      </DialogHeader>
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div><Label>First Name</Label><Input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></div>
@@ -206,7 +225,7 @@ function AdmitStudentDialog({ classes, onDone }: { classes: ClassRow[]; onDone: 
           <div><Label>Parent Phone</Label><Input value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })} /></div>
           <div><Label>Parent Email</Label><Input type="email" value={form.parent_email} onChange={(e) => setForm({ ...form, parent_email: e.target.value })} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">Admission number will be auto-generated.</p>
+        <p className="text-xs text-muted-foreground">Admission number and unique STU ID will be auto-generated using current academic settings.</p>
         <DialogFooter>
           <Button type="submit" disabled={m.isPending}>
             {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
