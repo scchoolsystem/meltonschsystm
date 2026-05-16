@@ -103,11 +103,55 @@ function LinksPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="parents">
+      <Tabs defaultValue="pending">
         <TabsList>
+          <TabsTrigger value="pending">
+            Pending requests {pending.length > 0 && <Badge variant="secondary" className="ml-2">{pending.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="parents">Parent ↔ Student</TabsTrigger>
           <TabsTrigger value="students">Student account ↔ Student record</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Parent link requests</CardTitle>
+              <CardDescription>
+                Parents whose email/phone didn't match any student record on signup. Approve by selecting the correct child.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pending.length === 0 && <p className="text-sm text-muted-foreground">No pending requests.</p>}
+              {pending.map((p) => (
+                <div key={p.id} className="rounded-md border p-3 space-y-2">
+                  <div className="text-sm">
+                    <div className="font-medium">Parent UID: <span className="font-mono text-xs">{p.parent_user_id}</span></div>
+                    <div className="text-xs text-muted-foreground">
+                      Email: {p.parent_email ?? "—"} · Phone: {p.parent_phone ?? "—"}
+                      {p.attempted_code && <> · Tried code: <span className="font-mono">{p.attempted_code}</span></>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <select
+                      value={pendingChoice[p.id] ?? ""}
+                      onChange={(e) => setPendingChoice({ ...pendingChoice, [p.id]: e.target.value })}
+                      className="flex-1 min-w-[200px] h-9 rounded-md border bg-transparent px-3 text-sm"
+                    >
+                      <option value="">Match to student…</option>
+                      {students.map((s) => <option key={s.id} value={s.id}>{s.admission_no} — {s.first_name} {s.last_name}</option>)}
+                    </select>
+                    <Button size="sm" onClick={() => resolve(p.id, "approve")}>
+                      <Check className="w-3.5 h-3.5 mr-1" />Approve
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => resolve(p.id, "reject")}>
+                      <X className="w-3.5 h-3.5 mr-1" />Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="parents" className="space-y-4">
           <Card>
