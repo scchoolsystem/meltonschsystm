@@ -17,6 +17,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { createStaff } from "@/lib/admissions.functions";
 import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
+import { LifecycleActions } from "@/components/LifecycleActions";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export const Route = createFileRoute("/_app/staff")({
   component: StaffPage,
