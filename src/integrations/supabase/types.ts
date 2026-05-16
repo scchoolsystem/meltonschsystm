@@ -536,6 +536,36 @@ export type Database = {
         }
         Relationships: []
       }
+      school_settings: {
+        Row: {
+          created_at: string
+          credential_delivery_mode: string
+          email_domain: string
+          id: string
+          school_name: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credential_delivery_mode?: string
+          email_domain?: string
+          id?: string
+          school_name?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credential_delivery_mode?: string
+          email_domain?: string
+          id?: string
+          school_name?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           created_at: string
@@ -549,6 +579,7 @@ export type Database = {
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           status: string
+          unique_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -563,6 +594,7 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          unique_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -577,6 +609,7 @@ export type Database = {
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
+          unique_id?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -599,6 +632,7 @@ export type Database = {
           parent_phone: string | null
           photo_url: string | null
           status: string
+          unique_id: string | null
           updated_at: string
         }
         Insert: {
@@ -618,6 +652,7 @@ export type Database = {
           parent_phone?: string | null
           photo_url?: string | null
           status?: string
+          unique_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -637,6 +672,7 @@ export type Database = {
           parent_phone?: string | null
           photo_url?: string | null
           status?: string
+          unique_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -769,6 +805,57 @@ export type Database = {
         }
         Relationships: []
       }
+      unique_id_counters: {
+        Row: {
+          category: string
+          last_value: number
+          year: number
+        }
+        Insert: {
+          category: string
+          last_value?: number
+          year: number
+        }
+        Update: {
+          category?: string
+          last_value?: number
+          year?: number
+        }
+        Relationships: []
+      }
+      user_credentials: {
+        Row: {
+          category: string
+          created_at: string
+          is_active: boolean
+          last_reset_at: string | null
+          password_reset_required: boolean
+          synthetic_email: string
+          unique_id: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          is_active?: boolean
+          last_reset_at?: string | null
+          password_reset_required?: boolean
+          synthetic_email: string
+          unique_id: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          is_active?: boolean
+          last_reset_at?: string | null
+          password_reset_required?: boolean
+          synthetic_email?: string
+          unique_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -803,6 +890,8 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      lookup_login_email: { Args: { _unique_id: string }; Returns: string }
+      next_unique_id: { Args: { _category: string }; Returns: string }
     }
     Enums: {
       app_role:
@@ -824,6 +913,30 @@ export type Database = {
         | "matron"
         | "transport_officer"
         | "teacher"
+        | "school_admin"
+        | "academic_master"
+        | "exams_admin"
+        | "exams_user"
+        | "finance_admin"
+        | "finance_user"
+        | "boarding_admin"
+        | "boarding_user"
+        | "kitchen_admin"
+        | "kitchen_user"
+        | "security_admin"
+        | "security_user"
+        | "library_admin"
+        | "library_user"
+        | "clinic_admin"
+        | "clinic_user"
+        | "sports_admin"
+        | "sports_user"
+        | "store_admin"
+        | "store_user"
+        | "transport_admin"
+        | "guidance_admin"
+        | "ict_admin"
+        | "discipline_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -970,6 +1083,30 @@ export const Constants = {
         "matron",
         "transport_officer",
         "teacher",
+        "school_admin",
+        "academic_master",
+        "exams_admin",
+        "exams_user",
+        "finance_admin",
+        "finance_user",
+        "boarding_admin",
+        "boarding_user",
+        "kitchen_admin",
+        "kitchen_user",
+        "security_admin",
+        "security_user",
+        "library_admin",
+        "library_user",
+        "clinic_admin",
+        "clinic_user",
+        "sports_admin",
+        "sports_user",
+        "store_admin",
+        "store_user",
+        "transport_admin",
+        "guidance_admin",
+        "ict_admin",
+        "discipline_admin",
       ],
     },
   },
