@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
@@ -26,7 +27,9 @@ import { Route as AppClassesRouteImport } from './routes/_app.classes'
 import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
+import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
+import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
 import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
 import { Route as AppIdsVerifyRouteImport } from './routes/_app.ids.verify'
@@ -63,6 +66,11 @@ const AppRoute = AppRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SysControlRoomRoute = SysControlRoomRouteImport.update({
+  id: '/sys/control-room',
+  path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransportRoute = AppTransportRouteImport.update({
@@ -135,10 +143,20 @@ const AppAnnouncementsRoute = AppAnnouncementsRouteImport.update({
   path: '/announcements',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   id: '/api/public/mpesa-callback',
   path: '/api/public/mpesa-callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppTimetableGenerateRoute = AppTimetableGenerateRouteImport.update({
+  id: '/generate',
+  path: '/generate',
+  getParentRoute: () => AppTimetableRoute,
 } as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
   id: '/portal/student',
@@ -260,6 +278,7 @@ const AppAcademicsReportCardStudentIdExamIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
@@ -272,8 +291,9 @@ export interface FileRoutesByFullPath {
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
-  '/timetable': typeof AppTimetableRoute
+  '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -293,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/ids/verify': typeof AppIdsVerifyRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -302,6 +323,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
@@ -314,8 +336,9 @@ export interface FileRoutesByTo {
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
-  '/timetable': typeof AppTimetableRoute
+  '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -335,6 +358,7 @@ export interface FileRoutesByTo {
   '/ids/verify': typeof AppIdsVerifyRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -346,6 +370,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
   '/_app/attendance': typeof AppAttendanceRoute
   '/_app/boarding': typeof AppBoardingRoute
@@ -358,8 +383,9 @@ export interface FileRoutesById {
   '/_app/security': typeof AppSecurityRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
-  '/_app/timetable': typeof AppTimetableRoute
+  '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
+  '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
   '/_app/academics/report-cards': typeof AppAcademicsReportCardsRoute
@@ -379,6 +405,7 @@ export interface FileRoutesById {
   '/_app/ids/verify': typeof AppIdsVerifyRoute
   '/_app/portal/parent': typeof AppPortalParentRoute
   '/_app/portal/student': typeof AppPortalStudentRoute
+  '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -390,6 +417,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/analytics'
     | '/announcements'
     | '/attendance'
     | '/boarding'
@@ -404,6 +432,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/report-cards'
@@ -423,6 +452,7 @@ export interface FileRouteTypes {
     | '/ids/verify'
     | '/portal/parent'
     | '/portal/student'
+    | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -432,6 +462,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/analytics'
     | '/announcements'
     | '/attendance'
     | '/boarding'
@@ -446,6 +477,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/report-cards'
@@ -465,6 +497,7 @@ export interface FileRouteTypes {
     | '/ids/verify'
     | '/portal/parent'
     | '/portal/student'
+    | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -475,6 +508,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/login'
+    | '/_app/analytics'
     | '/_app/announcements'
     | '/_app/attendance'
     | '/_app/boarding'
@@ -489,6 +523,7 @@ export interface FileRouteTypes {
     | '/_app/students'
     | '/_app/timetable'
     | '/_app/transport'
+    | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
     | '/_app/academics/report-cards'
@@ -508,6 +543,7 @@ export interface FileRouteTypes {
     | '/_app/ids/verify'
     | '/_app/portal/parent'
     | '/_app/portal/student'
+    | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
@@ -519,6 +555,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
 }
 
@@ -543,6 +580,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sys/control-room': {
+      id: '/sys/control-room'
+      path: '/sys/control-room'
+      fullPath: '/sys/control-room'
+      preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/transport': {
@@ -643,12 +687,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnnouncementsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/analytics': {
+      id: '/_app/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/public/mpesa-callback': {
       id: '/api/public/mpesa-callback'
       path: '/api/public/mpesa-callback'
       fullPath: '/api/public/mpesa-callback'
       preLoaderRoute: typeof ApiPublicMpesaCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/timetable/generate': {
+      id: '/_app/timetable/generate'
+      path: '/generate'
+      fullPath: '/timetable/generate'
+      preLoaderRoute: typeof AppTimetableGenerateRouteImport
+      parentRoute: typeof AppTimetableRoute
     }
     '/_app/portal/student': {
       id: '/_app/portal/student'
@@ -814,7 +872,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppTimetableRouteChildren {
+  AppTimetableGenerateRoute: typeof AppTimetableGenerateRoute
+}
+
+const AppTimetableRouteChildren: AppTimetableRouteChildren = {
+  AppTimetableGenerateRoute: AppTimetableGenerateRoute,
+}
+
+const AppTimetableRouteWithChildren = AppTimetableRoute._addFileChildren(
+  AppTimetableRouteChildren,
+)
+
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAnnouncementsRoute: typeof AppAnnouncementsRoute
   AppAttendanceRoute: typeof AppAttendanceRoute
   AppBoardingRoute: typeof AppBoardingRoute
@@ -827,7 +898,7 @@ interface AppRouteChildren {
   AppSecurityRoute: typeof AppSecurityRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
-  AppTimetableRoute: typeof AppTimetableRoute
+  AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
   AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
@@ -855,6 +926,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppAnnouncementsRoute: AppAnnouncementsRoute,
   AppAttendanceRoute: AppAttendanceRoute,
   AppBoardingRoute: AppBoardingRoute,
@@ -867,7 +939,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSecurityRoute: AppSecurityRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
-  AppTimetableRoute: AppTimetableRoute,
+  AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
   AppAcademicsMarksRoute: AppAcademicsMarksRoute,
@@ -901,6 +973,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
 }
 export const routeTree = rootRouteImport
