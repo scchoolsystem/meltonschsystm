@@ -6,6 +6,8 @@ import { useState, useMemo } from "react";
 import { admitStudent } from "@/lib/admissions.functions";
 import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
+import { LifecycleActions } from "@/components/LifecycleActions";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
