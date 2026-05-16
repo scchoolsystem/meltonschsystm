@@ -34,17 +34,17 @@ function Page() {
   const { data: classes = [] } = useQuery({ queryKey: ["classes-marks"], queryFn: async () => (await supabase.from("classes").select("id,name").order("name")).data ?? [] });
   const { data: subjects = [] } = useQuery({ queryKey: ["subjects-marks"], queryFn: async () => (await supabase.from("subjects").select("id,code,name").order("code")).data ?? [] });
 
-  const { data: students = [], isFetching: loadingStudents } = useQuery({
+  const { data: students, isFetching: loadingStudents } = useQuery({
     queryKey: ["students-class-marks", classId],
     enabled: !!classId,
     queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").eq("class_id", classId).eq("status", "active").order("last_name")).data ?? [],
   });
 
-  const { data: existing = [], isFetching: loadingExisting } = useQuery({
+  const { data: existing, isFetching: loadingExisting } = useQuery({
     queryKey: ["existing-results", examId, subjectId, classId],
-    enabled: !!(examId && subjectId && classId),
+    enabled: !!(examId && subjectId && classId && students && (students as any[]).length > 0),
     queryFn: async () => {
-      const ids = (students as any[]).map(s => s.id);
+      const ids = ((students as any[]) ?? []).map(s => s.id);
       if (!ids.length) return [];
       const { data } = await supabase.from("exam_results")
         .select("id,student_id,score,verified")
@@ -54,9 +54,10 @@ function Page() {
   });
 
   useEffect(() => {
+    if (!students) return;
     const map: Record<string, { id?: string; score: string; verified: boolean }> = {};
     (students as any[]).forEach(s => {
-      const ex = (existing as any[]).find(e => e.student_id === s.id);
+      const ex = (existing as any[] | undefined)?.find(e => e.student_id === s.id);
       map[s.id] = { id: ex?.id, score: ex ? String(ex.score) : "", verified: !!ex?.verified };
     });
     setScores(map);
