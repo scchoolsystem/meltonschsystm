@@ -61,6 +61,7 @@ const adminItems = [
   { title: "Users & Credentials", url: "/admin/users", icon: Users },
   { title: "Portal Links", url: "/admin/links", icon: Link2 },
   { title: "User Roles", url: "/admin/roles", icon: Users },
+  { title: "CSV Import", url: "/admin/import", icon: FileText },
   { title: "Activity Log", url: "/admin/activity", icon: Activity },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
