@@ -17,6 +17,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { createStaff } from "@/lib/admissions.functions";
 import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
+import { LifecycleActions } from "@/components/LifecycleActions";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export const Route = createFileRoute("/_app/staff")({
   component: StaffPage,
@@ -85,11 +87,12 @@ function StaffPage() {
                     <TableHead>Department</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Status</TableHead>
+                    {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {staff.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">No staff yet.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">No staff yet.</TableCell></TableRow>
                   )}
                   {staff.map((s: any) => (
                     <TableRow key={s.id}>
@@ -102,12 +105,12 @@ function StaffPage() {
                       <TableCell><Badge variant="outline">{s.role.replace(/_/g, " ")}</Badge></TableCell>
                       <TableCell>{s.department ?? "—"}</TableCell>
                       <TableCell>{s.phone ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={
-                          s.status === "active" ? "bg-success/15 text-success border-success/30" :
-                          s.status === "on_leave" ? "bg-warning/15 text-warning-foreground border-warning/30" : ""
-                        }>{s.status}</Badge>
-                      </TableCell>
+                      <TableCell><StatusBadge status={s.lifecycle_status ?? s.status} /></TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right">
+                          <LifecycleActions kind="staff" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="staff" />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
