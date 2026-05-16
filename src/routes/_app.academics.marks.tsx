@@ -34,17 +34,17 @@ function Page() {
   const { data: classes = [] } = useQuery({ queryKey: ["classes-marks"], queryFn: async () => (await supabase.from("classes").select("id,name").order("name")).data ?? [] });
   const { data: subjects = [] } = useQuery({ queryKey: ["subjects-marks"], queryFn: async () => (await supabase.from("subjects").select("id,code,name").order("code")).data ?? [] });
 
-  const { data: students = [], isFetching: loadingStudents } = useQuery({
+  const { data: students, isFetching: loadingStudents } = useQuery({
     queryKey: ["students-class-marks", classId],
     enabled: !!classId,
     queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").eq("class_id", classId).eq("status", "active").order("last_name")).data ?? [],
   });
 
-  const { data: existing = [], isFetching: loadingExisting } = useQuery({
+  const { data: existing, isFetching: loadingExisting } = useQuery({
     queryKey: ["existing-results", examId, subjectId, classId],
-    enabled: !!(examId && subjectId && classId),
+    enabled: !!(examId && subjectId && classId && students && ((students as any[]) ?? []).length > 0),
     queryFn: async () => {
-      const ids = (students as any[]).map(s => s.id);
+      const ids = (((students as any[]) ?? []) ?? []).map(s => s.id);
       if (!ids.length) return [];
       const { data } = await supabase.from("exam_results")
         .select("id,student_id,score,verified")
@@ -54,9 +54,10 @@ function Page() {
   });
 
   useEffect(() => {
+    if (!students) return;
     const map: Record<string, { id?: string; score: string; verified: boolean }> = {};
-    (students as any[]).forEach(s => {
-      const ex = (existing as any[]).find(e => e.student_id === s.id);
+    ((students as any[]) ?? []).forEach(s => {
+      const ex = (existing as any[] | undefined)?.find(e => e.student_id === s.id);
       map[s.id] = { id: ex?.id, score: ex ? String(ex.score) : "", verified: !!ex?.verified };
     });
     setScores(map);
@@ -87,7 +88,7 @@ function Page() {
 
   const verifyMut = useMutation({
     mutationFn: async () => {
-      const ids = (existing as any[]).filter(e => !e.verified).map(e => e.id);
+      const ids = ((existing as any[]) ?? []).filter(e => !e.verified).map(e => e.id);
       if (!ids.length) throw new Error("Nothing to verify");
       const { data: u } = await supabase.auth.getUser();
       const { error } = await supabase.from("exam_results").update({
@@ -110,7 +111,7 @@ function Page() {
   }, [scores]);
 
   const ready = examId && classId && subjectId;
-  const unverifiedCount = (existing as any[]).filter(e => !e.verified).length;
+  const unverifiedCount = ((existing as any[]) ?? []).filter(e => !e.verified).length;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -156,7 +157,7 @@ function Page() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-base">{(students as any[]).length} student(s)</CardTitle>
+              <CardTitle className="text-base">{((students as any[]) ?? []).length} student(s)</CardTitle>
               {stats && (
                 <>
                   <Badge variant="secondary">avg {stats.avg}</Badge>
@@ -191,7 +192,7 @@ function Page() {
                   <TableHead className="w-28">Status</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {(students as any[]).map(s => {
+                  {((students as any[]) ?? []).map(s => {
                     const row = scores[s.id] || { score: "", verified: false };
                     const n = Number(row.score);
                     return (
@@ -212,7 +213,7 @@ function Page() {
                       </TableRow>
                     );
                   })}
-                  {(students as any[]).length === 0 && (
+                  {((students as any[]) ?? []).length === 0 && (
                     <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No active students in this class.</TableCell></TableRow>
                   )}
                 </TableBody>
