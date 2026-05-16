@@ -28,7 +28,9 @@ const mainItems = [
 const academicItems = [
   { title: "Subjects", url: "/academics/subjects", icon: BookText },
   { title: "Exams", url: "/academics/exams", icon: FileText },
+  { title: "Mark Entry", url: "/academics/marks", icon: ClipboardCheck },
   { title: "Results", url: "/academics/results", icon: Award },
+  { title: "Report Cards", url: "/academics/report-cards", icon: FileText },
   { title: "Timetable", url: "/timetable", icon: CalendarDays },
 ];
 
