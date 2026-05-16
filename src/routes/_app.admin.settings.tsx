@@ -44,6 +44,7 @@ function SettingsPage() {
   });
 
   const [form, setForm] = useState<Partial<SchoolSettings>>({});
+  const [uploading, setUploading] = useState(false);
   useEffect(() => { if (data) setForm(data); }, [data]);
 
   const save = useMutation({
