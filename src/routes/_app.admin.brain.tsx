@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { computeSchoolBrain } from "@/lib/brain.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Brain, TrendingUp, AlertTriangle } from "lucide-react";
+import { Loader2, Brain, TrendingUp, AlertTriangle, ShieldCheck, Lock, Unlock, History, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/admin/brain")({ component: BrainPage });
