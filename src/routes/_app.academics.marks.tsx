@@ -44,7 +44,7 @@ function Page() {
     queryKey: ["existing-results", examId, subjectId, classId],
     enabled: !!(examId && subjectId && classId && students && ((students as any[]) ?? []).length > 0),
     queryFn: async () => {
-      const ids = (((students as any[]) ?? []) ?? []).map(s => s.id);
+      const ids = ((students as any[]) ?? []).map(s => s.id);
       if (!ids.length) return [];
       const { data } = await supabase.from("exam_results")
         .select("id,student_id,score,verified")
