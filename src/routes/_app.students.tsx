@@ -46,7 +46,7 @@ function StudentsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, admission_no, first_name, last_name, gender, class_id, status, parent_phone, classes(name)")
+        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)")
         .order("admission_no", { ascending: false });
       if (error) throw error;
       return data as unknown as Student[];
