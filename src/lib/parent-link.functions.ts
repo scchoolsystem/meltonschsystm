@@ -12,7 +12,7 @@ export const autoLinkParent = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: matches } = await supabaseAdmin.rpc("find_parent_match", {
-      _email: data.email || null, _phone: data.phone || null,
+      _email: data.email || "", _phone: data.phone || "",
     });
     const list = (matches ?? []) as Array<{ student_id: string; method: string }>;
     if (list.length === 0) {
