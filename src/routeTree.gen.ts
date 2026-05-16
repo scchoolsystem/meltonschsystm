@@ -40,6 +40,7 @@ import { Route as AppFinanceGenerateRouteImport } from './routes/_app.finance.ge
 import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
+import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.permissions'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
@@ -210,6 +211,11 @@ const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminSchoolsRoute = AppAdminSchoolsRouteImport.update({
+  id: '/admin/schools',
+  path: '/admin/schools',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   id: '/admin/roles',
   path: '/admin/roles',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
@@ -364,6 +371,7 @@ export interface FileRoutesByTo {
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
@@ -413,6 +421,7 @@ export interface FileRoutesById {
   '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/permissions': typeof AppAdminPermissionsRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
+  '/_app/admin/schools': typeof AppAdminSchoolsRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/finance/fees': typeof AppFinanceFeesRoute
@@ -462,6 +471,7 @@ export interface FileRouteTypes {
     | '/admin/links'
     | '/admin/permissions'
     | '/admin/roles'
+    | '/admin/schools'
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
@@ -509,6 +519,7 @@ export interface FileRouteTypes {
     | '/admin/links'
     | '/admin/permissions'
     | '/admin/roles'
+    | '/admin/schools'
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
@@ -557,6 +568,7 @@ export interface FileRouteTypes {
     | '/_app/admin/links'
     | '/_app/admin/permissions'
     | '/_app/admin/roles'
+    | '/_app/admin/schools'
     | '/_app/admin/settings'
     | '/_app/admin/users'
     | '/_app/finance/fees'
@@ -802,6 +814,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/schools': {
+      id: '/_app/admin/schools'
+      path: '/admin/schools'
+      fullPath: '/admin/schools'
+      preLoaderRoute: typeof AppAdminSchoolsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/roles': {
       id: '/_app/admin/roles'
       path: '/admin/roles'
@@ -949,6 +968,7 @@ interface AppRouteChildren {
   AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminPermissionsRoute: typeof AppAdminPermissionsRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
+  AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppFinanceFeesRoute: typeof AppFinanceFeesRoute
@@ -992,6 +1012,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminPermissionsRoute: AppAdminPermissionsRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
+  AppAdminSchoolsRoute: AppAdminSchoolsRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppFinanceFeesRoute: AppFinanceFeesRoute,
