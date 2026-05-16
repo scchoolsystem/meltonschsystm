@@ -1,63 +1,377 @@
-## Phase 1 — Auth & Unique IDs (foundation for everything else)
+&nbsp;
 
-This phase delivers the strict identification system. Existing users keep working during the rollout; we layer the new login on top without breaking anything.
+SYSTEM STATUS:
 
-### What you get
+This is a FULL ENTERPRISE SCHOOL ERP (Phases 1–6 core + Phase 7 governance + Intelligence Layer upgrade)
 
-1. **System-generated Unique IDs** for every account: `STU-2026-000245`, `STF-2026-000045`, `LIB-2026-0002`, `SEC-2026-0004`, `EXM-2026-0001`, etc.
-2. **System-generated strong passwords** (14 chars, mixed case + digits + symbols) at account creation. Never user-chosen.
-3. **Hybrid credential delivery**:
-   - Always shown ONCE in a secure admin popup with a Copy button.
-   - Also queued for email (rendered later when email infra is set up — won't block creation now).
-   - Per-school setting: `on_screen` | `email` | `hybrid` (default).
-4. **Login modes**:
-   - Default tab: **Unique ID + password** (works for everyone).
-   - Super admin tab: **email + password** (only super_admin/principal can use this).
-5. **Password reset by super admin only** — regenerates and shows once. Self-reset by email is disabled until email infra is wired.
-6. **Role expansion** — adds the 30+ enterprise roles you listed (school_admin, academic_master, exams_admin/user, finance_admin/user, boarding_admin/user, kitchen_admin/user, security_admin/user, library_admin/user, clinic_admin/user, sports_admin/user, store_admin/user, transport_admin, guidance_admin, ict_admin, discipline_admin) to the existing `app_role` enum. Existing roles stay.
-7. **Revoke flow** — admin can deactivate a user: marks `is_active=false`, login is blocked at the server function, profile + audit trail preserved.
-8. **Migration of existing users** — every existing auth user gets a unique_id backfilled based on their current role (super_admin → `SUP-2026-xxxx`, staff → `STF-…`, etc.). Their current email/password keeps working so nobody is locked out; the new unique-ID login starts working immediately alongside it.
+DO NOT RESET OR REBUILD EXISTING SYSTEM
 
-### Technical layout
+ONLY EXTEND AND UPGRADE
 
-```text
-DB
-├── ALTER TYPE app_role ADD VALUE ...        (30+ new roles)
-├── school_settings                          (singleton: name, email_domain, delivery_mode)
-├── user_credentials                          (user_id, unique_id, category, synthetic_email,
-│                                              is_active, last_reset_at)
-├── students.unique_id                        (column added, backfilled)
-├── staff.unique_id                           (column added, backfilled)
-├── RLS: super_admin manages credentials; users read their own
-└── trigger: on new staff/student row → enqueue unique_id assignment
+========================================================
 
-Server fns  (src/lib/auth-admin.functions.ts)
-├── createAccount({ role, full_name, email?, link_to_staff_id?, link_to_student_id? })
-│       → generates uniqueId + password, supabaseAdmin.auth.admin.createUser,
-│         inserts user_credentials, returns { uniqueId, password } ONCE
-├── resetPassword({ user_id })  super_admin only
-├── revokeAccount({ user_id })  super_admin only
-└── loginWithUniqueId({ uniqueId, password })
-        → looks up synthetic_email, checks is_active, returns email for client
-          to complete signInWithPassword
+PART 1 — CORE ERP (PHASES 1–6 CONFIRMED)
 
-UI
-├── /login              tabs: "Unique ID" (default) | "Super Admin Email"
-├── /_app/admin/users   new page: create account → modal with copy-able credentials
-└── /_app/admin/roles   already exists; extended with new role list
-```
+========================================================
 
-### Out of scope for Phase 1 (explicitly deferred)
+Includes fully working modules:
 
-- Email delivery of credentials (needs domain + email infra — separate phase).
-- Auto-generated `student001@school.erp` mailboxes (rendered as synthetic logins only; no real inbox yet).
-- Student/parent portals, finance, timetable, exam engine, IDs/QR — Phases 2–6.
+- Authentication (Unique ID + Email login + Setup admin)
 
-### Safety guarantees
+- User management (students, staff, parents, roles)
 
-- No existing data deleted.
-- No existing user locked out — old email login continues working in parallel.
-- All new RLS policies are additive and role-scoped.
-- Backfill is idempotent (re-running won't duplicate IDs).
+- Academics (classes, subjects, exams, results, report cards)
 
-Approve and I'll execute the migration, then wire the server functions and login UI in one pass.
+- Timetable system (clash-free scheduling engine)
+
+- Finance system (fees, invoices, payments, receipts, MPESA hooks)
+
+- Attendance + discipline tracking
+
+- Library system
+
+- Boarding system
+
+- Kitchen system
+
+- Clinic system
+
+- Security system
+
+- Transport system
+
+- Digital ID system (QR + printable cards)
+
+- Parent + Student portals
+
+========================================================
+
+PART 2 — UNIVERSAL GOVERNANCE ENGINE (PHASE 7)
+
+========================================================
+
+A. USER LIFECYCLE SYSTEM
+
+Statuses:
+
+- active
+
+- suspended
+
+- expelled
+
+- transferred
+
+- archived (soft delete only)
+
+Rules:
+
+- NO hard deletes anywhere
+
+- All changes logged in lifecycle_events
+
+- Suspended users cannot log in
+
+- Expelled users are read-only (admin/principal only)
+
+---
+
+B. UNIVERSAL PERMISSION ENGINE
+
+Replace ALL edit logic with:
+
+can_edit(user, resource, field, record)
+
+Role hierarchy:
+
+- super_admin (100)
+
+- principal (90)
+
+- deputy_principal (80)
+
+- academic_master (75)
+
+- exams_admin / bursar (70)
+
+- hod (60)
+
+- senior_teacher (55)
+
+- class_teacher (50)
+
+- subject_teacher (40)
+
+- staff (30)
+
+- student (10)
+
+- parent (5)
+
+Field types:
+
+- editable
+
+- restricted
+
+- locked
+
+Rules:
+
+- locked fields require override ONLY
+
+- no direct bypass anywhere
+
+---
+
+C. OVERRIDE SYSTEM
+
+- Super admin: full override
+
+- Principal: academic + discipline + general override
+
+- Department heads: module-scoped override only
+
+All overrides require:
+
+- reason
+
+- audit log entry (override_log + field_edit_audit)
+
+---
+
+D. AUTO USER CREATION ENGINE
+
+On ANY user creation:
+
+Automatically:
+
+- Generate Unique ID (STU/STF/PAR/ADM/etc.)
+
+- Generate strong password
+
+- Assign role + department/class
+
+- Auto-link parent ↔ student via email/phone match
+
+- If no match → generate Parent Auth Code (PRN-YYYY-XXXXX)
+
+---
+
+E. EMAIL AUTOMATION (FALLBACK SAFE)
+
+- If email system enabled + domain configured:
+
+  send credentials, invoices, receipts automatically
+
+- Else:
+
+  show secure admin popup (fallback mode)
+
+System must NOT depend on email being active.
+
+---
+
+F. PARENT LINKING SYSTEM
+
+Priority:
+
+1. email match
+
+2. phone match
+
+3. parent auth code
+
+4. admin override
+
+---
+
+G. FEES SYSTEM (CLASS-BASED)
+
+- Fees assigned per CLASS, not per student
+
+- Auto-generate invoices on:
+
+  - admission
+
+  - term start
+
+Components:
+
+- tuition
+
+- boarding
+
+- transport
+
+- meals
+
+---
+
+H. PAYMENT AUTOMATION
+
+On payment:
+
+- update invoice status
+
+- generate receipt
+
+- update finance dashboard
+
+- send receipt (if email enabled)
+
+---
+
+I. AUDIT SYSTEM (GLOBAL)
+
+Log ALL:
+
+- edits
+
+- overrides
+
+- payments
+
+- transfers
+
+- suspensions
+
+- role changes
+
+Fields:
+
+user_id, role, action, before, after, timestamp, reason
+
+---
+
+J. SUPER ADMIN RULE
+
+Super admin can:
+
+- see ALL data
+
+- override EVERYTHING
+
+- access ALL logs
+
+- bypass restrictions
+
+========================================================
+
+PART 3 — NEXT BRAIN LAYER (INTELLIGENCE ENGINE)
+
+========================================================
+
+THIS IS THE NEW UPGRADE LAYER ON TOP OF ERP
+
+---
+
+A. SCHOOL INTELLIGENCE CORE
+
+System becomes predictive, not just record-based:
+
+- predicts student performance trends
+
+- detects failing students early
+
+- flags attendance risks
+
+- predicts fee default risk
+
+- detects discipline escalation patterns
+
+---
+
+B. SMART ALERT ENGINE
+
+Auto-generate alerts for:
+
+- declining grades
+
+- unpaid fees risk
+
+- absenteeism spikes
+
+- teacher workload imbalance
+
+- timetable overload conflicts
+
+Alerts go to:
+
+- class teacher
+
+- HOD
+
+- principal
+
+- super admin
+
+---
+
+C. AUTO-DECISION SUPPORT SYSTEM
+
+System suggests:
+
+- class reshuffling for balance
+
+- exam intervention groups
+
+- fee reminder timing optimization
+
+- teacher workload redistribution
+
+Human approves, system suggests.
+
+---
+
+D. ANALYTICS BRAIN DASHBOARD
+
+New super dashboard:
+
+Shows:
+
+- school health score
+
+- academic performance index
+
+- financial stability index
+
+- attendance stability index
+
+- discipline risk index
+
+---
+
+E. ANOMALY DETECTION ENGINE
+
+Flags:
+
+- fake attendance patterns
+
+- suspicious fee edits
+
+- abnormal grade changes
+
+- repeated overrides by same user
+
+- irregular timetable usage
+
+---
+
+F. SMART AUTOMATION TRIGGERS
+
+System auto-runs:
+
+- fee reminders
+
+- report card generation alerts
+
+- performance summaries
+
+- parent notifications
+
+- weekly school report to principal
+
+---
+
+END OF SYSTEM
