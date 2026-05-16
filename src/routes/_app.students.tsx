@@ -158,15 +158,6 @@ function StudentsPage() {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    active: "bg-success/15 text-success border-success/30",
-    inactive: "bg-muted text-muted-foreground",
-    transferred: "bg-warning/15 text-warning-foreground border-warning/30",
-    graduated: "bg-accent/15 text-accent border-accent/30",
-  };
-  return <Badge variant="outline" className={map[status] ?? ""}>{status}</Badge>;
-}
 
 function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]; settings: any; onDone: () => void }) {
   const admit = useServerFn(admitStudent);
