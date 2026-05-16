@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { lookupLoginEmail } from "@/lib/auth-admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,13 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   // Hidden trigger: 5 clicks on the logo unlocks admin link
   const [clicks, setClicks] = useState(0);
+  const { data: settings } = useQuery({
+    queryKey: ["school-settings-login"],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_settings").select("school_name, motto, logo_url").limit(1).maybeSingle();
+      return data;
+    },
+  });
 
   useEffect(() => {
     if (!loading && session) navigate({ to: "/dashboard" });
@@ -51,13 +59,17 @@ function LoginPage() {
           <button
             type="button"
             onClick={() => setClicks((c) => c + 1)}
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg cursor-default"
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg cursor-default overflow-hidden"
             aria-label="School logo"
           >
-            <GraduationCap className="w-8 h-8" />
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="School logo" className="w-full h-full object-cover" />
+            ) : (
+              <GraduationCap className="w-8 h-8" />
+            )}
           </button>
-          <h1 className="text-3xl font-bold">Greenfield Academy</h1>
-          <p className="text-sm text-muted-foreground mt-1">School Management System</p>
+          <h1 className="text-3xl font-bold">{settings?.school_name ?? "School ERP"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{settings?.motto ?? "School Management System"}</p>
         </div>
 
         <Card className="shadow-xl">
