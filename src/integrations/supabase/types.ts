@@ -697,28 +697,52 @@ export type Database = {
       }
       school_settings: {
         Row: {
+          academic_year: number | null
+          address: string | null
           created_at: string
           credential_delivery_mode: string
+          current_term: string | null
+          email: string | null
           email_domain: string
           id: string
+          logo_url: string | null
+          motto: string | null
+          phone: string | null
+          primary_color: string | null
           school_name: string
           singleton: boolean
           updated_at: string
         }
         Insert: {
+          academic_year?: number | null
+          address?: string | null
           created_at?: string
           credential_delivery_mode?: string
+          current_term?: string | null
+          email?: string | null
           email_domain?: string
           id?: string
+          logo_url?: string | null
+          motto?: string | null
+          phone?: string | null
+          primary_color?: string | null
           school_name?: string
           singleton?: boolean
           updated_at?: string
         }
         Update: {
+          academic_year?: number | null
+          address?: string | null
           created_at?: string
           credential_delivery_mode?: string
+          current_term?: string | null
+          email?: string | null
           email_domain?: string
           id?: string
+          logo_url?: string | null
+          motto?: string | null
+          phone?: string | null
+          primary_color?: string | null
           school_name?: string
           singleton?: boolean
           updated_at?: string
