@@ -1,7 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
+import { admitStudent } from "@/lib/admissions.functions";
+import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
+import { IdCard } from "@/components/IdCard";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,28 +167,84 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]; settings: any; onDone: () => void }) {
+  const admit = useServerFn(admitStudent);
+  const [photo, setPhoto] = useState<string | null>(null);
   const [form, setForm] = useState({
     first_name: "", last_name: "", gender: "", class_id: "",
     parent_name: "", parent_phone: "", parent_email: "", date_of_birth: "",
+    address: "", medical_notes: "",
   });
+  const [result, setResult] = useState<null | { uniqueId: string; password: string; admission_no: string; full_name: string; photo_url: string | null; class_name?: string }>(null);
+
   const m = useMutation({
     mutationFn: async () => {
-      const payload: any = { ...form };
-      if (!payload.class_id) delete payload.class_id;
-      if (!payload.gender) delete payload.gender;
-      if (!payload.date_of_birth) delete payload.date_of_birth;
-      // Auto-issue unique STU ID synced with settings
-      const { data: uid, error: uidErr } = await supabase.rpc("next_unique_id", { _category: "STU" });
-      if (uidErr) throw uidErr;
-      payload.unique_id = uid;
-      const { error } = await supabase.from("students").insert(payload);
-      if (error) throw error;
+      let photo_url: string | undefined;
+      if (photo) {
+        photo_url = await uploadPhotoDataUrl(supabase, photo, "students", `${form.first_name}-${form.last_name}`.toLowerCase().replace(/\s+/g, "-"));
+      }
+      const payload: any = {
+        first_name: form.first_name, last_name: form.last_name,
+        parent_name: form.parent_name, parent_phone: form.parent_phone, parent_email: form.parent_email,
+        address: form.address, medical_notes: form.medical_notes,
+        photo_url,
+      };
+      if (form.gender) payload.gender = form.gender;
+      if (form.date_of_birth) payload.date_of_birth = form.date_of_birth;
+      if (form.class_id) payload.class_id = form.class_id;
+      const res = await admit({ data: payload });
+      return { ...res, photo_url: photo_url ?? null };
     },
-    onSuccess: () => { toast.success("Student admitted"); onDone(); },
+    onSuccess: (res) => {
+      toast.success("Student admitted");
+      const cls = classes.find((c) => c.id === form.class_id)?.name;
+      setResult({
+        uniqueId: res.uniqueId,
+        password: res.password,
+        admission_no: res.student.admission_no,
+        full_name: `${res.student.first_name} ${res.student.last_name}`,
+        photo_url: res.photo_url,
+        class_name: cls,
+      });
+    },
     onError: (e: any) => toast.error(e.message),
   });
+
+  if (result) {
+    return (
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Student admitted ✓</DialogTitle>
+          <p className="text-xs text-muted-foreground">Save or print the credentials below — the password is shown only once.</p>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex justify-center">
+            <IdCard
+              schoolName={settings?.school_name ?? "School"}
+              kind="STUDENT"
+              uniqueId={result.uniqueId}
+              fullName={result.full_name}
+              subtitle={result.class_name ?? "Student"}
+              photoUrl={result.photo_url}
+              meta={[{ label: "ADM", value: result.admission_no }]}
+              validUntil={settings?.academic_year ? `Dec ${settings.academic_year}` : undefined}
+            />
+          </div>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm font-mono space-y-1">
+            <div>Login ID: <span className="font-bold">{result.uniqueId}</span></div>
+            <div>Password: <span className="font-bold">{result.password}</span></div>
+            <div>Admission #: {result.admission_no}</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          <Button onClick={onDone}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    );
+  }
+
   return (
-    <DialogContent className="max-w-lg">
+    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Admit New Student</DialogTitle>
         {settings && (
@@ -192,10 +253,14 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
           </p>
         )}
       </DialogHeader>
-      <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+      <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-4">
+        <div>
+          <Label className="mb-2 block">Student Photo</Label>
+          <PhotoCapture value={photo} onChange={setPhoto} />
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><Label>First Name</Label><Input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></div>
-          <div><Label>Last Name</Label><Input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></div>
+          <div><Label>First Name *</Label><Input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></div>
+          <div><Label>Last Name *</Label><Input required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Date of Birth</Label><Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></div>
@@ -220,16 +285,21 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
             </SelectContent>
           </Select>
         </div>
-        <div><Label>Parent / Guardian Name</Label><Input value={form.parent_name} onChange={(e) => setForm({ ...form, parent_name: e.target.value })} /></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><Label>Parent Phone</Label><Input value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })} /></div>
-          <div><Label>Parent Email</Label><Input type="email" value={form.parent_email} onChange={(e) => setForm({ ...form, parent_email: e.target.value })} /></div>
+        <div className="border-t pt-3 space-y-3">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Parent / Guardian</div>
+          <div><Label>Name</Label><Input value={form.parent_name} onChange={(e) => setForm({ ...form, parent_name: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Phone</Label><Input value={form.parent_phone} onChange={(e) => setForm({ ...form, parent_phone: e.target.value })} /></div>
+            <div><Label>Email</Label><Input type="email" value={form.parent_email} onChange={(e) => setForm({ ...form, parent_email: e.target.value })} /></div>
+          </div>
+          <div><Label>Address</Label><Textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+          <div><Label>Medical Notes</Label><Textarea rows={2} value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">Admission number and unique STU ID will be auto-generated using current academic settings.</p>
+        <p className="text-xs text-muted-foreground">A unique Student ID (STU-{settings?.academic_year ?? new Date().getFullYear()}-XXXXXX), admission number, and login password are generated automatically.</p>
         <DialogFooter>
           <Button type="submit" disabled={m.isPending}>
             {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Admit
+            Admit Student
           </Button>
         </DialogFooter>
       </form>
