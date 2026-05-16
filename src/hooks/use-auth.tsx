@@ -7,7 +7,14 @@ type AppRole =
   | "super_admin" | "principal" | "deputy_principal" | "class_teacher"
   | "subject_teacher" | "hod" | "admission_officer" | "bursar"
   | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff"
-  | "teacher" | "nurse" | "matron" | "transport_officer";
+  | "teacher" | "nurse" | "matron" | "transport_officer"
+  | "school_admin" | "academic_master"
+  | "exams_admin" | "exams_user" | "finance_admin" | "finance_user"
+  | "boarding_admin" | "boarding_user" | "kitchen_admin" | "kitchen_user"
+  | "security_admin" | "security_user" | "library_admin" | "library_user"
+  | "clinic_admin" | "clinic_user" | "sports_admin" | "sports_user"
+  | "store_admin" | "store_user" | "transport_admin" | "guidance_admin"
+  | "ict_admin" | "discipline_admin";
 
 interface AuthCtx {
   session: Session | null;
