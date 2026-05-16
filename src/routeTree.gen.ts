@@ -39,6 +39,7 @@ import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
+import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
@@ -199,6 +200,11 @@ const AppAdminLinksRoute = AppAdminLinksRouteImport.update({
   path: '/admin/links',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminImportRoute = AppAdminImportRouteImport.update({
+  id: '/admin/import',
+  path: '/admin/import',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
   id: '/admin/activity',
   path: '/admin/activity',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/import': typeof AppAdminImportRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/import': typeof AppAdminImportRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
@@ -358,6 +366,7 @@ export interface FileRoutesById {
   '/_app/academics/results': typeof AppAcademicsResultsRoute
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/import': typeof AppAdminImportRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
@@ -401,6 +410,7 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/import'
     | '/admin/links'
     | '/admin/roles'
     | '/admin/settings'
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/import'
     | '/admin/links'
     | '/admin/roles'
     | '/admin/settings'
@@ -484,6 +495,7 @@ export interface FileRouteTypes {
     | '/_app/academics/results'
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
+    | '/_app/admin/import'
     | '/_app/admin/links'
     | '/_app/admin/roles'
     | '/_app/admin/settings'
@@ -722,6 +734,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLinksRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/import': {
+      id: '/_app/admin/import'
+      path: '/admin/import'
+      fullPath: '/admin/import'
+      preLoaderRoute: typeof AppAdminImportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/activity': {
       id: '/_app/admin/activity'
       path: '/admin/activity'
@@ -816,6 +835,7 @@ interface AppRouteChildren {
   AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminImportRoute: typeof AppAdminImportRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
@@ -855,6 +875,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAcademicsResultsRoute: AppAcademicsResultsRoute,
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminImportRoute: AppAdminImportRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
