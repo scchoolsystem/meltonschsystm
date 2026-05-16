@@ -24,10 +24,12 @@ import { Route as AppClassesRouteImport } from './routes/_app.classes'
 import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
+import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
 import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
 import { Route as AppFinancePaymentsRouteImport } from './routes/_app.finance.payments'
 import { Route as AppFinanceInvoicesRouteImport } from './routes/_app.finance.invoices'
+import { Route as AppFinanceGenerateRouteImport } from './routes/_app.finance.generate'
 import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
@@ -37,6 +39,7 @@ import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activi
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
+import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -112,6 +115,11 @@ const AppAnnouncementsRoute = AppAnnouncementsRouteImport.update({
   path: '/announcements',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
+  id: '/api/public/mpesa-callback',
+  path: '/api/public/mpesa-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
   id: '/portal/student',
   path: '/portal/student',
@@ -130,6 +138,11 @@ const AppFinancePaymentsRoute = AppFinancePaymentsRouteImport.update({
 const AppFinanceInvoicesRoute = AppFinanceInvoicesRouteImport.update({
   id: '/finance/invoices',
   path: '/finance/invoices',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceGenerateRoute = AppFinanceGenerateRouteImport.update({
+  id: '/finance/generate',
+  path: '/finance/generate',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFinanceFeesRoute = AppFinanceFeesRouteImport.update({
@@ -177,6 +190,11 @@ const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
   path: '/academics/exams',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
+  id: '/finance/receipt/$id',
+  path: '/finance/receipt/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -202,10 +220,13 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
+  '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -231,10 +252,13 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
+  '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -262,10 +286,13 @@ export interface FileRoutesById {
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/finance/fees': typeof AppFinanceFeesRoute
+  '/_app/finance/generate': typeof AppFinanceGenerateRoute
   '/_app/finance/invoices': typeof AppFinanceInvoicesRoute
   '/_app/finance/payments': typeof AppFinancePaymentsRoute
   '/_app/portal/parent': typeof AppPortalParentRoute
   '/_app/portal/student': typeof AppPortalStudentRoute
+  '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,10 +320,13 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
+    | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
     | '/portal/parent'
     | '/portal/student'
+    | '/api/public/mpesa-callback'
+    | '/finance/receipt/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -322,10 +352,13 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/users'
     | '/finance/fees'
+    | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
     | '/portal/parent'
     | '/portal/student'
+    | '/api/public/mpesa-callback'
+    | '/finance/receipt/$id'
   id:
     | '__root__'
     | '/'
@@ -352,16 +385,20 @@ export interface FileRouteTypes {
     | '/_app/admin/settings'
     | '/_app/admin/users'
     | '/_app/finance/fees'
+    | '/_app/finance/generate'
     | '/_app/finance/invoices'
     | '/_app/finance/payments'
     | '/_app/portal/parent'
     | '/_app/portal/student'
+    | '/api/public/mpesa-callback'
+    | '/_app/finance/receipt/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -471,6 +508,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnnouncementsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/mpesa-callback': {
+      id: '/api/public/mpesa-callback'
+      path: '/api/public/mpesa-callback'
+      fullPath: '/api/public/mpesa-callback'
+      preLoaderRoute: typeof ApiPublicMpesaCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/portal/student': {
       id: '/_app/portal/student'
       path: '/portal/student'
@@ -497,6 +541,13 @@ declare module '@tanstack/react-router' {
       path: '/finance/invoices'
       fullPath: '/finance/invoices'
       preLoaderRoute: typeof AppFinanceInvoicesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/generate': {
+      id: '/_app/finance/generate'
+      path: '/finance/generate'
+      fullPath: '/finance/generate'
+      preLoaderRoute: typeof AppFinanceGenerateRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/finance/fees': {
@@ -562,6 +613,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAcademicsExamsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/finance/receipt/$id': {
+      id: '/_app/finance/receipt/$id'
+      path: '/finance/receipt/$id'
+      fullPath: '/finance/receipt/$id'
+      preLoaderRoute: typeof AppFinanceReceiptIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -587,10 +645,12 @@ interface AppRouteChildren {
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppFinanceFeesRoute: typeof AppFinanceFeesRoute
+  AppFinanceGenerateRoute: typeof AppFinanceGenerateRoute
   AppFinanceInvoicesRoute: typeof AppFinanceInvoicesRoute
   AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
   AppPortalParentRoute: typeof AppPortalParentRoute
   AppPortalStudentRoute: typeof AppPortalStudentRoute
+  AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -615,10 +675,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppFinanceFeesRoute: AppFinanceFeesRoute,
+  AppFinanceGenerateRoute: AppFinanceGenerateRoute,
   AppFinanceInvoicesRoute: AppFinanceInvoicesRoute,
   AppFinancePaymentsRoute: AppFinancePaymentsRoute,
   AppPortalParentRoute: AppPortalParentRoute,
   AppPortalStudentRoute: AppPortalStudentRoute,
+  AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -627,7 +689,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
