@@ -41,6 +41,7 @@ import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
+import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.permissions'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
@@ -214,6 +215,11 @@ const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   path: '/admin/roles',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminPermissionsRoute = AppAdminPermissionsRouteImport.update({
+  id: '/admin/permissions',
+  path: '/admin/permissions',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminLinksRoute = AppAdminLinksRouteImport.update({
   id: '/admin/links',
   path: '/admin/links',
@@ -309,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/import': typeof AppAdminImportRoute
   '/admin/links': typeof AppAdminLinksRoute
+  '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -355,6 +362,7 @@ export interface FileRoutesByTo {
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/import': typeof AppAdminImportRoute
   '/admin/links': typeof AppAdminLinksRoute
+  '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -403,6 +411,7 @@ export interface FileRoutesById {
   '/_app/admin/brain': typeof AppAdminBrainRoute
   '/_app/admin/import': typeof AppAdminImportRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
+  '/_app/admin/permissions': typeof AppAdminPermissionsRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/admin/brain'
     | '/admin/import'
     | '/admin/links'
+    | '/admin/permissions'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -497,6 +507,7 @@ export interface FileRouteTypes {
     | '/admin/brain'
     | '/admin/import'
     | '/admin/links'
+    | '/admin/permissions'
     | '/admin/roles'
     | '/admin/settings'
     | '/admin/users'
@@ -544,6 +555,7 @@ export interface FileRouteTypes {
     | '/_app/admin/brain'
     | '/_app/admin/import'
     | '/_app/admin/links'
+    | '/_app/admin/permissions'
     | '/_app/admin/roles'
     | '/_app/admin/settings'
     | '/_app/admin/users'
@@ -797,6 +809,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminRolesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/permissions': {
+      id: '/_app/admin/permissions'
+      path: '/admin/permissions'
+      fullPath: '/admin/permissions'
+      preLoaderRoute: typeof AppAdminPermissionsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/links': {
       id: '/_app/admin/links'
       path: '/admin/links'
@@ -928,6 +947,7 @@ interface AppRouteChildren {
   AppAdminBrainRoute: typeof AppAdminBrainRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
+  AppAdminPermissionsRoute: typeof AppAdminPermissionsRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
@@ -970,6 +990,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminBrainRoute: AppAdminBrainRoute,
   AppAdminImportRoute: AppAdminImportRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
+  AppAdminPermissionsRoute: AppAdminPermissionsRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
@@ -1000,13 +1021,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
