@@ -99,7 +99,7 @@ function StudentsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Students</h1>
-          <p className="text-sm text-muted-foreground mt-1">{students.length} total enrolled</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} total enrolled</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCsv}><Download className="w-4 h-4 mr-2" />Export</Button>
@@ -118,7 +118,7 @@ function StudentsPage() {
         <CardHeader>
           <div className="relative max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
+            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
           </div>
         </CardHeader>
         <CardContent>
