@@ -132,6 +132,7 @@ function StudentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Admission No</TableHead>
+                    <TableHead>Unique ID</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Gender</TableHead>
@@ -143,7 +144,7 @@ function StudentsPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={canEdit ? 8 : 6} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canEdit ? 9 : 7} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
                   )}
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
