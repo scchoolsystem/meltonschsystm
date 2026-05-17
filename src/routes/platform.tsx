@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/platform")({
   beforeLoad: async ({ location }) => {
+    // Don't guard the login page itself (avoid redirect loop)
+    if (location.pathname === "/platform/login") return;
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       throw redirect({ to: "/platform/login", search: { redirect: location.href } });
