@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
+import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
@@ -82,6 +83,11 @@ const SysControlRoomRoute = SysControlRoomRouteImport.update({
   id: '/sys/control-room',
   path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformLoginRoute = PlatformLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => PlatformRoute,
 } as any)
 const AppTransportRoute = AppTransportRouteImport.update({
   id: '/transport',
@@ -309,7 +315,7 @@ const AppAcademicsReportCardStudentIdExamIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/platform': typeof PlatformRoute
+  '/platform': typeof PlatformRouteWithChildren
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -325,6 +331,7 @@ export interface FileRoutesByFullPath {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/platform/login': typeof PlatformLoginRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -359,7 +366,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/platform': typeof PlatformRoute
+  '/platform': typeof PlatformRouteWithChildren
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -375,6 +382,7 @@ export interface FileRoutesByTo {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/platform/login': typeof PlatformLoginRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -411,7 +419,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/platform': typeof PlatformRoute
+  '/platform': typeof PlatformRouteWithChildren
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
   '/_app/attendance': typeof AppAttendanceRoute
@@ -427,6 +435,7 @@ export interface FileRoutesById {
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
+  '/platform/login': typeof PlatformLoginRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
@@ -479,6 +488,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/platform/login'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/platform/login'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -580,6 +591,7 @@ export interface FileRouteTypes {
     | '/_app/students'
     | '/_app/timetable'
     | '/_app/transport'
+    | '/platform/login'
     | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
@@ -616,7 +628,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
-  PlatformRoute: typeof PlatformRoute
+  PlatformRoute: typeof PlatformRouteWithChildren
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -658,6 +670,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sys/control-room'
       preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/platform/login': {
+      id: '/platform/login'
+      path: '/login'
+      fullPath: '/platform/login'
+      preLoaderRoute: typeof PlatformLoginRouteImport
+      parentRoute: typeof PlatformRoute
     }
     '/_app/transport': {
       id: '/_app/transport'
@@ -1073,11 +1092,23 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface PlatformRouteChildren {
+  PlatformLoginRoute: typeof PlatformLoginRoute
+}
+
+const PlatformRouteChildren: PlatformRouteChildren = {
+  PlatformLoginRoute: PlatformLoginRoute,
+}
+
+const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
+  PlatformRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
-  PlatformRoute: PlatformRoute,
+  PlatformRoute: PlatformRouteWithChildren,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
@@ -1085,3 +1116,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
