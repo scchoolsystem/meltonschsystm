@@ -163,6 +163,7 @@ function StudentsPage() {
               </Table>
             </div>
           )}
+          <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
         </CardContent>
       </Card>
     </div>
