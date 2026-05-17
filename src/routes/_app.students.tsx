@@ -120,7 +120,7 @@ function StudentsPage() {
         <CardHeader>
           <div className="relative max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
+            <Input placeholder="Search by name, admission no, or unique ID…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
           </div>
         </CardHeader>
         <CardContent>
