@@ -28,9 +28,11 @@ function PlatformSchools() {
   const { roles } = useAuth();
   const qc = useQueryClient();
   const isOwner = roles.includes("platform_owner");
+  const provision = useServerFn(provisionSchoolAdmin);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+  const [credentials, setCredentials] = useState<{ email: string; password: string; portal_url: string; school_name: string } | null>(null);
 
   const { data: schools, isLoading } = useQuery({
     queryKey: ["platform-schools"],
@@ -58,12 +60,13 @@ function PlatformSchools() {
     mutationFn: async () => {
       const slug = form.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
       if (!slug || !form.name.trim()) throw new Error("Slug and name are required");
+      if (!form.email.trim()) throw new Error("Contact email is required — it becomes the school super-admin");
 
       const { data: school, error } = await supabase
         .from("schools")
         .insert({
           slug, name: form.name.trim(),
-          email: form.email || null, phone: form.phone || null,
+          email: form.email.trim(), phone: form.phone || null,
           primary_color: form.primary_color || null,
         })
         .select()
@@ -82,11 +85,20 @@ function PlatformSchools() {
       await supabase.from("school_features").insert(
         FEATURE_KEYS.map((k) => ({ school_id: school.id, feature_key: k, enabled: true }))
       );
+
+      // Provision the super-admin user from the school's contact email
+      const res: any = await provision({ data: {
+        school_id: school.id, email: form.email.trim(), full_name: `${form.name.trim()} Admin`,
+      }});
+      return { school, res };
     },
-    onSuccess: () => {
-      toast.success("School created — Free plan, all features on");
+    onSuccess: ({ school, res }: any) => {
+      toast.success("School created");
       setOpen(false);
       setForm({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+      setCredentials({
+        email: res.email, password: res.password, portal_url: res.portal_url, school_name: school.name,
+      });
       qc.invalidateQueries({ queryKey: ["platform-schools"] });
     },
     onError: (e: any) => toast.error(e.message),
