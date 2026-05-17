@@ -17,20 +17,21 @@ function Analytics() {
   const { data: kpis } = useQuery({
     queryKey: ["analytics-kpis"],
     queryFn: async () => {
-      const [students, staff, invoices, attendance] = await Promise.all([
-        supabase.from("students").select("id,status,gender,class_id", { count: "exact" }),
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const [students, staff, finance, attendance] = await Promise.all([
+        supabase.from("students").select("id,gender", { count: "exact" }),
         supabase.from("staff").select("id", { count: "exact", head: true }),
-        supabase.from("invoices").select("amount,paid,status"),
-        supabase.from("attendance_records").select("status,date").gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
+        (supabase as any).from("v_finance_summary").select("total_invoiced,total_paid,defaulters,collection_pct").maybeSingle(),
+        (supabase as any).from("v_attendance_daily").select("date,present,absent").gte("date", since).order("date", { ascending: true }),
       ]);
-      const totalInvoiced = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
-      const totalPaid = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.paid), 0);
-      const defaulters = (invoices.data ?? []).filter((r: any) => r.status !== "paid").length;
+      const f = (finance.data ?? {}) as any;
       return {
         students: students.count ?? 0,
         staff: staff.count ?? 0,
-        totalInvoiced, totalPaid, collection: totalInvoiced ? (totalPaid / totalInvoiced) * 100 : 0,
-        defaulters,
+        totalInvoiced: Number(f.total_invoiced ?? 0),
+        totalPaid: Number(f.total_paid ?? 0),
+        collection: Number(f.collection_pct ?? 0),
+        defaulters: Number(f.defaulters ?? 0),
         attendance: attendance.data ?? [],
         genders: students.data ?? [],
       };
