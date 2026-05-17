@@ -198,9 +198,9 @@ function PlatformSchools() {
               <p className="text-muted-foreground text-xs">
                 Share these privately with the school. The password is shown only once.
               </p>
-              <SchoolCredRow label="Portal" value={credentials.portal_url} />
-              <SchoolCredRow label="Email" value={credentials.email} />
-              <SchoolCredRow label="Password" value={credentials.password} mono />
+              <div><span className="text-muted-foreground">Portal:</span> <span className="font-medium break-all">{credentials.portal_url}</span></div>
+              <div><span className="text-muted-foreground">Email:</span> <span className="font-medium break-all">{credentials.email}</span></div>
+              <div><span className="text-muted-foreground">Password:</span> <span className="font-mono font-medium break-all">{credentials.password}</span></div>
             </div>
             <DialogFooter>
               <Button onClick={() => setCredentials(null)}>Done</Button>
