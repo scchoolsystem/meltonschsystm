@@ -60,16 +60,10 @@ function Analytics() {
     },
   });
 
-  // Attendance trend (last 30 days)
-  const attTrend = (() => {
-    const m = new Map<string, { date: string; present: number; absent: number }>();
-    (kpis?.attendance ?? []).forEach((r: any) => {
-      const cur = m.get(r.date) ?? { date: r.date, present: 0, absent: 0 };
-      if (r.status === "present") cur.present++; else cur.absent++;
-      m.set(r.date, cur);
-    });
-    return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
-  })();
+  // Attendance trend (last 30 days) — sourced from v_attendance_daily
+  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({
+    date: r.date, present: Number(r.present ?? 0), absent: Number(r.absent ?? 0),
+  }));
 
   const genderMix = (() => {
     const m = new Map<string, number>();
