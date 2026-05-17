@@ -23,6 +23,8 @@ export const Route = createFileRoute("/platform/schools/$id")({
 });
 
 const FEATURE_LABELS: Record<string, string> = {
+  timetable: "Timetable",
+  attendance: "Attendance",
   academics: "Academics & Exams",
   finance: "Finance & Billing",
   boarding: "Boarding",
@@ -32,6 +34,7 @@ const FEATURE_LABELS: Record<string, string> = {
   transport: "Transport",
   security: "Security",
   discipline: "Discipline",
+  announcements: "Announcements",
   portals: "Parent / Student portals",
 };
 
