@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { provisionSchoolAdmin } from "@/lib/school-admin.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Building2, Plus, ExternalLink, Globe, Settings } from "lucide-react";
+import { Building2, Plus, ExternalLink, Globe, Settings, KeyRound, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/platform/schools")({
   component: PlatformSchools,
@@ -26,9 +28,11 @@ function PlatformSchools() {
   const { roles } = useAuth();
   const qc = useQueryClient();
   const isOwner = roles.includes("platform_owner");
+  const provision = useServerFn(provisionSchoolAdmin);
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+  const [credentials, setCredentials] = useState<{ email: string; password: string; portal_url: string; school_name: string } | null>(null);
 
   const { data: schools, isLoading } = useQuery({
     queryKey: ["platform-schools"],
@@ -56,12 +60,13 @@ function PlatformSchools() {
     mutationFn: async () => {
       const slug = form.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
       if (!slug || !form.name.trim()) throw new Error("Slug and name are required");
+      if (!form.email.trim()) throw new Error("Contact email is required — it becomes the school super-admin");
 
       const { data: school, error } = await supabase
         .from("schools")
         .insert({
           slug, name: form.name.trim(),
-          email: form.email || null, phone: form.phone || null,
+          email: form.email.trim(), phone: form.phone || null,
           primary_color: form.primary_color || null,
         })
         .select()
@@ -80,11 +85,20 @@ function PlatformSchools() {
       await supabase.from("school_features").insert(
         FEATURE_KEYS.map((k) => ({ school_id: school.id, feature_key: k, enabled: true }))
       );
+
+      // Provision the super-admin user from the school's contact email
+      const res: any = await provision({ data: {
+        school_id: school.id, email: form.email.trim(), full_name: `${form.name.trim()} Admin`,
+      }});
+      return { school, res };
     },
-    onSuccess: () => {
-      toast.success("School created — Free plan, all features on");
+    onSuccess: ({ school, res }: any) => {
+      toast.success("School created");
       setOpen(false);
       setForm({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+      setCredentials({
+        email: res.email, password: res.password, portal_url: res.portal_url, school_name: school.name,
+      });
       qc.invalidateQueries({ queryKey: ["platform-schools"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -121,7 +135,7 @@ function PlatformSchools() {
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New school</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-xl">
               <DialogHeader><DialogTitle>Onboard a new school</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
@@ -146,20 +160,54 @@ function PlatformSchools() {
                   </div>
                 </div>
                 <div>
-                  <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  <Label>Super-admin email <span className="text-destructive">*</span></Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+                    placeholder="principal@school.ac.ke" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This address becomes the school's super-admin. A login password will be generated and shown on the next screen.
+                  </p>
+                </div>
+                <div className="rounded border bg-muted/40 p-3 text-xs space-y-1">
+                  <div className="font-medium text-foreground">DNS (one-time setup)</div>
+                  <div className="font-mono">A &nbsp; *.erp &nbsp; → 185.158.133.1</div>
+                  <div className="text-muted-foreground">
+                    Then in <strong>Project Settings → Domains</strong>, add <code>{form.slug || "[slug]"}.{rootDomain}</code> so SSL is issued.
+                  </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={() => create.mutate()} disabled={create.isPending}>
-                  {create.isPending ? "Creating..." : "Create school"}
+                  {create.isPending ? "Creating..." : "Create school & admin"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
       </div>
+
+      {credentials && (
+        <Dialog open={!!credentials} onOpenChange={(v) => !v && setCredentials(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" /> {credentials.school_name} — admin credentials
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground text-xs">
+                Share these privately with the school. The password is shown only once.
+              </p>
+              <SchoolCredRow label="Portal" value={credentials.portal_url} />
+              <SchoolCredRow label="Email" value={credentials.email} />
+              <SchoolCredRow label="Password" value={credentials.password} mono />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setCredentials(null)}>Done</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Card>
         <CardHeader>
@@ -232,6 +280,18 @@ function PlatformSchools() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SchoolCredRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <code className={`flex-1 px-2 py-1 rounded bg-muted border text-xs ${mono ? "font-mono" : ""}`}>{value}</code>
+      <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}>
+        <Copy className="h-3 w-3" />
+      </Button>
     </div>
   );
 }
