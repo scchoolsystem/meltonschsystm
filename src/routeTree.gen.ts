@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
 import { Route as PlatformSupportRouteImport } from './routes/platform.support'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
+import { Route as PlatformPlansRouteImport } from './routes/platform.plans'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
@@ -97,6 +98,11 @@ const PlatformSupportRoute = PlatformSupportRouteImport.update({
 const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
   id: '/schools',
   path: '/schools',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformPlansRoute = PlatformPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformLoginRoute = PlatformLoginRouteImport.update({
@@ -364,6 +370,7 @@ export interface FileRoutesByFullPath {
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
@@ -420,6 +427,7 @@ export interface FileRoutesByTo {
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
@@ -478,6 +486,7 @@ export interface FileRoutesById {
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
@@ -536,6 +545,7 @@ export interface FileRouteTypes {
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/sys/control-room'
@@ -592,6 +602,7 @@ export interface FileRouteTypes {
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/sys/control-room'
@@ -649,6 +660,7 @@ export interface FileRouteTypes {
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/sys/control-room'
@@ -743,6 +755,13 @@ declare module '@tanstack/react-router' {
       path: '/schools'
       fullPath: '/platform/schools'
       preLoaderRoute: typeof PlatformSchoolsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/plans': {
+      id: '/platform/plans'
+      path: '/plans'
+      fullPath: '/platform/plans'
+      preLoaderRoute: typeof PlatformPlansRouteImport
       parentRoute: typeof PlatformRoute
     }
     '/platform/login': {
@@ -1203,6 +1222,7 @@ interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
   PlatformInvoicesRoute: typeof PlatformInvoicesRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
+  PlatformPlansRoute: typeof PlatformPlansRoute
   PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
   PlatformSupportRoute: typeof PlatformSupportRoute
 }
@@ -1211,6 +1231,7 @@ const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
   PlatformInvoicesRoute: PlatformInvoicesRoute,
   PlatformLoginRoute: PlatformLoginRoute,
+  PlatformPlansRoute: PlatformPlansRoute,
   PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
   PlatformSupportRoute: PlatformSupportRoute,
 }
