@@ -19,7 +19,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
-  const { school, slug } = useTenant();
+  const { school, slug, isPlatformHost } = useTenant();
 
   const [uniqueId, setUniqueId] = useState("");
   const [pw, setPw] = useState("");
