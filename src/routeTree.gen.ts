@@ -20,6 +20,7 @@ import { Route as PlatformPlansRouteImport } from './routes/platform.plans'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
+import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
@@ -36,6 +37,7 @@ import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools.$id'
+import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
@@ -60,6 +62,8 @@ import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics
 import { Route as AppAcademicsReportCardsRouteImport } from './routes/_app.academics.report-cards'
 import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
+import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
+import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
@@ -119,6 +123,11 @@ const PlatformDashboardRoute = PlatformDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => PlatformRoute,
+} as any)
+const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
+  id: '/email/unsubscribe',
+  path: '/email/unsubscribe',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransportRoute = AppTransportRouteImport.update({
   id: '/transport',
@@ -199,6 +208,11 @@ const PlatformSchoolsIdRoute = PlatformSchoolsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => PlatformSchoolsRoute,
+} as any)
+const LovableEmailSuppressionRoute = LovableEmailSuppressionRouteImport.update({
+  id: '/lovable/email/suppression',
+  path: '/lovable/email/suppression',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   id: '/api/public/mpesa-callback',
@@ -320,6 +334,18 @@ const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
   path: '/academics/exams',
   getParentRoute: () => AppRoute,
 } as any)
+const LovableEmailTransactionalSendRoute =
+  LovableEmailTransactionalSendRouteImport.update({
+    id: '/lovable/email/transactional/send',
+    path: '/lovable/email/transactional/send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LovableEmailTransactionalPreviewRoute =
+  LovableEmailTransactionalPreviewRouteImport.update({
+    id: '/lovable/email/transactional/preview',
+    path: '/lovable/email/transactional/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LovableEmailQueueProcessRoute =
   LovableEmailQueueProcessRouteImport.update({
     id: '/lovable/email/queue/process',
@@ -367,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
@@ -398,11 +425,14 @@ export interface FileRoutesByFullPath {
   '/portal/student': typeof AppPortalStudentRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesByTo {
@@ -424,6 +454,7 @@ export interface FileRoutesByTo {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
@@ -455,11 +486,14 @@ export interface FileRoutesByTo {
   '/portal/student': typeof AppPortalStudentRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesById {
@@ -483,6 +517,7 @@ export interface FileRoutesById {
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
+  '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
@@ -514,11 +549,14 @@ export interface FileRoutesById {
   '/_app/portal/student': typeof AppPortalStudentRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
+  '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/_app/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRouteTypes {
@@ -542,6 +580,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/email/unsubscribe'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
@@ -573,11 +612,14 @@ export interface FileRouteTypes {
     | '/portal/student'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/lovable/email/suppression'
     | '/platform/schools/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/academics/report-card/$studentId/$examId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -599,6 +641,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/email/unsubscribe'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
@@ -630,11 +673,14 @@ export interface FileRouteTypes {
     | '/portal/student'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/lovable/email/suppression'
     | '/platform/schools/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/academics/report-card/$studentId/$examId'
   id:
     | '__root__'
@@ -657,6 +703,7 @@ export interface FileRouteTypes {
     | '/_app/students'
     | '/_app/timetable'
     | '/_app/transport'
+    | '/email/unsubscribe'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
@@ -688,11 +735,14 @@ export interface FileRouteTypes {
     | '/_app/portal/student'
     | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/lovable/email/suppression'
     | '/platform/schools/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
     | '/lovable/email/queue/process'
+    | '/lovable/email/transactional/preview'
+    | '/lovable/email/transactional/send'
     | '/_app/academics/report-card/$studentId/$examId'
   fileRoutesById: FileRoutesById
 }
@@ -701,9 +751,13 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   PlatformRoute: typeof PlatformRouteWithChildren
+  EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
+  LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
+  LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
+  LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -784,6 +838,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/dashboard'
       preLoaderRoute: typeof PlatformDashboardRouteImport
       parentRoute: typeof PlatformRoute
+    }
+    '/email/unsubscribe': {
+      id: '/email/unsubscribe'
+      path: '/email/unsubscribe'
+      fullPath: '/email/unsubscribe'
+      preLoaderRoute: typeof EmailUnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/transport': {
       id: '/_app/transport'
@@ -896,6 +957,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/platform/schools/$id'
       preLoaderRoute: typeof PlatformSchoolsIdRouteImport
       parentRoute: typeof PlatformSchoolsRoute
+    }
+    '/lovable/email/suppression': {
+      id: '/lovable/email/suppression'
+      path: '/lovable/email/suppression'
+      fullPath: '/lovable/email/suppression'
+      preLoaderRoute: typeof LovableEmailSuppressionRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/mpesa-callback': {
       id: '/api/public/mpesa-callback'
@@ -1064,6 +1132,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/academics/exams'
       preLoaderRoute: typeof AppAcademicsExamsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/lovable/email/transactional/send': {
+      id: '/lovable/email/transactional/send'
+      path: '/lovable/email/transactional/send'
+      fullPath: '/lovable/email/transactional/send'
+      preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lovable/email/transactional/preview': {
+      id: '/lovable/email/transactional/preview'
+      path: '/lovable/email/transactional/preview'
+      fullPath: '/lovable/email/transactional/preview'
+      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/lovable/email/queue/process': {
       id: '/lovable/email/queue/process'
@@ -1245,9 +1327,13 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   PlatformRoute: PlatformRouteWithChildren,
+  EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
+  LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
+  LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
+  LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
