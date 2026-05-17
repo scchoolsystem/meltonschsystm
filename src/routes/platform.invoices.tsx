@@ -47,13 +47,15 @@ function PlatformInvoices() {
         amount,
         method: payForm.method,
         reference: payForm.reference || null,
+        notes: payForm.notes || null,
+        recorded_by: user?.id ?? null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Payment recorded");
       setPayOpen(false);
-      setPayForm({ invoice_id: "", amount: "", method: "manual", reference: "" });
+      setPayForm({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
       qc.invalidateQueries({ queryKey: ["all-platform-invoices"] });
     },
     onError: (e: any) => toast.error(e.message),
