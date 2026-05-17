@@ -35,15 +35,23 @@ function StaffPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const { data: staff = [], isLoading } = useQuery({
-    queryKey: ["staff"],
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["staff", page],
     queryFn: async () => {
-      const { data, error } = await supabase.from("staff").select("*").order("employee_no", { ascending: false });
+      const { data, error, count } = await supabase
+        .from("staff").select("*", { count: "exact" })
+        .order("employee_no", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       if (error) throw error;
-      return data;
+      return { rows: data ?? [], count: count ?? 0 };
     },
   });
+  const staff = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const { data: settings } = useQuery({
     queryKey: ["school-settings"],
