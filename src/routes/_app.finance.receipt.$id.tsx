@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
+import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/finance/receipt/$id")({ component: Page });
 
 function Page() {
   const { id } = Route.useParams();
+  const { school } = useTenant();
   const { data, isLoading } = useQuery({
     queryKey: ["receipt", id],
     queryFn: async () => {
@@ -19,10 +21,6 @@ function Page() {
       if (error) throw error;
       return data;
     },
-  });
-  const { data: school } = useQuery({
-    queryKey: ["school-settings-rcpt"],
-    queryFn: async () => (await supabase.from("school_settings").select("school_name").maybeSingle()).data,
   });
 
   if (isLoading) return <div className="h-screen grid place-items-center"><Loader2 className="animate-spin" /></div>;
@@ -41,7 +39,7 @@ function Page() {
         </div>
         <div className="bg-card border rounded-xl p-10 print:border-0 print:rounded-none print:shadow-none">
           <div className="text-center border-b pb-4 mb-6">
-            <h2 className="text-2xl font-bold">{school?.school_name || "School"}</h2>
+            <h2 className="text-2xl font-bold">{school?.name || "School"}</h2>
             <p className="text-sm text-muted-foreground">Official Payment Receipt</p>
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm mb-6">

@@ -19,19 +19,16 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
+  const { school, slug } = useTenant();
 
   const [uniqueId, setUniqueId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   // Hidden trigger: 5 clicks on the logo unlocks admin link
   const [clicks, setClicks] = useState(0);
-  const { data: settings } = useQuery({
-    queryKey: ["school-settings-login"],
-    queryFn: async () => {
-      const { data } = await supabase.from("school_settings").select("school_name, motto, logo_url").limit(1).maybeSingle();
-      return data;
-    },
-  });
+  const settings = school
+    ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
+    : null;
 
   useEffect(() => {
     if (!loading && session) navigate({ to: "/dashboard" });
@@ -41,7 +38,7 @@ function LoginPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const { email: loginEmail } = await lookup({ data: { uniqueId: uniqueId.trim() } });
+      const { email: loginEmail } = await lookup({ data: { uniqueId: uniqueId.trim(), schoolSlug: slug ?? "school-1" } });
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: pw });
       if (error) throw error;
       toast.success("Welcome back");
