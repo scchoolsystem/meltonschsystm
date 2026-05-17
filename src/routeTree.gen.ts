@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
+import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
@@ -95,6 +96,11 @@ const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
 const PlatformLoginRoute = PlatformLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformInvoicesRoute = PlatformInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
   getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformDashboardRoute = PlatformDashboardRouteImport.update({
@@ -350,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
@@ -404,6 +411,7 @@ export interface FileRoutesByTo {
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
@@ -460,6 +468,7 @@ export interface FileRoutesById {
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
@@ -516,6 +525,7 @@ export interface FileRouteTypes {
     | '/timetable'
     | '/transport'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
     | '/sys/control-room'
@@ -570,6 +580,7 @@ export interface FileRouteTypes {
     | '/timetable'
     | '/transport'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
     | '/sys/control-room'
@@ -625,6 +636,7 @@ export interface FileRouteTypes {
     | '/_app/timetable'
     | '/_app/transport'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
     | '/sys/control-room'
@@ -719,6 +731,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/platform/login'
       preLoaderRoute: typeof PlatformLoginRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/invoices': {
+      id: '/platform/invoices'
+      path: '/invoices'
+      fullPath: '/platform/invoices'
+      preLoaderRoute: typeof PlatformInvoicesRouteImport
       parentRoute: typeof PlatformRoute
     }
     '/platform/dashboard': {
@@ -1163,12 +1182,14 @@ const PlatformSchoolsRouteWithChildren = PlatformSchoolsRoute._addFileChildren(
 
 interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
+  PlatformInvoicesRoute: typeof PlatformInvoicesRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
   PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
 }
 
 const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
+  PlatformInvoicesRoute: PlatformInvoicesRoute,
   PlatformLoginRoute: PlatformLoginRoute,
   PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
 }
