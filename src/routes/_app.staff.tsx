@@ -19,6 +19,7 @@ import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
 import { LifecycleActions } from "@/components/LifecycleActions";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/staff")({
   component: StaffPage,
@@ -66,7 +67,7 @@ function StaffPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Staff</h1>
-          <p className="text-sm text-muted-foreground mt-1">{staff.length} members</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} members</p>
         </div>
         {isAdmin && (
           <Dialog open={open} onOpenChange={(o) => setOpen(o)}>
@@ -125,6 +126,7 @@ function StaffPage() {
               </Table>
             </div>
           )}
+          <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
         </CardContent>
       </Card>
     </div>
