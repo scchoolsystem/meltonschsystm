@@ -32,6 +32,11 @@ function PlatformLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Login page renders standalone (no sidebar / no auth chrome)
+  if (location.pathname === "/platform/login") {
+    return <Outlet />;
+  }
+
   if (loading || !session) {
     return (
       <div className="min-h-screen grid place-items-center">
