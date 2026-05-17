@@ -39,19 +39,28 @@ function StudentsPage() {
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
   const [open, setOpen] = useState(false);
 
-  const { data: students = [], isLoading } = useQuery({
-    queryKey: ["students"],
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["students", q, page],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let req = supabase
         .from("students")
-        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)")
-        .order("admission_no", { ascending: false });
+        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
+        .order("admission_no", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      const t = q.trim();
+      if (t) req = req.or(`admission_no.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+      const { data, error, count } = await req;
       if (error) throw error;
-      return data as unknown as Student[];
+      return { rows: (data as unknown as Student[]) ?? [], count: count ?? 0 };
     },
   });
+  const students = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-min"],
