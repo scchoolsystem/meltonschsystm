@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
+import { Route as PlatformSupportRouteImport } from './routes/platform.support'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
@@ -87,6 +88,11 @@ const SysControlRoomRoute = SysControlRoomRouteImport.update({
   id: '/sys/control-room',
   path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformSupportRoute = PlatformSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
   id: '/schools',
@@ -359,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
+  '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -414,6 +421,7 @@ export interface FileRoutesByTo {
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
+  '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -471,6 +479,7 @@ export interface FileRoutesById {
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
+  '/platform/support': typeof PlatformSupportRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
@@ -528,6 +537,7 @@ export interface FileRouteTypes {
     | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
+    | '/platform/support'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -583,6 +593,7 @@ export interface FileRouteTypes {
     | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
+    | '/platform/support'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -639,6 +650,7 @@ export interface FileRouteTypes {
     | '/platform/invoices'
     | '/platform/login'
     | '/platform/schools'
+    | '/platform/support'
     | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
@@ -718,6 +730,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sys/control-room'
       preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/platform/support': {
+      id: '/platform/support'
+      path: '/support'
+      fullPath: '/platform/support'
+      preLoaderRoute: typeof PlatformSupportRouteImport
+      parentRoute: typeof PlatformRoute
     }
     '/platform/schools': {
       id: '/platform/schools'
@@ -1185,6 +1204,7 @@ interface PlatformRouteChildren {
   PlatformInvoicesRoute: typeof PlatformInvoicesRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
   PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
+  PlatformSupportRoute: typeof PlatformSupportRoute
 }
 
 const PlatformRouteChildren: PlatformRouteChildren = {
@@ -1192,6 +1212,7 @@ const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformInvoicesRoute: PlatformInvoicesRoute,
   PlatformLoginRoute: PlatformLoginRoute,
   PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
+  PlatformSupportRoute: PlatformSupportRoute,
 }
 
 const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
