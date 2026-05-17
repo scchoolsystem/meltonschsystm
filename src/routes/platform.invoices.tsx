@@ -113,6 +113,10 @@ function PlatformInvoices() {
                   <Label>Reference (optional)</Label>
                   <Input value={payForm.reference} onChange={e => setPayForm({ ...payForm, reference: e.target.value })} />
                 </div>
+                <div>
+                  <Label>Notes (optional)</Label>
+                  <Input value={payForm.notes} onChange={e => setPayForm({ ...payForm, notes: e.target.value })} />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
