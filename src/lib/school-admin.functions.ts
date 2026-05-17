@@ -1,7 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import * as React from "react";
+import { render } from "@react-email/components";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { template as schoolAdminCredentialsTemplate } from "@/lib/email-templates/school-admin-credentials";
+
+const SITE_NAME = "Smartdev ERP";
+const SENDER_DOMAIN = "notify.erp.smartdev.co.ke";
+const FROM_DOMAIN = "erp.smartdev.co.ke";
 
 function generatePassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -83,48 +90,55 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
     const portal_url = `https://${school.slug}.smartdev.co.ke`;
     const full_name = data.full_name ?? school.name + " Admin";
 
-    // Send welcome email with credentials (fire-and-forget — never block provisioning).
+    // Render + enqueue the welcome email (fire-and-forget; never block provisioning).
     let email_sent = false;
     let email_error: string | null = null;
     try {
-      const origin =
-        process.env.SITE_URL ||
-        process.env.PUBLIC_SITE_URL ||
-        "https://admin.smartdev.co.ke";
-      const supabaseUrl = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      // Mint a short-lived service-role JWT-free call by using the dedicated send route
-      // with a Bearer token issued for the platform owner who's currently authenticated.
-      // We piggy-back on the caller's session token, which the route validates.
-      const authHeader = (await (async () => {
-        // The server-fn middleware already validated the caller, but we don't have the raw token here.
-        // Instead, use service-role auth: the send route accepts service-role JWT.
-        return serviceKey ? `Bearer ${serviceKey}` : "";
-      })());
+      const messageId = crypto.randomUUID();
+      const recipient = data.email.toLowerCase();
+      const templateData = {
+        schoolName: school.name,
+        portalUrl: portal_url,
+        loginEmail: data.email,
+        password,
+        fullName: full_name,
+      };
+      const element = React.createElement(schoolAdminCredentialsTemplate.component, templateData);
+      const html = await render(element);
+      const text = await render(element, { plainText: true });
+      const subject =
+        typeof schoolAdminCredentialsTemplate.subject === "function"
+          ? schoolAdminCredentialsTemplate.subject(templateData)
+          : schoolAdminCredentialsTemplate.subject;
 
-      const res = await fetch(`${origin}/lovable/email/transactional/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(authHeader ? { Authorization: authHeader } : {}),
-        },
-        body: JSON.stringify({
-          templateName: "school-admin-credentials",
-          recipientEmail: data.email,
-          idempotencyKey: `school-admin-${school.id}-${Date.now()}`,
-          templateData: {
-            schoolName: school.name,
-            portalUrl: portal_url,
-            loginEmail: data.email,
-            password,
-            fullName: full_name,
-          },
-        }),
+      await supabaseAdmin.from("email_send_log").insert({
+        message_id: messageId,
+        template_name: "school-admin-credentials",
+        recipient_email: recipient,
+        status: "pending",
       });
-      email_sent = res.ok;
-      if (!res.ok) email_error = await res.text().catch(() => res.statusText);
+
+      const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_email", {
+        queue_name: "transactional_emails",
+        payload: {
+          message_id: messageId,
+          to: recipient,
+          from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+          sender_domain: SENDER_DOMAIN,
+          subject,
+          html,
+          text,
+          purpose: "transactional",
+          label: "school-admin-credentials",
+          idempotency_key: `school-admin-${school.id}-${messageId}`,
+          queued_at: new Date().toISOString(),
+        },
+      });
+      if (enqueueError) throw enqueueError;
+      email_sent = true;
     } catch (e: any) {
       email_error = e?.message ?? "unknown error";
+      console.error("Failed to send school admin credentials email", e);
     }
 
     return {
