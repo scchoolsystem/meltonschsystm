@@ -37,14 +37,14 @@ function Page() {
   });
 
   const ranked = useMemo(() => {
-    const byStudent: Record<string, { total: number; n: number }> = {};
+    const byStudent: Record<string, { total: number; n: number; verified: number }> = {};
     (results as any[]).forEach(r => {
-      const cur = byStudent[r.student_id] ||= { total: 0, n: 0 };
-      cur.total += Number(r.score); cur.n += 1;
+      const cur = byStudent[r.student_id] ||= { total: 0, n: 0, verified: 0 };
+      cur.total += Number(r.score); cur.n += 1; if (r.verified) cur.verified += 1;
     });
     const rows = (students as any[]).map(s => {
       const r = byStudent[s.id];
-      return { ...s, total: r?.total ?? 0, n: r?.n ?? 0, mean: r ? r.total / r.n : 0 };
+      return { ...s, total: r?.total ?? 0, n: r?.n ?? 0, verified: r?.verified ?? 0, mean: r ? r.total / r.n : 0 };
     });
     rows.sort((a, b) => b.mean - a.mean);
     return rows.map((r, i) => ({ ...r, position: r.n ? i + 1 : null }));
@@ -87,6 +87,7 @@ function Page() {
                   <TableHead className="w-12">#</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Subjects</TableHead>
+                  <TableHead>Verified</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Mean</TableHead>
                   <TableHead className="text-right">Report</TableHead>
@@ -97,6 +98,7 @@ function Page() {
                       <TableCell className="font-bold">{r.position ?? "—"}</TableCell>
                       <TableCell>{r.first_name} {r.last_name} <span className="text-xs text-muted-foreground font-mono">{r.admission_no}</span></TableCell>
                       <TableCell>{r.n}</TableCell>
+                      <TableCell className="text-xs">{r.verified}/{r.n}</TableCell>
                       <TableCell>{r.total.toFixed(1)}</TableCell>
                       <TableCell className="font-semibold">{r.mean.toFixed(1)}</TableCell>
                       <TableCell className="text-right">
@@ -108,7 +110,7 @@ function Page() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {ranked.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No students.</TableCell></TableRow>}
+                  {ranked.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No students.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             )}
