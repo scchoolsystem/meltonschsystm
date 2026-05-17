@@ -6,14 +6,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/finance/payments")({ component: Page });
 
 function Page() {
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["payments"],
-    queryFn: async () => (await supabase.from("payments").select("*, invoices(invoice_no, students(first_name,last_name,admission_no))").order("paid_on", { ascending: false }).limit(300)).data ?? [],
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["payments", page],
+    queryFn: async () => {
+      const { data, count } = await supabase.from("payments")
+        .select("*, invoices(invoice_no, students(first_name,last_name,admission_no))", { count: "exact" })
+        .order("paid_on", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      return { rows: data ?? [], count: count ?? 0 };
+    },
   });
+  const data = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const total = (data as any[]).reduce((s, p) => s + Number(p.amount), 0);
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
