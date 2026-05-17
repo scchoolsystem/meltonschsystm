@@ -30,7 +30,7 @@ function Landing() {
             <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
               <GraduationCap className="w-5 h-5" />
             </div>
-            <span className="font-bold">Greenfield Academy</span>
+            <span className="font-bold">SMART DEV</span>
           </div>
           <Link to="/login"><Button>Sign in</Button></Link>
         </div>
