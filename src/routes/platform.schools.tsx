@@ -117,7 +117,7 @@ function PlatformSchools() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const rootDomain = "erp.smartdev.co.ke";
+  const rootDomain = "smartdev.co.ke";
 
   return (
     <div className="space-y-6">

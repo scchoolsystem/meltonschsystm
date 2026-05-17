@@ -85,6 +85,6 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
       created,
       email: data.email,
       password,
-      portal_url: `https://${school.slug}.erp.smartdev.co.ke`,
+      portal_url: `https://${school.slug}.smartdev.co.ke`,
     };
   });
