@@ -22,12 +22,12 @@ function Page() {
   const [classId, setClassId] = useState("");
   const [open, setOpen] = useState(false);
   const { data: classes = [] } = useQuery({ queryKey: ["classes-tt"], queryFn: async () => (await supabase.from("classes").select("id,name").order("name")).data ?? [] });
-  const { data: subjects = [] } = useQuery({ queryKey: ["subjects-tt"], queryFn: async () => (await supabase.from("subjects").select("id,code").order("code")).data ?? [] });
+  const { data: subjects = [] } = useQuery({ queryKey: ["subjects-tt"], queryFn: async () => (await supabase.from("subjects").select("id,code,name").order("code")).data ?? [] });
   const { data: staff = [] } = useQuery({ queryKey: ["staff-tt"], queryFn: async () => (await supabase.from("staff").select("id,first_name,last_name").order("first_name")).data ?? [] });
   const { data: slots = [] } = useQuery({
     queryKey: ["tt", classId],
     enabled: !!classId,
-    queryFn: async () => (await supabase.from("timetable_slots").select("*, subjects(code), staff(first_name,last_name)").eq("class_id", classId).order("day_of_week").order("start_time")).data ?? [],
+    queryFn: async () => (await supabase.from("timetable_slots").select("*, subjects(code,name), staff(first_name,last_name)").eq("class_id", classId).order("day_of_week").order("start_time")).data ?? [],
   });
 
   const grid = useMemo(() => {
@@ -61,7 +61,7 @@ function Page() {
               {(grid[i + 1] ?? []).map((s: any) => (
                 <div key={s.id} className="border rounded p-2">
                   <div className="font-mono text-xs text-muted-foreground">{s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}</div>
-                  <div className="font-medium">{s.subjects?.code}</div>
+                  <div className="font-medium">{s.subjects?.code} <span className="text-xs text-muted-foreground font-normal">{s.subjects?.name}</span></div>
                   <div className="text-xs text-muted-foreground">{s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : "—"} {s.room && `· ${s.room}`}</div>
                 </div>
               ))}
@@ -103,7 +103,7 @@ function AddSlot({ classId, subjects, staff, onDone }: { classId: string; subjec
         <div><Label>Subject</Label>
           <Select value={f.subject_id} onValueChange={v => setF({ ...f, subject_id: v })}>
             <SelectTrigger><SelectValue placeholder="Choose subject" /></SelectTrigger>
-            <SelectContent>{subjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.code}</SelectItem>)}</SelectContent>
+            <SelectContent>{subjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.code} – {s.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div><Label>Teacher</Label>

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -22,14 +23,14 @@ function gradeFor(s: number) {
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
-  const can = isAdmin || hasRole("teacher");
+  const can = isAdmin || hasRole("teacher") || hasRole("exams_admin") || hasRole("academic_master");
   const [open, setOpen] = useState(false);
   const { data = [], isLoading } = useQuery({
     queryKey: ["exam_results"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("exam_results")
-        .select("id, score, grade, exams(name), students(first_name,last_name,admission_no), subjects(code)")
+        .select("id, score, grade, verified, exams(name), students(first_name,last_name,admission_no), subjects(code)")
         .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       return data as any[];
@@ -51,9 +52,9 @@ function Page() {
         <CardContent>
           {isLoading ? <div className="h-40 grid place-items-center"><Loader2 className="animate-spin" /></div> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Adm No</TableHead><TableHead>Exam</TableHead><TableHead>Subject</TableHead><TableHead>Score</TableHead><TableHead>Grade</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Adm No</TableHead><TableHead>Exam</TableHead><TableHead>Subject</TableHead><TableHead>Score</TableHead><TableHead>Grade</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
-                {data.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No results yet.</TableCell></TableRow>}
+                {data.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No results yet.</TableCell></TableRow>}
                 {data.map(r => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.students?.first_name} {r.students?.last_name}</TableCell>
@@ -62,6 +63,7 @@ function Page() {
                     <TableCell>{r.subjects?.code}</TableCell>
                     <TableCell>{r.score}</TableCell>
                     <TableCell className="font-bold">{r.grade}</TableCell>
+                    <TableCell>{r.verified ? <Badge className="bg-green-600">Verified</Badge> : <Badge variant="outline">Pending</Badge>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
