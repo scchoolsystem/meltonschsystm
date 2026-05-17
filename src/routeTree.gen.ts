@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -58,6 +59,11 @@ import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -303,6 +309,7 @@ const AppAcademicsReportCardStudentIdExamIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/platform': typeof PlatformRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -352,6 +359,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/platform': typeof PlatformRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -403,6 +411,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/platform': typeof PlatformRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
   '/_app/attendance': typeof AppAttendanceRoute
@@ -454,6 +463,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/platform'
     | '/analytics'
     | '/announcements'
     | '/attendance'
@@ -503,6 +513,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/platform'
     | '/analytics'
     | '/announcements'
     | '/attendance'
@@ -553,6 +564,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/login'
+    | '/platform'
     | '/_app/analytics'
     | '/_app/announcements'
     | '/_app/attendance'
@@ -604,6 +616,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PlatformRoute: typeof PlatformRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -611,6 +624,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -1057,6 +1077,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  PlatformRoute: PlatformRoute,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
