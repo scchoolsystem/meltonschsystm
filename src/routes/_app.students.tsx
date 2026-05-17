@@ -85,8 +85,8 @@ function StudentsPage() {
 
   function exportCsv() {
     const rows = [
-      ["Admission No", "First Name", "Last Name", "Gender", "Class", "Status", "Parent Phone"],
-      ...filtered.map((s) => [s.admission_no, s.first_name, s.last_name, s.gender ?? "", s.classes?.name ?? "", s.status, s.parent_phone ?? ""]),
+      ["Admission No", "Unique ID", "First Name", "Last Name", "Gender", "Class", "Status", "Parent Phone"],
+      ...filtered.map((s) => [s.admission_no, s.unique_id ?? "", s.first_name, s.last_name, s.gender ?? "", s.classes?.name ?? "", s.status, s.parent_phone ?? ""]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
