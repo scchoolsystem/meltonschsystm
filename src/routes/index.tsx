@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Users, BookOpen, BarChart3, ShieldCheck, ArrowRight } from "lucide-react";
 
@@ -10,10 +11,16 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   const { session, loading } = useAuth();
+  const { isPlatformHost } = useTenant();
   const navigate = useNavigate();
   useEffect(() => {
+    if (isPlatformHost) {
+      navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
+      return;
+    }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate]);
+  }, [session, loading, isPlatformHost, navigate]);
+
 
   return (
     <div className="min-h-screen bg-background">
