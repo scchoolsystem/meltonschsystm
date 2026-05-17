@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/finance/invoices")({ component: Page });
 
@@ -79,6 +80,7 @@ function Page() {
             </TableBody>
           </Table>
         )}
+        <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
       </CardContent></Card>
     </div>
   );
