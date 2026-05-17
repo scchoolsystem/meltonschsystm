@@ -142,6 +142,7 @@ function PlatformInvoices() {
                 <TableHead>Paid</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Notes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -158,10 +159,11 @@ function PlatformInvoices() {
                       {i.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{i.notes ?? "—"}</TableCell>
                 </TableRow>
               ))}
               {(!invoices || invoices.length === 0) && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">No invoices yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">No invoices yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
