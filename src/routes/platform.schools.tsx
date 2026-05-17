@@ -135,7 +135,7 @@ function PlatformSchools() {
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />New school</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-xl">
               <DialogHeader><DialogTitle>Onboard a new school</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
@@ -160,20 +160,54 @@ function PlatformSchools() {
                   </div>
                 </div>
                 <div>
-                  <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  <Label>Super-admin email <span className="text-destructive">*</span></Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+                    placeholder="principal@school.ac.ke" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This address becomes the school's super-admin. A login password will be generated and shown on the next screen.
+                  </p>
+                </div>
+                <div className="rounded border bg-muted/40 p-3 text-xs space-y-1">
+                  <div className="font-medium text-foreground">DNS (one-time setup)</div>
+                  <div className="font-mono">A &nbsp; *.erp &nbsp; → 185.158.133.1</div>
+                  <div className="text-muted-foreground">
+                    Then in <strong>Project Settings → Domains</strong>, add <code>{form.slug || "[slug]"}.{rootDomain}</code> so SSL is issued.
+                  </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={() => create.mutate()} disabled={create.isPending}>
-                  {create.isPending ? "Creating..." : "Create school"}
+                  {create.isPending ? "Creating..." : "Create school & admin"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
       </div>
+
+      {credentials && (
+        <Dialog open={!!credentials} onOpenChange={(v) => !v && setCredentials(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" /> {credentials.school_name} — admin credentials
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <p className="text-muted-foreground text-xs">
+                Share these privately with the school. The password is shown only once.
+              </p>
+              <SchoolCredRow label="Portal" value={credentials.portal_url} />
+              <SchoolCredRow label="Email" value={credentials.email} />
+              <SchoolCredRow label="Password" value={credentials.password} mono />
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setCredentials(null)}>Done</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Card>
         <CardHeader>
