@@ -169,7 +169,7 @@ function PlatformSchools() {
                 </div>
                 <div className="rounded border bg-muted/40 p-3 text-xs space-y-1">
                   <div className="font-medium text-foreground">DNS (one-time setup)</div>
-                  <div className="font-mono">A &nbsp; *.erp &nbsp; → 185.158.133.1</div>
+                  <div className="font-mono">A &nbsp; * &nbsp; → 185.158.133.1</div>
                   <div className="text-muted-foreground">
                     Then in <strong>Project Settings → Domains</strong>, add <code>{form.slug || "[slug]"}.{rootDomain}</code> so SSL is issued.
                   </div>
@@ -215,9 +215,9 @@ function PlatformSchools() {
           <CardDescription>At your domain registrar (smartdev.co.ke):</CardDescription>
         </CardHeader>
         <CardContent className="text-sm space-y-1 font-mono bg-muted/50 p-3 rounded">
-          <div>A &nbsp;&nbsp; admin &nbsp;&nbsp; → 185.158.133.1 &nbsp; (this portal)</div>
-          <div>A &nbsp;&nbsp; erp &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → 185.158.133.1</div>
-          <div>A &nbsp;&nbsp; *.erp &nbsp;&nbsp;&nbsp; → 185.158.133.1 &nbsp; (all school subdomains)</div>
+          <div>A &nbsp;&nbsp; @ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → 185.158.133.1 &nbsp; (smartdev.co.ke)</div>
+          <div>A &nbsp;&nbsp; admin &nbsp; → 185.158.133.1 &nbsp; (this portal)</div>
+          <div>A &nbsp;&nbsp; * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → 185.158.133.1 &nbsp; (all school subdomains, e.g. greenfield.smartdev.co.ke)</div>
           <div className="text-xs text-muted-foreground font-sans mt-2">
             Then in <strong>Project Settings → Domains</strong>, add each school's full subdomain so Lovable issues an SSL cert.
           </div>
