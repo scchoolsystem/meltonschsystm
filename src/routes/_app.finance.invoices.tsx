@@ -143,10 +143,11 @@ function StkButton({ invoiceId, balance }: { invoiceId: string; balance: number 
 }
 
 function PayDialog({ invoiceId, balance, onDone }: { invoiceId: string; balance: number; onDone: () => void }) {
+  const { user } = useAuth();
   const [f, setF] = useState({ amount: balance, method: "cash", reference: "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("payments").insert({ invoice_id: invoiceId, ...f } as any); if (error) throw error;
+      const { error } = await supabase.from("payments").insert({ invoice_id: invoiceId, received_by: user?.id, ...f } as any); if (error) throw error;
     },
     onSuccess: () => { toast.success("Payment recorded"); onDone(); },
     onError: (e: any) => toast.error(e.message),
