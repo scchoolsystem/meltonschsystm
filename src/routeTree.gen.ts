@@ -52,6 +52,7 @@ import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics
 import { Route as AppAcademicsReportCardsRouteImport } from './routes/_app.academics.report-cards'
 import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
@@ -271,6 +272,12 @@ const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
   path: '/academics/exams',
   getParentRoute: () => AppRoute,
 } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppIdsStudentIdRoute = AppIdsStudentIdRouteImport.update({
   id: '/ids/student/$id',
   path: '/ids/student/$id',
@@ -339,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesByTo {
@@ -387,6 +395,7 @@ export interface FileRoutesByTo {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRoutesById {
@@ -437,6 +446,7 @@ export interface FileRoutesById {
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/_app/academics/report-card/$studentId/$examId': typeof AppAcademicsReportCardStudentIdExamIdRoute
 }
 export interface FileRouteTypes {
@@ -487,6 +497,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/lovable/email/queue/process'
     | '/academics/report-card/$studentId/$examId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -535,6 +546,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/lovable/email/queue/process'
     | '/academics/report-card/$studentId/$examId'
   id:
     | '__root__'
@@ -584,6 +596,7 @@ export interface FileRouteTypes {
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
+    | '/lovable/email/queue/process'
     | '/_app/academics/report-card/$studentId/$examId'
   fileRoutesById: FileRoutesById
 }
@@ -593,6 +606,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
+  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -898,6 +912,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAcademicsExamsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/ids/student/$id': {
       id: '/_app/ids/student/$id'
       path: '/ids/student/$id'
@@ -1038,6 +1059,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
+  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
