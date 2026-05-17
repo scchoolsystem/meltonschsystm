@@ -65,7 +65,11 @@ function AddDialog({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", category: "behaviour", severity: "minor", description: "", action_taken: "", incident_date: new Date().toISOString().slice(0, 10) });
   const { data: students = [] } = useQuery({ queryKey: ["students-min3"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").limit(500)).data ?? [] });
   const m = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from("discipline_records").insert(f); if (error) throw error; },
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("discipline_records").insert({ ...f, reported_by: u.user?.id });
+      if (error) throw error;
+    },
     onSuccess: () => { toast.success("Incident logged"); onDone(); },
     onError: (e: any) => toast.error(e.message),
   });
