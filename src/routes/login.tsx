@@ -31,8 +31,12 @@ function LoginPage() {
     : null;
 
   useEffect(() => {
+    if (isPlatformHost) {
+      navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
+      return;
+    }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, isPlatformHost]);
 
   async function handleUniqueIdSignIn(e: React.FormEvent) {
     e.preventDefault();
