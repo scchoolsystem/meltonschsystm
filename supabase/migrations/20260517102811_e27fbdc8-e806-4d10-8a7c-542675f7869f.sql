@@ -1,0 +1,10 @@
+GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_platform_admin(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_platform_owner(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.role_level(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.can_edit(uuid, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.current_user_school() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.my_school_id() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_student(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_parent_of(uuid) TO anon, authenticated;
