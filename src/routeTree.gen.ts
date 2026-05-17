@@ -54,8 +54,11 @@ import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settin
 import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.permissions'
+import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overrides'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
+import { Route as AppAdminLifecycleRouteImport } from './routes/_app.admin.lifecycle'
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
+import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
@@ -295,14 +298,29 @@ const AppAdminPermissionsRoute = AppAdminPermissionsRouteImport.update({
   path: '/admin/permissions',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminOverridesRoute = AppAdminOverridesRouteImport.update({
+  id: '/admin/overrides',
+  path: '/admin/overrides',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminLinksRoute = AppAdminLinksRouteImport.update({
   id: '/admin/links',
   path: '/admin/links',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLifecycleRoute = AppAdminLifecycleRouteImport.update({
+  id: '/admin/lifecycle',
+  path: '/admin/lifecycle',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminImportRoute = AppAdminImportRouteImport.update({
   id: '/admin/import',
   path: '/admin/import',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminFieldEditsRoute = AppAdminFieldEditsRouteImport.update({
+  id: '/admin/field-edits',
+  path: '/admin/field-edits',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminBrainRoute = AppAdminBrainRouteImport.update({
@@ -415,8 +433,11 @@ export interface FileRoutesByFullPath {
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
+  '/admin/overrides': typeof AppAdminOverridesRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
@@ -477,8 +498,11 @@ export interface FileRoutesByTo {
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
+  '/admin/overrides': typeof AppAdminOverridesRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
@@ -541,8 +565,11 @@ export interface FileRoutesById {
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
+  '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/import': typeof AppAdminImportRoute
+  '/_app/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
+  '/_app/admin/overrides': typeof AppAdminOverridesRoute
   '/_app/admin/permissions': typeof AppAdminPermissionsRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/schools': typeof AppAdminSchoolsRoute
@@ -605,8 +632,11 @@ export interface FileRouteTypes {
     | '/academics/subjects'
     | '/admin/activity'
     | '/admin/brain'
+    | '/admin/field-edits'
     | '/admin/import'
+    | '/admin/lifecycle'
     | '/admin/links'
+    | '/admin/overrides'
     | '/admin/permissions'
     | '/admin/roles'
     | '/admin/schools'
@@ -667,8 +697,11 @@ export interface FileRouteTypes {
     | '/academics/subjects'
     | '/admin/activity'
     | '/admin/brain'
+    | '/admin/field-edits'
     | '/admin/import'
+    | '/admin/lifecycle'
     | '/admin/links'
+    | '/admin/overrides'
     | '/admin/permissions'
     | '/admin/roles'
     | '/admin/schools'
@@ -730,8 +763,11 @@ export interface FileRouteTypes {
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
     | '/_app/admin/brain'
+    | '/_app/admin/field-edits'
     | '/_app/admin/import'
+    | '/_app/admin/lifecycle'
     | '/_app/admin/links'
+    | '/_app/admin/overrides'
     | '/_app/admin/permissions'
     | '/_app/admin/roles'
     | '/_app/admin/schools'
@@ -1090,6 +1126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminPermissionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/overrides': {
+      id: '/_app/admin/overrides'
+      path: '/admin/overrides'
+      fullPath: '/admin/overrides'
+      preLoaderRoute: typeof AppAdminOverridesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/links': {
       id: '/_app/admin/links'
       path: '/admin/links'
@@ -1097,11 +1140,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLinksRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/lifecycle': {
+      id: '/_app/admin/lifecycle'
+      path: '/admin/lifecycle'
+      fullPath: '/admin/lifecycle'
+      preLoaderRoute: typeof AppAdminLifecycleRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/import': {
       id: '/_app/admin/import'
       path: '/admin/import'
       fullPath: '/admin/import'
       preLoaderRoute: typeof AppAdminImportRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/field-edits': {
+      id: '/_app/admin/field-edits'
+      path: '/admin/field-edits'
+      fullPath: '/admin/field-edits'
+      preLoaderRoute: typeof AppAdminFieldEditsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/brain': {
@@ -1240,8 +1297,11 @@ interface AppRouteChildren {
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
+  AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
+  AppAdminLifecycleRoute: typeof AppAdminLifecycleRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
+  AppAdminOverridesRoute: typeof AppAdminOverridesRoute
   AppAdminPermissionsRoute: typeof AppAdminPermissionsRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
@@ -1284,8 +1344,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
+  AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminImportRoute: AppAdminImportRoute,
+  AppAdminLifecycleRoute: AppAdminLifecycleRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
+  AppAdminOverridesRoute: AppAdminOverridesRoute,
   AppAdminPermissionsRoute: AppAdminPermissionsRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminSchoolsRoute: AppAdminSchoolsRoute,
