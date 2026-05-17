@@ -19,12 +19,12 @@ export const Route = createFileRoute("/platform/invoices")({
 });
 
 function PlatformInvoices() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const qc = useQueryClient();
   const isOwner = roles.includes("platform_owner");
 
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ invoice_id: "", amount: "", method: "manual", reference: "" });
+  const [payForm, setPayForm] = useState({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
 
   const { data: invoices } = useQuery({
     queryKey: ["all-platform-invoices"],
