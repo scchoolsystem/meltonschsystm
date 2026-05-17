@@ -14,7 +14,8 @@ type AppRole =
   | "security_admin" | "security_user" | "library_admin" | "library_user"
   | "clinic_admin" | "clinic_user" | "sports_admin" | "sports_user"
   | "store_admin" | "store_user" | "transport_admin" | "guidance_admin"
-  | "ict_admin" | "discipline_admin";
+  | "ict_admin" | "discipline_admin"
+  | "platform_owner" | "platform_support";
 
 interface AuthCtx {
   session: Session | null;
