@@ -23,6 +23,19 @@ function Page() {
   const [openD, setOpenD] = useState(false); const [openA, setOpenA] = useState(false);
   const { data: dorms = [] } = useQuery({ queryKey: ["dorms"], queryFn: async () => (await supabase.from("dormitories").select("*").order("name")).data ?? [] });
   const { data: asg = [] } = useQuery({ queryKey: ["dorm_asg"], queryFn: async () => (await supabase.from("dorm_assignments").select("*, dormitories(name), students(first_name,last_name,admission_no)").order("assigned_on", { ascending: false })).data ?? [] });
+  const { data: staffMap = {} } = useQuery({
+    queryKey: ["dorm-matrons", dorms.length],
+    enabled: dorms.length > 0,
+    queryFn: async () => {
+      const ids = Array.from(new Set((dorms as any[]).map(d => d.matron_id).filter(Boolean)));
+      if (ids.length === 0) return {} as Record<string, string>;
+      const { data } = await supabase.from("profiles").select("id,full_name").in("id", ids);
+      const m: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => { m[p.id] = p.full_name; });
+      return m;
+    },
+  });
+  const occupancy = (dormId: string) => (asg as any[]).filter(a => a.dormitory_id === dormId).length;
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div><h1 className="text-3xl font-bold">Boarding</h1><p className="text-sm text-muted-foreground mt-1">Dormitories & assignments</p></div>
@@ -34,10 +47,22 @@ function Page() {
               <AddDorm onDone={() => { setOpenD(false); qc.invalidateQueries({ queryKey: ["dorms"] }); }} /></Dialog>}
           </CardHeader><CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Gender</TableHead><TableHead className="text-right">Capacity</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Gender</TableHead><TableHead>Matron</TableHead><TableHead className="text-right">Occupancy</TableHead><TableHead className="text-right">Capacity</TableHead></TableRow></TableHeader>
               <TableBody>
-                {dorms.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No dorms.</TableCell></TableRow>}
-                {(dorms as any[]).map(d => <TableRow key={d.id}><TableCell className="font-medium">{d.name}</TableCell><TableCell className="capitalize">{d.gender}</TableCell><TableCell className="text-right">{d.capacity}</TableCell></TableRow>)}
+                {dorms.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No dorms.</TableCell></TableRow>}
+                {(dorms as any[]).map(d => {
+                  const occ = occupancy(d.id);
+                  const full = occ >= d.capacity;
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium">{d.name}</TableCell>
+                      <TableCell className="capitalize">{d.gender}</TableCell>
+                      <TableCell>{(staffMap as any)[d.matron_id] ?? "—"}</TableCell>
+                      <TableCell className={`text-right font-mono ${full ? 'text-destructive font-semibold' : ''}`}>{occ}</TableCell>
+                      <TableCell className="text-right">{d.capacity}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent></Card>

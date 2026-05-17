@@ -79,17 +79,20 @@ function Page() {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Out</TableHead><TableHead>Expected back</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Out</TableHead><TableHead>Expected back</TableHead><TableHead>Actual back</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
-                  {passes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
-                  {(passes as any[]).map(p => (
+                  {passes.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
+                  {(passes as any[]).map(p => {
+                    const overdue = p.status === "out" && p.expected_return && new Date(p.expected_return) < new Date();
+                    return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.students?.first_name} {p.students?.last_name} <span className="font-mono text-xs text-muted-foreground">{p.students?.admission_no}</span></TableCell>
                       <TableCell className="text-sm">{p.reason}</TableCell>
                       <TableCell className="text-xs">{new Date(p.exit_time).toLocaleString()}</TableCell>
-                      <TableCell className="text-xs">{p.expected_return ? new Date(p.expected_return).toLocaleString() : "—"}</TableCell>
+                      <TableCell className={`text-xs ${overdue ? 'text-destructive font-semibold' : ''}`}>{p.expected_return ? new Date(p.expected_return).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="text-xs">{p.actual_return ? new Date(p.actual_return).toLocaleString() : "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={p.status === "out" ? "outline" : p.status === "returned" ? "default" : "destructive"} className="capitalize">{p.status}</Badge>
+                        <Badge variant={overdue ? "destructive" : p.status === "out" ? "outline" : p.status === "returned" ? "default" : "destructive"} className="capitalize">{overdue ? "overdue" : p.status}</Badge>
                       </TableCell>
                       <TableCell>
                         {p.status === "out" && canManage && (
@@ -97,7 +100,8 @@ function Page() {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
