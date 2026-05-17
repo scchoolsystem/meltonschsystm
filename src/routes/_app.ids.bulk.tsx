@@ -7,19 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Printer } from "lucide-react";
 import { IdCard } from "@/components/IdCard";
+import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/ids/bulk")({ component: Page });
 
 function Page() {
   const [classId, setClassId] = useState<string>("all");
+  const { school } = useTenant();
 
   const { data: classes } = useQuery({
     queryKey: ["classes-bulk-id"],
     queryFn: async () => (await supabase.from("classes").select("id,name").order("name")).data || [],
-  });
-  const { data: school } = useQuery({
-    queryKey: ["school-bulk-id"],
-    queryFn: async () => (await supabase.from("school_settings").select("school_name").maybeSingle()).data,
   });
   const { data: students = [] } = useQuery({
     queryKey: ["students-bulk-id", classId],
@@ -54,7 +52,7 @@ function Page() {
         {students.map((s: any) => (
           <IdCard
             key={s.id}
-            schoolName={school?.school_name || "School"}
+            schoolName={school?.name || "School"}
             kind="STUDENT"
             uniqueId={s.unique_id || s.admission_no}
             fullName={`${s.first_name} ${s.last_name}`}
