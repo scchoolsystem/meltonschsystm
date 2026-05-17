@@ -68,6 +68,9 @@ const adminItems = [
   { title: "Field Permissions", url: "/admin/permissions", icon: Settings },
   { title: "CSV Import", url: "/admin/import", icon: FileText },
   { title: "Activity Log", url: "/admin/activity", icon: Activity },
+  { title: "Lifecycle Events", url: "/admin/lifecycle", icon: Activity },
+  { title: "Field Edit Audit", url: "/admin/field-edits", icon: Activity },
+  { title: "Override Log", url: "/admin/overrides", icon: Activity },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
