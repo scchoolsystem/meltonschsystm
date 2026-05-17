@@ -41,16 +41,16 @@ const TenantContext = createContext<TenantState>({
 /**
  * Extract the school slug from the current hostname.
  * Rules:
- *   admin.smartdev.co.ke           -> "__platform__" (platform admin portal)
- *   admin.erp.smartdev.co.ke       -> "__platform__"
- *   greenfield.erp.smartdev.co.ke  -> "greenfield"
- *   erp.smartdev.co.ke             -> null  (root, shows default)
- *   *.lovable.app / localhost      -> null  (dev / preview)
+ *   smartdev.co.ke              -> null  (root / marketing)
+ *   admin.smartdev.co.ke        -> "__platform__" (platform admin portal)
+ *   greenfield.smartdev.co.ke   -> "greenfield"
+ *   (legacy) admin.erp.smartdev.co.ke / *.erp.smartdev.co.ke still supported
+ *   *.lovable.app / localhost   -> null  (dev / preview)
  */
 export function getSubdomainSlug(hostname: string): string | null {
   const host = hostname.toLowerCase().split(":")[0];
 
-  // Platform admin host (works at admin.smartdev.co.ke and admin.erp.smartdev.co.ke)
+  // Platform admin host
   if (host === "admin.smartdev.co.ke" || host === "admin.erp.smartdev.co.ke") {
     return PLATFORM_SLUG;
   }
@@ -58,12 +58,25 @@ export function getSubdomainSlug(hostname: string): string | null {
   if (host === "localhost" || /^[\d.]+$/.test(host)) return null;
   if (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com")) return null;
 
-  const ROOT = "erp.smartdev.co.ke";
-  if (host === ROOT) return null;
+  // Root domains — no school context
+  if (host === "smartdev.co.ke" || host === "www.smartdev.co.ke" || host === "erp.smartdev.co.ke") {
+    return null;
+  }
+
+  // Legacy *.erp.smartdev.co.ke still resolves to its slug
+  const LEGACY_ROOT = "erp.smartdev.co.ke";
+  if (host.endsWith("." + LEGACY_ROOT)) {
+    const sub = host.slice(0, host.length - LEGACY_ROOT.length - 1);
+    return sub || null;
+  }
+
+  // New scheme: <slug>.smartdev.co.ke
+  const ROOT = "smartdev.co.ke";
   if (host.endsWith("." + ROOT)) {
     const sub = host.slice(0, host.length - ROOT.length - 1);
     return sub || null;
   }
+
   const parts = host.split(".");
   if (parts.length >= 3) return parts[0];
   return null;

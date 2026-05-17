@@ -35,7 +35,7 @@ function SchoolsPage() {
     );
   }
 
-  const rootDomain = "erp.smartdev.co.ke";
+  const rootDomain = "smartdev.co.ke";
 
   return (
     <div className="space-y-6 p-6">
