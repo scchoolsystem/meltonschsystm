@@ -4,16 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Printer } from "lucide-react";
+import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/academics/report-card/$studentId/$examId")({ component: Page });
 
 function Page() {
   const { studentId, examId } = Route.useParams();
-
-  const { data: school } = useQuery({
-    queryKey: ["school-rc-print"],
-    queryFn: async () => (await supabase.from("school_settings").select("school_name").maybeSingle()).data,
-  });
+  const { school } = useTenant();
   const { data: exam } = useQuery({
     queryKey: ["exam-rc", examId],
     queryFn: async () => (await supabase.from("exams").select("name,term,year,start_date,end_date").eq("id", examId).single()).data,
@@ -44,7 +41,7 @@ function Page() {
         </div>
         <div className="bg-card text-card-foreground border rounded-lg p-8 print:border-0 print:p-6">
           <div className="text-center mb-6 pb-4 border-b">
-            <h1 className="text-2xl font-bold">{school?.school_name || "School"}</h1>
+            <h1 className="text-2xl font-bold">{school?.name || "School"}</h1>
             <div className="text-sm text-muted-foreground">STUDENT REPORT CARD</div>
             <div className="text-sm mt-1">{exam?.name} — {exam?.term} {exam?.year}</div>
           </div>
