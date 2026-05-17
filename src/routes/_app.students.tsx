@@ -50,11 +50,11 @@ function StudentsPage() {
     queryFn: async () => {
       let req = supabase
         .from("students")
-        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
+        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
         .order("admission_no", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       const t = q.trim();
-      if (t) req = req.or(`admission_no.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+      if (t) req = req.or(`admission_no.ilike.%${t}%,unique_id.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
       const { data, error, count } = await req;
       if (error) throw error;
       return { rows: (data as unknown as Student[]) ?? [], count: count ?? 0 };
