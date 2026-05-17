@@ -44,14 +44,22 @@ function ActivityPage() {
                     <TableHead>Time</TableHead>
                     <TableHead>Action</TableHead>
                     <TableHead>Entity</TableHead>
+                    <TableHead>Entity ID</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.map((l: any) => (
                     <TableRow key={l.id}>
-                      <TableCell className="text-xs text-muted-foreground">{new Date(l.created_at).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
                       <TableCell className="font-medium">{l.action}</TableCell>
                       <TableCell className="text-sm">{l.entity ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{l.entity_id ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{l.user_id ? l.user_id.slice(0, 8) : "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate" title={l.metadata ? JSON.stringify(l.metadata) : ""}>
+                        {l.metadata ? JSON.stringify(l.metadata) : "—"}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
