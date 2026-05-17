@@ -12,9 +12,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { useTheme } from "@/hooks/use-theme";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -80,13 +79,10 @@ export function AppSidebar() {
   const isParent = hasRole("parent");
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
-  const { data: settings } = useQuery({
-    queryKey: ["school-settings"],
-    queryFn: async () => {
-      const { data } = await supabase.from("school_settings").select("school_name, motto, logo_url").limit(1).maybeSingle();
-      return data;
-    },
-  });
+  const { school } = useTenant();
+  const settings = school
+    ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
+    : null;
 
   return (
     <Sidebar collapsible="icon">
