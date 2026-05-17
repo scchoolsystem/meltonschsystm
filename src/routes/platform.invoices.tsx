@@ -19,12 +19,12 @@ export const Route = createFileRoute("/platform/invoices")({
 });
 
 function PlatformInvoices() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const qc = useQueryClient();
   const isOwner = roles.includes("platform_owner");
 
   const [payOpen, setPayOpen] = useState(false);
-  const [payForm, setPayForm] = useState({ invoice_id: "", amount: "", method: "manual", reference: "" });
+  const [payForm, setPayForm] = useState({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
 
   const { data: invoices } = useQuery({
     queryKey: ["all-platform-invoices"],
@@ -47,13 +47,15 @@ function PlatformInvoices() {
         amount,
         method: payForm.method,
         reference: payForm.reference || null,
+        notes: payForm.notes || null,
+        recorded_by: user?.id ?? null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Payment recorded");
       setPayOpen(false);
-      setPayForm({ invoice_id: "", amount: "", method: "manual", reference: "" });
+      setPayForm({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
       qc.invalidateQueries({ queryKey: ["all-platform-invoices"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -111,6 +113,10 @@ function PlatformInvoices() {
                   <Label>Reference (optional)</Label>
                   <Input value={payForm.reference} onChange={e => setPayForm({ ...payForm, reference: e.target.value })} />
                 </div>
+                <div>
+                  <Label>Notes (optional)</Label>
+                  <Input value={payForm.notes} onChange={e => setPayForm({ ...payForm, notes: e.target.value })} />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setPayOpen(false)}>Cancel</Button>
@@ -136,6 +142,7 @@ function PlatformInvoices() {
                 <TableHead>Paid</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Notes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,10 +159,11 @@ function PlatformInvoices() {
                       {i.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{i.notes ?? "—"}</TableCell>
                 </TableRow>
               ))}
               {(!invoices || invoices.length === 0) && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">No invoices yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">No invoices yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
