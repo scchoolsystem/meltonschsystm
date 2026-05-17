@@ -28,7 +28,8 @@ export const Route = createFileRoute("/_app/students")({
 
 interface ClassRow { id: string; name: string }
 interface Student {
-  id: string; admission_no: string; first_name: string; last_name: string;
+  id: string; admission_no: string; unique_id: string | null;
+  first_name: string; last_name: string;
   gender: string | null; class_id: string | null; status: string;
   lifecycle_status: string; parent_auth_code: string | null;
   parent_phone: string | null;
@@ -49,11 +50,11 @@ function StudentsPage() {
     queryFn: async () => {
       let req = supabase
         .from("students")
-        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
+        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
         .order("admission_no", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       const t = q.trim();
-      if (t) req = req.or(`admission_no.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+      if (t) req = req.or(`admission_no.ilike.%${t}%,unique_id.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
       const { data, error, count } = await req;
       if (error) throw error;
       return { rows: (data as unknown as Student[]) ?? [], count: count ?? 0 };
@@ -84,8 +85,8 @@ function StudentsPage() {
 
   function exportCsv() {
     const rows = [
-      ["Admission No", "First Name", "Last Name", "Gender", "Class", "Status", "Parent Phone"],
-      ...filtered.map((s) => [s.admission_no, s.first_name, s.last_name, s.gender ?? "", s.classes?.name ?? "", s.status, s.parent_phone ?? ""]),
+      ["Admission No", "Unique ID", "First Name", "Last Name", "Gender", "Class", "Status", "Parent Phone"],
+      ...filtered.map((s) => [s.admission_no, s.unique_id ?? "", s.first_name, s.last_name, s.gender ?? "", s.classes?.name ?? "", s.status, s.parent_phone ?? ""]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -119,7 +120,7 @@ function StudentsPage() {
         <CardHeader>
           <div className="relative max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
+            <Input placeholder="Search by name, admission no, or unique ID…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
           </div>
         </CardHeader>
         <CardContent>
@@ -131,6 +132,7 @@ function StudentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Admission No</TableHead>
+                    <TableHead>Unique ID</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Gender</TableHead>
@@ -142,11 +144,12 @@ function StudentsPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={canEdit ? 8 : 6} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canEdit ? 9 : 7} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
                   )}
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-mono text-xs">{s.admission_no}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.unique_id ?? "—"}</TableCell>
                       <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
                       <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="capitalize">{s.gender ?? "—"}</TableCell>
