@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
+import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
@@ -84,6 +85,11 @@ const SysControlRoomRoute = SysControlRoomRouteImport.update({
   id: '/sys/control-room',
   path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformSchoolsRoute = PlatformSchoolsRouteImport.update({
+  id: '/schools',
+  path: '/schools',
+  getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformLoginRoute = PlatformLoginRouteImport.update({
   id: '/login',
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/_app/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/schools': typeof PlatformSchoolsRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
@@ -499,6 +508,7 @@ export interface FileRouteTypes {
     | '/transport'
     | '/platform/dashboard'
     | '/platform/login'
+    | '/platform/schools'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -551,6 +561,7 @@ export interface FileRouteTypes {
     | '/transport'
     | '/platform/dashboard'
     | '/platform/login'
+    | '/platform/schools'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/_app/transport'
     | '/platform/dashboard'
     | '/platform/login'
+    | '/platform/schools'
     | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
@@ -682,6 +694,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sys/control-room'
       preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/platform/schools': {
+      id: '/platform/schools'
+      path: '/schools'
+      fullPath: '/platform/schools'
+      preLoaderRoute: typeof PlatformSchoolsRouteImport
+      parentRoute: typeof PlatformRoute
     }
     '/platform/login': {
       id: '/platform/login'
@@ -1114,11 +1133,13 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
+  PlatformSchoolsRoute: typeof PlatformSchoolsRoute
 }
 
 const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
   PlatformLoginRoute: PlatformLoginRoute,
+  PlatformSchoolsRoute: PlatformSchoolsRoute,
 }
 
 const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
