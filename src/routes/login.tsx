@@ -19,7 +19,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
-  const { school, slug } = useTenant();
+  const { school, slug, isPlatformHost } = useTenant();
 
   const [uniqueId, setUniqueId] = useState("");
   const [pw, setPw] = useState("");
@@ -31,8 +31,12 @@ function LoginPage() {
     : null;
 
   useEffect(() => {
+    if (isPlatformHost) {
+      navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
+      return;
+    }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, isPlatformHost]);
 
   async function handleUniqueIdSignIn(e: React.FormEvent) {
     e.preventDefault();
