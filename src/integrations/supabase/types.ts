@@ -2072,8 +2072,12 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_parent_of: { Args: { _student_id: string }; Returns: boolean }
       is_student: { Args: { _student_id: string }; Returns: boolean }
-      lookup_login_email: { Args: { _unique_id: string }; Returns: string }
+      lookup_login_email: {
+        Args: { _school_slug?: string; _unique_id: string }
+        Returns: string
+      }
       my_children_ids: { Args: never; Returns: string[] }
+      my_school_id: { Args: never; Returns: string }
       next_unique_id: { Args: { _category: string }; Returns: string }
       role_level: { Args: { _user: string }; Returns: number }
     }
