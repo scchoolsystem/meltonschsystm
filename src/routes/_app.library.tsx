@@ -47,13 +47,14 @@ function Page() {
           </CardHeader><CardContent>
             {l1 ? <Loader2 className="animate-spin mx-auto" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>Category</TableHead><TableHead>Shelf</TableHead><TableHead className="text-right">Available / Total</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>ISBN</TableHead><TableHead>Category</TableHead><TableHead>Shelf</TableHead><TableHead className="text-right">Available / Total</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {books.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No books.</TableCell></TableRow>}
+                  {books.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No books.</TableCell></TableRow>}
                   {(books as any[]).map(b => (
                     <TableRow key={b.id}>
                       <TableCell className="font-medium">{b.title}</TableCell>
                       <TableCell>{b.author ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.isbn ?? "—"}</TableCell>
                       <TableCell>{b.category ?? "—"}</TableCell>
                       <TableCell>{b.shelf ?? "—"}</TableCell>
                       <TableCell className="text-right font-mono">{b.copies_available} / {b.copies_total}</TableCell>
@@ -70,19 +71,23 @@ function Page() {
           </CardHeader><CardContent>
             {l2 ? <Loader2 className="animate-spin mx-auto" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Book</TableHead><TableHead>Student</TableHead><TableHead>Borrowed</TableHead><TableHead>Due</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Book</TableHead><TableHead>Student</TableHead><TableHead>Borrowed</TableHead><TableHead>Due</TableHead><TableHead>Returned</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
-                  {loans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No loans.</TableCell></TableRow>}
-                  {(loans as any[]).map(l => (
+                  {loans.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No loans.</TableCell></TableRow>}
+                  {(loans as any[]).map(l => {
+                    const overdue = l.status === 'active' && l.due_on && new Date(l.due_on) < new Date();
+                    return (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{l.books?.title}</TableCell>
                       <TableCell>{l.students?.first_name} {l.students?.last_name}</TableCell>
                       <TableCell className="text-xs">{l.borrowed_on}</TableCell>
-                      <TableCell className="text-xs">{l.due_on}</TableCell>
-                      <TableCell><Badge variant="outline" className={l.status === 'returned' ? 'bg-success/15 text-success border-success/30' : ''}>{l.status}</Badge></TableCell>
+                      <TableCell className={`text-xs ${overdue ? 'text-destructive font-semibold' : ''}`}>{l.due_on}</TableCell>
+                      <TableCell className="text-xs">{l.returned_on ?? "—"}</TableCell>
+                      <TableCell><Badge variant="outline" className={l.status === 'returned' ? 'bg-success/15 text-success border-success/30' : overdue ? 'bg-destructive/15 text-destructive border-destructive/30' : ''}>{overdue ? 'overdue' : l.status}</Badge></TableCell>
                       <TableCell>{can && l.status === 'active' && <Button size="sm" variant="outline" onClick={() => ret.mutate(l)}>Return</Button>}</TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
