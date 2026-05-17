@@ -80,11 +80,60 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
       });
     }
 
+    const portal_url = `https://${school.slug}.smartdev.co.ke`;
+    const full_name = data.full_name ?? school.name + " Admin";
+
+    // Send welcome email with credentials (fire-and-forget — never block provisioning).
+    let email_sent = false;
+    let email_error: string | null = null;
+    try {
+      const origin =
+        process.env.SITE_URL ||
+        process.env.PUBLIC_SITE_URL ||
+        "https://admin.smartdev.co.ke";
+      const supabaseUrl = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      // Mint a short-lived service-role JWT-free call by using the dedicated send route
+      // with a Bearer token issued for the platform owner who's currently authenticated.
+      // We piggy-back on the caller's session token, which the route validates.
+      const authHeader = (await (async () => {
+        // The server-fn middleware already validated the caller, but we don't have the raw token here.
+        // Instead, use service-role auth: the send route accepts service-role JWT.
+        return serviceKey ? `Bearer ${serviceKey}` : "";
+      })());
+
+      const res = await fetch(`${origin}/lovable/email/transactional/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        body: JSON.stringify({
+          templateName: "school-admin-credentials",
+          recipientEmail: data.email,
+          idempotencyKey: `school-admin-${school.id}-${Date.now()}`,
+          templateData: {
+            schoolName: school.name,
+            portalUrl: portal_url,
+            loginEmail: data.email,
+            password,
+            fullName: full_name,
+          },
+        }),
+      });
+      email_sent = res.ok;
+      if (!res.ok) email_error = await res.text().catch(() => res.statusText);
+    } catch (e: any) {
+      email_error = e?.message ?? "unknown error";
+    }
+
     return {
       ok: true,
       created,
       email: data.email,
       password,
-      portal_url: `https://${school.slug}.smartdev.co.ke`,
+      portal_url,
+      email_sent,
+      email_error,
     };
   });

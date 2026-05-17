@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
@@ -70,6 +71,11 @@ import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
+const UnsubscribeRoute = UnsubscribeRouteImport.update({
+  id: '/unsubscribe',
+  path: '/unsubscribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformRoute = PlatformRouteImport.update({
   id: '/platform',
   path: '/platform',
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/unsubscribe': typeof UnsubscribeRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -439,6 +446,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/unsubscribe': typeof UnsubscribeRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/attendance': typeof AppAttendanceRoute
@@ -502,6 +510,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/unsubscribe': typeof UnsubscribeRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
   '/_app/attendance': typeof AppAttendanceRoute
@@ -565,6 +574,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/platform'
+    | '/unsubscribe'
     | '/analytics'
     | '/announcements'
     | '/attendance'
@@ -626,6 +636,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/platform'
+    | '/unsubscribe'
     | '/analytics'
     | '/announcements'
     | '/attendance'
@@ -688,6 +699,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/platform'
+    | '/unsubscribe'
     | '/_app/analytics'
     | '/_app/announcements'
     | '/_app/attendance'
@@ -751,6 +763,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
   PlatformRoute: typeof PlatformRouteWithChildren
+  UnsubscribeRoute: typeof UnsubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
@@ -762,6 +775,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/unsubscribe': {
+      id: '/unsubscribe'
+      path: '/unsubscribe'
+      fullPath: '/unsubscribe'
+      preLoaderRoute: typeof UnsubscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform': {
       id: '/platform'
       path: '/platform'
@@ -1327,6 +1347,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
   PlatformRoute: PlatformRouteWithChildren,
+  UnsubscribeRoute: UnsubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
