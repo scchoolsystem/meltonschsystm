@@ -21,8 +21,20 @@ function Page() {
   const { isAdmin, hasRole } = useAuth();
   const can = isAdmin || hasRole("matron");
   const [openD, setOpenD] = useState(false); const [openA, setOpenA] = useState(false);
-  const { data: dorms = [] } = useQuery({ queryKey: ["dorms"], queryFn: async () => (await supabase.from("dormitories").select("*, profiles:matron_id(full_name)").order("name")).data ?? [] });
+  const { data: dorms = [] } = useQuery({ queryKey: ["dorms"], queryFn: async () => (await supabase.from("dormitories").select("*").order("name")).data ?? [] });
   const { data: asg = [] } = useQuery({ queryKey: ["dorm_asg"], queryFn: async () => (await supabase.from("dorm_assignments").select("*, dormitories(name), students(first_name,last_name,admission_no)").order("assigned_on", { ascending: false })).data ?? [] });
+  const { data: staffMap = {} } = useQuery({
+    queryKey: ["dorm-matrons", dorms.length],
+    enabled: dorms.length > 0,
+    queryFn: async () => {
+      const ids = Array.from(new Set((dorms as any[]).map(d => d.matron_id).filter(Boolean)));
+      if (ids.length === 0) return {} as Record<string, string>;
+      const { data } = await supabase.from("profiles").select("id,full_name").in("id", ids);
+      const m: Record<string, string> = {};
+      (data ?? []).forEach((p: any) => { m[p.id] = p.full_name; });
+      return m;
+    },
+  });
   const occupancy = (dormId: string) => (asg as any[]).filter(a => a.dormitory_id === dormId).length;
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -45,7 +57,7 @@ function Page() {
                     <TableRow key={d.id}>
                       <TableCell className="font-medium">{d.name}</TableCell>
                       <TableCell className="capitalize">{d.gender}</TableCell>
-                      <TableCell>{d.profiles?.full_name ?? "—"}</TableCell>
+                      <TableCell>{(staffMap as any)[d.matron_id] ?? "—"}</TableCell>
                       <TableCell className={`text-right font-mono ${full ? 'text-destructive font-semibold' : ''}`}>{occ}</TableCell>
                       <TableCell className="text-right">{d.capacity}</TableCell>
                     </TableRow>
