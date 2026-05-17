@@ -32,6 +32,7 @@ import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
+import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools.$id'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
@@ -175,6 +176,11 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => AppRoute,
+} as any)
+const PlatformSchoolsIdRoute = PlatformSchoolsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PlatformSchoolsRoute,
 } as any)
 const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   id: '/api/public/mpesa-callback',
@@ -345,7 +351,7 @@ export interface FileRoutesByFullPath {
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -371,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/portal/student': typeof AppPortalStudentRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -398,7 +405,7 @@ export interface FileRoutesByTo {
   '/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -424,6 +431,7 @@ export interface FileRoutesByTo {
   '/portal/student': typeof AppPortalStudentRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -453,7 +461,7 @@ export interface FileRoutesById {
   '/_app/transport': typeof AppTransportRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/login': typeof PlatformLoginRoute
-  '/platform/schools': typeof PlatformSchoolsRoute
+  '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
@@ -479,6 +487,7 @@ export interface FileRoutesById {
   '/_app/portal/student': typeof AppPortalStudentRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
+  '/platform/schools/$id': typeof PlatformSchoolsIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -534,6 +543,7 @@ export interface FileRouteTypes {
     | '/portal/student'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/platform/schools/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -587,6 +597,7 @@ export interface FileRouteTypes {
     | '/portal/student'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/platform/schools/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -641,6 +652,7 @@ export interface FileRouteTypes {
     | '/_app/portal/student'
     | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
+    | '/platform/schools/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
@@ -820,6 +832,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/analytics'
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/platform/schools/$id': {
+      id: '/platform/schools/$id'
+      path: '/$id'
+      fullPath: '/platform/schools/$id'
+      preLoaderRoute: typeof PlatformSchoolsIdRouteImport
+      parentRoute: typeof PlatformSchoolsRoute
     }
     '/api/public/mpesa-callback': {
       id: '/api/public/mpesa-callback'
@@ -1130,16 +1149,28 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface PlatformSchoolsRouteChildren {
+  PlatformSchoolsIdRoute: typeof PlatformSchoolsIdRoute
+}
+
+const PlatformSchoolsRouteChildren: PlatformSchoolsRouteChildren = {
+  PlatformSchoolsIdRoute: PlatformSchoolsIdRoute,
+}
+
+const PlatformSchoolsRouteWithChildren = PlatformSchoolsRoute._addFileChildren(
+  PlatformSchoolsRouteChildren,
+)
+
 interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
-  PlatformSchoolsRoute: typeof PlatformSchoolsRoute
+  PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
 }
 
 const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
   PlatformLoginRoute: PlatformLoginRoute,
-  PlatformSchoolsRoute: PlatformSchoolsRoute,
+  PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
 }
 
 const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
