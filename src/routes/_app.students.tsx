@@ -78,15 +78,8 @@ function StudentsPage() {
     },
   });
 
-  const filtered = useMemo(() => {
-    const t = q.toLowerCase();
-    return students.filter((s) =>
-      !t ||
-      s.admission_no.toLowerCase().includes(t) ||
-      s.first_name.toLowerCase().includes(t) ||
-      s.last_name.toLowerCase().includes(t)
-    );
-  }, [students, q]);
+  // Server-side search via `q` in queryKey; no client-side filter.
+  const filtered = students;
 
   function exportCsv() {
     const rows = [
