@@ -103,6 +103,8 @@ function LoginPage() {
         </Card>
         <p className="text-center text-xs text-muted-foreground mt-6">
           <Link to="/" className="hover:underline">← Back home</Link>
+          {" · "}
+          <Link to="/platform/login" className="hover:underline text-primary">Platform admin sign-in</Link>
           {clicks >= 5 && (
             <>
               {" · "}
