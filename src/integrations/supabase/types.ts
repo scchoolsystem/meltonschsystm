@@ -2147,7 +2147,131 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_attendance_daily: {
+        Row: {
+          absent: number | null
+          date: string | null
+          late: number | null
+          present: number | null
+          school_id: string | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_finance_summary: {
+        Row: {
+          collection_pct: number | null
+          defaulters: number | null
+          invoice_count: number | null
+          school_id: string | null
+          total_invoiced: number | null
+          total_paid: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_results_by_class: {
+        Row: {
+          class_id: string | null
+          class_name: string | null
+          mean_score: number | null
+          sample_size: number | null
+          school_id: string | null
+          subject_code: string | null
+          subject_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_results_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_results_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_subject_means: {
+        Row: {
+          mean_score: number | null
+          sample_size: number | null
+          school_id: string | null
+          subject_code: string | null
+          subject_id: string | null
+          subject_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_results_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_results_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_weak_students: {
+        Row: {
+          admission_no: string | null
+          first_name: string | null
+          last_name: string | null
+          mean_score: number | null
+          sample_size: number | null
+          school_id: string | null
+          student_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_results_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_results_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       assign_class_fees: {
