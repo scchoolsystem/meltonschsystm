@@ -283,3 +283,15 @@ function PlatformSchools() {
     </div>
   );
 }
+
+function SchoolCredRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <code className={`flex-1 px-2 py-1 rounded bg-muted border text-xs ${mono ? "font-mono" : ""}`}>{value}</code>
+      <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}>
+        <Copy className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
