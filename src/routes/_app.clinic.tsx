@@ -37,9 +37,9 @@ function Page() {
       <Card><CardHeader /><CardContent>
         {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
           <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Student</TableHead><TableHead>Symptoms</TableHead><TableHead>Diagnosis</TableHead><TableHead>Treatment</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Student</TableHead><TableHead>Symptoms</TableHead><TableHead>Diagnosis</TableHead><TableHead>Treatment</TableHead><TableHead>Referred</TableHead></TableRow></TableHeader>
             <TableBody>
-              {data.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No visits logged.</TableCell></TableRow>}
+              {data.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No visits logged.</TableCell></TableRow>}
               {(data as any[]).map(v => (
                 <TableRow key={v.id}>
                   <TableCell className="text-xs">{v.visit_date}</TableCell>
@@ -47,6 +47,7 @@ function Page() {
                   <TableCell className="max-w-xs text-sm truncate">{v.symptoms}</TableCell>
                   <TableCell className="max-w-xs text-sm truncate">{v.diagnosis ?? "—"}</TableCell>
                   <TableCell className="max-w-xs text-sm truncate">{v.treatment ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{v.referred_to ?? "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -60,7 +61,7 @@ function Page() {
 function AddDialog({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", visit_date: new Date().toISOString().slice(0, 10), symptoms: "", diagnosis: "", treatment: "", referred_to: "" });
   const { data: students = [] } = useQuery({ queryKey: ["students-min7"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").limit(500)).data ?? [] });
-  const m = useMutation({ mutationFn: async () => { const { error } = await supabase.from("clinic_visits").insert(f); if (error) throw error; }, onSuccess: () => { toast.success("Visit logged"); onDone(); }, onError: (e: any) => toast.error(e.message) });
+  const m = useMutation({ mutationFn: async () => { const { data: u } = await supabase.auth.getUser(); const { error } = await supabase.from("clinic_visits").insert({ ...f, attended_by: u.user?.id }); if (error) throw error; }, onSuccess: () => { toast.success("Visit logged"); onDone(); }, onError: (e: any) => toast.error(e.message) });
   return (
     <DialogContent><DialogHeader><DialogTitle>New Clinic Visit</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">

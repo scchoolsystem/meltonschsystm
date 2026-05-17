@@ -34,10 +34,23 @@ function Page() {
               <AddRoute onDone={() => { setOpenR(false); qc.invalidateQueries({ queryKey: ["t_routes"] }); }} /></Dialog>}
           </CardHeader><CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Vehicle</TableHead><TableHead>Driver</TableHead><TableHead>Phone</TableHead><TableHead className="text-right">Fee/mo</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Vehicle</TableHead><TableHead>Driver</TableHead><TableHead>Phone</TableHead><TableHead className="text-right">Assigned / Cap.</TableHead><TableHead className="text-right">Fee/mo</TableHead></TableRow></TableHeader>
               <TableBody>
-                {routes.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No routes.</TableCell></TableRow>}
-                {(routes as any[]).map(r => <TableRow key={r.id}><TableCell className="font-medium">{r.name}</TableCell><TableCell>{r.vehicle_reg ?? "—"}</TableCell><TableCell>{r.driver_name ?? "—"}</TableCell><TableCell>{r.driver_phone ?? "—"}</TableCell><TableCell className="text-right font-mono">KES {Number(r.monthly_fee).toLocaleString()}</TableCell></TableRow>)}
+                {routes.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No routes.</TableCell></TableRow>}
+                {(routes as any[]).map(r => {
+                  const used = (asg as any[]).filter(a => a.route_id === r.id).length;
+                  const full = used >= r.capacity;
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell>{r.vehicle_reg ?? "—"}</TableCell>
+                      <TableCell>{r.driver_name ?? "—"}</TableCell>
+                      <TableCell>{r.driver_phone ?? "—"}</TableCell>
+                      <TableCell className={`text-right font-mono ${full ? 'text-destructive font-semibold' : ''}`}>{used} / {r.capacity}</TableCell>
+                      <TableCell className="text-right font-mono">KES {Number(r.monthly_fee).toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent></Card>
