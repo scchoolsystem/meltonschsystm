@@ -19,6 +19,7 @@ import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
 import { LifecycleActions } from "@/components/LifecycleActions";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/staff")({
   component: StaffPage,
@@ -35,15 +36,23 @@ function StaffPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const { data: staff = [], isLoading } = useQuery({
-    queryKey: ["staff"],
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["staff", page],
     queryFn: async () => {
-      const { data, error } = await supabase.from("staff").select("*").order("employee_no", { ascending: false });
+      const { data, error, count } = await supabase
+        .from("staff").select("*", { count: "exact" })
+        .order("employee_no", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       if (error) throw error;
-      return data;
+      return { rows: data ?? [], count: count ?? 0 };
     },
   });
+  const staff = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const { data: settings } = useQuery({
     queryKey: ["school-settings"],
@@ -58,7 +67,7 @@ function StaffPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Staff</h1>
-          <p className="text-sm text-muted-foreground mt-1">{staff.length} members</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} members</p>
         </div>
         {isAdmin && (
           <Dialog open={open} onOpenChange={(o) => setOpen(o)}>
@@ -117,6 +126,7 @@ function StaffPage() {
               </Table>
             </div>
           )}
+          <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
         </CardContent>
       </Card>
     </div>

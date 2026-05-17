@@ -17,68 +17,53 @@ function Analytics() {
   const { data: kpis } = useQuery({
     queryKey: ["analytics-kpis"],
     queryFn: async () => {
-      const [students, staff, invoices, attendance] = await Promise.all([
-        supabase.from("students").select("id,status,gender,class_id", { count: "exact" }),
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const [students, staff, finance, attendance] = await Promise.all([
+        supabase.from("students").select("id,gender", { count: "exact" }),
         supabase.from("staff").select("id", { count: "exact", head: true }),
-        supabase.from("invoices").select("amount,paid,status"),
-        supabase.from("attendance_records").select("status,date").gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
+        (supabase as any).from("v_finance_summary").select("total_invoiced,total_paid,defaulters,collection_pct").maybeSingle(),
+        (supabase as any).from("v_attendance_daily").select("date,present,absent").gte("date", since).order("date", { ascending: true }),
       ]);
-      const totalInvoiced = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.amount), 0);
-      const totalPaid = (invoices.data ?? []).reduce((s, r: any) => s + Number(r.paid), 0);
-      const defaulters = (invoices.data ?? []).filter((r: any) => r.status !== "paid").length;
+      const f = (finance.data ?? {}) as any;
       return {
         students: students.count ?? 0,
         staff: staff.count ?? 0,
-        totalInvoiced, totalPaid, collection: totalInvoiced ? (totalPaid / totalInvoiced) * 100 : 0,
-        defaulters,
+        totalInvoiced: Number(f.total_invoiced ?? 0),
+        totalPaid: Number(f.total_paid ?? 0),
+        collection: Number(f.collection_pct ?? 0),
+        defaulters: Number(f.defaulters ?? 0),
         attendance: attendance.data ?? [],
         genders: students.data ?? [],
       };
     },
   });
 
-  const { data: results = [] } = useQuery({
-    queryKey: ["analytics-results"],
-    queryFn: async () => (await supabase.from("exam_results")
-      .select("score,subject_id,subjects(code)").limit(2000)).data ?? [],
+  const { data: subjectAvg = [] } = useQuery({
+    queryKey: ["analytics-subject-means"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("v_subject_means")
+        .select("subject_code,mean_score").order("mean_score", { ascending: false });
+      return (data ?? []).map((r: any) => ({ code: r.subject_code ?? "—", mean: Number(r.mean_score) }));
+    },
   });
 
   const { data: weakStudents = [] } = useQuery({
     queryKey: ["analytics-weak"],
     queryFn: async () => {
-      const { data } = await supabase.from("exam_results")
-        .select("student_id,score,students(first_name,last_name,admission_no)").limit(2000);
-      const agg = new Map<string, { name: string; admno: string; total: number; n: number }>();
-      (data ?? []).forEach((r: any) => {
-        const k = r.student_id; const cur = agg.get(k) ?? { name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`, admno: r.students?.admission_no ?? "", total: 0, n: 0 };
-        cur.total += Number(r.score); cur.n += 1; agg.set(k, cur);
-      });
-      return [...agg.entries()].map(([id, v]) => ({ id, ...v, mean: v.total / v.n }))
-        .filter(s => s.mean < 50).sort((a, b) => a.mean - b.mean).slice(0, 10);
+      const { data } = await (supabase as any).from("v_weak_students")
+        .select("student_id,admission_no,first_name,last_name,mean_score")
+        .order("mean_score", { ascending: true }).limit(10);
+      return (data ?? []).map((r: any) => ({
+        id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
+        admno: r.admission_no ?? "", mean: Number(r.mean_score),
+      }));
     },
   });
 
-  // Subject performance
-  const subjectAvg = (() => {
-    const m = new Map<string, { code: string; total: number; n: number }>();
-    (results as any[]).forEach((r) => {
-      const code = r.subjects?.code ?? "—";
-      const cur = m.get(code) ?? { code, total: 0, n: 0 };
-      cur.total += Number(r.score); cur.n += 1; m.set(code, cur);
-    });
-    return [...m.values()].map(v => ({ code: v.code, mean: +(v.total / v.n).toFixed(1) })).sort((a, b) => b.mean - a.mean);
-  })();
-
-  // Attendance trend (last 30 days)
-  const attTrend = (() => {
-    const m = new Map<string, { date: string; present: number; absent: number }>();
-    (kpis?.attendance ?? []).forEach((r: any) => {
-      const cur = m.get(r.date) ?? { date: r.date, present: 0, absent: 0 };
-      if (r.status === "present") cur.present++; else cur.absent++;
-      m.set(r.date, cur);
-    });
-    return [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
-  })();
+  // Attendance trend (last 30 days) — sourced from v_attendance_daily
+  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({
+    date: r.date, present: Number(r.present ?? 0), absent: Number(r.absent ?? 0),
+  }));
 
   const genderMix = (() => {
     const m = new Map<string, number>();

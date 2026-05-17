@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/finance/invoices")({ component: Page });
 
@@ -24,14 +25,25 @@ function Page() {
   const can = isAdmin || hasRole("bursar");
   const [open, setOpen] = useState(false);
   const [openPay, setOpenPay] = useState<string | null>(null);
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["invoices"],
-    queryFn: async () => (await supabase.from("invoices").select("*, students(first_name,last_name,admission_no)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["invoices", page],
+    queryFn: async () => {
+      const { data, count } = await supabase.from("invoices")
+        .select("*, students(first_name,last_name,admission_no)", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      return { rows: data ?? [], count: count ?? 0 };
+    },
   });
+  const data = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-3xl font-bold">Invoices</h1><p className="text-sm text-muted-foreground mt-1">{data.length} invoices</p></div>
+        <div><h1 className="text-3xl font-bold">Invoices</h1><p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} invoices</p></div>
         {can && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Issue Invoice</Button></DialogTrigger>
@@ -68,6 +80,7 @@ function Page() {
             </TableBody>
           </Table>
         )}
+        <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
       </CardContent></Card>
     </div>
   );

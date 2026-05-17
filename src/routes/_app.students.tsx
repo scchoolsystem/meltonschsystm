@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { admitStudent } from "@/lib/admissions.functions";
 import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { Pager } from "@/components/Pager";
 
 export const Route = createFileRoute("/_app/students")({
   component: StudentsPage,
@@ -39,19 +40,28 @@ function StudentsPage() {
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
   const [open, setOpen] = useState(false);
 
-  const { data: students = [], isLoading } = useQuery({
-    queryKey: ["students"],
+  const { data: pageData, isLoading } = useQuery({
+    queryKey: ["students", q, page],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let req = supabase
         .from("students")
-        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)")
-        .order("admission_no", { ascending: false });
+        .select("id, admission_no, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
+        .order("admission_no", { ascending: false })
+        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      const t = q.trim();
+      if (t) req = req.or(`admission_no.ilike.%${t}%,first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+      const { data, error, count } = await req;
       if (error) throw error;
-      return data as unknown as Student[];
+      return { rows: (data as unknown as Student[]) ?? [], count: count ?? 0 };
     },
   });
+  const students = pageData?.rows ?? [];
+  const totalCount = pageData?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-min"],
@@ -69,15 +79,8 @@ function StudentsPage() {
     },
   });
 
-  const filtered = useMemo(() => {
-    const t = q.toLowerCase();
-    return students.filter((s) =>
-      !t ||
-      s.admission_no.toLowerCase().includes(t) ||
-      s.first_name.toLowerCase().includes(t) ||
-      s.last_name.toLowerCase().includes(t)
-    );
-  }, [students, q]);
+  // Server-side search via `q` in queryKey; no client-side filter.
+  const filtered = students;
 
   function exportCsv() {
     const rows = [
@@ -97,7 +100,7 @@ function StudentsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Students</h1>
-          <p className="text-sm text-muted-foreground mt-1">{students.length} total enrolled</p>
+          <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} total enrolled</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCsv}><Download className="w-4 h-4 mr-2" />Export</Button>
@@ -116,7 +119,7 @@ function StudentsPage() {
         <CardHeader>
           <div className="relative max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
+            <Input placeholder="Search by name or admission no…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} className="pl-9" />
           </div>
         </CardHeader>
         <CardContent>
@@ -161,6 +164,7 @@ function StudentsPage() {
               </Table>
             </div>
           )}
+          <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
         </CardContent>
       </Card>
     </div>
