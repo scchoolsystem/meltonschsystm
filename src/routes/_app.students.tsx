@@ -149,6 +149,7 @@ function StudentsPage() {
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-mono text-xs">{s.admission_no}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.unique_id ?? "—"}</TableCell>
                       <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
                       <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="capitalize">{s.gender ?? "—"}</TableCell>
