@@ -40,16 +40,28 @@ function Page() {
     return m;
   }, [existing]);
 
+  const remarksMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    (existing as any[]).forEach(r => { if (r.remarks) m[r.student_id] = r.remarks; });
+    return m;
+  }, [existing]);
+
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [remarksDraft, setRemarksDraft] = useState<Record<string, string>>({});
   const get = (id: string) => draft[id] ?? map[id] ?? "present";
+  const getRemarks = (id: string) => remarksDraft[id] ?? remarksMap[id] ?? "";
 
   const save = useMutation({
     mutationFn: async () => {
-      const rows = (students as any[]).map(s => ({ student_id: s.id, class_id: classId, date, status: get(s.id) }));
+      const { data: u } = await supabase.auth.getUser();
+      const rows = (students as any[]).map(s => ({
+        student_id: s.id, class_id: classId, date, status: get(s.id),
+        remarks: getRemarks(s.id) || null, recorded_by: u.user?.id,
+      }));
       const { error } = await supabase.from("attendance_records").upsert(rows, { onConflict: "student_id,date" });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Attendance saved"); qc.invalidateQueries({ queryKey: ["att", classId, date] }); setDraft({}); },
+    onSuccess: () => { toast.success("Attendance saved"); qc.invalidateQueries({ queryKey: ["att", classId, date] }); setDraft({}); setRemarksDraft({}); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -70,9 +82,9 @@ function Page() {
       </CardHeader><CardContent>
         {!classId ? <p className="text-center text-muted-foreground py-8">Select a class to begin.</p> : (
           <Table>
-            <TableHeader><TableRow><TableHead>Adm No</TableHead><TableHead>Name</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Adm No</TableHead><TableHead>Name</TableHead><TableHead>Status</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader>
             <TableBody>
-              {(students as any[]).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No students in this class.</TableCell></TableRow>}
+              {(students as any[]).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No students in this class.</TableCell></TableRow>}
               {(students as any[]).map(s => (
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-xs">{s.admission_no}</TableCell>
@@ -87,6 +99,9 @@ function Page() {
                         <SelectItem value="excused">Excused</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Input value={getRemarks(s.id)} onChange={e => setRemarksDraft({ ...remarksDraft, [s.id]: e.target.value })} disabled={!can} placeholder="—" className="h-8 text-sm" />
                   </TableCell>
                 </TableRow>
               ))}
