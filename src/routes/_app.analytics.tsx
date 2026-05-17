@@ -37,37 +37,27 @@ function Analytics() {
     },
   });
 
-  const { data: results = [] } = useQuery({
-    queryKey: ["analytics-results"],
-    queryFn: async () => (await supabase.from("exam_results")
-      .select("score,subject_id,subjects(code)").limit(2000)).data ?? [],
+  const { data: subjectAvg = [] } = useQuery({
+    queryKey: ["analytics-subject-means"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("v_subject_means")
+        .select("subject_code,mean_score").order("mean_score", { ascending: false });
+      return (data ?? []).map((r: any) => ({ code: r.subject_code ?? "—", mean: Number(r.mean_score) }));
+    },
   });
 
   const { data: weakStudents = [] } = useQuery({
     queryKey: ["analytics-weak"],
     queryFn: async () => {
-      const { data } = await supabase.from("exam_results")
-        .select("student_id,score,students(first_name,last_name,admission_no)").limit(2000);
-      const agg = new Map<string, { name: string; admno: string; total: number; n: number }>();
-      (data ?? []).forEach((r: any) => {
-        const k = r.student_id; const cur = agg.get(k) ?? { name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`, admno: r.students?.admission_no ?? "", total: 0, n: 0 };
-        cur.total += Number(r.score); cur.n += 1; agg.set(k, cur);
-      });
-      return [...agg.entries()].map(([id, v]) => ({ id, ...v, mean: v.total / v.n }))
-        .filter(s => s.mean < 50).sort((a, b) => a.mean - b.mean).slice(0, 10);
+      const { data } = await (supabase as any).from("v_weak_students")
+        .select("student_id,admission_no,first_name,last_name,mean_score")
+        .order("mean_score", { ascending: true }).limit(10);
+      return (data ?? []).map((r: any) => ({
+        id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
+        admno: r.admission_no ?? "", mean: Number(r.mean_score),
+      }));
     },
   });
-
-  // Subject performance
-  const subjectAvg = (() => {
-    const m = new Map<string, { code: string; total: number; n: number }>();
-    (results as any[]).forEach((r) => {
-      const code = r.subjects?.code ?? "—";
-      const cur = m.get(code) ?? { code, total: 0, n: 0 };
-      cur.total += Number(r.score); cur.n += 1; m.set(code, cur);
-    });
-    return [...m.values()].map(v => ({ code: v.code, mean: +(v.total / v.n).toFixed(1) })).sort((a, b) => b.mean - a.mean);
-  })();
 
   // Attendance trend (last 30 days)
   const attTrend = (() => {
