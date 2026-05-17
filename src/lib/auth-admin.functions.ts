@@ -68,14 +68,20 @@ const CATEGORY_BY_ROLE: Record<string, string> = {
 
 export const lookupLoginEmail = createServerFn({ method: "POST" })
   .inputValidator((input) =>
-    z.object({ uniqueId: z.string().trim().min(3).max(40) }).parse(input)
+    z
+      .object({
+        uniqueId: z.string().trim().min(3).max(40),
+        schoolSlug: z.string().trim().min(1).max(60).optional().nullable(),
+      })
+      .parse(input)
   )
   .handler(async ({ data }) => {
     const { data: email, error } = await supabaseAdmin.rpc("lookup_login_email", {
       _unique_id: data.uniqueId,
-    });
+      _school_slug: data.schoolSlug ?? null,
+    } as any);
     if (error) throw new Error(error.message);
-    if (!email) throw new Error("Account not found or deactivated");
+    if (!email) throw new Error("Account not found in this school portal");
     return { email: email as string };
   });
 
