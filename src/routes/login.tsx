@@ -30,13 +30,36 @@ function LoginPage() {
     ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
     : null;
 
+  // On the root marketing domain there is no school context — bounce to the landing page.
+  const isRootHost = !isPlatformHost && !slug;
+
   useEffect(() => {
     if (isPlatformHost) {
       navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
       return;
     }
+    if (isRootHost) {
+      navigate({ to: "/" });
+      return;
+    }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate, isPlatformHost]);
+  }, [session, loading, navigate, isPlatformHost, isRootHost]);
+
+  if (isRootHost) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6 text-center">
+        <div className="max-w-md space-y-4">
+          <GraduationCap className="w-10 h-10 mx-auto text-primary" />
+          <h1 className="text-2xl font-bold">Sign in from your school portal</h1>
+          <p className="text-sm text-muted-foreground">
+            Each school has its own address, e.g. <code className="px-1 py-0.5 rounded bg-muted">yourschool.smartdev.co.ke</code>.
+            Please open your school's portal to sign in.
+          </p>
+          <Link to="/"><Button>Back to home</Button></Link>
+        </div>
+      </div>
+    );
+  }
 
   async function handleUniqueIdSignIn(e: React.FormEvent) {
     e.preventDefault();
