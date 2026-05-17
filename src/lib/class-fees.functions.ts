@@ -37,7 +37,14 @@ export const generateTermInvoices = createServerFn({ method: "POST" })
   }).parse(i))
   .handler(async ({ data, context }) => {
     await ensureBursar(context);
-    let q = supabaseAdmin.from("students").select("id, class_id").eq("lifecycle_status", "active");
+    const { data: schoolId, error: schErr } = await context.supabase.rpc("my_school_id");
+    if (schErr) throw new Error(schErr.message);
+    if (!schoolId) throw new Error("No school context for this user");
+    let q = supabaseAdmin
+      .from("students")
+      .select("id, class_id")
+      .eq("school_id", schoolId)
+      .eq("lifecycle_status", "active");
     if (data.class_id) q = q.eq("class_id", data.class_id);
     const { data: students, error } = await q;
     if (error) throw new Error(error.message);

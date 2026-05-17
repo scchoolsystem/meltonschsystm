@@ -4,11 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { IdCard } from "@/components/IdCard";
+import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/ids/staff/$id")({ component: Page });
 
 function Page() {
   const { id } = Route.useParams();
+  const { school } = useTenant();
   const { data, isLoading } = useQuery({
     queryKey: ["id-staff", id],
     queryFn: async () => {
@@ -19,10 +21,6 @@ function Page() {
       if (error) throw error;
       return data as any;
     },
-  });
-  const { data: school } = useQuery({
-    queryKey: ["school-settings-id-staff"],
-    queryFn: async () => (await supabase.from("school_settings").select("school_name").maybeSingle()).data,
   });
 
   if (isLoading) return <div className="h-64 grid place-items-center"><Loader2 className="animate-spin" /></div>;
@@ -36,7 +34,7 @@ function Page() {
       </div>
       <div className="flex justify-center">
         <IdCard
-          schoolName={school?.school_name || "School"}
+          schoolName={school?.name || "School"}
           kind="STAFF"
           uniqueId={data.unique_id || data.employee_no}
           fullName={`${data.first_name} ${data.last_name}`}

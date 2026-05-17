@@ -29,24 +29,34 @@ export const bulkGenerateInvoices = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinance(context);
 
+    // Resolve caller's school for tenant scoping (admin client bypasses RLS)
+    const { data: schoolId, error: schErr } = await context.supabase.rpc("my_school_id");
+    if (schErr) throw new Error(schErr.message);
+    if (!schoolId) throw new Error("No school context for this user");
+
     const { data: fee, error: feeErr } = await supabaseAdmin
       .from("fee_structures")
-      .select("id, amount, level, name, term, year")
+      .select("id, amount, level, name, term, year, school_id")
       .eq("id", data.fee_structure_id)
+      .eq("school_id", schoolId)
       .single();
-    if (feeErr || !fee) throw new Error(feeErr?.message ?? "Fee structure not found");
+    if (feeErr || !fee) throw new Error(feeErr?.message ?? "Fee structure not found in this school");
 
-    let q = supabaseAdmin.from("students").select("id").eq("status", "active");
+    let q = supabaseAdmin
+      .from("students")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("status", "active");
     if (data.class_id) q = q.eq("class_id", data.class_id);
     const { data: students, error: stuErr } = await q;
     if (stuErr) throw new Error(stuErr.message);
     if (!students?.length) return { created: 0, skipped: 0 };
 
-    // skip students who already have an invoice for this fee structure
     const ids = students.map((s) => s.id);
     const { data: existing } = await supabaseAdmin
       .from("invoices")
       .select("student_id")
+      .eq("school_id", schoolId)
       .eq("fee_structure_id", data.fee_structure_id)
       .in("student_id", ids);
     const existingSet = new Set((existing ?? []).map((e: any) => e.student_id));
@@ -58,6 +68,7 @@ export const bulkGenerateInvoices = createServerFn({ method: "POST" })
         fee_structure_id: fee.id,
         amount: fee.amount,
         due_date: data.due_date || null,
+        school_id: schoolId,
       }));
 
     if (toInsert.length === 0) return { created: 0, skipped: students.length };

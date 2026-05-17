@@ -1,98 +1,73 @@
-# Multi-Tenant ERP — erp.smartdev.co.ke
+# Final Hardening Plan — Phased
 
-Convert the current single-tenant ERP into a multi-tenant SaaS where each of your 20 schools lives at its own subdomain (e.g. `greenfield.erp.smartdev.co.ke`), shares the same codebase, but has fully isolated data.
-
-Existing data is **never wiped** — it is migrated into a default "School 1" derived from current `school_settings`.
+The scope you listed is ~3 weeks of work. Shipping it as one mega-commit would destabilize a 95%-ready system. I'll split into **5 phases**, smallest blast radius first. Each phase is independently shippable and testable.
 
 ---
 
-## Phase 1 — Tenancy foundation (this batch)
+## Phase A — Security-Critical (ship first, ~1 session)
 
-### 1.1 Schema
-- New `schools` table: `id, slug (unique), name, motto, primary_color, logo_url, email, phone, address, academic_year, current_term, status (active/suspended), created_at`.
-- New `school_members` table: `(user_id, school_id, default)` — lets one super-admin belong to many schools; everyone else belongs to one.
-- Add nullable `school_id uuid` to every tenant table (~30): `students, staff, classes, subjects, exams, exam_results, attendance_records, invoices, payments, fee_structures, class_fee_components, announcements, books, book_loans, dormitories, dorm_assignments, clinic_visits, discipline_records, gate_passes, incident_reports, kitchen_stock, meal_plans, transport_routes, transport_assignments, timetable_slots, smart_alerts, lifecycle_events, field_edit_audit, override_log, activity_logs, user_credentials, parent_student_links, student_user_links, pending_parent_links, profiles, user_roles, unique_id_counters`.
-- Backfill: create one row in `schools` from current `school_settings` (slug = `school-1`); set every existing row's `school_id` to that id.
-- Make `school_id` `NOT NULL` after backfill. Add indexes `(school_id)` and composite `(school_id, ...)` where useful.
-- `unique_id_counters` keyed by `(school_id, category, year)` so STU/STF codes restart per school.
+Cross-tenant data leaks are the only real production blockers. Everything else is polish.
 
-### 1.2 Helpers (SECURITY DEFINER)
-- `current_user_school()` → uuid of the user's active school (from `school_members` + subdomain claim in JWT).
-- `belongs_to_school(_school uuid)` → boolean.
-- Super-admin keeps cross-school access.
+**A1. Tenant-scoped login lookup**
+- Rewrite `lookup_login_email(_unique_id)` → `lookup_login_email(_unique_id, _school_slug)`. Join `user_credentials` → `school_members` → `schools`, filter by slug.
+- Update `src/lib/auth-admin.functions.ts` validator + handler.
+- Update `src/routes/login.tsx` to pass `useTenant().slug` (fallback `school-1`).
+- Super-admin override path preserved (email login).
 
-### 1.3 RLS rewrite
-Every existing policy gets an additional `AND school_id = current_user_school()` clause. Super-admin bypass preserved. No table loses RLS.
+**A2. Tenant-scoped finance generation**
+- `src/lib/finance.functions.ts`: in `bulkGenerateInvoices`, resolve caller's `school_id` from `school_members` and add `.eq('school_id', schoolId)` to every `supabaseAdmin` query (students, existing invoices, inserts).
+- Same audit for `src/lib/class-fees.functions.ts` `assign_class_fees` (DB function already uses `current_user_school()` — verify), `src/lib/admissions.functions.ts`, `src/lib/parent-link.functions.ts`, `src/lib/timetable.functions.ts`, `src/lib/lifecycle.functions.ts`.
+- Rule: any `supabaseAdmin` call MUST filter or stamp `school_id`.
 
-### 1.4 Triggers
-- `BEFORE INSERT` stamp trigger on every tenant table sets `school_id = current_user_school()` if null.
-- `BEFORE UPDATE` guard prevents changing `school_id` (anti-tenant-jumping).
-
----
-
-## Phase 2 — App wiring
-
-### 2.1 Tenant resolver
-- New `src/lib/tenant.ts`: parses `window.location.hostname`, extracts subdomain, resolves to a `schools` row (cached in React Query).
-- New `TenantProvider` in `__root.tsx` wraps the app; exposes `useSchool()`.
-- Login flow: after sign-in, verify the user has a `school_members` row matching the current subdomain — else sign out and show "Wrong school portal" page.
-- Apply the school's branding (`primary_color`, `logo_url`, name) at the layout level.
-
-### 2.2 Server functions
-- Audit every `createServerFn` that touches tenant data; insert/update calls rely on the BEFORE-INSERT trigger, but explicit `.eq('school_id', school.id)` is added to admin queries for clarity.
-- `lookup_login_email` becomes school-scoped (unique-ID + subdomain → synthetic_email).
-- `assign_class_fees`, `next_unique_id`, `find_parent_match` updated for tenancy.
-
-### 2.3 Super-admin console
-- New `/admin/schools` route (super-admin only): list schools, create new school (slug + name), suspend, switch active school.
+**A3. Remove `school_settings` reads from tenant-facing UI**
+- Replace `supabase.from("school_settings").select(...)` with `useTenant().school` in:
+  - `src/routes/login.tsx`
+  - `src/routes/_app.ids.student.$id.tsx`, `_app.ids.staff.$id.tsx`, `_app.ids.bulk.tsx`
+  - `src/routes/_app.academics.report-card.$studentId.$examId.tsx`
+  - `src/routes/_app.finance.receipt.$id.tsx`
+  - `src/components/AppSidebar.tsx`
+- Keep `school_settings` table for now (legacy data); just stop reading it from tenant routes.
 
 ---
 
-## Phase 3 — Governance reinforcement (3-tier edits)
+## Phase B — Performance (next session)
 
-The infrastructure already exists (`field_policies`, `field_edit_audit`, `override_log`, `role_level()`, `can_edit()`, `LockedFieldGate`). Phase 3 ensures it is applied consistently:
+**B1. Cursor pagination** on `students`, `staff`, `invoices`, `payments`, `attendance_records` list routes. Use React Query `useInfiniteQuery` + `.range(from, to).order('created_at', { ascending: false })`.
 
-- Default policies seeded per school for sensitive fields (grades, fees, lifecycle, identity).
-- Tier mapping:
-  - **Normal users** (teacher/staff, level < 50): read + own-scope edits only.
-  - **HOD/Admin** (level 50–80): department-scoped edits, restricted fields require justification.
-  - **Super Admin** (level ≥ 90): full override with mandatory reason → `override_log`.
-- All edits flow through `field_edit_audit` (already wired); add missing trigger wrappers on `students`, `staff`, `invoices`, `exam_results`.
+**B2. Analytics SQL views** — move dashboard aggregates from frontend reduce-loops into Postgres views (`v_finance_summary`, `v_attendance_daily`, `v_results_by_class`). Frontend just selects.
+
+**B3. Drop `.limit(2000)`** in exam_results queries (your earlier 400s) — replace with paginated/aggregated SQL.
 
 ---
 
-## Phase 4 — DNS & domain
+## Phase C — Upload + Session Security
 
-You handle DNS at your registrar:
-- Wildcard A record: `*.erp.smartdev.co.ke` → `185.158.133.1`
-- Root A record: `erp.smartdev.co.ke` → `185.158.133.1`
-
-Then in Lovable → Project Settings → Domains, add each subdomain you want to activate (`greenfield.erp.smartdev.co.ke`, `school2.erp.smartdev.co.ke`, …). Lovable issues a separate cert per subdomain — wildcard SSL is not auto-provisioned, so each school must be added individually (one-time, ~1 min each).
+**C1. Storage**: tighten `profile-photos` policies, add per-school path prefix (`{school_id}/{user_id}/...`), enforce MIME via client validation + RLS path check.
+**C2. Sessions**: enable Supabase JWT short expiry + refresh rotation in `configure_auth`; add `last_login_at` tracking + multi-device logout UI in `_app.admin.users.tsx`.
 
 ---
 
-## Technical notes
+## Phase D — UX Polish
 
-- **Migration order matters**: add nullable column → backfill → set NOT NULL → enable trigger → rewrite RLS. Done in one transaction per table group to avoid downtime.
-- **No data loss**: all current rows go to `school-1`; you (current super_admin) become `school_members` for school-1 plus a global super-admin row.
-- **Tenant isolation is enforced at the DB layer (RLS)** — even a bug in the frontend cannot leak School A data to School B.
-- **Performance**: indexes on `school_id` keep queries fast; existing FK-less design stays.
-- **Rollback**: each phase is reversible until Phase 1.4 triggers go live.
-
-## What this plan does NOT include
-
-- Per-school billing/subscription (can add later).
-- Cross-school reporting dashboard for you as SaaS owner (can add later).
-- Per-school email sender domains.
-- Auto-onboarding wizard for new schools (after Phase 1, you create schools via SQL or the super-admin console in Phase 2).
+**D1.** First-school setup wizard (only shown when no `schools` row exists for super-admin).
+**D2.** Empty states across list routes.
+**D3.** Mobile table → card collapse breakpoints.
+**D4.** Notifications: email via Lovable transactional email skill; in-app via existing `smart_alerts`; SMS/push deferred (needs paid providers — out of scope unless you confirm budget).
 
 ---
 
-## Order of execution
+## Phase E — Infra & Ops (out of build scope, doc-only)
 
-1. **Phase 1** migration (single supabase--migration call, large) → I'll ask you to approve it.
-2. **Phase 2** code wiring (TenantProvider, server-fn updates, super-admin console).
-3. **Phase 3** governance polish.
-4. **Phase 4** you add the DNS records and subdomains.
+CI/CD, Sentry, backups, PITR, monitoring all live **outside the Lovable app codebase** — they're configured in GitHub, Sentry dashboard, and Supabase project settings. I can produce a `DEPLOYMENT.md` checklist with exact steps, but I can't actually wire GitHub Actions or Sentry from here without you providing tokens.
 
-Approve this plan and I'll begin with the Phase 1 migration.
+---
+
+## What I need from you
+
+Reply with **one** of:
+
+1. **"Start Phase A"** — I implement A1+A2+A3 now (security fixes only, ~1 migration + ~8 file edits). Safest, highest ROI.
+2. **"A + B"** — security + performance in one go (larger, riskier).
+3. **"Custom"** — tell me which specific items from A–E to do first.
+
+I strongly recommend **option 1**. Phases B–E build on a verified-secure Phase A.
