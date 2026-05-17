@@ -1,7 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import * as React from "react";
+import { render } from "@react-email/components";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { template as schoolAdminCredentialsTemplate } from "@/lib/email-templates/school-admin-credentials";
+
+const SITE_NAME = "Smartdev ERP";
+const SENDER_DOMAIN = "notify.erp.smartdev.co.ke";
+const FROM_DOMAIN = "erp.smartdev.co.ke";
 
 function generatePassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -80,11 +87,67 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
       });
     }
 
+    const portal_url = `https://${school.slug}.smartdev.co.ke`;
+    const full_name = data.full_name ?? school.name + " Admin";
+
+    // Render + enqueue the welcome email (fire-and-forget; never block provisioning).
+    let email_sent = false;
+    let email_error: string | null = null;
+    try {
+      const messageId = crypto.randomUUID();
+      const recipient = data.email.toLowerCase();
+      const templateData = {
+        schoolName: school.name,
+        portalUrl: portal_url,
+        loginEmail: data.email,
+        password,
+        fullName: full_name,
+      };
+      const element = React.createElement(schoolAdminCredentialsTemplate.component, templateData);
+      const html = await render(element);
+      const text = await render(element, { plainText: true });
+      const subject =
+        typeof schoolAdminCredentialsTemplate.subject === "function"
+          ? schoolAdminCredentialsTemplate.subject(templateData)
+          : schoolAdminCredentialsTemplate.subject;
+
+      await supabaseAdmin.from("email_send_log").insert({
+        message_id: messageId,
+        template_name: "school-admin-credentials",
+        recipient_email: recipient,
+        status: "pending",
+      });
+
+      const { error: enqueueError } = await supabaseAdmin.rpc("enqueue_email", {
+        queue_name: "transactional_emails",
+        payload: {
+          message_id: messageId,
+          to: recipient,
+          from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
+          sender_domain: SENDER_DOMAIN,
+          subject,
+          html,
+          text,
+          purpose: "transactional",
+          label: "school-admin-credentials",
+          idempotency_key: `school-admin-${school.id}-${messageId}`,
+          queued_at: new Date().toISOString(),
+        },
+      });
+      if (enqueueError) throw enqueueError;
+      email_sent = true;
+    } catch (e: any) {
+      email_error = e?.message ?? "unknown error";
+      console.error("Failed to send school admin credentials email", e);
+    }
+
     return {
       ok: true,
       created,
       email: data.email,
       password,
-      portal_url: `https://${school.slug}.erp.smartdev.co.ke`,
+      portal_url,
+      email_sent,
+      email_error,
     };
   });
