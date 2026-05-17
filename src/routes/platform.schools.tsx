@@ -133,7 +133,7 @@ function PlatformSchools() {
                 </div>
                 <div>
                   <Label>School name</Label>
-                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Greenfield Academy" />
+                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="SMART DEV" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
