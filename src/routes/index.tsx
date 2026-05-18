@@ -144,10 +144,10 @@ function Landing() {
         <p className="mt-2 text-muted-foreground">Get in touch — we'll set up your portal and onboard your team.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
           <a href="mailto:hello@smartdev.co.ke" className="inline-flex items-center gap-2 hover:text-accent">
-            <Mail className="w-4 h-4" /> hello@smartdev.co.ke
+            <Mail className="w-4 h-4" /><span>hello@smartdev.co.ke</span>
           </a>
           <a href="tel:+254700000000" className="inline-flex items-center gap-2 hover:text-accent">
-            <Phone className="w-4 h-4" /> +254 700 000 000
+            <Phone className="w-4 h-4" /><span>+254 700 000 000</span>
           </a>
         </div>
       </section>

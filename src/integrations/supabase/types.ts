@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      _one_time_secrets: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          value?: string
+        }
+        Relationships: []
+      }
       activity_logs: {
         Row: {
           action: string
@@ -1941,6 +1962,7 @@ export type Database = {
           medical_notes: string | null
           national_id: string | null
           parent_auth_code: string | null
+          parent_auth_code_hash: string | null
           parent_email: string | null
           parent_name: string | null
           parent_phone: string | null
@@ -1969,6 +1991,7 @@ export type Database = {
           medical_notes?: string | null
           national_id?: string | null
           parent_auth_code?: string | null
+          parent_auth_code_hash?: string | null
           parent_email?: string | null
           parent_name?: string | null
           parent_phone?: string | null
@@ -1997,6 +2020,7 @@ export type Database = {
           medical_notes?: string | null
           national_id?: string | null
           parent_auth_code?: string | null
+          parent_auth_code_hash?: string | null
           parent_email?: string | null
           parent_name?: string | null
           parent_phone?: string | null
