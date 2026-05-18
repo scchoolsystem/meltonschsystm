@@ -1,1 +1,2 @@
-UPDATE auth.users SET encrypted_password = crypt('MeltonAdmin#2026!', gen_salt('bf')), updated_at = now() WHERE email = 'meltongraymond1@gmail.com';
+-- skipped: handled manually
+SELECT 1;
