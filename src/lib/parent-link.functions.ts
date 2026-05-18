@@ -43,9 +43,14 @@ export const redeemParentCode = createServerFn({ method: "POST" })
     code: z.string().trim().min(6).max(40),
   }).parse(i))
   .handler(async ({ data, context }) => {
+    // Hash the supplied code and compare to the stored hash — never query plaintext.
+    const enc = new TextEncoder().encode(data.code.toUpperCase());
+    const digest = await crypto.subtle.digest("SHA-256", enc);
+    const hash = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
     const { data: student } = await supabaseAdmin
       .from("students").select("id, lifecycle_status")
-      .eq("parent_auth_code", data.code.toUpperCase()).maybeSingle();
+      .eq("parent_auth_code_hash", hash).maybeSingle();
     if (!student) throw new Error("Invalid parent code");
     if (student.lifecycle_status !== "active") throw new Error("Student record is not active");
     const { error } = await supabaseAdmin.from("parent_student_links").upsert({
