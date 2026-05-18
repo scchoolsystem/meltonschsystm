@@ -3,16 +3,32 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-function generatePassword(len = 12): string {
+// CSPRNG-backed picker (uses Web Crypto; works in Node and Workers).
+function randInt(maxExclusive: number): number {
+  const limit = Math.floor(0xffffffff / maxExclusive) * maxExclusive;
+  const buf = new Uint32Array(1);
+  let n: number;
+  do {
+    crypto.getRandomValues(buf);
+    n = buf[0];
+  } while (n >= limit);
+  return n % maxExclusive;
+}
+
+function generatePassword(len = 14): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const lower = "abcdefghijkmnpqrstuvwxyz";
   const digits = "23456789";
   const symbols = "!@#$%&*?";
   const all = upper + lower + digits + symbols;
-  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
-  const required = [pick(upper), pick(lower), pick(digits), pick(symbols)];
-  const rest = Array.from({ length: len - required.length }, () => pick(all));
-  return [...required, ...rest].sort(() => Math.random() - 0.5).join("");
+  const pick = (s: string) => s[randInt(s.length)];
+  const out = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  while (out.length < len) out.push(pick(all));
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out.join("");
 }
 
 async function assertAdmin(context: any) {
@@ -39,7 +55,7 @@ async function provisionAccount(opts: {
   if (idErr || !uniqueId) throw new Error(idErr?.message ?? "ID generation failed");
   const domain = await getDomain();
   const syntheticEmail = `${String(uniqueId).toLowerCase()}@${domain}`;
-  const password = generatePassword(12);
+  const password = generatePassword(14);
 
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email: syntheticEmail,

@@ -15,6 +15,17 @@ export const Route = createFileRoute("/platform")({
     if (!data.session) {
       throw redirect({ to: "/platform/login", search: { redirect: location.href } });
     }
+    // BUG A2-1: enforce platform role server-side BEFORE any data loaders run.
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.session.user.id);
+    const isPlatform = (roleRows ?? []).some(
+      (r: { role: string }) => r.role === "platform_owner" || r.role === "platform_support"
+    );
+    if (!isPlatform) {
+      throw redirect({ to: "/platform/login", search: { redirect: location.href } });
+    }
   },
   component: PlatformLayout,
 });
