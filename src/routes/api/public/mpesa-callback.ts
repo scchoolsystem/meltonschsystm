@@ -55,20 +55,46 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           return new Response("ok");
         }
 
-        // accountRef is first 12 chars of invoice uuid
-        const { data: inv } = await supabaseAdmin
+        // BUG B8-1: deduplicate by receipt before doing any work.
+        // (DB also has a UNIQUE index on split_part(reference,' ',1) WHERE method='mpesa'.)
+        const { data: dup } = await supabaseAdmin
+          .from("payments")
+          .select("id")
+          .eq("method", "mpesa")
+          .like("reference", `${receipt}%`)
+          .maybeSingle();
+        if (dup) return new Response("ok");
+
+        // BUG B8-2: accountRef is the first 12 chars of an invoice UUID — a
+        // 12-hex prefix can collide. Require an unambiguous single match.
+        const { data: matches } = await supabaseAdmin
           .from("invoices")
           .select("id")
           .like("id", `${accountRef}%`)
-          .maybeSingle();
-        if (!inv) return new Response("ok");
+          .limit(2);
+        if (!matches || matches.length !== 1) {
+          await supabaseAdmin.from("activity_logs").insert({
+            action: "mpesa.ambiguous_ref",
+            entity: "payment",
+            metadata: { accountRef, receipt, matchCount: matches?.length ?? 0 },
+          } as any);
+          return new Response("ok");
+        }
+        const inv = matches[0];
 
-        await supabaseAdmin.from("payments").insert({
+        const { error: insErr } = await supabaseAdmin.from("payments").insert({
           invoice_id: inv.id,
           amount,
           method: "mpesa",
           reference: `${receipt} (${phone})`,
         } as any);
+        if (insErr && !/duplicate key/i.test(insErr.message)) {
+          await supabaseAdmin.from("activity_logs").insert({
+            action: "mpesa.insert_failed",
+            entity: "payment",
+            metadata: { receipt, error: insErr.message },
+          } as any);
+        }
 
         return new Response("ok");
       },
