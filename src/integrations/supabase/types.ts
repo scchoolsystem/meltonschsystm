@@ -1689,8 +1689,14 @@ export type Database = {
           academic_year: number | null
           address: string | null
           created_at: string
+          credential_delivery_mode: string
           current_term: string | null
           email: string | null
+          email_domain: string
+          email_host: string | null
+          email_pass: string | null
+          email_port: number | null
+          email_user: string | null
           id: string
           logo_url: string | null
           motto: string | null
@@ -1705,8 +1711,14 @@ export type Database = {
           academic_year?: number | null
           address?: string | null
           created_at?: string
+          credential_delivery_mode?: string
           current_term?: string | null
           email?: string | null
+          email_domain?: string
+          email_host?: string | null
+          email_pass?: string | null
+          email_port?: number | null
+          email_user?: string | null
           id?: string
           logo_url?: string | null
           motto?: string | null
@@ -1721,8 +1733,14 @@ export type Database = {
           academic_year?: number | null
           address?: string | null
           created_at?: string
+          credential_delivery_mode?: string
           current_term?: string | null
           email?: string | null
+          email_domain?: string
+          email_host?: string | null
+          email_pass?: string | null
+          email_port?: number | null
+          email_user?: string | null
           id?: string
           logo_url?: string | null
           motto?: string | null
