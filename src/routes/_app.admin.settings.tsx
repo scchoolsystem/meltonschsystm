@@ -37,9 +37,19 @@ function SettingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("school_settings").select("*").limit(1).maybeSingle();
+      // Read the current school directly from `schools`. RLS scopes us to our row.
+      const { data: schoolIdRow } = await supabase.rpc("current_user_school");
+      const schoolId = schoolIdRow as unknown as string | null;
+      if (!schoolId) return null;
+      const { data, error } = await supabase
+        .from("schools")
+        .select("id,name,motto,email,phone,address,logo_url,primary_color,academic_year,current_term,email_domain,credential_delivery_mode")
+        .eq("id", schoolId)
+        .maybeSingle();
       if (error) throw error;
-      return data as SchoolSettings | null;
+      if (!data) return null;
+      const { name, ...rest } = data as any;
+      return { ...rest, school_name: name } as SchoolSettings;
     },
   });
 
@@ -49,9 +59,9 @@ function SettingsPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      if (!data?.id) throw new Error("Settings row missing");
-      const { error } = await supabase.from("school_settings").update({
-        school_name: form.school_name,
+      if (!data?.id) throw new Error("School row missing");
+      const { error } = await supabase.from("schools").update({
+        name: form.school_name,
         motto: form.motto,
         email: form.email,
         phone: form.phone,
@@ -61,7 +71,7 @@ function SettingsPage() {
         academic_year: form.academic_year,
         current_term: form.current_term,
         credential_delivery_mode: form.credential_delivery_mode,
-      }).eq("id", data.id);
+      } as any).eq("id", data.id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Settings saved"); qc.invalidateQueries({ queryKey: ["school-settings"] }); },
