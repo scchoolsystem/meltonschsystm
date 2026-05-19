@@ -2633,6 +2633,7 @@ export type Database = {
           requires_override: boolean
         }[]
       }
+      current_school_email_domain: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
       current_user_school: { Args: never; Returns: string }
       delete_email: {

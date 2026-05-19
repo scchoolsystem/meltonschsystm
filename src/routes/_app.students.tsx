@@ -75,8 +75,11 @@ function StudentsPage() {
   const { data: settings } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
-      const { data } = await supabase.from("school_settings").select("school_name, academic_year, current_term").limit(1).maybeSingle();
-      return data;
+      const { data } = await supabase.rpc("current_user_school");
+      const schoolId = (data as unknown) as string | null;
+      if (!schoolId) return null;
+      const { data: sch } = await supabase.from("schools").select("name, academic_year, current_term").eq("id", schoolId).maybeSingle();
+      return sch ? { school_name: (sch as any).name, academic_year: (sch as any).academic_year, current_term: (sch as any).current_term } : null;
     },
   });
 

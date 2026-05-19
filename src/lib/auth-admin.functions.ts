@@ -125,24 +125,26 @@ export const createAccount = createServerFn({ method: "POST" })
 
     const category = CATEGORY_BY_ROLE[data.role] ?? "STF";
 
-    // get unique_id from the database
-    const { data: uniqueId, error: idErr } = await supabaseAdmin.rpc(
+    // Resolve via caller's authenticated client (SECURITY DEFINER reads auth.uid()).
+    const { data: uniqueId, error: idErr } = await context.supabase.rpc(
       "next_unique_id",
       { _category: category }
     );
     if (idErr || !uniqueId) throw new Error(idErr?.message ?? "ID generation failed");
 
-    // school email domain
-    const { data: settings } = await supabaseAdmin
-      .from("school_settings")
-      .select("email_domain")
-      .maybeSingle();
-    const domain = settings?.email_domain || "school.erp";
+    const { data: domainResp } = await context.supabase.rpc("current_school_email_domain");
+    const domain = (domainResp as string) || "school.erp";
     const syntheticEmail = `${String(uniqueId).toLowerCase()}@${domain}`;
+
+    // Caller's school (for explicit school_id on admin inserts).
+    const { data: member } = await supabaseAdmin
+      .from("school_members").select("school_id")
+      .eq("user_id", context.userId).order("is_default", { ascending: false }).limit(1).maybeSingle();
+    const schoolId = (member as any)?.school_id as string | undefined;
+    if (!schoolId) throw new Error("No school context for current user");
 
     const password = generatePassword(14);
 
-    // create auth user (email confirmed so they can login immediately)
     const { data: created, error: createErr } =
       await supabaseAdmin.auth.admin.createUser({
         email: syntheticEmail,
@@ -156,10 +158,8 @@ export const createAccount = createServerFn({ method: "POST" })
 
     const userId = created.user.id;
 
-    // ensure profile exists
     await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: data.full_name });
 
-    // delete the auto-assigned 'staff' role from handle_new_user if it differs
     if (data.role !== "staff") {
       await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
       await supabaseAdmin
@@ -167,14 +167,19 @@ export const createAccount = createServerFn({ method: "POST" })
         .insert({ user_id: userId, role: data.role as never });
     }
 
-    // store credentials record
     await supabaseAdmin.from("user_credentials").insert({
       user_id: userId,
       unique_id: uniqueId,
       category,
       synthetic_email: syntheticEmail,
       is_active: true,
-    });
+      school_id: schoolId,
+    } as any);
+
+    await supabaseAdmin.from("school_members").upsert(
+      { user_id: userId, school_id: schoolId, is_default: true },
+      { onConflict: "user_id,school_id" }
+    );
 
     return {
       uniqueId: uniqueId as string,
