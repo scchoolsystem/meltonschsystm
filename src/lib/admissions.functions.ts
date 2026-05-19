@@ -118,7 +118,7 @@ export const admitStudent = createServerFn({ method: "POST" })
     }
 
     const fullName = `${data.first_name} ${data.last_name}`.trim();
-    const acct = await provisionAccount({ category: "STU", role: "student", fullName });
+    const acct = await provisionAccount({ category: "STU", role: "student", fullName, context });
 
     const insertPayload: any = {
       first_name: data.first_name,
