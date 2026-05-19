@@ -41,21 +41,26 @@ async function assertAdmin(context: any) {
   return true;
 }
 
-async function getDomain(): Promise<string> {
-  const { data } = await supabaseAdmin.from("school_settings").select("email_domain").maybeSingle();
-  return data?.email_domain || "school.erp";
-}
-
 async function provisionAccount(opts: {
   category: string;
   role: string;
   fullName: string;
+  context: { supabase: any; userId: string };
 }) {
-  const { data: uniqueId, error: idErr } = await supabaseAdmin.rpc("next_unique_id", { _category: opts.category });
+  // Use the caller's authenticated client so current_user_school() resolves.
+  const { data: uniqueId, error: idErr } = await opts.context.supabase.rpc("next_unique_id", { _category: opts.category });
   if (idErr || !uniqueId) throw new Error(idErr?.message ?? "ID generation failed");
-  const domain = await getDomain();
-  const syntheticEmail = `${String(uniqueId).toLowerCase()}@${domain}`;
+  const { data: domain } = await opts.context.supabase.rpc("current_school_email_domain");
+  const emailDomain = (domain as string) || "school.erp";
+  const syntheticEmail = `${String(uniqueId).toLowerCase()}@${emailDomain}`;
   const password = generatePassword(14);
+
+  // Resolve caller's school explicitly so admin inserts include school_id.
+  const { data: member } = await supabaseAdmin
+    .from("school_members").select("school_id")
+    .eq("user_id", opts.context.userId).order("is_default", { ascending: false }).limit(1).maybeSingle();
+  const schoolId = (member as any)?.school_id as string | undefined;
+  if (!schoolId) throw new Error("No school context for current user");
 
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email: syntheticEmail,
@@ -67,7 +72,6 @@ async function provisionAccount(opts: {
   const userId = created.user.id;
 
   await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: opts.fullName });
-  // replace default 'staff' role from handle_new_user
   await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
   await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: opts.role as never });
   await supabaseAdmin.from("user_credentials").insert({
@@ -76,7 +80,12 @@ async function provisionAccount(opts: {
     category: opts.category,
     synthetic_email: syntheticEmail,
     is_active: true,
-  });
+    school_id: schoolId,
+  } as any);
+  await supabaseAdmin.from("school_members").upsert(
+    { user_id: userId, school_id: schoolId, is_default: true },
+    { onConflict: "user_id,school_id" }
+  );
 
   return { userId, uniqueId: uniqueId as string, password, syntheticEmail };
 }
