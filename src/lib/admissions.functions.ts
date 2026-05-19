@@ -208,7 +208,7 @@ export const createStaff = createServerFn({ method: "POST" })
     if (!ok) throw new Error("Only super admin can create staff");
 
     const fullName = `${data.first_name} ${data.last_name}`.trim();
-    const acct = await provisionAccount({ category: "STF", role: data.role, fullName });
+    const acct = await provisionAccount({ category: "STF", role: data.role, fullName, context });
 
     const insertPayload: any = {
       first_name: data.first_name,
