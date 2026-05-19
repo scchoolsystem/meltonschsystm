@@ -100,13 +100,13 @@ function LoginPage() {
         <Card className="shadow-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Sign in</CardTitle>
-            <CardDescription>Use the Unique ID issued by your school.</CardDescription>
+            <CardDescription>Use the Unique ID issued by your school — or your email if you're a school admin.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUniqueIdSignIn} className="space-y-4">
               <div>
-                <Label htmlFor="uid">Unique ID</Label>
-                <Input id="uid" placeholder="e.g. STU-2026-000245" required autoComplete="username"
+                <Label htmlFor="uid">Unique ID or email</Label>
+                <Input id="uid" placeholder="e.g. STU-2026-000245 or you@example.com" required autoComplete="username"
                   value={uniqueId} onChange={(e) => setUniqueId(e.target.value)} />
               </div>
               <div>
