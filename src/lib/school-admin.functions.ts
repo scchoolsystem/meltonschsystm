@@ -72,9 +72,13 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
     );
 
     // Assign super_admin role (idempotent)
-    await supabaseAdmin
+    const { error: roleError } = await supabaseAdmin
       .from("user_roles")
-      .upsert({ user_id: userId!, role: "super_admin", school_id: school.id }, { onConflict: "user_id,role,school_id" });
+      .upsert({ user_id: userId!, role: "super_admin", school_id: school.id }, { onConflict: "user_id" });
+    if (roleError) throw new Error(`Failed to assign super_admin role: ${roleError.message}`);
+
+
+      .upsert({ user_id: userId!, role: "super_admin", school_id: school.id }, { onConflict: "user_id" });
 
     // Link to school as default member (idempotent on user_id+school_id)
     const { data: existingMember } = await supabaseAdmin
