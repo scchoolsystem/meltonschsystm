@@ -964,6 +964,86 @@ export type Database = {
           },
         ]
       }
+      grading_bands: {
+        Row: {
+          created_at: string
+          grade: string
+          id: string
+          max_score: number
+          min_score: number
+          remarks: string | null
+          scale_id: string
+          school_id: string
+        }
+        Insert: {
+          created_at?: string
+          grade: string
+          id?: string
+          max_score: number
+          min_score: number
+          remarks?: string | null
+          scale_id: string
+          school_id?: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string
+          id?: string
+          max_score?: number
+          min_score?: number
+          remarks?: string | null
+          scale_id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_bands_scale_id_fkey"
+            columns: ["scale_id"]
+            isOneToOne: false
+            referencedRelation: "grading_scales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_bands_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grading_scales: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          school_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          school_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_reports: {
         Row: {
           created_at: string
@@ -1107,6 +1187,66 @@ export type Database = {
           },
         ]
       }
+      leaving_certificates: {
+        Row: {
+          achievements: string | null
+          conduct: string
+          id: string
+          issued_at: string
+          issued_by: string | null
+          leaving_date: string
+          reason: string
+          school_id: string
+          serial_no: string
+          signed_by_name: string | null
+          signed_by_title: string | null
+          student_id: string
+        }
+        Insert: {
+          achievements?: string | null
+          conduct?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          leaving_date?: string
+          reason?: string
+          school_id?: string
+          serial_no: string
+          signed_by_name?: string | null
+          signed_by_title?: string | null
+          student_id: string
+        }
+        Update: {
+          achievements?: string | null
+          conduct?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          leaving_date?: string
+          reason?: string
+          school_id?: string
+          serial_no?: string
+          signed_by_name?: string | null
+          signed_by_title?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leaving_certificates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leaving_certificates_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lifecycle_events: {
         Row: {
           actor_id: string | null
@@ -1185,6 +1325,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "meal_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_payment_intents: {
+        Row: {
+          amount: number
+          checkout_request_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          initiated_by: string | null
+          invoice_id: string
+          phone: string
+          school_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          checkout_request_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          initiated_by?: string | null
+          invoice_id: string
+          phone: string
+          school_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          checkout_request_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          initiated_by?: string | null
+          invoice_id?: string
+          phone?: string
+          school_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_payment_intents_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_payment_intents_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -2646,6 +2843,13 @@ export type Database = {
         Returns: {
           method: string
           student_id: string
+        }[]
+      }
+      grade_for: {
+        Args: { p_school_id: string; p_score: number }
+        Returns: {
+          grade: string
+          remarks: string
         }[]
       }
       has_role: {
