@@ -6,12 +6,12 @@
   "main": "src/server.ts",
   "routes": [
     {
-      "pattern": "smatdev.co.ke/*",
-      "zone_name": "smatdev.co.ke"
+      "pattern": "smartdev.co.ke/*",
+      "zone_name": "smartdev.co.ke"
     },
     {
-      "pattern": "www.smatdev.co.ke/*",
-      "zone_name": "smatdev.co.ke"
+      "pattern": "www.smartdev.co.ke/*",
+      "zone_name": "smartdev.co.ke"
     }
   ]
 }
