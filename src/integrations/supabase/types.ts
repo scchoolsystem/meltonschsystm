@@ -1961,7 +1961,6 @@ export type Database = {
           lifecycle_status: string
           medical_notes: string | null
           national_id: string | null
-          parent_auth_code: string | null
           parent_auth_code_hash: string | null
           parent_email: string | null
           parent_name: string | null
@@ -1990,7 +1989,6 @@ export type Database = {
           lifecycle_status?: string
           medical_notes?: string | null
           national_id?: string | null
-          parent_auth_code?: string | null
           parent_auth_code_hash?: string | null
           parent_email?: string | null
           parent_name?: string | null
@@ -2019,7 +2017,6 @@ export type Database = {
           lifecycle_status?: string
           medical_notes?: string | null
           national_id?: string | null
-          parent_auth_code?: string | null
           parent_auth_code_hash?: string | null
           parent_email?: string | null
           parent_name?: string | null
@@ -2651,7 +2648,6 @@ export type Database = {
           student_id: string
         }[]
       }
-      generate_parent_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

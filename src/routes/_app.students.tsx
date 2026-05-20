@@ -31,7 +31,7 @@ interface Student {
   id: string; admission_no: string; unique_id: string | null;
   first_name: string; last_name: string;
   gender: string | null; class_id: string | null; status: string;
-  lifecycle_status: string; parent_auth_code: string | null;
+  lifecycle_status: string;
   parent_phone: string | null;
   classes?: { name: string } | null;
 }
@@ -50,7 +50,7 @@ function StudentsPage() {
     queryFn: async () => {
       let req = supabase
         .from("students")
-        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_auth_code, parent_phone, classes(name)", { count: "exact" })
+        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_phone, classes(name)", { count: "exact" })
         .order("admission_no", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       const t = q.trim();
@@ -140,14 +140,14 @@ function StudentsPage() {
                     <TableHead>Class</TableHead>
                     <TableHead>Gender</TableHead>
                     <TableHead>Parent Phone</TableHead>
-                    {canEdit && <TableHead>Parent Code</TableHead>}
+                    
                     <TableHead>Status</TableHead>
                     {canEdit && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={canEdit ? 9 : 7} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canEdit ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
                   )}
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
@@ -157,7 +157,7 @@ function StudentsPage() {
                       <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="capitalize">{s.gender ?? "—"}</TableCell>
                       <TableCell>{s.parent_phone ?? "—"}</TableCell>
-                      {canEdit && <TableCell className="font-mono text-xs">{s.parent_auth_code ?? "—"}</TableCell>}
+                      
                       <TableCell><StatusBadge status={s.lifecycle_status ?? s.status} /></TableCell>
                       {canEdit && (
                         <TableCell className="text-right">
