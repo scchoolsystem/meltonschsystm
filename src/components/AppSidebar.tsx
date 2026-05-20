@@ -86,6 +86,8 @@ export function AppSidebar() {
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { school } = useTenant();
+  const { isEnabled } = useFeatureGate();
+  const filt = (items: NavItem[]) => items.filter(i => !i.feature || isEnabled(i.feature));
   const settings = school
     ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
     : null;
