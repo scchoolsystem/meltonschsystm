@@ -26,6 +26,9 @@ function isForbidden(error: unknown): boolean {
   }
   return error instanceof Error && error.message.includes('403')
 }
+ ^/
+
+
 
 // Extract Retry-After seconds from a structured EmailAPIError, or default to 60s.
 function getRetryAfterSeconds(error: unknown): number {
@@ -230,6 +233,7 @@ export const Route = createFileRoute("/lovable/email/queue/process")({
                 html: payload.html,
                 text: payload.text,
               })
+              )
 
               // Log success
               await supabase.from('email_send_log').insert({
