@@ -57,6 +57,7 @@ import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.per
 import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overrides'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminLifecycleRouteImport } from './routes/_app.admin.lifecycle'
+import { Route as AppAdminLeavingCertificatesRouteImport } from './routes/_app.admin.leaving-certificates'
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
 import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
@@ -314,6 +315,12 @@ const AppAdminLifecycleRoute = AppAdminLifecycleRouteImport.update({
   path: '/admin/lifecycle',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLeavingCertificatesRoute =
+  AppAdminLeavingCertificatesRouteImport.update({
+    id: '/admin/leaving-certificates',
+    path: '/admin/leaving-certificates',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAdminImportRoute = AppAdminImportRouteImport.update({
   id: '/admin/import',
   path: '/admin/import',
@@ -442,6 +449,7 @@ export interface FileRoutesByFullPath {
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
@@ -508,6 +516,7 @@ export interface FileRoutesByTo {
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
@@ -576,6 +585,7 @@ export interface FileRoutesById {
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/grading': typeof AppAdminGradingRoute
   '/_app/admin/import': typeof AppAdminImportRoute
+  '/_app/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/_app/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/overrides': typeof AppAdminOverridesRoute
@@ -644,6 +654,7 @@ export interface FileRouteTypes {
     | '/admin/field-edits'
     | '/admin/grading'
     | '/admin/import'
+    | '/admin/leaving-certificates'
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
@@ -710,6 +721,7 @@ export interface FileRouteTypes {
     | '/admin/field-edits'
     | '/admin/grading'
     | '/admin/import'
+    | '/admin/leaving-certificates'
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
@@ -777,6 +789,7 @@ export interface FileRouteTypes {
     | '/_app/admin/field-edits'
     | '/_app/admin/grading'
     | '/_app/admin/import'
+    | '/_app/admin/leaving-certificates'
     | '/_app/admin/lifecycle'
     | '/_app/admin/links'
     | '/_app/admin/overrides'
@@ -1159,6 +1172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLifecycleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/leaving-certificates': {
+      id: '/_app/admin/leaving-certificates'
+      path: '/admin/leaving-certificates'
+      fullPath: '/admin/leaving-certificates'
+      preLoaderRoute: typeof AppAdminLeavingCertificatesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/import': {
       id: '/_app/admin/import'
       path: '/admin/import'
@@ -1319,6 +1339,7 @@ interface AppRouteChildren {
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminGradingRoute: typeof AppAdminGradingRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
+  AppAdminLeavingCertificatesRoute: typeof AppAdminLeavingCertificatesRoute
   AppAdminLifecycleRoute: typeof AppAdminLifecycleRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminOverridesRoute: typeof AppAdminOverridesRoute
@@ -1367,6 +1388,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminGradingRoute: AppAdminGradingRoute,
   AppAdminImportRoute: AppAdminImportRoute,
+  AppAdminLeavingCertificatesRoute: AppAdminLeavingCertificatesRoute,
   AppAdminLifecycleRoute: AppAdminLifecycleRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminOverridesRoute: AppAdminOverridesRoute,
