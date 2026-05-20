@@ -210,12 +210,6 @@ function PlatformSchools() {
       )}
 
       <Card>
-        <CardHeader>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader><CardTitle>All schools</CardTitle></CardHeader>
         <CardContent>
           {isLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : (
