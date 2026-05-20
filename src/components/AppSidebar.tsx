@@ -134,7 +134,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Academics</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {academicItems.map((item) => (
+            {filt(academicItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -147,7 +147,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Operations</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {operationsItems.map((item) => (
+            {filt(operationsItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -160,7 +160,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Finance</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {financeItems.map((item) => (
+            {filt(financeItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -173,7 +173,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Digital IDs</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {idItems.map((item) => (
+            {filt(idItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
