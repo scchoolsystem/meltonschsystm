@@ -12,6 +12,10 @@
     {
       "pattern": "www.smartdev.co.ke/*",
       "zone_name": "smartdev.co.ke"
-    }
+    {
+  "pattern": "*.smartdev.co.ke/*",
+  "zone_name": "smartdev.co.ke"
+}
+}
   ]
 }
