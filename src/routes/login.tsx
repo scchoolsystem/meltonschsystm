@@ -68,6 +68,13 @@ function LoginPage() {
       const { email: loginEmail } = await lookup({ data: { uniqueId: uniqueId.trim(), schoolSlug: slug ?? "school-1" } });
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: pw });
       if (error) throw error;
+      if (school?.id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("school_members").update({ is_default: false }).eq("user_id", user.id);
+          await supabase.from("school_members").update({ is_default: true }).eq("user_id", user.id).eq("school_id", school.id);
+        }
+      }
       toast.success("Welcome back");
       navigate({ to: "/dashboard" });
     } catch (err: any) {
