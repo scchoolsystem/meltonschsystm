@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -16,7 +17,7 @@ import { Plus, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
-export const Route = createFileRoute("/_app/security")({ component: Page });
+export const Route = createFileRoute("/_app/security")({ component: () => (<FeatureGate feature="security"><Page /></FeatureGate>) });
 
 const SEV_STYLE: Record<string, string> = {
   low: "bg-blue-500/20 text-blue-700 dark:text-blue-300",

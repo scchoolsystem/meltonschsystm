@@ -57,7 +57,9 @@ import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.per
 import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overrides'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminLifecycleRouteImport } from './routes/_app.admin.lifecycle'
+import { Route as AppAdminLeavingCertificatesRouteImport } from './routes/_app.admin.leaving-certificates'
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
+import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
@@ -72,6 +74,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
+import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
@@ -313,9 +316,20 @@ const AppAdminLifecycleRoute = AppAdminLifecycleRouteImport.update({
   path: '/admin/lifecycle',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLeavingCertificatesRoute =
+  AppAdminLeavingCertificatesRouteImport.update({
+    id: '/admin/leaving-certificates',
+    path: '/admin/leaving-certificates',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAdminImportRoute = AppAdminImportRouteImport.update({
   id: '/admin/import',
   path: '/admin/import',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminGradingRoute = AppAdminGradingRouteImport.update({
+  id: '/admin/grading',
+  path: '/admin/grading',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminFieldEditsRoute = AppAdminFieldEditsRouteImport.update({
@@ -391,6 +405,12 @@ const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
   path: '/finance/receipt/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLeavingCertificateIdRoute =
+  AppAdminLeavingCertificateIdRouteImport.update({
+    id: '/admin/leaving-certificate/$id',
+    path: '/admin/leaving-certificate/$id',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAcademicsReportCardStudentIdExamIdRoute =
   AppAcademicsReportCardStudentIdExamIdRouteImport.update({
     id: '/academics/report-card/$studentId/$examId',
@@ -434,7 +454,9 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
@@ -455,6 +477,7 @@ export interface FileRoutesByFullPath {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -499,7 +522,9 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
+  '/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
@@ -520,6 +545,7 @@ export interface FileRoutesByTo {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -566,7 +592,9 @@ export interface FileRoutesById {
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/_app/admin/grading': typeof AppAdminGradingRoute
   '/_app/admin/import': typeof AppAdminImportRoute
+  '/_app/admin/leaving-certificates': typeof AppAdminLeavingCertificatesRoute
   '/_app/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/overrides': typeof AppAdminOverridesRoute
@@ -587,6 +615,7 @@ export interface FileRoutesById {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/_app/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -633,7 +662,9 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/brain'
     | '/admin/field-edits'
+    | '/admin/grading'
     | '/admin/import'
+    | '/admin/leaving-certificates'
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
@@ -654,6 +685,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -698,7 +730,9 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/brain'
     | '/admin/field-edits'
+    | '/admin/grading'
     | '/admin/import'
+    | '/admin/leaving-certificates'
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
@@ -719,6 +753,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -764,7 +799,9 @@ export interface FileRouteTypes {
     | '/_app/admin/activity'
     | '/_app/admin/brain'
     | '/_app/admin/field-edits'
+    | '/_app/admin/grading'
     | '/_app/admin/import'
+    | '/_app/admin/leaving-certificates'
     | '/_app/admin/lifecycle'
     | '/_app/admin/links'
     | '/_app/admin/overrides'
@@ -785,6 +822,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/_app/admin/leaving-certificate/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
@@ -1147,11 +1185,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLifecycleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/leaving-certificates': {
+      id: '/_app/admin/leaving-certificates'
+      path: '/admin/leaving-certificates'
+      fullPath: '/admin/leaving-certificates'
+      preLoaderRoute: typeof AppAdminLeavingCertificatesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/import': {
       id: '/_app/admin/import'
       path: '/admin/import'
       fullPath: '/admin/import'
       preLoaderRoute: typeof AppAdminImportRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/grading': {
+      id: '/_app/admin/grading'
+      path: '/admin/grading'
+      fullPath: '/admin/grading'
+      preLoaderRoute: typeof AppAdminGradingRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/field-edits': {
@@ -1252,6 +1304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceReceiptIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/leaving-certificate/$id': {
+      id: '/_app/admin/leaving-certificate/$id'
+      path: '/admin/leaving-certificate/$id'
+      fullPath: '/admin/leaving-certificate/$id'
+      preLoaderRoute: typeof AppAdminLeavingCertificateIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/academics/report-card/$studentId/$examId': {
       id: '/_app/academics/report-card/$studentId/$examId'
       path: '/academics/report-card/$studentId/$examId'
@@ -1298,7 +1357,9 @@ interface AppRouteChildren {
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
+  AppAdminGradingRoute: typeof AppAdminGradingRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
+  AppAdminLeavingCertificatesRoute: typeof AppAdminLeavingCertificatesRoute
   AppAdminLifecycleRoute: typeof AppAdminLifecycleRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminOverridesRoute: typeof AppAdminOverridesRoute
@@ -1315,6 +1376,7 @@ interface AppRouteChildren {
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
   AppPortalParentRoute: typeof AppPortalParentRoute
   AppPortalStudentRoute: typeof AppPortalStudentRoute
+  AppAdminLeavingCertificateIdRoute: typeof AppAdminLeavingCertificateIdRoute
   AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
   AppIdsStaffIdRoute: typeof AppIdsStaffIdRoute
   AppIdsStudentIdRoute: typeof AppIdsStudentIdRoute
@@ -1345,7 +1407,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
+  AppAdminGradingRoute: AppAdminGradingRoute,
   AppAdminImportRoute: AppAdminImportRoute,
+  AppAdminLeavingCertificatesRoute: AppAdminLeavingCertificatesRoute,
   AppAdminLifecycleRoute: AppAdminLifecycleRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminOverridesRoute: AppAdminOverridesRoute,
@@ -1362,6 +1426,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIdsVerifyRoute: AppIdsVerifyRoute,
   AppPortalParentRoute: AppPortalParentRoute,
   AppPortalStudentRoute: AppPortalStudentRoute,
+  AppAdminLeavingCertificateIdRoute: AppAdminLeavingCertificateIdRoute,
   AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
   AppIdsStaffIdRoute: AppIdsStaffIdRoute,
   AppIdsStudentIdRoute: AppIdsStudentIdRoute,

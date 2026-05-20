@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Pager } from "@/components/Pager";
 
-export const Route = createFileRoute("/_app/finance/payments")({ component: Page });
+export const Route = createFileRoute("/_app/finance/payments")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
 
 function Page() {
   const [page, setPage] = useState(0);

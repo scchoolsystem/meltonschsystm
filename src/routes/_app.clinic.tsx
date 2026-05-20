@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -14,7 +15,7 @@ import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
-export const Route = createFileRoute("/_app/clinic")({ component: Page });
+export const Route = createFileRoute("/_app/clinic")({ component: () => (<FeatureGate feature="clinic"><Page /></FeatureGate>) });
 
 function Page() {
   const qc = useQueryClient();
