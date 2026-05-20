@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,8 +15,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from "sonner";
 import { Building2, Plus, ExternalLink, Globe, Settings, KeyRound, Copy } from "lucide-react";
 
+function PlatformSchoolsLayout() {
+  const location = useLocation();
+  if (location.pathname !== "/platform/schools") return <Outlet />;
+  return <PlatformSchools />;
+}
+
 export const Route = createFileRoute("/platform/schools")({
-  component: PlatformSchools,
+  component: PlatformSchoolsLayout,
 });
 
 const FEATURE_KEYS = [
