@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { useTenant } from "@/hooks/use-tenant";
 
-export const Route = createFileRoute("/_app/finance/receipt/$id")({ component: Page });
+export const Route = createFileRoute("/_app/finance/receipt/$id")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
 
 function Page() {
   const { id } = Route.useParams();
