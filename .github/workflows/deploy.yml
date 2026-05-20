@@ -1,4 +1,7 @@
-name: Deploy to Cloudflare Workers
+- name: Download a Build Artifact
+  uses: actions/download-artifact@v8.0.1
+  
+  name: Deploy to Cloudflare Workers
 
 on:
   push:
