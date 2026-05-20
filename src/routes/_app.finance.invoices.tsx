@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +18,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Pager } from "@/components/Pager";
 
-export const Route = createFileRoute("/_app/finance/invoices")({ component: Page });
+export const Route = createFileRoute("/_app/finance/invoices")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
 
 function Page() {
   const qc = useQueryClient();
