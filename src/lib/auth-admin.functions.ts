@@ -164,7 +164,7 @@ export const createAccount = createServerFn({ method: "POST" })
       await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
       await supabaseAdmin
         .from("user_roles")
-        .insert({ user_id: userId, role: data.role as never });
+        .insert({ user_id: userId, role: data.role as never, school_id: schoolId });
     }
 
     await supabaseAdmin.from("user_credentials").insert({
