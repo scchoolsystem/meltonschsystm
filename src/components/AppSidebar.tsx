@@ -74,6 +74,8 @@ const adminItems = [
   { title: "Lifecycle Events", url: "/admin/lifecycle", icon: Activity },
   { title: "Field Edit Audit", url: "/admin/field-edits", icon: Activity },
   { title: "Override Log", url: "/admin/overrides", icon: Activity },
+  { title: "Leaving Certificates", url: "/admin/leaving-certificates", icon: Award },
+  { title: "Grading Scale", url: "/admin/grading", icon: Award },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
