@@ -175,17 +175,21 @@ export const admitStudent = createServerFn({ method: "POST" })
       }
     } catch {}
 
-    // re-fetch to surface the auto-generated parent_auth_code
-    const { data: full } = await supabaseAdmin
-      .from("students").select("id, admission_no, unique_id, first_name, last_name, parent_auth_code")
-      .eq("id", student.id).maybeSingle();
+    // Generate parent auth code in-app, store only the SHA-256 hash; return plaintext once.
+    const codeBytes = new Uint8Array(5);
+    crypto.getRandomValues(codeBytes);
+    const codeHex = Array.from(codeBytes).map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase().slice(0, 5);
+    const parentAuthCode = `PRN-${new Date().getFullYear()}-${codeHex}`;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parentAuthCode.toUpperCase()));
+    const codeHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    await supabaseAdmin.from("students").update({ parent_auth_code_hash: codeHash } as any).eq("id", student.id);
 
     return {
-      student: full ?? student,
+      student,
       uniqueId: acct.uniqueId,
       password: acct.password,
       syntheticEmail: acct.syntheticEmail,
-      parentAuthCode: (full as any)?.parent_auth_code ?? null,
+      parentAuthCode,
     };
   });
 
