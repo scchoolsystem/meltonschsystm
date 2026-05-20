@@ -30,37 +30,37 @@ const mainItems = [
   { title: "Announcements", url: "/announcements", icon: Megaphone },
 ];
 
-const academicItems = [
+const academicItems: NavItem[] = [
   { title: "Subjects", url: "/academics/subjects", icon: BookText },
   { title: "Exams", url: "/academics/exams", icon: FileText },
   { title: "Mark Entry", url: "/academics/marks", icon: ClipboardCheck },
   { title: "Results", url: "/academics/results", icon: Award },
   { title: "Report Cards", url: "/academics/report-cards", icon: FileText },
-  { title: "Timetable", url: "/timetable", icon: CalendarDays },
-  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays },
+  { title: "Timetable", url: "/timetable", icon: CalendarDays, feature: "timetable" },
+  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays, feature: "timetable" },
 ];
 
-const operationsItems = [
+const operationsItems: NavItem[] = [
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
-  { title: "Discipline", url: "/discipline", icon: AlertTriangle },
-  { title: "Library", url: "/library", icon: Library },
-  { title: "Boarding", url: "/boarding", icon: Home },
-  { title: "Kitchen", url: "/kitchen", icon: BookOpen },
-  { title: "Transport", url: "/transport", icon: Bus },
-  { title: "Clinic", url: "/clinic", icon: Stethoscope },
-  { title: "Security", url: "/security", icon: AlertTriangle },
+  { title: "Discipline", url: "/discipline", icon: AlertTriangle, feature: "discipline" },
+  { title: "Library", url: "/library", icon: Library, feature: "library" },
+  { title: "Boarding", url: "/boarding", icon: Home, feature: "boarding" },
+  { title: "Kitchen", url: "/kitchen", icon: BookOpen, feature: "kitchen" },
+  { title: "Transport", url: "/transport", icon: Bus, feature: "transport" },
+  { title: "Clinic", url: "/clinic", icon: Stethoscope, feature: "clinic" },
+  { title: "Security", url: "/security", icon: AlertTriangle, feature: "security" },
 ];
 
-const financeItems = [
-  { title: "Fee Structures", url: "/finance/fees", icon: Wallet },
-  { title: "Invoices", url: "/finance/invoices", icon: Receipt },
-  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt },
-  { title: "Payments", url: "/finance/payments", icon: Receipt },
+const financeItems: NavItem[] = [
+  { title: "Fee Structures", url: "/finance/fees", icon: Wallet, feature: "finance" },
+  { title: "Invoices", url: "/finance/invoices", icon: Receipt, feature: "finance" },
+  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt, feature: "finance" },
+  { title: "Payments", url: "/finance/payments", icon: Receipt, feature: "finance" },
 ];
 
-const idItems = [
-  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode },
-  { title: "Verify ID", url: "/ids/verify", icon: ScanLine },
+const idItems: NavItem[] = [
+  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode, feature: "id_cards" },
+  { title: "Verify ID", url: "/ids/verify", icon: ScanLine, feature: "id_cards" },
 ];
 
 const adminItems = [
