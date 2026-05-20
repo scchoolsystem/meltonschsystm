@@ -105,5 +105,6 @@
       "sharp",
       "workerd"
     ]
-  }
+  },
+  "packageManager": "pnpm@10.11.1"
 }
