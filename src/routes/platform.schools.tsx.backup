@@ -1,4 +1,3 @@
-import { provisionSchoolWithAdmin } from "@/lib/school-admin.functions";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -78,13 +77,6 @@ function PlatformSchools() {
         })
         .select()
         .single();
-
-await provisionSchoolWithAdmin({
-  id: school.id,
-  name: school.name,
-  slug: school.slug,
-  admin_email: values.admin_email,
-});
       if (error) throw error;
 
       // Default plan = Free
