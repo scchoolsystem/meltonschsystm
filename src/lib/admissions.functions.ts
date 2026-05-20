@@ -73,7 +73,7 @@ async function provisionAccount(opts: {
 
   await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: opts.fullName });
   await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
-  await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: opts.role as never });
+  await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: opts.role as never, school_id: schoolId });
   await supabaseAdmin.from("user_credentials").insert({
     user_id: userId,
     unique_id: uniqueId as string,
@@ -81,13 +81,14 @@ async function provisionAccount(opts: {
     synthetic_email: syntheticEmail,
     is_active: true,
     school_id: schoolId,
+
   } as any);
   await supabaseAdmin.from("school_members").upsert(
     { user_id: userId, school_id: schoolId, is_default: true },
     { onConflict: "user_id,school_id" }
   );
 
-  return { userId, uniqueId: uniqueId as string, password, syntheticEmail };
+  return { userId, uniqueId: uniqueId as string, password, syntheticEmail, schoolId };
 }
 
 // ---------- ADMIT STUDENT ----------
@@ -125,6 +126,7 @@ export const admitStudent = createServerFn({ method: "POST" })
       last_name: data.last_name,
       unique_id: acct.uniqueId,
       photo_url: data.photo_url || null,
+      school_id: acct.schoolId,
     };
     if (data.gender) insertPayload.gender = data.gender;
     if (data.date_of_birth) insertPayload.date_of_birth = data.date_of_birth;
@@ -221,6 +223,7 @@ export const createStaff = createServerFn({ method: "POST" })
       user_id: acct.userId,
       unique_id: acct.uniqueId,
       photo_url: data.photo_url || null,
+      school_id: acct.schoolId,
     };
     if (data.email) insertPayload.email = data.email;
     if (data.phone) insertPayload.phone = data.phone;
