@@ -74,6 +74,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
+import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
@@ -404,6 +405,12 @@ const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
   path: '/finance/receipt/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminLeavingCertificateIdRoute =
+  AppAdminLeavingCertificateIdRouteImport.update({
+    id: '/admin/leaving-certificate/$id',
+    path: '/admin/leaving-certificate/$id',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAcademicsReportCardStudentIdExamIdRoute =
   AppAcademicsReportCardStudentIdExamIdRouteImport.update({
     id: '/academics/report-card/$studentId/$examId',
@@ -470,6 +477,7 @@ export interface FileRoutesByFullPath {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -537,6 +545,7 @@ export interface FileRoutesByTo {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -606,6 +615,7 @@ export interface FileRoutesById {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/_app/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
@@ -675,6 +685,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -742,6 +753,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
@@ -810,6 +822,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/_app/admin/leaving-certificate/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
@@ -1291,6 +1304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceReceiptIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/leaving-certificate/$id': {
+      id: '/_app/admin/leaving-certificate/$id'
+      path: '/admin/leaving-certificate/$id'
+      fullPath: '/admin/leaving-certificate/$id'
+      preLoaderRoute: typeof AppAdminLeavingCertificateIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/academics/report-card/$studentId/$examId': {
       id: '/_app/academics/report-card/$studentId/$examId'
       path: '/academics/report-card/$studentId/$examId'
@@ -1356,6 +1376,7 @@ interface AppRouteChildren {
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
   AppPortalParentRoute: typeof AppPortalParentRoute
   AppPortalStudentRoute: typeof AppPortalStudentRoute
+  AppAdminLeavingCertificateIdRoute: typeof AppAdminLeavingCertificateIdRoute
   AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
   AppIdsStaffIdRoute: typeof AppIdsStaffIdRoute
   AppIdsStudentIdRoute: typeof AppIdsStudentIdRoute
@@ -1405,6 +1426,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIdsVerifyRoute: AppIdsVerifyRoute,
   AppPortalParentRoute: AppPortalParentRoute,
   AppPortalStudentRoute: AppPortalStudentRoute,
+  AppAdminLeavingCertificateIdRoute: AppAdminLeavingCertificateIdRoute,
   AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
   AppIdsStaffIdRoute: AppIdsStaffIdRoute,
   AppIdsStudentIdRoute: AppIdsStudentIdRoute,
