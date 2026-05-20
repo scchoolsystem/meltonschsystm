@@ -58,6 +58,7 @@ import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overr
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminLifecycleRouteImport } from './routes/_app.admin.lifecycle'
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
+import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
@@ -318,6 +319,11 @@ const AppAdminImportRoute = AppAdminImportRouteImport.update({
   path: '/admin/import',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminGradingRoute = AppAdminGradingRouteImport.update({
+  id: '/admin/grading',
+  path: '/admin/grading',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminFieldEditsRoute = AppAdminFieldEditsRouteImport.update({
   id: '/admin/field-edits',
   path: '/admin/field-edits',
@@ -434,6 +440,7 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
@@ -499,6 +506,7 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
@@ -566,6 +574,7 @@ export interface FileRoutesById {
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
+  '/_app/admin/grading': typeof AppAdminGradingRoute
   '/_app/admin/import': typeof AppAdminImportRoute
   '/_app/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
@@ -633,6 +642,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/brain'
     | '/admin/field-edits'
+    | '/admin/grading'
     | '/admin/import'
     | '/admin/lifecycle'
     | '/admin/links'
@@ -698,6 +708,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/brain'
     | '/admin/field-edits'
+    | '/admin/grading'
     | '/admin/import'
     | '/admin/lifecycle'
     | '/admin/links'
@@ -764,6 +775,7 @@ export interface FileRouteTypes {
     | '/_app/admin/activity'
     | '/_app/admin/brain'
     | '/_app/admin/field-edits'
+    | '/_app/admin/grading'
     | '/_app/admin/import'
     | '/_app/admin/lifecycle'
     | '/_app/admin/links'
@@ -1154,6 +1166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminImportRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/grading': {
+      id: '/_app/admin/grading'
+      path: '/admin/grading'
+      fullPath: '/admin/grading'
+      preLoaderRoute: typeof AppAdminGradingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/field-edits': {
       id: '/_app/admin/field-edits'
       path: '/admin/field-edits'
@@ -1298,6 +1317,7 @@ interface AppRouteChildren {
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
+  AppAdminGradingRoute: typeof AppAdminGradingRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
   AppAdminLifecycleRoute: typeof AppAdminLifecycleRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
@@ -1345,6 +1365,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
+  AppAdminGradingRoute: AppAdminGradingRoute,
   AppAdminImportRoute: AppAdminImportRoute,
   AppAdminLifecycleRoute: AppAdminLifecycleRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
