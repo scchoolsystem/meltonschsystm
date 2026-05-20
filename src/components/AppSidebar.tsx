@@ -13,10 +13,13 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
+import { useFeatureGate, type FeatureKey } from "@/hooks/use-feature-gate";
 import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+type NavItem = { title: string; url: string; icon: any; feature?: FeatureKey };
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -27,37 +30,37 @@ const mainItems = [
   { title: "Announcements", url: "/announcements", icon: Megaphone },
 ];
 
-const academicItems = [
+const academicItems: NavItem[] = [
   { title: "Subjects", url: "/academics/subjects", icon: BookText },
   { title: "Exams", url: "/academics/exams", icon: FileText },
   { title: "Mark Entry", url: "/academics/marks", icon: ClipboardCheck },
   { title: "Results", url: "/academics/results", icon: Award },
   { title: "Report Cards", url: "/academics/report-cards", icon: FileText },
-  { title: "Timetable", url: "/timetable", icon: CalendarDays },
-  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays },
+  { title: "Timetable", url: "/timetable", icon: CalendarDays, feature: "timetable" },
+  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays, feature: "timetable" },
 ];
 
-const operationsItems = [
+const operationsItems: NavItem[] = [
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
-  { title: "Discipline", url: "/discipline", icon: AlertTriangle },
-  { title: "Library", url: "/library", icon: Library },
-  { title: "Boarding", url: "/boarding", icon: Home },
-  { title: "Kitchen", url: "/kitchen", icon: BookOpen },
-  { title: "Transport", url: "/transport", icon: Bus },
-  { title: "Clinic", url: "/clinic", icon: Stethoscope },
-  { title: "Security", url: "/security", icon: AlertTriangle },
+  { title: "Discipline", url: "/discipline", icon: AlertTriangle, feature: "discipline" },
+  { title: "Library", url: "/library", icon: Library, feature: "library" },
+  { title: "Boarding", url: "/boarding", icon: Home, feature: "boarding" },
+  { title: "Kitchen", url: "/kitchen", icon: BookOpen, feature: "kitchen" },
+  { title: "Transport", url: "/transport", icon: Bus, feature: "transport" },
+  { title: "Clinic", url: "/clinic", icon: Stethoscope, feature: "clinic" },
+  { title: "Security", url: "/security", icon: AlertTriangle, feature: "security" },
 ];
 
-const financeItems = [
-  { title: "Fee Structures", url: "/finance/fees", icon: Wallet },
-  { title: "Invoices", url: "/finance/invoices", icon: Receipt },
-  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt },
-  { title: "Payments", url: "/finance/payments", icon: Receipt },
+const financeItems: NavItem[] = [
+  { title: "Fee Structures", url: "/finance/fees", icon: Wallet, feature: "finance" },
+  { title: "Invoices", url: "/finance/invoices", icon: Receipt, feature: "finance" },
+  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt, feature: "finance" },
+  { title: "Payments", url: "/finance/payments", icon: Receipt, feature: "finance" },
 ];
 
-const idItems = [
-  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode },
-  { title: "Verify ID", url: "/ids/verify", icon: ScanLine },
+const idItems: NavItem[] = [
+  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode, feature: "id_cards" },
+  { title: "Verify ID", url: "/ids/verify", icon: ScanLine, feature: "id_cards" },
 ];
 
 const adminItems = [
@@ -71,6 +74,8 @@ const adminItems = [
   { title: "Lifecycle Events", url: "/admin/lifecycle", icon: Activity },
   { title: "Field Edit Audit", url: "/admin/field-edits", icon: Activity },
   { title: "Override Log", url: "/admin/overrides", icon: Activity },
+  { title: "Leaving Certificates", url: "/admin/leaving-certificates", icon: Award },
+  { title: "Grading Scale", url: "/admin/grading", icon: Award },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
@@ -83,6 +88,8 @@ export function AppSidebar() {
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { school } = useTenant();
+  const { isEnabled } = useFeatureGate();
+  const filt = (items: NavItem[]) => items.filter(i => !i.feature || isEnabled(i.feature));
   const settings = school
     ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
     : null;
@@ -129,7 +136,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Academics</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {academicItems.map((item) => (
+            {filt(academicItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -142,7 +149,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Operations</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {operationsItems.map((item) => (
+            {filt(operationsItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -155,7 +162,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Finance</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {financeItems.map((item) => (
+            {filt(financeItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
@@ -168,7 +175,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Digital IDs</SidebarGroupLabel>
           <SidebarGroupContent><SidebarMenu>
-            {idItems.map((item) => (
+            {filt(idItems).map((item) => (
               <SidebarMenuItem key={item.url}>
                 <SidebarMenuButton asChild isActive={path === item.url}>
                   <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>

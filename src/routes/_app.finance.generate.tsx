@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { Loader2, Zap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/finance/generate")({ component: Page });
+export const Route = createFileRoute("/_app/finance/generate")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
 
 function Page() {
   const generate = useServerFn(bulkGenerateInvoices);
