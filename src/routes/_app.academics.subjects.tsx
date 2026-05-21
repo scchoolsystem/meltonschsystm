@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export const Route = createFileRoute("/_app/academics/subjects")({ component: Page });
 
