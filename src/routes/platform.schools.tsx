@@ -124,6 +124,18 @@ function PlatformSchools() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const deleteSchool = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("schools").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("School deleted");
+      qc.invalidateQueries({ queryKey: ["platform-schools"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const rootDomain = "smartdev.co.ke";
 
   return (
