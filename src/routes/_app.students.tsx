@@ -42,6 +42,9 @@ function StudentsPage() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
+  const deleteMutation = useTrackedDelete();
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+  useEffect(() => { supabase.rpc("current_user_school").then(({ data }) => setSchoolId(data as string)); }, []);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
