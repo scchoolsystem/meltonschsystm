@@ -19,7 +19,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
-  const { school, slug, isPlatformHost } = useTenant();
+  const { school, slug, isPlatformHost, error: tenantError, loading: tenantLoading } = useTenant();
 
   const [uniqueId, setUniqueId] = useState("");
   const [pw, setPw] = useState("");
@@ -32,14 +32,22 @@ function LoginPage() {
 
   // On the root marketing domain there is no school context — bounce to the landing page.
   const isRootHost = !isPlatformHost && !slug;
-  const { error: tenantError, loading: tenantLoading } = useTenant();
 
   useEffect(() => {
     if (isPlatformHost) {
       navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
       return;
     }
-    if (!tenantLoading && !isPlatformHost && slug && (tenantError || !school)) {
+
+    if (isRootHost) {
+      navigate({ to: "/" });
+      return;
+    }
+
+    if (!loading && session) navigate({ to: "/dashboard" });
+  }, [session, loading, navigate, isPlatformHost, isRootHost]);
+
+  if (!tenantLoading && !isPlatformHost && slug && (tenantError || !school)) {
     return (
       <div className="min-h-screen grid place-items-center p-6 text-center">
         <div className="max-w-md space-y-4">
@@ -53,13 +61,6 @@ function LoginPage() {
       </div>
     );
   }
-
-  if (isRootHost) {
-      navigate({ to: "/" });
-      return;
-    }
-    if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate, isPlatformHost, isRootHost]);
 
   if (isRootHost) {
     return (
