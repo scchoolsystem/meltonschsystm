@@ -271,9 +271,35 @@ function PlatformSchools() {
                           <Button size="sm" variant="outline"><Settings className="h-3 w-3 mr-1" /> Manage</Button>
                         </Link>
                         {isOwner && (
-                          <Button size="sm" variant="outline" onClick={() => toggleStatus.mutate({ id: s.id, status: s.status })}>
-                            {s.status === "active" ? "Suspend" : "Activate"}
-                          </Button>
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => toggleStatus.mutate({ id: s.id, status: s.status })}>
+                              {s.status === "active" ? "Suspend" : "Activate"}
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete {s.name}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This permanently removes the school and all related records (subscriptions, features, members). This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteSchool.mutate(s.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete permanently
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
                         )}
                       </TableCell>
                     </TableRow>
@@ -284,18 +310,6 @@ function PlatformSchools() {
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function SchoolCredRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-20 text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <code className={`flex-1 px-2 py-1 rounded bg-muted border text-xs ${mono ? "font-mono" : ""}`}>{value}</code>
-      <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}>
-        <Copy className="h-3 w-3" />
-      </Button>
     </div>
   );
 }
