@@ -32,13 +32,29 @@ function LoginPage() {
 
   // On the root marketing domain there is no school context — bounce to the landing page.
   const isRootHost = !isPlatformHost && !slug;
+  const { error: tenantError, loading: tenantLoading } = useTenant();
 
   useEffect(() => {
     if (isPlatformHost) {
       navigate({ to: session ? "/platform/dashboard" : "/platform/login" });
       return;
     }
-    if (isRootHost) {
+    if (!tenantLoading && !isPlatformHost && slug && (tenantError || !school)) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6 text-center">
+        <div className="max-w-md space-y-4">
+          <GraduationCap className="w-10 h-10 mx-auto text-destructive" />
+          <h1 className="text-2xl font-bold">School not found</h1>
+          <p className="text-sm text-muted-foreground">
+            The school portal <code className="px-1 py-0.5 rounded bg-muted">{slug}.smartdev.co.ke</code> does not exist.
+            Please check the address or contact your school administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRootHost) {
       navigate({ to: "/" });
       return;
     }
@@ -68,6 +84,13 @@ function LoginPage() {
       const { email: loginEmail } = await lookup({ data: { uniqueId: uniqueId.trim(), schoolSlug: slug ?? "school-1" } });
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: pw });
       if (error) throw error;
+      if (school?.id) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("school_members").update({ is_default: false }).eq("user_id", user.id);
+          await supabase.from("school_members").update({ is_default: true }).eq("user_id", user.id).eq("school_id", school.id);
+        }
+      }
       toast.success("Welcome back");
       navigate({ to: "/dashboard" });
     } catch (err: any) {

@@ -5,16 +5,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { provisionSchoolAdmin } from "@/lib/school-admin.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Building2, Plus, ExternalLink, Settings, KeyRound, Trash2 } from "lucide-react";
+import { Building2, Plus, ExternalLink, Globe, Settings, KeyRound, Copy } from "lucide-react";
 
 function PlatformSchoolsLayout() {
   const location = useLocation();
@@ -78,7 +77,7 @@ function PlatformSchools() {
         })
         .select()
         .single();
-      if (error || !school) throw error ?? new Error("Failed to create school");
+      if (error) throw error;
 
       // Default plan = Free
       const { data: freePlan } = await supabase
@@ -119,18 +118,6 @@ function PlatformSchools() {
     },
     onSuccess: () => {
       toast.success("Status updated");
-      qc.invalidateQueries({ queryKey: ["platform-schools"] });
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deleteSchool = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("schools").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("School deleted");
       qc.invalidateQueries({ queryKey: ["platform-schools"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -271,35 +258,9 @@ function PlatformSchools() {
                           <Button size="sm" variant="outline"><Settings className="h-3 w-3 mr-1" /> Manage</Button>
                         </Link>
                         {isOwner && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => toggleStatus.mutate({ id: s.id, status: s.status })}>
-                              {s.status === "active" ? "Suspend" : "Activate"}
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
-                                  <Trash2 className="h-3 w-3 mr-1" /> Delete
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete {s.name}?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This permanently removes the school and all related records (subscriptions, features, members). This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => deleteSchool.mutate(s.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Delete permanently
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
+                          <Button size="sm" variant="outline" onClick={() => toggleStatus.mutate({ id: s.id, status: s.status })}>
+                            {s.status === "active" ? "Suspend" : "Activate"}
+                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -310,6 +271,18 @@ function PlatformSchools() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SchoolCredRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <code className={`flex-1 px-2 py-1 rounded bg-muted border text-xs ${mono ? "font-mono" : ""}`}>{value}</code>
+      <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}>
+        <Copy className="h-3 w-3" />
+      </Button>
     </div>
   );
 }
