@@ -143,8 +143,8 @@ function Landing() {
         <h2 className="text-2xl font-bold">Want SmartDev for your school?</h2>
         <p className="mt-2 text-muted-foreground">Get in touch — we'll set up your portal and onboard your team.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
-          <a href="mailto:yournew@email.com" className="inline-flex items-center gap-2 hover:text-accent">
-            <Mail className="w-4 h-4" /><span>yournew@email.com</span>
+          <a href="mailto:hello@smartdev.co.ke" className="inline-flex items-center gap-2 hover:text-accent">
+            <Mail className="w-4 h-4" /><span>hello@smartdev.co.ke</span>
           </a>
           <a href="tel:+254792991222" className="inline-flex items-center gap-2 hover:text-accent">
             <Phone className="w-4 h-4" /><span>+254 792 991 222</span>
