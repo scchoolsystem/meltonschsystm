@@ -37,3 +37,4 @@ dist-ssr
 !.env.example
 backup_roles.sql
 dist/
+.dev.vars
