@@ -101,7 +101,7 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
           role: "super_admin",
           school_id: school.id,
         },
-        { onConflict: "user_id" },
+        { onConflict: "user_id,role,school_id" },
       );
 
     if (roleError) {
