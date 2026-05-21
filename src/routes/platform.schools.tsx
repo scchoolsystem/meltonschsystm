@@ -78,14 +78,7 @@ function PlatformSchools() {
         })
         .select()
         .single();
-
-await provisionSchoolWithAdmin({
-  id: school.id,
-  name: school.name,
-  slug: school.slug,
-  admin_email: values.admin_email,
-});
-      if (error) throw error;
+      if (error || !school) throw error ?? new Error("Failed to create school");
 
       // Default plan = Free
       const { data: freePlan } = await supabase
