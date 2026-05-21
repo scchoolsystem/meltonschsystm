@@ -38,6 +38,7 @@ import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
+import { Route as PlatformSchoolsTsxsRouteImport } from './routes/platform.schools.tsxs'
 import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools.$id'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
@@ -221,6 +222,11 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
   getParentRoute: () => AppRoute,
+} as any)
+const PlatformSchoolsTsxsRoute = PlatformSchoolsTsxsRouteImport.update({
+  id: '/tsxs',
+  path: '/tsxs',
+  getParentRoute: () => PlatformSchoolsRoute,
 } as any)
 const PlatformSchoolsIdRoute = PlatformSchoolsIdRouteImport.update({
   id: '/$id',
@@ -484,6 +490,7 @@ export interface FileRoutesByFullPath {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/platform/schools/tsxs': typeof PlatformSchoolsTsxsRoute
   '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -553,6 +560,7 @@ export interface FileRoutesByTo {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/platform/schools/tsxs': typeof PlatformSchoolsTsxsRoute
   '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -624,6 +632,7 @@ export interface FileRoutesById {
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/platform/schools/tsxs': typeof PlatformSchoolsTsxsRoute
   '/_app/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -695,6 +704,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/platform/schools/tsxs'
     | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -764,6 +774,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/platform/schools/tsxs'
     | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -834,6 +845,7 @@ export interface FileRouteTypes {
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/platform/schools/tsxs'
     | '/_app/admin/leaving-certificate/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
@@ -1064,6 +1076,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/analytics'
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/platform/schools/tsxs': {
+      id: '/platform/schools/tsxs'
+      path: '/tsxs'
+      fullPath: '/platform/schools/tsxs'
+      preLoaderRoute: typeof PlatformSchoolsTsxsRouteImport
+      parentRoute: typeof PlatformSchoolsRoute
     }
     '/platform/schools/$id': {
       id: '/platform/schools/$id'
@@ -1458,10 +1477,12 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface PlatformSchoolsRouteChildren {
   PlatformSchoolsIdRoute: typeof PlatformSchoolsIdRoute
+  PlatformSchoolsTsxsRoute: typeof PlatformSchoolsTsxsRoute
 }
 
 const PlatformSchoolsRouteChildren: PlatformSchoolsRouteChildren = {
   PlatformSchoolsIdRoute: PlatformSchoolsIdRoute,
+  PlatformSchoolsTsxsRoute: PlatformSchoolsTsxsRoute,
 }
 
 const PlatformSchoolsRouteWithChildren = PlatformSchoolsRoute._addFileChildren(
