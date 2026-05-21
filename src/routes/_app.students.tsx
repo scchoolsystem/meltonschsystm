@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { admitStudent } from "@/lib/admissions.functions";
 import { PhotoCapture, uploadPhotoDataUrl } from "@/components/PhotoCapture";
 import { IdCard } from "@/components/IdCard";
