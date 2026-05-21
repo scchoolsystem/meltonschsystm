@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search, Loader2, Download } from "lucide-react";
+import { useTrackedDelete } from "@/hooks/useTrackedDelete";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Pager } from "@/components/Pager";
@@ -162,6 +164,7 @@ function StudentsPage() {
                       {canEdit && (
                         <TableCell className="text-right">
                           <LifecycleActions kind="student" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="students" />
+                          {isAdmin && <DeleteConfirmDialog label={`${s.first_name} ${s.last_name}`} isPending={deleteMutation.isPending} onConfirm={() => schoolId && deleteMutation.mutate({ id: s.id, schoolId, table: "students", entity: "student", label: `${s.first_name} ${s.last_name}`, invalidateKeys: ["students"] })} />}
                         </TableCell>
                       )}
                     </TableRow>

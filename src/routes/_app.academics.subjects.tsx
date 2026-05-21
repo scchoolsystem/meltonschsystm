@@ -48,7 +48,7 @@ function Page() {
               <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Level</TableHead></TableRow></TableHeader>
               <TableBody>
                 {data.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No subjects yet.</TableCell></TableRow>}
-                {data.map(s => <TableRow key={s.id}><TableCell className="font-mono">{s.code}</TableCell><TableCell className="font-medium">{s.name}</TableCell><TableCell className="capitalize">{s.level}</TableCell></TableRow>)}
+                {data.map(s => <TableRow key={s.id}><TableCell className="font-mono">{s.code}</TableCell><TableCell className="font-medium">{s.name}</TableCell><TableCell className="capitalize">{s.level}</TableCell>{isAdmin && <TableCell><DeleteConfirmDialog label={s.name} isPending={false} onConfirm={async () => { const { data: sid } = await supabase.rpc("current_user_school"); if (sid) { await supabase.from("subjects").delete().eq("id", s.id); await supabase.from("activity_logs").insert({ action: "DELETE_SUBJECT", entity: "subject", entity_id: s.id, school_id: sid as string, metadata: { label: s.name } }); qc.invalidateQueries({ queryKey: ["subjects"] }); toast.success(`${s.name} deleted`); }}} /></TableCell>}</TableRow>)}
               </TableBody>
             </Table>
           )}

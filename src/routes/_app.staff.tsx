@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Loader2 } from "lucide-react";
+import { useTrackedDelete } from "@/hooks/useTrackedDelete";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { createStaff } from "@/lib/admissions.functions";
@@ -35,6 +37,9 @@ const ROLE_OPTIONS = [
 function StaffPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
+  const deleteMutation = useTrackedDelete();
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+  supabase.rpc("current_user_school").then(({ data }) => setSchoolId(data as string));
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -98,6 +103,7 @@ function StaffPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Phone</TableHead>
+                    {isAdmin && <TableHead></TableHead>}
                     <TableHead>Status</TableHead>
                     {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
@@ -121,6 +127,7 @@ function StaffPage() {
                       {isAdmin && (
                         <TableCell className="text-right">
                           <LifecycleActions kind="staff" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="staff" />
+                          {isAdmin && <DeleteConfirmDialog label={`${s.first_name ?? ""} ${s.last_name ?? s.full_name ?? s.employee_no}`} isPending={deleteMutation.isPending} onConfirm={() => schoolId && deleteMutation.mutate({ id: s.id, schoolId, table: "staff", entity: "staff", label: s.employee_no, invalidateKeys: ["staff"] })} />}
                         </TableCell>
                       )}
                     </TableRow>
