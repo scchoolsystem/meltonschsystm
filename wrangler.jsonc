@@ -4,6 +4,13 @@
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "vars": {
+    "SUPABASE_URL": "https://vpikrrytxeyybfhnozyt.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaWtycnl0eGV5eWJmaG5venl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTEwMzcsImV4cCI6MjA5NDY2NzAzN30.093gsEOCH5R1XKzhCr0mbrIEhydJc5Mv8TxUWga7iy0",
+    "VITE_SUPABASE_URL": "https://vpikrrytxeyybfhnozyt.supabase.co",
+    "VITE_SUPABASE_PUBLISHABLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaWtycnl0eGV5eWJmaG5venl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTEwMzcsImV4cCI6MjA5NDY2NzAzN30.093gsEOCH5R1XKzhCr0mbrIEhydJc5Mv8TxUWga7iy0",
+    "VITE_SUPABASE_PROJECT_ID": "vpikrrytxeyybfhnozyt"
+  },
   "routes": [
     {
       "pattern": "smartdev.co.ke/*",
