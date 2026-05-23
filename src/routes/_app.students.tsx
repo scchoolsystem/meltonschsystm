@@ -32,7 +32,7 @@ interface ClassRow { id: string; name: string; stream: string | null; year: numb
 interface Student {
   id: string; admission_no: string; unique_id: string | null;
   first_name: string; last_name: string;
-  gender: string | null; class_id: string | null; status: string;
+  gender: string | null; class_id: string | null; status: string; desk_no: number | null;
   lifecycle_status: string;
   parent_phone: string | null;
   classes?: { name: string } | null;
@@ -56,7 +56,7 @@ function StudentsPage() {
     queryFn: async () => {
       let req = supabase
         .from("students")
-        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_phone, classes(name)", { count: "exact" })
+        .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, parent_phone, desk_no, classes(name)", { count: "exact" })
         .order("admission_no", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       const t = q.trim();
@@ -144,7 +144,7 @@ function StudentsPage() {
                     <TableHead>Admission No</TableHead>
                     <TableHead>Unique ID</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Class</TableHead>
+                    <TableHead>Class</TableHead><TableHead>Desk</TableHead>
                     <TableHead>Gender</TableHead>
                     <TableHead>Parent Phone</TableHead>
                     
@@ -161,7 +161,7 @@ function StudentsPage() {
                       <TableCell className="font-mono text-xs">{s.admission_no}</TableCell>
                       <TableCell className="font-mono text-xs">{s.unique_id ?? "—"}</TableCell>
                       <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
-                      <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell>{s.classes?.name ?? <span className="text-muted-foreground">—</span>}</TableCell><TableCell className="font-mono text-xs">{s.desk_no ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="capitalize">{s.gender ?? "—"}</TableCell>
                       <TableCell>{s.parent_phone ?? "—"}</TableCell>
                       

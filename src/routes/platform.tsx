@@ -15,6 +15,16 @@ export const Route = createFileRoute("/platform")({
     if (!data.session) {
       throw redirect({ to: "/platform/login", search: { redirect: location.href } });
     }
+    // Verify the user actually holds a platform-level role (server-side guard)
+    const { data: rolesData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.session.user.id)
+      .in("role", ["platform_owner", "platform_support"]);
+    if (!rolesData || rolesData.length === 0) {
+      // Valid session but not a platform admin — redirect to school login
+      throw redirect({ to: "/login" });
+    }
   },
   component: PlatformLayout,
 });

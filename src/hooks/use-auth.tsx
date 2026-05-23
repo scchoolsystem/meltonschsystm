@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "@tanstack/react-router";
+import { getSubdomainSlug, PLATFORM_SLUG } from "@/hooks/use-tenant";
 
 type AppRole =
   | "super_admin" | "principal" | "deputy_principal" | "class_teacher"
@@ -16,6 +17,9 @@ type AppRole =
   | "store_admin" | "store_user" | "transport_admin" | "guidance_admin"
   | "ict_admin" | "discipline_admin"
   | "platform_owner" | "platform_support";
+
+// Platform-level roles that are not scoped to any school
+const PLATFORM_ROLES: AppRole[] = ["platform_owner", "platform_support"];
 
 interface AuthCtx {
   session: Session | null;
@@ -37,33 +41,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Determine current school slug from hostname once (stable for session lifetime)
+  const slug = typeof window !== "undefined"
+    ? getSubdomainSlug(window.location.hostname)
+    : null;
+  const isPlatformHost = slug === PLATFORM_SLUG;
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       if (s?.user) {
-        setTimeout(() => loadProfile(s.user.id), 0);
+        // Use setTimeout to avoid Supabase auth state deadlock
+        setTimeout(() => {
+          loadProfile(s.user.id).catch(console.error);
+        }, 0);
       } else {
-        setRoles([]); setFullName("");
+        setRoles([]);
+        setFullName("");
       }
       router.invalidate();
     });
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
-      if (s?.user) loadProfile(s.user.id).finally(() => setLoading(false));
-      else setLoading(false);
+      if (s?.user) {
+        loadProfile(s.user.id).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadProfile(uid: string) {
-    const [{ data: rolesData }, { data: prof }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-      supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
-    ]);
-    setRoles((rolesData ?? []).map((r) => r.role as AppRole));
+    // --- 1. Fetch profile; check account status ---
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("full_name, status")
+      .eq("id", uid)
+      .maybeSingle();
+
+    // If the account has been explicitly deactivated, sign out immediately
+    if (prof?.status && prof.status !== "active") {
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+      return;
+    }
+
     setFullName(prof?.full_name ?? "");
+
+    // --- 2. Load roles scoped to the current school ---
+    if (isPlatformHost) {
+      // On the platform host, only load platform-level roles (no school_id filter)
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .in("role", PLATFORM_ROLES as string[]);
+      setRoles((rolesData ?? []).map((r) => r.role as AppRole));
+      return;
+    }
+
+    if (!slug) {
+      // Root host or unrecognised — no school context, no roles
+      setRoles([]);
+      return;
+    }
+
+    // Resolve this user's school_id for the current subdomain
+    const { data: memberRow } = await supabase
+      .from("school_members")
+      .select("school_id, schools!inner(slug, status)")
+      .eq("user_id", uid)
+      .eq("schools.slug", slug)
+      .eq("schools.status", "active")
+      .maybeSingle();
+
+    if (!memberRow) {
+      // User has no membership in this school (or school is suspended)
+      setRoles([]);
+      return;
+    }
+
+    const schoolId = (memberRow as any).school_id as string;
+
+    // Load roles scoped to this specific school only
+    const { data: rolesData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", uid)
+      .eq("school_id", schoolId);
+
+    setRoles((rolesData ?? []).map((r) => r.role as AppRole));
   }
 
   const value: AuthCtx = {
@@ -88,3 +158,4 @@ export function useAuth() {
   if (!c) throw new Error("useAuth must be used inside AuthProvider");
   return c;
 }
+

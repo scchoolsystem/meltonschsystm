@@ -110,6 +110,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!data) {
         setError(`School portal "${targetSlug}" not found`);
         setSchool(null);
+      } else if (data.status !== "active") {
+        // School exists but is suspended or otherwise inactive — treat as blocked
+        setError(
+          data.status === "suspended"
+            ? `This school portal has been suspended. Please contact SmartDev support.`
+            : `This school portal is not available (status: ${data.status}).`
+        );
+        setSchool(null);
       } else {
         setSchool(data as School);
         // Load feature flags for this school (best-effort; default to enabled)

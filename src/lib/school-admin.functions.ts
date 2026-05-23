@@ -30,7 +30,17 @@ export const provisionSchoolAdmin = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    // 0. Verify caller is a platform admin (platform_owner or platform_support)
+    const { data: callerRoles } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .in("role", ["platform_owner", "platform_support"]);
+    if (!callerRoles || callerRoles.length === 0) {
+      throw new Error("Only platform admins can provision school administrators");
+    }
+
     // 1. Get school
     const { data: school, error: schErr } = await supabaseAdmin
       .from("schools")

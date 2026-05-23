@@ -4,7 +4,7 @@ import {
   Settings, Activity, LogOut, Sun, Moon, ChevronDown,
   ClipboardCheck, AlertTriangle, Library, Home, Bus, Stethoscope,
   Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award, User, Users2, Link2,
-  QrCode, ScanLine,
+  QrCode, ScanLine, ShieldCheck, FolderOpen,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -76,6 +76,8 @@ const adminItems = [
   { title: "Override Log", url: "/admin/overrides", icon: Activity },
   { title: "Leaving Certificates", url: "/admin/leaving-certificates", icon: Award },
   { title: "Grading Scale", url: "/admin/grading", icon: Award },
+  { title: "Student Documents", url: "/admin/student-documents", icon: FolderOpen },
+  { title: "Insurance", url: "/admin/insurance", icon: ShieldCheck },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
 
