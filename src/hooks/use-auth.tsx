@@ -110,16 +110,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Resolve this user's school_id for the current subdomain
+    // Use a simple join — the school status is already enforced by
+    // current_user_school() at the DB level via RLS
     const { data: memberRow } = await supabase
       .from("school_members")
       .select("school_id, schools!inner(slug, status)")
       .eq("user_id", uid)
       .eq("schools.slug", slug)
-      .eq("schools.status", "active")
       .maybeSingle();
 
+    // School not found, not active, or user has no membership here
     if (!memberRow) {
-      // User has no membership in this school (or school is suspended)
+      setRoles([]);
+      return;
+    }
+
+    const schoolStatus = (memberRow as any).schools?.status;
+    if (schoolStatus && schoolStatus !== "active") {
       setRoles([]);
       return;
     }
