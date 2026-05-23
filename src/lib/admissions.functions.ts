@@ -101,12 +101,26 @@ export const admitStudent = createServerFn({ method: "POST" })
       gender: z.enum(["male", "female", "other"]).optional(),
       date_of_birth: z.string().optional(),
       class_id: z.string().uuid().optional(),
+      level: z.string().trim().max(40).optional(), // e.g. "Form 1" — auto-pick stream by capacity
       parent_name: z.string().trim().max(120).optional(),
       parent_phone: z.string().trim().max(40).optional(),
       parent_email: z.string().email().max(255).optional().or(z.literal("")),
       address: z.string().trim().max(500).optional(),
       medical_notes: z.string().trim().max(1000).optional(),
       photo_url: z.string().url().optional().or(z.literal("")),
+      national_id: z.string().trim().max(40).optional(),
+      documents: z.array(z.object({
+        doc_type: z.enum([
+          "birth_certificate","report_form","passport_photo",
+          "medical_records","transfer_letter","national_id",
+          "parent_id","other",
+        ]),
+        file_path: z.string().min(1).max(500),
+        file_name: z.string().max(255).optional(),
+        mime_type: z.string().max(120).optional(),
+        size_bytes: z.number().int().nonnegative().optional(),
+        notes: z.string().max(500).optional(),
+      })).max(20).optional(),
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
@@ -121,6 +135,13 @@ export const admitStudent = createServerFn({ method: "POST" })
     const fullName = `${data.first_name} ${data.last_name}`.trim();
     const acct = await provisionAccount({ category: "STU", role: "student", fullName, context });
 
+    // Auto-pick a stream when only level is provided.
+    let chosenClassId = data.class_id ?? null;
+    if (!chosenClassId && data.level) {
+      const { data: picked } = await context.supabase.rpc("pick_class_for_level", { _level: data.level } as any);
+      if (picked) chosenClassId = picked as string;
+    }
+
     const insertPayload: any = {
       first_name: data.first_name,
       last_name: data.last_name,
@@ -130,29 +151,81 @@ export const admitStudent = createServerFn({ method: "POST" })
     };
     if (data.gender) insertPayload.gender = data.gender;
     if (data.date_of_birth) insertPayload.date_of_birth = data.date_of_birth;
-    if (data.class_id) insertPayload.class_id = data.class_id;
+    if (chosenClassId) insertPayload.class_id = chosenClassId;
     if (data.parent_name) insertPayload.parent_name = data.parent_name;
     if (data.parent_phone) insertPayload.parent_phone = data.parent_phone;
     if (data.parent_email) insertPayload.parent_email = data.parent_email;
     if (data.address) insertPayload.address = data.address;
     if (data.medical_notes) insertPayload.medical_notes = data.medical_notes;
+    if (data.national_id) insertPayload.national_id = data.national_id;
 
     const { data: student, error: stErr } = await supabaseAdmin
       .from("students")
       .insert(insertPayload)
-      .select("id, admission_no, unique_id, first_name, last_name")
+      .select("id, admission_no, unique_id, first_name, last_name, class_id")
       .single();
     if (stErr) throw new Error(stErr.message);
 
-    await supabaseAdmin.from("student_user_links").insert({
+    const { error: linkErr } = await supabaseAdmin.from("student_user_links").insert({
       user_id: acct.userId,
       student_id: student.id,
-    });
+      school_id: acct.schoolId,
+    } as any);
+    if (linkErr) throw new Error(`Failed to link student to portal account: ${linkErr.message}`);
+
+    // Persist uploaded documents (files already in storage, we record the rows).
+    if (data.documents?.length) {
+      const docRows = data.documents.map((d) => ({
+        student_id: student.id,
+        doc_type: d.doc_type,
+        file_path: d.file_path,
+        file_name: d.file_name ?? null,
+        mime_type: d.mime_type ?? null,
+        size_bytes: d.size_bytes ?? null,
+        notes: d.notes ?? null,
+        uploaded_by: context.userId,
+        school_id: acct.schoolId,
+      }));
+      const { error: docErr } = await supabaseAdmin.from("student_documents").insert(docRows as any);
+      if (docErr) console.error("student_documents insert failed:", docErr.message);
+    }
 
     // Auto-assign class-based fee invoices for the current term
-    if (data.class_id) {
+    if (chosenClassId) {
       try { await supabaseAdmin.rpc("assign_class_fees", { _student: student.id } as any); } catch {}
     }
+
+    // Auto-assign dorm if school has dormitories matching the student's gender (boarding schools).
+    let assignedDorm: { id: string; name: string } | null = null;
+    if (data.gender) {
+      try {
+        const { data: dormId } = await context.supabase.rpc("pick_dorm_for_gender", { _gender: data.gender } as any);
+        if (dormId) {
+          const { error: daErr } = await supabaseAdmin.from("dorm_assignments").insert({
+            student_id: student.id, dormitory_id: dormId, school_id: acct.schoolId,
+          } as any);
+          if (!daErr) {
+            const { data: d } = await supabaseAdmin.from("dormitories").select("id,name").eq("id", dormId).maybeSingle();
+            if (d) assignedDorm = d as any;
+          }
+        }
+      } catch (e) { console.error("auto-dorm failed:", (e as Error).message); }
+    }
+
+    // Auto-enroll in default insurance policy (if any).
+    let insuranceEnrolled = false;
+    try {
+      const { data: defaultPolicy } = await supabaseAdmin.from("insurance_policies")
+        .select("id").eq("school_id", acct.schoolId).eq("is_default", true).maybeSingle();
+      if (defaultPolicy?.id) {
+        const { error: insErr } = await supabaseAdmin.from("student_insurance").insert({
+          student_id: student.id, policy_id: defaultPolicy.id, school_id: acct.schoolId,
+        } as any);
+        if (!insErr) insuranceEnrolled = true;
+      }
+    } catch (e) { console.error("auto-insurance failed:", (e as Error).message); }
+
+
 
     // Auto-link parent by email/phone match (if any existing parent account matches)
     try {
@@ -171,7 +244,9 @@ export const admitStudent = createServerFn({ method: "POST" })
               parent_user_id: existing.parent_user_id,
               student_id: student.id, link_method: m.method, verified: true,
               linked_by: context.userId,
+              school_id: acct.schoolId,
             } as any, { onConflict: "parent_user_id,student_id" } as any);
+
           }
         }
       }
@@ -192,6 +267,10 @@ export const admitStudent = createServerFn({ method: "POST" })
       password: acct.password,
       syntheticEmail: acct.syntheticEmail,
       parentAuthCode,
+      assignedClassId: chosenClassId,
+      assignedDorm,
+      insuranceEnrolled,
+      documentsSaved: data.documents?.length ?? 0,
     };
   });
 

@@ -1085,6 +1085,53 @@ export type Database = {
           },
         ]
       }
+      insurance_policies: {
+        Row: {
+          cover_amount: number | null
+          created_at: string
+          ends_on: string | null
+          id: string
+          is_default: boolean
+          policy_name: string
+          premium_per_student: number
+          provider: string
+          school_id: string
+          starts_on: string | null
+        }
+        Insert: {
+          cover_amount?: number | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          is_default?: boolean
+          policy_name: string
+          premium_per_student?: number
+          provider: string
+          school_id?: string
+          starts_on?: string | null
+        }
+        Update: {
+          cover_amount?: number | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          is_default?: boolean
+          policy_name?: string
+          premium_per_student?: number
+          provider?: string
+          school_id?: string
+          starts_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_policies_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
@@ -2101,6 +2148,112 @@ export type Database = {
           },
         ]
       }
+      student_documents: {
+        Row: {
+          created_at: string
+          doc_type: Database["public"]["Enums"]["student_doc_type"]
+          file_name: string | null
+          file_path: string
+          id: string
+          mime_type: string | null
+          notes: string | null
+          school_id: string
+          size_bytes: number | null
+          student_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          doc_type: Database["public"]["Enums"]["student_doc_type"]
+          file_name?: string | null
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          school_id?: string
+          size_bytes?: number | null
+          student_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          doc_type?: Database["public"]["Enums"]["student_doc_type"]
+          file_name?: string | null
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          school_id?: string
+          size_bytes?: number | null
+          student_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_documents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_insurance: {
+        Row: {
+          created_at: string
+          enrolled_on: string
+          id: string
+          policy_id: string
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          enrolled_on?: string
+          id?: string
+          policy_id: string
+          school_id?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          enrolled_on?: string
+          id?: string
+          policy_id?: string
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_insurance_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_insurance_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_insurance_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_user_links: {
         Row: {
           created_at: string
@@ -2880,6 +3033,8 @@ export type Database = {
       my_children_ids: { Args: never; Returns: string[] }
       my_school_id: { Args: never; Returns: string }
       next_unique_id: { Args: { _category: string }; Returns: string }
+      pick_class_for_level: { Args: { _level: string }; Returns: string }
+      pick_dorm_for_gender: { Args: { _gender: string }; Returns: string }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -2936,6 +3091,15 @@ export type Database = {
         | "discipline_admin"
         | "platform_owner"
         | "platform_support"
+      student_doc_type:
+        | "birth_certificate"
+        | "report_form"
+        | "passport_photo"
+        | "medical_records"
+        | "transfer_letter"
+        | "national_id"
+        | "parent_id"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3108,6 +3272,16 @@ export const Constants = {
         "discipline_admin",
         "platform_owner",
         "platform_support",
+      ],
+      student_doc_type: [
+        "birth_certificate",
+        "report_form",
+        "passport_photo",
+        "medical_records",
+        "transfer_letter",
+        "national_id",
+        "parent_id",
+        "other",
       ],
     },
   },

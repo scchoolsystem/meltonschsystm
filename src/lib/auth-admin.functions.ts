@@ -216,33 +216,7 @@ export const resetPassword = createServerFn({ method: "POST" })
     return { password };
   });
 
-// ----- 4. Permanently delete a user account -----
-
-export const deleteAccount = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ user_id: z.string().uuid() }).parse(input)
-  )
-  .handler(async ({ data, context }) => {
-    const { data: isAdminData } = await context.supabase.rpc("is_admin", {
-      _user_id: context.userId,
-    });
-    if (!isAdminData) throw new Error("Only super admin can delete accounts");
-
-    // Remove all related DB rows first (FK cascades may not cover all tables)
-    await supabaseAdmin.from("school_members").delete().eq("user_id", data.user_id);
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
-    await supabaseAdmin.from("user_credentials").delete().eq("user_id", data.user_id);
-    await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
-
-    // Finally remove the Supabase Auth user so the email/login no longer works
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-    if (error) throw new Error(error.message);
-
-    return { ok: true };
-  });
-
-// ----- 5. Revoke / restore -----
+// ----- 4. Revoke / restore -----
 
 export const setAccountActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

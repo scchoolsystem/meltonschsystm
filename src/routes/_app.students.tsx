@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_app/students")({
   component: StudentsPage,
 });
 
-interface ClassRow { id: string; name: string }
+interface ClassRow { id: string; name: string; stream: string | null; year: number; capacity: number }
 interface Student {
   id: string; admission_no: string; unique_id: string | null;
   first_name: string; last_name: string;
@@ -37,6 +37,7 @@ interface Student {
   parent_phone: string | null;
   classes?: { name: string } | null;
 }
+
 
 function StudentsPage() {
   const qc = useQueryClient();
@@ -72,10 +73,11 @@ function StudentsPage() {
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-min"],
     queryFn: async () => {
-      const { data } = await supabase.from("classes").select("id, name").order("name");
+      const { data } = await supabase.from("classes").select("id, name, stream, year, capacity").order("name").order("stream");
       return (data ?? []) as ClassRow[];
     },
   });
+
 
   const { data: settings } = useQuery({
     queryKey: ["school-settings"],
@@ -184,15 +186,38 @@ function StudentsPage() {
 }
 
 
+const DOC_TYPES: { key: "birth_certificate"|"report_form"|"passport_photo"|"medical_records"|"transfer_letter"|"national_id"|"parent_id"|"other"; label: string; accept: string }[] = [
+  { key: "birth_certificate", label: "Birth Certificate", accept: "image/*,application/pdf" },
+  { key: "report_form",       label: "Previous Report Form", accept: "image/*,application/pdf" },
+  { key: "passport_photo",    label: "Passport Photo", accept: "image/*" },
+  { key: "medical_records",   label: "Medical Records", accept: "image/*,application/pdf" },
+  { key: "transfer_letter",   label: "Transfer Letter", accept: "image/*,application/pdf" },
+  { key: "national_id",       label: "National ID (if applicable)", accept: "image/*,application/pdf" },
+  { key: "parent_id",         label: "Parent / Guardian ID", accept: "image/*,application/pdf" },
+  { key: "other",             label: "Other Supporting Document", accept: "image/*,application/pdf" },
+];
+
 function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]; settings: any; onDone: () => void }) {
   const admit = useServerFn(admitStudent);
   const [photo, setPhoto] = useState<string | null>(null);
   const [form, setForm] = useState({
-    first_name: "", last_name: "", gender: "", class_id: "",
+    first_name: "", last_name: "", gender: "", class_id: "", level: "",
     parent_name: "", parent_phone: "", parent_email: "", date_of_birth: "",
-    address: "", medical_notes: "",
+    address: "", medical_notes: "", national_id: "",
   });
-  const [result, setResult] = useState<null | { uniqueId: string; password: string; admission_no: string; full_name: string; photo_url: string | null; class_name?: string }>(null);
+  // class_id has special values: "" | "auto:Form 1" | "<uuid>"
+  const [docs, setDocs] = useState<Record<string, File | null>>({});
+  const [result, setResult] = useState<null | {
+    uniqueId: string; password: string; admission_no: string; full_name: string;
+    photo_url: string | null; class_name?: string;
+    parentAuthCode?: string;
+    assignedDorm?: { id: string; name: string } | null;
+    insuranceEnrolled?: boolean;
+    documentsSaved?: number;
+  }>(null);
+
+  // Group classes by level name for the picker
+  const levels = Array.from(new Set(classes.map(c => c.name)));
 
   const m = useMutation({
     mutationFn: async () => {
@@ -200,28 +225,53 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
       if (photo) {
         photo_url = await uploadPhotoDataUrl(supabase, photo, "students", `${form.first_name}-${form.last_name}`.toLowerCase().replace(/\s+/g, "-"));
       }
+
+      // Upload documents first (so the server fn just records refs).
+      const docRefs: Array<{ doc_type: any; file_path: string; file_name?: string; mime_type?: string; size_bytes?: number }> = [];
+      const ts = Date.now();
+      for (const def of DOC_TYPES) {
+        const file = docs[def.key];
+        if (!file) continue;
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `pending/${ts}-${def.key}-${safeName}`;
+        const { error: upErr } = await supabase.storage.from("student-documents").upload(path, file, { upsert: false, contentType: file.type });
+        if (upErr) throw new Error(`Failed to upload ${def.label}: ${upErr.message}`);
+        docRefs.push({ doc_type: def.key, file_path: path, file_name: file.name, mime_type: file.type, size_bytes: file.size });
+      }
+
       const payload: any = {
         first_name: form.first_name, last_name: form.last_name,
         parent_name: form.parent_name, parent_phone: form.parent_phone, parent_email: form.parent_email,
         address: form.address, medical_notes: form.medical_notes,
         photo_url,
+        documents: docRefs.length ? docRefs : undefined,
       };
       if (form.gender) payload.gender = form.gender;
       if (form.date_of_birth) payload.date_of_birth = form.date_of_birth;
-      if (form.class_id) payload.class_id = form.class_id;
+      if (form.national_id) payload.national_id = form.national_id;
+      if (form.class_id.startsWith("auto:")) {
+        payload.level = form.class_id.slice(5);
+      } else if (form.class_id) {
+        payload.class_id = form.class_id;
+      }
       const res = await admit({ data: payload });
       return { ...res, photo_url: photo_url ?? null };
     },
     onSuccess: (res) => {
       toast.success("Student admitted");
-      const cls = classes.find((c) => c.id === form.class_id)?.name;
+      const cls = classes.find((c) => c.id === res.assignedClassId);
+      const className = cls ? `${cls.name}${cls.stream ? " " + cls.stream : ""}` : undefined;
       setResult({
         uniqueId: res.uniqueId,
         password: res.password,
         admission_no: res.student.admission_no,
         full_name: `${res.student.first_name} ${res.student.last_name}`,
         photo_url: res.photo_url,
-        class_name: cls,
+        class_name: className,
+        parentAuthCode: res.parentAuthCode,
+        assignedDorm: res.assignedDorm,
+        insuranceEnrolled: res.insuranceEnrolled,
+        documentsSaved: res.documentsSaved,
       });
     },
     onError: (e: any) => toast.error(e.message),
@@ -229,7 +279,7 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
 
   if (result) {
     return (
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Student admitted ✓</DialogTitle>
           <p className="text-xs text-muted-foreground">Save or print the credentials below — the password is shown only once.</p>
@@ -251,6 +301,14 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
             <div>Login ID: <span className="font-bold">{result.uniqueId}</span></div>
             <div>Password: <span className="font-bold">{result.password}</span></div>
             <div>Admission #: {result.admission_no}</div>
+            {result.parentAuthCode && <div>Parent code: <span className="font-bold">{result.parentAuthCode}</span></div>}
+          </div>
+          <div className="text-xs space-y-1 border rounded-md p-3">
+            <div className="font-semibold text-muted-foreground uppercase tracking-wide mb-1">Auto-assignments</div>
+            <div>Class / stream: <span className="font-medium">{result.class_name ?? "— (none assigned)"}</span></div>
+            <div>Dormitory: <span className="font-medium">{result.assignedDorm?.name ?? "— (day scholar / no capacity)"}</span></div>
+            <div>Insurance: <span className="font-medium">{result.insuranceEnrolled ? "Enrolled in default policy" : "— (no default policy)"}</span></div>
+            <div>Documents saved: <span className="font-medium">{result.documentsSaved ?? 0}</span></div>
           </div>
         </div>
         <DialogFooter>
@@ -295,14 +353,26 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
           </div>
         </div>
         <div>
-          <Label>Class</Label>
+          <Label>Class / Stream</Label>
           <Select value={form.class_id} onValueChange={(v) => setForm({ ...form, class_id: v })}>
-            <SelectTrigger><SelectValue placeholder="Assign class" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Assign class or auto-pick a stream" /></SelectTrigger>
             <SelectContent>
-              {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {levels.map((lvl) => (
+                <div key={lvl}>
+                  <SelectItem value={`auto:${lvl}`}>★ Auto-assign stream — {lvl}</SelectItem>
+                  {classes.filter(c => c.name === lvl).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}{c.stream ? ` ${c.stream}` : ""}
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
             </SelectContent>
           </Select>
+          <p className="text-[11px] text-muted-foreground mt-1">Auto-assign picks the least-full stream of the chosen level.</p>
         </div>
+        <div><Label>National ID (if applicable)</Label><Input value={form.national_id} onChange={(e) => setForm({ ...form, national_id: e.target.value })} /></div>
+
         <div className="border-t pt-3 space-y-3">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Parent / Guardian</div>
           <div><Label>Name</Label><Input value={form.parent_name} onChange={(e) => setForm({ ...form, parent_name: e.target.value })} /></div>
@@ -313,7 +383,26 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
           <div><Label>Address</Label><Textarea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
           <div><Label>Medical Notes</Label><Textarea rows={2} value={form.medical_notes} onChange={(e) => setForm({ ...form, medical_notes: e.target.value })} /></div>
         </div>
-        <p className="text-xs text-muted-foreground">A unique Student ID (STU-{settings?.academic_year ?? new Date().getFullYear()}-XXXXXX), admission number, and login password are generated automatically.</p>
+
+        <div className="border-t pt-3 space-y-3">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Documents</div>
+          <p className="text-[11px] text-muted-foreground">Attach a file for each document you have. All are optional but recommended.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {DOC_TYPES.map(d => (
+              <div key={d.key} className="space-y-1">
+                <Label className="text-xs">{d.label}</Label>
+                <Input
+                  type="file"
+                  accept={d.accept}
+                  onChange={(e) => setDocs(prev => ({ ...prev, [d.key]: e.target.files?.[0] ?? null }))}
+                />
+                {docs[d.key] && <p className="text-[10px] text-muted-foreground truncate">{docs[d.key]!.name}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">A unique Student ID (STU-{settings?.academic_year ?? new Date().getFullYear()}-XXXXXX), admission number, and login password are generated automatically. If a dormitory matches the student's gender (boarding school) the system will auto-assign one. If a default insurance policy is set, the student will be auto-enrolled.</p>
         <DialogFooter>
           <Button type="submit" disabled={m.isPending}>
             {m.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -324,3 +413,4 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
     </DialogContent>
   );
 }
+
