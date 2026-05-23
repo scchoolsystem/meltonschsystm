@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/hooks/use-tenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -13,11 +14,16 @@ export const Route = createFileRoute("/_app/admin/grading")({ component: Page })
 
 function Page() {
   const qc = useQueryClient();
+  const { school } = useTenant();
+  const schoolId = school?.id;
+
   const { data: scales = [] } = useQuery({
-    queryKey: ["grading-scales"],
-    queryFn: async () => (await supabase.from("grading_scales").select("*").order("created_at")).data ?? [],
+    enabled: !!schoolId,
+    queryKey: ["grading-scales", schoolId],
+    queryFn: async () => (await supabase.from("grading_scales").select("*").eq("school_id", schoolId!).order("created_at")).data ?? [],
   });
   const defaultScale = (scales as any[]).find(s => s.is_default) ?? (scales as any[])[0];
+
   const { data: bands = [], refetch } = useQuery({
     enabled: !!defaultScale,
     queryKey: ["grading-bands", defaultScale?.id],
@@ -29,12 +35,18 @@ function Page() {
   const addMut = useMutation({
     mutationFn: async () => {
       if (!defaultScale) throw new Error("No scale");
-      const { error } = await supabase.from("grading_bands").insert({ ...newRow, scale_id: defaultScale.id });
+      if (!schoolId) throw new Error("No school");
+      const { error } = await supabase.from("grading_bands").insert({
+        ...newRow,
+        scale_id: defaultScale.id,
+        school_id: schoolId,
+      });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Band added"); setNewRow({ min_score: 0, max_score: 0, grade: "", remarks: "" }); refetch(); },
     onError: (e: any) => toast.error(e.message),
   });
+
   const delMut = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("grading_bands").delete().eq("id", id); if (error) throw error; },
     onSuccess: () => { toast.success("Deleted"); refetch(); },
