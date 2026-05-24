@@ -56,7 +56,7 @@ async function provisionAccount(opts: {
   const password = generatePassword(14);
 
   // Resolve caller's school explicitly so admin inserts include school_id.
-  const { data: member } = await supabaseAdmin
+  const { data: member } = await opts.context.supabase
     .from("school_members").select("school_id")
     .eq("user_id", opts.context.userId).order("is_default", { ascending: false }).limit(1).maybeSingle();
   const schoolId = (member as any)?.school_id as string | undefined;
