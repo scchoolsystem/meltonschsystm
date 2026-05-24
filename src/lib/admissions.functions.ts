@@ -74,15 +74,16 @@ async function provisionAccount(opts: {
   await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: opts.fullName });
   await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
   await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: opts.role as never, school_id: schoolId });
-  await supabaseAdmin.from("user_credentials").insert({
+  const { error: credErr } = await supabaseAdmin.from("user_credentials").insert({
     user_id: userId,
     unique_id: uniqueId as string,
     category: opts.category,
     synthetic_email: syntheticEmail,
     is_active: true,
     school_id: schoolId,
-
   } as any);
+  if (credErr) throw new Error(`user_credentials insert failed: ${credErr.message}`);
+
   await supabaseAdmin.from("school_members").upsert(
     { user_id: userId, school_id: schoolId, is_default: true },
     { onConflict: "user_id,school_id" }
