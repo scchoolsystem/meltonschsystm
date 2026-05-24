@@ -39,7 +39,7 @@ function LoginPage() {
       return;
     }
 
-    if (isRootHost) {
+    if (false && isRootHost) {
       navigate({ to: "/" });
       return;
     }
@@ -62,7 +62,7 @@ function LoginPage() {
     );
   }
 
-  if (isRootHost) {
+  if (false && isRootHost) {
     return (
       <div className="min-h-screen grid place-items-center p-6 text-center">
         <div className="max-w-md space-y-4">

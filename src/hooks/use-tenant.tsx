@@ -40,9 +40,17 @@ const TenantContext = createContext<TenantState>({
 
 export function getSubdomainSlug(hostname: string): string | null {
   const host = hostname.toLowerCase().split(":")[0];
+  // Dev override: ?school=yourslug works on localhost, Codespace, Lovable previews
+  if (typeof window !== "undefined") {
+    const devSlug = new URLSearchParams(window.location.search).get("school");
+    if (devSlug) { sessionStorage.setItem("dev_school_slug", devSlug); return devSlug; }
+    const stored = sessionStorage.getItem("dev_school_slug");
+    if (stored) return stored;
+  }
   if (host === "admin.smartdev.co.ke" || host === "admin.erp.smartdev.co.ke") return PLATFORM_SLUG;
   if (host === "localhost" || /^[\d.]+$/.test(host)) return null;
   if (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com")) return null;
+  if (host.endsWith(".app.github.dev")) return null;
   if (host === "smartdev.co.ke" || host === "www.smartdev.co.ke" || host === "erp.smartdev.co.ke") return null;
   const LEGACY_ROOT = "erp.smartdev.co.ke";
   if (host.endsWith("." + LEGACY_ROOT)) {
