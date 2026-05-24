@@ -96,6 +96,7 @@ export const lookupLoginEmail = createServerFn({ method: "POST" })
       _unique_id: data.uniqueId,
       _school_slug: data.schoolSlug ?? null,
     } as any);
+
     if (error) throw new Error(error.message);
     if (!email) throw new Error("Account not found in this school portal");
     return { email: email as string };
@@ -167,7 +168,7 @@ export const createAccount = createServerFn({ method: "POST" })
         .insert({ user_id: userId, role: data.role as never, school_id: schoolId });
     }
 
-    await supabaseAdmin.from("user_credentials").insert({
+    const { error: credError } = await supabaseAdmin.from("user_credentials").insert({
       user_id: userId,
       unique_id: uniqueId,
       category,
@@ -175,6 +176,8 @@ export const createAccount = createServerFn({ method: "POST" })
       is_active: true,
       school_id: schoolId,
     } as any);
+
+    if (credError) throw new Error(`user_credentials insert failed: ${credError.message}`);
 
     await supabaseAdmin.from("school_members").upsert(
       { user_id: userId, school_id: schoolId, is_default: true },
