@@ -1,2 +1,11 @@
+name = "smartdev"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
 [build]
 command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"
+
+routes = [
+  { pattern = "smartdev.co.ke", custom_domain = true },
+  { pattern = "*.smartdev.co.ke", custom_domain = true }
+]
