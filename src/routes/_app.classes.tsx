@@ -211,7 +211,7 @@ function EditClassDialog({ cls, onDone }: { cls: any; onDone: () => void }) {
               <SelectContent>
                 <SelectItem value="none">— Unassigned —</SelectItem>
                 {teachers.map((t) => (
-                  <SelectItem key={t.id} value={t.user_id ?? t.id}>
+                  <SelectItem key={t.id} value={t.id}>
                     {t.first_name} {t.last_name} <span className="text-muted-foreground text-xs">({t.role.replace(/_/g, " ")})</span>
                   </SelectItem>
                 ))}
