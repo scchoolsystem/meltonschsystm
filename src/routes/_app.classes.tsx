@@ -23,7 +23,7 @@ function useTeachers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("staff")
-        .select("id, first_name, last_name, role")
+        .select("id, user_id, first_name, last_name, role")
         .in("role", ["class_teacher", "subject_teacher", "teacher", "hod", "deputy_principal", "principal", "academic_master"])
         .order("first_name");
       if (error) throw error;
@@ -42,7 +42,7 @@ function ClassesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("classes")
-        .select("*, students(count), class_teacher:staff!classes_class_teacher_id_fkey(id, first_name, last_name)")
+        .select("*, students(count), class_teacher:staff!staff_user_id_fkey(id, user_id, first_name, last_name)")
         .order("level").order("name");
       if (error) {
         // Fallback if FK alias differs
@@ -173,7 +173,7 @@ function EditClassDialog({ cls, onDone }: { cls: any; onDone: () => void }) {
     name: cls.name ?? "",
     stream: cls.stream ?? "",
     capacity: cls.capacity ?? 40,
-    class_teacher_id: cls.class_teacher_id ?? "none",
+    class_teacher_id: cls.class_teacher_id ?? "none", // already a user_id or null // already a user_id or null
   });
   const m = useMutation({
     mutationFn: async () => {
@@ -211,7 +211,7 @@ function EditClassDialog({ cls, onDone }: { cls: any; onDone: () => void }) {
               <SelectContent>
                 <SelectItem value="none">— Unassigned —</SelectItem>
                 {teachers.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
+                  <SelectItem key={t.id} value={t.user_id ?? t.id}>
                     {t.first_name} {t.last_name} <span className="text-muted-foreground text-xs">({t.role.replace(/_/g, " ")})</span>
                   </SelectItem>
                 ))}
