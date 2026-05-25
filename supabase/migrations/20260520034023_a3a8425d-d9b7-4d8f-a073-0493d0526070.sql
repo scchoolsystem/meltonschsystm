@@ -26,18 +26,28 @@ CREATE INDEX IF NOT EXISTS idx_bands_scale ON public.grading_bands(scale_id);
 ALTER TABLE public.grading_scales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grading_bands ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "auth view scales" ON public.grading_scales;
 CREATE POLICY "auth view scales" ON public.grading_scales FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admin manage scales" ON public.grading_scales;
+DROP POLICY IF EXISTS "admin manage scales" ON public.grading_scales;
 CREATE POLICY "admin manage scales" ON public.grading_scales FOR ALL TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'academic_master'::app_role) OR has_role(auth.uid(),'exams_admin'::app_role))
   WITH CHECK (is_admin(auth.uid()) OR has_role(auth.uid(),'academic_master'::app_role) OR has_role(auth.uid(),'exams_admin'::app_role));
+DROP POLICY IF EXISTS "tenant_isolation_scales" ON public.grading_scales;
+DROP POLICY IF EXISTS "tenant_isolation_scales" ON public.grading_scales;
 CREATE POLICY "tenant_isolation_scales" ON public.grading_scales AS RESTRICTIVE FOR ALL TO authenticated
   USING (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role))
   WITH CHECK (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "auth view bands" ON public.grading_bands;
 CREATE POLICY "auth view bands" ON public.grading_bands FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admin manage bands" ON public.grading_bands;
+DROP POLICY IF EXISTS "admin manage bands" ON public.grading_bands;
 CREATE POLICY "admin manage bands" ON public.grading_bands FOR ALL TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'academic_master'::app_role) OR has_role(auth.uid(),'exams_admin'::app_role))
   WITH CHECK (is_admin(auth.uid()) OR has_role(auth.uid(),'academic_master'::app_role) OR has_role(auth.uid(),'exams_admin'::app_role));
+DROP POLICY IF EXISTS "tenant_isolation_bands" ON public.grading_bands;
+DROP POLICY IF EXISTS "tenant_isolation_bands" ON public.grading_bands;
 CREATE POLICY "tenant_isolation_bands" ON public.grading_bands AS RESTRICTIVE FOR ALL TO authenticated
   USING (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role))
   WITH CHECK (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role));
@@ -100,12 +110,16 @@ CREATE TABLE IF NOT EXISTS public.leaving_certificates (
   UNIQUE (school_id, student_id)
 );
 ALTER TABLE public.leaving_certificates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "admin manage leaving" ON public.leaving_certificates;
 CREATE POLICY "admin manage leaving" ON public.leaving_certificates FOR ALL TO authenticated
   USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "student self view leaving" ON public.leaving_certificates;
 CREATE POLICY "student self view leaving" ON public.leaving_certificates FOR SELECT TO authenticated
   USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view leaving" ON public.leaving_certificates;
 CREATE POLICY "parent child view leaving" ON public.leaving_certificates FOR SELECT TO authenticated
   USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "tenant_isolation_leaving" ON public.leaving_certificates;
 CREATE POLICY "tenant_isolation_leaving" ON public.leaving_certificates AS RESTRICTIVE FOR ALL TO authenticated
   USING (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role))
   WITH CHECK (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role));
@@ -127,18 +141,23 @@ CREATE TABLE IF NOT EXISTS public.mpesa_payment_intents (
 CREATE INDEX IF NOT EXISTS idx_mpesa_intents_inv ON public.mpesa_payment_intents(invoice_id);
 
 ALTER TABLE public.mpesa_payment_intents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "admin bursar manage intents" ON public.mpesa_payment_intents;
 CREATE POLICY "admin bursar manage intents" ON public.mpesa_payment_intents FOR ALL TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'bursar'::app_role))
   WITH CHECK (is_admin(auth.uid()) OR has_role(auth.uid(),'bursar'::app_role));
+DROP POLICY IF EXISTS "student self view intents" ON public.mpesa_payment_intents;
 CREATE POLICY "student self view intents" ON public.mpesa_payment_intents FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM invoices i WHERE i.id = invoice_id AND is_student(i.student_id)));
+DROP POLICY IF EXISTS "parent child view intents" ON public.mpesa_payment_intents;
 CREATE POLICY "parent child view intents" ON public.mpesa_payment_intents FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM invoices i WHERE i.id = invoice_id AND is_parent_of(i.student_id)));
+DROP POLICY IF EXISTS "student insert own intents" ON public.mpesa_payment_intents;
 CREATE POLICY "student insert own intents" ON public.mpesa_payment_intents FOR INSERT TO authenticated
   WITH CHECK (
     EXISTS (SELECT 1 FROM invoices i WHERE i.id = invoice_id AND (is_student(i.student_id) OR is_parent_of(i.student_id)))
     AND initiated_by = auth.uid()
   );
+DROP POLICY IF EXISTS "tenant_isolation_intents" ON public.mpesa_payment_intents;
 CREATE POLICY "tenant_isolation_intents" ON public.mpesa_payment_intents AS RESTRICTIVE FOR ALL TO authenticated
   USING (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role))
   WITH CHECK (school_id = current_user_school() OR has_role(auth.uid(),'super_admin'::app_role));
