@@ -42,7 +42,7 @@ function ClassesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("classes")
-        .select("*, students(count), class_teacher:staff!staff_user_id_fkey(id, user_id, first_name, last_name)")
+        .select("*, students(count), class_teacher:staff!classes_class_teacher_id_fkey(id, first_name, last_name)")
         .order("level").order("name");
       if (error) {
         // Fallback if FK alias differs
