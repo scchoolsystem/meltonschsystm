@@ -15,6 +15,8 @@ export const Route = createFileRoute("/_app/admin/roles")({
   component: RolesPage,
 });
 
+// "student" is intentionally excluded — students are managed via enrolment,
+// not through this roles page. Students will not appear in this table.
 const ALL_ROLES = [
   "super_admin","school_admin","principal","deputy_principal","academic_master",
   "class_teacher","subject_teacher","teacher","hod","staff",
@@ -29,7 +31,7 @@ const ALL_ROLES = [
   "store_admin","store_user",
   "transport_admin","transport_officer",
   "guidance_admin","ict_admin","discipline_admin",
-  "admission_officer","parent","student",
+  "admission_officer","parent",
 ];
 
 function RolesPage() {
@@ -43,16 +45,22 @@ function RolesPage() {
         supabase.from("profiles").select("id, full_name"),
         supabase.from("user_roles").select("id, user_id, role"),
       ]);
-      return (profiles ?? []).map((p) => ({
-        ...p,
-        roles: (roles ?? []).filter((r) => r.user_id === p.id),
-      }));
+      return (profiles ?? [])
+        .map((p) => ({
+          ...p,
+          roles: (roles ?? []).filter((r) => r.user_id === p.id),
+        }))
+        // Exclude student-only users — they are managed via enrolment, not here.
+        .filter((p) => {
+          const userRoles = p.roles.map((r: any) => r.role);
+          return !(userRoles.length > 0 && userRoles.every((r: string) => r === "student"));
+        });
     },
   });
 
   const addRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
-      const { error } = await supabase.from("user_roles").upsert({ user_id, role: role as any }, { onConflict: "user_id,school_id,role", ignoreDuplicates: true });
+      const { error } = await supabase.from("user_roles").upsert({ user_id, role: role as any }, { onConflict: "user_id,role", ignoreDuplicates: true });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role added"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
@@ -126,7 +134,7 @@ function UserRow({ user, onAdd, onRemove }: { user: any; onAdd: (role: string) =
       <TableCell>
         <div className="flex flex-wrap gap-1">
           {user.roles.length === 0 && <span className="text-xs text-muted-foreground">none</span>}
-          {user.roles.filter((r: any) => !["platform_owner","platform_support"].includes(r.role)).map((r: any) => (
+          {user.roles.map((r: any) => (
             <Badge key={r.id} variant="secondary" className="gap-1 pr-1">
               {r.role.replace(/_/g, " ")}
               <button onClick={() => onRemove(r.id)} className="hover:text-destructive ml-0.5"><X className="w-3 h-3" /></button>
