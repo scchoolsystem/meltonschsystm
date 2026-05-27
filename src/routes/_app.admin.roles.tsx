@@ -15,8 +15,7 @@ export const Route = createFileRoute("/_app/admin/roles")({
   component: RolesPage,
 });
 
-// "student" is intentionally excluded — students are managed via enrolment,
-// not through this roles page. Students will not appear in this table.
+// "student" is intentionally excluded — managed via enrolment, not here.
 const ALL_ROLES = [
   "super_admin","school_admin","principal","deputy_principal","academic_master",
   "class_teacher","subject_teacher","teacher","hod","staff",
@@ -43,14 +42,15 @@ function RolesPage() {
     queryFn: async () => {
       const [{ data: profiles }, { data: roles }] = await Promise.all([
         supabase.from("profiles").select("id, full_name"),
-        supabase.from("user_roles").select("id, user_id, role"),
+        // include school_id so the delete RLS check passes
+        supabase.from("user_roles").select("id, user_id, role, school_id"),
       ]);
       return (profiles ?? [])
         .map((p) => ({
           ...p,
           roles: (roles ?? []).filter((r) => r.user_id === p.id),
         }))
-        // Exclude student-only users — they are managed via enrolment, not here.
+        // Exclude student-only users — managed via enrolment, not here.
         .filter((p) => {
           const userRoles = p.roles.map((r: any) => r.role);
           return !(userRoles.length > 0 && userRoles.every((r: string) => r === "student"));
@@ -60,26 +60,34 @@ function RolesPage() {
 
   const addRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
-      const { error } = await supabase.from("user_roles").upsert({ user_id, role: role as any }, { onConflict: "user_id,role", ignoreDuplicates: true });
+      const { error } = await supabase
+        .from("user_roles")
+        .upsert({ user_id, role: role as any }, { onConflict: "user_id,school_id,role", ignoreDuplicates: true });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role added"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
     onError: (e: any) => {
       const msg = String(e?.message ?? "");
-      if (/duplicate key|unique constraint|user_roles_user_id_role_key/i.test(msg)) {
-        toast.error("This role is already assigned to this user in this school.");
+      if (/duplicate key|unique constraint/i.test(msg)) {
+        toast.error("This role is already assigned to this user.");
       } else {
         toast.error(msg || "Failed to add role");
       }
     },
   });
+
   const removeRole = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("user_roles").delete().eq("id", id);
+    mutationFn: async ({ id, user_id, role }: { id: string; user_id: string; role: string }) => {
+      // Delete by user_id + role (not just id) so RLS school_id check is satisfied
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", user_id)
+        .eq("role", role as any);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role removed"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(e.message || "Failed to remove role"),
   });
 
   if (!isAdmin) {
@@ -113,7 +121,7 @@ function RolesPage() {
                       key={u.id}
                       user={u}
                       onAdd={(role) => addRole.mutate({ user_id: u.id, role })}
-                      onRemove={(id) => removeRole.mutate(id)}
+                      onRemove={(id, user_id, role) => removeRole.mutate({ id, user_id, role })}
                     />
                   ))}
                 </TableBody>
@@ -126,7 +134,11 @@ function RolesPage() {
   );
 }
 
-function UserRow({ user, onAdd, onRemove }: { user: any; onAdd: (role: string) => void; onRemove: (id: string) => void }) {
+function UserRow({ user, onAdd, onRemove }: {
+  user: any;
+  onAdd: (role: string) => void;
+  onRemove: (id: string, user_id: string, role: string) => void;
+}) {
   const [pick, setPick] = useState("");
   return (
     <TableRow>
@@ -137,7 +149,12 @@ function UserRow({ user, onAdd, onRemove }: { user: any; onAdd: (role: string) =
           {user.roles.map((r: any) => (
             <Badge key={r.id} variant="secondary" className="gap-1 pr-1">
               {r.role.replace(/_/g, " ")}
-              <button onClick={() => onRemove(r.id)} className="hover:text-destructive ml-0.5"><X className="w-3 h-3" /></button>
+              <button
+                onClick={() => onRemove(r.id, r.user_id, r.role)}
+                className="hover:text-destructive ml-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </Badge>
           ))}
         </div>
