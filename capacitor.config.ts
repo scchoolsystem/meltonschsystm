@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
   appName: 'SmartDev',
   webDir: 'dist/client',
   server: {
-    url: 'https://smartdev.xco.ke',
+    url: 'https://smartdev.co.ke',
     cleartext: false
   }
 };
