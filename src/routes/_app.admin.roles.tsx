@@ -10,12 +10,16 @@ import { Loader2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/admin/roles")({
   component: RolesPage,
 });
 
-// "student" is intentionally excluded — managed via enrolment, not here.
+// "student" is managed via enrolment.
+// "platform_owner" and "platform_support" are platform-level — never shown to school admins.
+const HIDDEN_ROLES = new Set(["student", "platform_owner", "platform_support"]);
+
 const ALL_ROLES = [
   "super_admin","school_admin","principal","deputy_principal","academic_master",
   "class_teacher","subject_teacher","teacher","hod","staff",
@@ -36,33 +40,40 @@ const ALL_ROLES = [
 function RolesPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
+  const { school } = useTenant();
+  const schoolId = school?.id;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["users-with-roles"],
+    queryKey: ["users-with-roles", schoolId],
+    enabled: !!schoolId,
     queryFn: async () => {
       const [{ data: profiles }, { data: roles }] = await Promise.all([
         supabase.from("profiles").select("id, full_name"),
-        // include school_id so the delete RLS check passes
-        supabase.from("user_roles").select("id, user_id, role, school_id"),
+        supabase.from("user_roles").select("id, user_id, role, school_id").eq("school_id", schoolId!),
       ]);
       return (profiles ?? [])
         .map((p) => ({
           ...p,
-          roles: (roles ?? []).filter((r) => r.user_id === p.id),
+          roles: (roles ?? []).filter((r) => r.user_id === p.id && !HIDDEN_ROLES.has(r.role)),
         }))
-        // Exclude student-only users — managed via enrolment, not here.
         .filter((p) => {
-          const userRoles = p.roles.map((r: any) => r.role);
-          return !(userRoles.length > 0 && userRoles.every((r: string) => r === "student"));
+          const allRoles = (roles ?? []).filter((r) => r.user_id === p.id).map((r: any) => r.role);
+          const nonHidden = allRoles.filter((r: string) => !HIDDEN_ROLES.has(r));
+          const hiddenOnly = allRoles.length > 0 && nonHidden.length === 0;
+          return !hiddenOnly;
         });
     },
   });
 
   const addRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
+      if (!schoolId) throw new Error("No school context");
       const { error } = await supabase
         .from("user_roles")
-        .upsert({ user_id, role: role as any }, { onConflict: "user_id,school_id,role", ignoreDuplicates: true });
+        .upsert(
+          { user_id, role: role as any, school_id: schoolId },
+          { onConflict: "user_id,school_id,role", ignoreDuplicates: true }
+        );
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role added"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
@@ -77,13 +88,14 @@ function RolesPage() {
   });
 
   const removeRole = useMutation({
-    mutationFn: async ({ id, user_id, role }: { id: string; user_id: string; role: string }) => {
-      // Delete by user_id + role (not just id) so RLS school_id check is satisfied
+    mutationFn: async ({ id, user_id, role, school_id }: { id: string; user_id: string; role: string; school_id: string }) => {
       const { error } = await supabase
         .from("user_roles")
         .delete()
+        .eq("id", id)
         .eq("user_id", user_id)
-        .eq("role", role as any);
+        .eq("role", role as any)
+        .eq("school_id", school_id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role removed"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
@@ -120,8 +132,9 @@ function RolesPage() {
                     <UserRow
                       key={u.id}
                       user={u}
+                      schoolId={schoolId!}
                       onAdd={(role) => addRole.mutate({ user_id: u.id, role })}
-                      onRemove={(id, user_id, role) => removeRole.mutate({ id, user_id, role })}
+                      onRemove={(id, user_id, role, school_id) => removeRole.mutate({ id, user_id, role, school_id })}
                     />
                   ))}
                 </TableBody>
@@ -134,10 +147,11 @@ function RolesPage() {
   );
 }
 
-function UserRow({ user, onAdd, onRemove }: {
+function UserRow({ user, schoolId, onAdd, onRemove }: {
   user: any;
+  schoolId: string;
   onAdd: (role: string) => void;
-  onRemove: (id: string, user_id: string, role: string) => void;
+  onRemove: (id: string, user_id: string, role: string, school_id: string) => void;
 }) {
   const [pick, setPick] = useState("");
   return (
@@ -150,7 +164,7 @@ function UserRow({ user, onAdd, onRemove }: {
             <Badge key={r.id} variant="secondary" className="gap-1 pr-1">
               {r.role.replace(/_/g, " ")}
               <button
-                onClick={() => onRemove(r.id, r.user_id, r.role)}
+                onClick={() => onRemove(r.id, r.user_id, r.role, r.school_id ?? schoolId)}
                 className="hover:text-destructive ml-0.5"
               >
                 <X className="w-3 h-3" />

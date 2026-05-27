@@ -262,7 +262,7 @@ export function AppSidebar() {
                 <div className="font-medium">{fullName || "User"}</div>
                 <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {roles.length ? roles.join(", ") : "no roles"}
+                  {roles.filter((r) => r !== "platform_owner" && r !== "platform_support").join(", ") || "no roles"}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
