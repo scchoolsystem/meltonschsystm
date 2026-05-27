@@ -126,7 +126,7 @@ function UserRow({ user, onAdd, onRemove }: { user: any; onAdd: (role: string) =
       <TableCell>
         <div className="flex flex-wrap gap-1">
           {user.roles.length === 0 && <span className="text-xs text-muted-foreground">none</span>}
-          {user.roles.map((r: any) => (
+          {user.roles.filter((r: any) => !["platform_owner","platform_support"].includes(r.role)).map((r: any) => (
             <Badge key={r.id} variant="secondary" className="gap-1 pr-1">
               {r.role.replace(/_/g, " ")}
               <button onClick={() => onRemove(r.id)} className="hover:text-destructive ml-0.5"><X className="w-3 h-3" /></button>
