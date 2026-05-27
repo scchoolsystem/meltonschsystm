@@ -52,7 +52,7 @@ function RolesPage() {
 
   const addRole = useMutation({
     mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
-      const { error } = await supabase.from("user_roles").insert({ user_id, role: role as any });
+      const { error } = await supabase.from("user_roles").upsert({ user_id, role: role as any }, { onConflict: "user_id,role", ignoreDuplicates: true });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Role added"); qc.invalidateQueries({ queryKey: ["users-with-roles"] }); },
