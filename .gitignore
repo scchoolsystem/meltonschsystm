@@ -38,3 +38,8 @@ dist-ssr
 backup_roles.sql
 dist/
 .dev.vars
+android-sdk/
+cmdline-tools.zip
+tanstack_start_ts@
+vite
+*.zip
