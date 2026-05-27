@@ -23,7 +23,7 @@ function useTeachers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("staff")
-        .select("id, user_id, first_name, last_name, role")
+        .select("id, first_name, last_name, role")
         .in("role", ["class_teacher", "subject_teacher", "teacher", "hod", "deputy_principal", "principal", "academic_master"])
         .order("first_name");
       if (error) throw error;
@@ -173,7 +173,7 @@ function EditClassDialog({ cls, onDone }: { cls: any; onDone: () => void }) {
     name: cls.name ?? "",
     stream: cls.stream ?? "",
     capacity: cls.capacity ?? 40,
-    class_teacher_id: cls.class_teacher_id ?? "none", // already a user_id or null // already a user_id or null
+    class_teacher_id: cls.class_teacher_id ?? "none",
   });
   const m = useMutation({
     mutationFn: async () => {

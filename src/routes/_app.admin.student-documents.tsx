@@ -138,7 +138,7 @@ function UploadDocDialog({ students, onDone }: { students: any[]; onDone: () => 
       const path = "uploads/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
       const { error: upErr } = await supabase.storage.from("student-documents").upload(path, file, { upsert: false });
       if (upErr) throw upErr;
-      const { error } = await supabase.from("student_documents").insert({ student_id: studentId, doc_type: docType as "birth_certificate" | "report_form" | "passport_photo" | "medical_records" | "transfer_letter" | "national_id" | "parent_id" | "other", file_path: path, file_name: file.name, mime_type: file.type, size_bytes: file.size });
+      const { error } = await supabase.from("student_documents").insert({ student_id: studentId, doc_type: docType as "birth_certificate" | "report_form" | "passport_photo" | "medical_records" | "transfer_letter" | "national_id" | "parent_id" | "other" as "birth_certificate" | "report_form" | "passport_photo" | "medical_records" | "transfer_letter" | "national_id" | "parent_id" | "other", file_path: path, file_name: file.name, mime_type: file.type, size_bytes: file.size });
       if (error) throw error;
       toast.success("Document uploaded");
       onDone();

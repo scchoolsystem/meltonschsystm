@@ -1,3 +1,4 @@
+
 DROP POLICY IF EXISTS "tenant_isolation_bands" ON public.grading_bands;
 CREATE POLICY "tenant_isolation_bands" ON public.grading_bands
   AS RESTRICTIVE FOR ALL TO authenticated

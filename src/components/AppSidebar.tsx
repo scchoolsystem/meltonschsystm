@@ -1,6 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  GraduationCap, LogOut, Sun, Moon, ChevronDown,
+  LayoutDashboard, Users, GraduationCap, BookOpen, UserCog,
+  Settings, Activity, LogOut, Sun, Moon, ChevronDown,
+  ClipboardCheck, AlertTriangle, Library, Home, Bus, Stethoscope,
+  Megaphone, CalendarDays, Wallet, Receipt, FileText, BookText, Award, User, Users2, Link2,
+  QrCode, ScanLine,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -9,33 +13,92 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
-import { useFeatureGate } from "@/hooks/use-feature-gate";
+import { useFeatureGate, type FeatureKey } from "@/hooks/use-feature-gate";
 import { useTheme } from "@/hooks/use-theme";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-  DropdownMenuLabel, DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { buildNavigation } from "@/lib/role-experience";
+
+type NavItem = { title: string; url: string; icon: any; feature?: FeatureKey; module?: string };
+
+
+const mainItems: NavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { title: "Analytics", url: "/analytics", icon: Activity, module: "analytics" },
+  { title: "Students", url: "/students", icon: GraduationCap, module: "students" },
+  { title: "Staff", url: "/staff", icon: UserCog, module: "staff" },
+  { title: "Classes", url: "/classes", icon: BookOpen, module: "classes" },
+  { title: "Announcements", url: "/announcements", icon: Megaphone, module: "announcements" },
+];
+
+const academicItems: NavItem[] = [
+  { title: "Subjects", url: "/academics/subjects", icon: BookText, module: "subjects" },
+  { title: "Exams", url: "/academics/exams", icon: FileText, module: "exams" },
+  { title: "Mark Entry", url: "/academics/marks", icon: ClipboardCheck, module: "marks" },
+  { title: "Results", url: "/academics/results", icon: Award, module: "results" },
+  { title: "Report Cards", url: "/academics/report-cards", icon: FileText, module: "report-cards" },
+  { title: "Timetable", url: "/timetable", icon: CalendarDays, feature: "timetable", module: "timetable" },
+  { title: "Auto-generate", url: "/timetable/generate", icon: CalendarDays, feature: "timetable", module: "timetable" },
+];
+
+const operationsItems: NavItem[] = [
+  { title: "Attendance", url: "/attendance", icon: ClipboardCheck, module: "attendance" },
+  { title: "Discipline", url: "/discipline", icon: AlertTriangle, feature: "discipline", module: "discipline" },
+  { title: "Library", url: "/library", icon: Library, feature: "library", module: "library" },
+  { title: "Boarding", url: "/boarding", icon: Home, feature: "boarding", module: "boarding" },
+  { title: "Kitchen", url: "/kitchen", icon: BookOpen, feature: "kitchen", module: "kitchen" },
+  { title: "Transport", url: "/transport", icon: Bus, feature: "transport", module: "transport" },
+  { title: "Clinic", url: "/clinic", icon: Stethoscope, feature: "clinic", module: "clinic" },
+  { title: "Security", url: "/security", icon: AlertTriangle, feature: "security", module: "security" },
+];
+
+const financeItems: NavItem[] = [
+  { title: "Fee Structures", url: "/finance/fees", icon: Wallet, feature: "finance", module: "finance" },
+  { title: "Invoices", url: "/finance/invoices", icon: Receipt, feature: "finance", module: "finance" },
+  { title: "Bulk Generate", url: "/finance/generate", icon: Receipt, feature: "finance", module: "finance" },
+  { title: "Payments", url: "/finance/payments", icon: Receipt, feature: "finance", module: "finance" },
+];
+
+const idItems: NavItem[] = [
+  { title: "Bulk Print Cards", url: "/ids/bulk", icon: QrCode, feature: "id_cards", module: "ids" },
+  { title: "Verify ID", url: "/ids/verify", icon: ScanLine, feature: "id_cards", module: "ids" },
+];
+
+
+const adminItems = [
+  { title: "School Brain", url: "/admin/brain", icon: Activity },
+  { title: "Users & Credentials", url: "/admin/users", icon: Users },
+  { title: "Portal Links", url: "/admin/links", icon: Link2 },
+  { title: "User Roles", url: "/admin/roles", icon: Users },
+  { title: "Field Permissions", url: "/admin/permissions", icon: Settings },
+  { title: "CSV Import", url: "/admin/import", icon: FileText },
+  { title: "Activity Log", url: "/admin/activity", icon: Activity },
+  { title: "Lifecycle Events", url: "/admin/lifecycle", icon: Activity },
+  { title: "Field Edit Audit", url: "/admin/field-edits", icon: Activity },
+  { title: "Override Log", url: "/admin/overrides", icon: Activity },
+  { title: "Leaving Certificates", url: "/admin/leaving-certificates", icon: Award },
+  { title: "Grading Scale", url: "/admin/grading", icon: Award },
+  { title: "Settings", url: "/admin/settings", icon: Settings },
+];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { fullName, user, signOut, roles } = useAuth();
+  const { isAdmin, fullName, user, signOut, roles, hasRole } = useAuth();
+  const isStudent = hasRole("student");
+  const isParent = hasRole("parent");
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { school } = useTenant();
   const { isEnabled } = useFeatureGate();
-
-  const groups = buildNavigation(roles as string[]).map((g) => ({
-    ...g,
-    items: g.items.filter((i) => !i.feature || isEnabled(i.feature)),
-  })).filter((g) => g.items.length);
-
+  const { canAccess } = usePermissions();
+  const filt = (items: NavItem[]) =>
+    items.filter((i) => (!i.feature || isEnabled(i.feature)) && (!i.module || canAccess(i.module)));
   const settings = school
     ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
     : null;
+
 
   return (
     <Sidebar collapsible="icon">
@@ -58,13 +121,106 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {groups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {filt(mainItems).map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={path === item.url}>
+                    <Link to={item.url}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Academics</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {filt(academicItems).map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Operations</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {filt(operationsItems).map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Finance</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {filt(financeItems).map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Digital IDs</SidebarGroupLabel>
+          <SidebarGroupContent><SidebarMenu>
+            {filt(idItems).map((item) => (
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={path === item.url}>
+                  <Link to={item.url}><item.icon className="w-4 h-4" /><span>{item.title}</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu></SidebarGroupContent>
+        </SidebarGroup>
+
+        {(isStudent || isParent) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>My Portal</SidebarGroupLabel>
+            <SidebarGroupContent><SidebarMenu>
+              {isStudent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/student"}>
+                    <Link to="/portal/student"><User className="w-4 h-4" /><span>Student Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {isParent && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={path === "/portal/parent"}>
+                    <Link to="/portal/parent"><Users2 className="w-4 h-4" /><span>Parent Portal</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu></SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.url + item.title}>
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={path === item.url}>
                       <Link to={item.url}>
                         <item.icon className="w-4 h-4" />
@@ -76,27 +232,18 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-        ))}
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="p-2 space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggle}
-            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
-          >
+          <Button variant="ghost" size="sm" onClick={toggle} className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent">
             {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             {!collapsed && <span className="ml-2">{theme === "dark" ? "Light" : "Dark"} mode</span>}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
-              >
+              <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent">
                 <Avatar className="w-6 h-6">
                   <AvatarFallback className="text-[10px] bg-sidebar-primary text-sidebar-primary-foreground">
                     {(fullName || user?.email || "U").slice(0, 2).toUpperCase()}

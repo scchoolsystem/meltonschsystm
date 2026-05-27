@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { supabase } from "@/integrations/supabase/client";
+import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
@@ -16,7 +17,9 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
-  const { loading, session } = useAuth();
+  const { loading, session, roles } = useAuth();
+  const path = useRouterState({ select: (r) => r.location.pathname });
+
   if (loading || !session) {
     return (
       <div className="min-h-screen grid place-items-center">
@@ -24,6 +27,14 @@ function AppLayout() {
       </div>
     );
   }
+
+  // Centralized route guard: block direct-URL access to unauthorized modules.
+  // Admins bypass implicitly inside canAccessRoute(). Dashboard is always allowed.
+  const appRoles = roles as AppRole[];
+  if (path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
+    return <Navigate to="/dashboard" />;
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -44,3 +55,4 @@ function AppLayout() {
     </SidebarProvider>
   );
 }
+
