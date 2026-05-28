@@ -43,3 +43,6 @@ cmdline-tools.zip
 tanstack_start_ts@
 vite
 *.zip
+android-sdk/
+android/keystore.properties
+android/app/release-key.jks
