@@ -1,5 +1,5 @@
 -- Roles enum
-CREATE TYPE public.app_role AS ENUM (
+CREATE TYPE IF NOT EXISTS public.app_role AS ENUM (
   'super_admin','principal','deputy_principal','class_teacher','subject_teacher',
   'hod','admission_officer','bursar','librarian','sports','boarding','parent','student','staff'
 );
