@@ -160,7 +160,7 @@ DROP TRIGGER IF EXISTS trg_upd_invoice_paid ON public.payments;
 CREATE TRIGGER trg_upd_invoice_paid AFTER INSERT OR UPDATE OR DELETE ON public.payments
   FOR EACH ROW EXECUTE FUNCTION public.update_invoice_paid();
 
-CREATE UNIQUE INDEX IF NOT EXISTS IF NOT EXISTS payments_receipt_no_unique ON public.payments (receipt_no);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_receipt_no_unique ON public.payments (receipt_no);
 
 -- ATTENDANCE & DISCIPLINE
 CREATE TABLE IF NOT EXISTS public.attendance_records (

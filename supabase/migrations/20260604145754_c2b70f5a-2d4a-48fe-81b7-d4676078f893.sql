@@ -39,24 +39,17 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON public.user_roles TO authenticated;
 GRANT ALL ON public.user_roles TO service_role;
 
 DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
 CREATE POLICY "users view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
 CREATE POLICY "admins view all profiles" ON public.profiles FOR SELECT USING (public.is_admin(auth.uid()));
 DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
 CREATE POLICY "users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
 CREATE POLICY "users insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
-DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
 CREATE POLICY "users see own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
 DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
-DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
 CREATE POLICY "admins see all roles" ON public.user_roles FOR SELECT USING (public.is_admin(auth.uid()));
-DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
 DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
 CREATE POLICY "admins manage roles" ON public.user_roles FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
