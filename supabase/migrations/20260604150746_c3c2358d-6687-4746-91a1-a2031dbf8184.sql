@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS public.students (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.students TO authenticated;
 GRANT ALL ON public.students TO service_role;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_students_class ON public.students(class_id);
-CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_students_status ON public.students(status);
+CREATE INDEX IF NOT EXISTS idx_students_class ON public.students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_status ON public.students(status);
 
 -- Staff
 CREATE TABLE IF NOT EXISTS public.staff (
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
 GRANT SELECT, INSERT ON public.activity_logs TO authenticated;
 GRANT ALL ON public.activity_logs TO service_role;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_activity_logs_created ON public.activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON public.activity_logs(created_at DESC);
 
 -- RLS Policies
 DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
@@ -193,6 +193,7 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS on_auth_user_created ON public.handle_new_user;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -215,6 +216,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS set_admission_no ON public.students;
 CREATE TRIGGER set_admission_no
   BEFORE INSERT ON public.students
   FOR EACH ROW EXECUTE FUNCTION public.gen_admission_no();
@@ -233,6 +235,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS set_employee_no ON public.staff;
 CREATE TRIGGER set_employee_no
   BEFORE INSERT ON public.staff
   FOR EACH ROW EXECUTE FUNCTION public.gen_employee_no();

@@ -226,6 +226,7 @@ CREATE OR REPLACE FUNCTION public.touch_updated_at()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END $$;
 DROP TRIGGER IF EXISTS trg_school_settings_updated ON public.school_settings;
+DROP TRIGGER IF EXISTS trg_school_settings_updated ON public.school_settings;
 CREATE TRIGGER trg_school_settings_updated
 BEFORE UPDATE ON public.school_settings
 FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
