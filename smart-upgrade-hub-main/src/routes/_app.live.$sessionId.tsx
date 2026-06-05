@@ -1,0 +1,332 @@
+import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2, ArrowLeft, Video, Check, Clock, X } from "lucide-react";
+import { toast } from "sonner";
+import { format, differenceInMinutes } from "date-fns";
+
+export const Route = createFileRoute("/_app/live/$sessionId")({
+  component: SessionRoom,
+  errorComponent: ({ error }) => <div className="p-6 text-destructive">Couldn't load: {error.message}</div>,
+  notFoundComponent: () => <div className="p-6">Session not found</div>,
+});
+
+type AttendStatus = "present" | "late" | "absent";
+
+function SessionRoom() {
+  const { sessionId } = useParams({ from: "/_app/live/$sessionId" });
+  const { user, roles, isAdmin } = useAuth();
+  const qc = useQueryClient();
+  const isStudent = roles.includes("student" as any);
+  const canManage = isAdmin || roles.some((r) =>
+    ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
+  );
+
+  const { data: session, isLoading } = useQuery({
+    queryKey: ["live-session", sessionId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("live_sessions")
+        .select("*, classes!inner(name)")
+        .eq("id", sessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: myStudent } = useQuery({
+    queryKey: ["my-student-link", user?.id],
+    enabled: !!user?.id && isStudent,
+    queryFn: async () => {
+      const { data } = await supabase.from("student_user_links").select("student_id").eq("user_id", user!.id).maybeSingle();
+      return data?.student_id ?? null;
+    },
+  });
+
+  // Auto-track attendance on join/leave; auto-derive present vs late
+  const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  useEffect(() => {
+    if (!session || !isStudent || !myStudent) return;
+    let active = true;
+    (async () => {
+      const joinedAt = Date.now();
+      const minsLate = differenceInMinutes(new Date(joinedAt), new Date(session.scheduled_start));
+      const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
+      const { data, error } = await supabase
+        .from("live_session_attendance")
+        .upsert({
+          session_id: sessionId,
+          student_id: myStudent,
+          user_id: user?.id ?? null,
+          joined_at: new Date(joinedAt).toISOString(),
+          left_at: null,
+          duration_seconds: null,
+          status: autoStatus,
+        } as any, { onConflict: "session_id,student_id" })
+        .select("id")
+        .maybeSingle();
+      if (error) { console.warn("attendance insert", error); return; }
+      if (active && data) attendanceRef.current = { id: data.id, joinedAt };
+    })();
+    const markLeft = () => {
+      const { id, joinedAt } = attendanceRef.current;
+      if (!id || !joinedAt) return;
+      const dur = Math.round((Date.now() - joinedAt) / 1000);
+      supabase.from("live_session_attendance").update({
+        left_at: new Date().toISOString(),
+        duration_seconds: dur,
+      }).eq("id", id).then(() => {});
+    };
+    window.addEventListener("beforeunload", markLeft);
+    return () => {
+      active = false;
+      markLeft();
+      window.removeEventListener("beforeunload", markLeft);
+    };
+  }, [session, isStudent, myStudent, sessionId, user?.id]);
+
+  useEffect(() => {
+    if (!session || !canManage) return;
+    if (session.status === "scheduled") {
+      supabase.from("live_sessions").update({ status: "live", started_at: new Date().toISOString() }).eq("id", sessionId).then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
+    }
+  }, [session, canManage, sessionId, qc]);
+
+  if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  if (!session) return <div className="p-6">Session not found.</div>;
+
+  const displayName = encodeURIComponent(user?.email?.split("@")[0] || "Student");
+  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName=%22${displayName}%22&config.prejoinPageEnabled=false&config.disableDeepLinking=true`;
+
+  const endSession = async () => {
+    await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
+    toast.success("Session ended");
+    qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <Button asChild variant="ghost" size="sm"><Link to="/live"><ArrowLeft className="w-4 h-4 mr-2" />All sessions</Link></Button>
+          <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Video className="w-6 h-6 text-primary" />{session.title}</h1>
+          <div className="text-sm text-muted-foreground mt-1 flex gap-2 flex-wrap items-center">
+            <Badge variant="outline">{session.classes?.name}</Badge>
+            <span>{format(new Date(session.scheduled_start), "PPp")}</span>
+            <Badge>{session.status}</Badge>
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {canManage && (
+            <Button asChild variant="outline">
+              <Link to="/live/$sessionId/attendance" params={{ sessionId }}>Correct attendance</Link>
+            </Button>
+          )}
+          {canManage && session.status !== "ended" && (
+            <Button variant="destructive" onClick={endSession}>End session</Button>
+          )}
+        </div>
+      </div>
+
+      {session.status === "cancelled" || session.status === "ended" ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">This session has {session.status}. You can still adjust attendance below.</CardContent></Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <iframe
+            title={session.title}
+            src={jitsiUrl}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            className="w-full"
+            style={{ height: "70vh", minHeight: 480, border: 0 }}
+          />
+        </Card>
+      )}
+
+      {canManage && <AttendanceRoster sessionId={sessionId} classId={session.class_id} sessionEnded={session.status === "ended"} />}
+    </div>
+  );
+}
+
+function statusBadge(s: AttendStatus) {
+  if (s === "present") return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" variant="outline">Present</Badge>;
+  if (s === "late") return <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" variant="outline">Late</Badge>;
+  return <Badge className="bg-destructive/15 text-destructive border-destructive/30" variant="outline">Absent</Badge>;
+}
+
+function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: string; classId: string; sessionEnded: boolean }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: roster = [], isLoading: rosterLoading } = useQuery({
+    queryKey: ["class-roster", classId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, first_name, last_name, unique_id")
+        .eq("class_id", classId)
+        .order("last_name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: attendance = [], isLoading: attLoading } = useQuery({
+    queryKey: ["live-session-attendance", sessionId],
+    refetchInterval: sessionEnded ? false : 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("live_session_attendance")
+        .select("id, student_id, joined_at, left_at, duration_seconds, status")
+        .eq("session_id", sessionId);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const attMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const a of attendance as any[]) m.set(a.student_id, a);
+    return m;
+  }, [attendance]);
+
+  const setStatus = async (studentId: string, status: AttendStatus) => {
+    const existing = attMap.get(studentId);
+    const payload: any = {
+      session_id: sessionId,
+      student_id: studentId,
+      status,
+      marked_by: user?.id ?? null,
+      marked_at: new Date().toISOString(),
+    };
+    if (status === "absent" && !existing) {
+      payload.joined_at = null;
+    }
+    const { error } = await supabase
+      .from("live_session_attendance")
+      .upsert(payload, { onConflict: "session_id,student_id" });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+  };
+
+  const markAllUnjoined = async (status: AttendStatus) => {
+    const targets = (roster as any[]).filter(s => !attMap.has(s.id));
+    if (!targets.length) { toast.info("Everyone is already marked"); return; }
+    const rows = targets.map(s => ({
+      session_id: sessionId,
+      student_id: s.id,
+      status,
+      marked_by: user?.id ?? null,
+      marked_at: new Date().toISOString(),
+      joined_at: status === "absent" ? null : new Date().toISOString(),
+    }));
+    const { error } = await supabase.from("live_session_attendance").upsert(rows as any, { onConflict: "session_id,student_id" });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Marked ${rows.length} as ${status}`);
+    qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+  };
+
+  const counts = useMemo(() => {
+    let present = 0, late = 0, absent = 0, unmarked = 0;
+    for (const s of roster as any[]) {
+      const a = attMap.get(s.id);
+      if (!a) { unmarked++; continue; }
+      if (a.status === "present") present++;
+      else if (a.status === "late") late++;
+      else if (a.status === "absent") absent++;
+    }
+    return { present, late, absent, unmarked, total: (roster as any[]).length };
+  }, [roster, attMap]);
+
+  const loading = rosterLoading || attLoading;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 space-y-0">
+        <div>
+          <CardTitle className="text-base">Attendance roster</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            {counts.total} students · <span className="text-emerald-600">{counts.present} present</span> · <span className="text-amber-600">{counts.late} late</span> · <span className="text-destructive">{counts.absent} absent</span> · {counts.unmarked} unmarked
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("absent")}>Mark remaining absent</Button>
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("present")}>Mark remaining present</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        ) : (roster as any[]).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No students in this class yet.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead>Left</TableHead>
+                <TableHead>Minutes</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Mark</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(roster as any[]).map((s) => {
+                const a = attMap.get(s.id);
+                const status: AttendStatus = (a?.status as AttendStatus) ?? "absent";
+                const hasRecord = !!a;
+                return (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <div className="font-medium">{s.first_name} {s.last_name}</div>
+                      <div className="text-xs text-muted-foreground">{s.unique_id}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">{a?.joined_at ? format(new Date(a.joined_at), "p") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a?.left_at ? format(new Date(a.left_at), "p") : (hasRecord && status !== "absent" ? <Badge variant="secondary">In room</Badge> : "—")}</TableCell>
+                    <TableCell className="text-sm">{a?.duration_seconds ? Math.round(a.duration_seconds / 60) : "—"}</TableCell>
+                    <TableCell>{hasRecord ? statusBadge(status) : <span className="text-xs text-muted-foreground">Unmarked</span>}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex rounded-md border overflow-hidden">
+                        <Button
+                          size="sm"
+                          variant={status === "present" ? "default" : "ghost"}
+                          className="h-8 rounded-none px-2"
+                          onClick={() => setStatus(s.id, "present")}
+                          title="Present"
+                        ><Check className="w-4 h-4" /></Button>
+                        <Button
+                          size="sm"
+                          variant={status === "late" ? "default" : "ghost"}
+                          className="h-8 rounded-none px-2 border-l"
+                          onClick={() => setStatus(s.id, "late")}
+                          title="Late"
+                        ><Clock className="w-4 h-4" /></Button>
+                        <Button
+                          size="sm"
+                          variant={status === "absent" ? "destructive" : "ghost"}
+                          className="h-8 rounded-none px-2 border-l"
+                          onClick={() => setStatus(s.id, "absent")}
+                          title="Absent"
+                        ><X className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+        {sessionEnded && (
+          <p className="text-xs text-muted-foreground mt-3">Session has ended — corrections made here are saved immediately.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

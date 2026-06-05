@@ -28,11 +28,13 @@ import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
 import { Route as AppStaffRouteImport } from './routes/_app.staff'
 import { Route as AppSecurityRouteImport } from './routes/_app.security'
+import { Route as AppLiveRouteImport } from './routes/_app.live'
 import { Route as AppLibraryRouteImport } from './routes/_app.library'
 import { Route as AppKitchenRouteImport } from './routes/_app.kitchen'
 import { Route as AppDisciplineRouteImport } from './routes/_app.discipline'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppClinicRouteImport } from './routes/_app.clinic'
+import { Route as AppClassroomRouteImport } from './routes/_app.classroom'
 import { Route as AppClassesRouteImport } from './routes/_app.classes'
 import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
@@ -42,8 +44,11 @@ import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
+import { Route as AppStaffIdRouteImport } from './routes/_app.staff.$id'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
 import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
+import { Route as AppPortalMeRouteImport } from './routes/_app.portal.me'
+import { Route as AppLiveSessionIdRouteImport } from './routes/_app.live.$sessionId'
 import { Route as AppIdsVerifyRouteImport } from './routes/_app.ids.verify'
 import { Route as AppIdsBulkRouteImport } from './routes/_app.ids.bulk'
 import { Route as AppFinancePaymentsRouteImport } from './routes/_app.finance.payments'
@@ -64,7 +69,10 @@ import { Route as AppAdminInsuranceRouteImport } from './routes/_app.admin.insur
 import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
 import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
+import { Route as AppAdminFeaturesRouteImport } from './routes/_app.admin.features'
+import { Route as AppAdminCommunicationsRouteImport } from './routes/_app.admin.communications'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
+import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
@@ -74,6 +82,7 @@ import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.e
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
+import { Route as AppLiveSessionIdAttendanceRouteImport } from './routes/_app.live.$sessionId.attendance'
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
@@ -174,6 +183,11 @@ const AppSecurityRoute = AppSecurityRouteImport.update({
   path: '/security',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLiveRoute = AppLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLibraryRoute = AppLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -197,6 +211,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
 const AppClinicRoute = AppClinicRouteImport.update({
   id: '/clinic',
   path: '/clinic',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClassroomRoute = AppClassroomRouteImport.update({
+  id: '/classroom',
+  path: '/classroom',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClassesRoute = AppClassesRouteImport.update({
@@ -244,6 +263,11 @@ const AppTimetableGenerateRoute = AppTimetableGenerateRouteImport.update({
   path: '/generate',
   getParentRoute: () => AppTimetableRoute,
 } as any)
+const AppStaffIdRoute = AppStaffIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppStaffRoute,
+} as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
   id: '/portal/student',
   path: '/portal/student',
@@ -253,6 +277,16 @@ const AppPortalParentRoute = AppPortalParentRouteImport.update({
   id: '/portal/parent',
   path: '/portal/parent',
   getParentRoute: () => AppRoute,
+} as any)
+const AppPortalMeRoute = AppPortalMeRouteImport.update({
+  id: '/portal/me',
+  path: '/portal/me',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLiveSessionIdRoute = AppLiveSessionIdRouteImport.update({
+  id: '/$sessionId',
+  path: '/$sessionId',
+  getParentRoute: () => AppLiveRoute,
 } as any)
 const AppIdsVerifyRoute = AppIdsVerifyRouteImport.update({
   id: '/ids/verify',
@@ -356,9 +390,24 @@ const AppAdminFieldEditsRoute = AppAdminFieldEditsRouteImport.update({
   path: '/admin/field-edits',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminFeaturesRoute = AppAdminFeaturesRouteImport.update({
+  id: '/admin/features',
+  path: '/admin/features',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminCommunicationsRoute = AppAdminCommunicationsRouteImport.update({
+  id: '/admin/communications',
+  path: '/admin/communications',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminBrainRoute = AppAdminBrainRouteImport.update({
   id: '/admin/brain',
   path: '/admin/brain',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminBillingRoute = AppAdminBillingRouteImport.update({
+  id: '/admin/billing',
+  path: '/admin/billing',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
@@ -409,6 +458,12 @@ const LovableEmailQueueProcessRoute =
     path: '/lovable/email/queue/process',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AppLiveSessionIdAttendanceRoute =
+  AppLiveSessionIdAttendanceRouteImport.update({
+    id: '/attendance',
+    path: '/attendance',
+    getParentRoute: () => AppLiveSessionIdRoute,
+  } as any)
 const AppIdsStudentIdRoute = AppIdsStudentIdRouteImport.update({
   id: '/ids/student/$id',
   path: '/ids/student/$id',
@@ -448,13 +503,15 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
+  '/classroom': typeof AppClassroomRoute
   '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
+  '/live': typeof AppLiveRouteWithChildren
   '/security': typeof AppSecurityRoute
-  '/staff': typeof AppStaffRoute
+  '/staff': typeof AppStaffRouteWithChildren
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
@@ -472,7 +529,10 @@ export interface FileRoutesByFullPath {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
@@ -493,8 +553,11 @@ export interface FileRoutesByFullPath {
   '/finance/payments': typeof AppFinancePaymentsRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
+  '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
+  '/portal/me': typeof AppPortalMeRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/staff/$id': typeof AppStaffIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -503,6 +566,7 @@ export interface FileRoutesByFullPath {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -519,13 +583,15 @@ export interface FileRoutesByTo {
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
+  '/classroom': typeof AppClassroomRoute
   '/clinic': typeof AppClinicRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
+  '/live': typeof AppLiveRouteWithChildren
   '/security': typeof AppSecurityRoute
-  '/staff': typeof AppStaffRoute
+  '/staff': typeof AppStaffRouteWithChildren
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
@@ -543,7 +609,10 @@ export interface FileRoutesByTo {
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
   '/admin/import': typeof AppAdminImportRoute
@@ -564,8 +633,11 @@ export interface FileRoutesByTo {
   '/finance/payments': typeof AppFinancePaymentsRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
+  '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
+  '/portal/me': typeof AppPortalMeRoute
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
+  '/staff/$id': typeof AppStaffIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -574,6 +646,7 @@ export interface FileRoutesByTo {
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -592,13 +665,15 @@ export interface FileRoutesById {
   '/_app/attendance': typeof AppAttendanceRoute
   '/_app/boarding': typeof AppBoardingRoute
   '/_app/classes': typeof AppClassesRoute
+  '/_app/classroom': typeof AppClassroomRoute
   '/_app/clinic': typeof AppClinicRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/discipline': typeof AppDisciplineRoute
   '/_app/kitchen': typeof AppKitchenRoute
   '/_app/library': typeof AppLibraryRoute
+  '/_app/live': typeof AppLiveRouteWithChildren
   '/_app/security': typeof AppSecurityRoute
-  '/_app/staff': typeof AppStaffRoute
+  '/_app/staff': typeof AppStaffRouteWithChildren
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
@@ -616,7 +691,10 @@ export interface FileRoutesById {
   '/_app/academics/results': typeof AppAcademicsResultsRoute
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/billing': typeof AppAdminBillingRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
+  '/_app/admin/communications': typeof AppAdminCommunicationsRoute
+  '/_app/admin/features': typeof AppAdminFeaturesRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/grading': typeof AppAdminGradingRoute
   '/_app/admin/import': typeof AppAdminImportRoute
@@ -637,8 +715,11 @@ export interface FileRoutesById {
   '/_app/finance/payments': typeof AppFinancePaymentsRoute
   '/_app/ids/bulk': typeof AppIdsBulkRoute
   '/_app/ids/verify': typeof AppIdsVerifyRoute
+  '/_app/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
+  '/_app/portal/me': typeof AppPortalMeRoute
   '/_app/portal/parent': typeof AppPortalParentRoute
   '/_app/portal/student': typeof AppPortalStudentRoute
+  '/_app/staff/$id': typeof AppStaffIdRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -647,6 +728,7 @@ export interface FileRoutesById {
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
+  '/_app/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -665,11 +747,13 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/boarding'
     | '/classes'
+    | '/classroom'
     | '/clinic'
     | '/dashboard'
     | '/discipline'
     | '/kitchen'
     | '/library'
+    | '/live'
     | '/security'
     | '/staff'
     | '/students'
@@ -689,7 +773,10 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/billing'
     | '/admin/brain'
+    | '/admin/communications'
+    | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
     | '/admin/import'
@@ -710,8 +797,11 @@ export interface FileRouteTypes {
     | '/finance/payments'
     | '/ids/bulk'
     | '/ids/verify'
+    | '/live/$sessionId'
+    | '/portal/me'
     | '/portal/parent'
     | '/portal/student'
+    | '/staff/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -720,6 +810,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/live/$sessionId/attendance'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -736,11 +827,13 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/boarding'
     | '/classes'
+    | '/classroom'
     | '/clinic'
     | '/dashboard'
     | '/discipline'
     | '/kitchen'
     | '/library'
+    | '/live'
     | '/security'
     | '/staff'
     | '/students'
@@ -760,7 +853,10 @@ export interface FileRouteTypes {
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
+    | '/admin/billing'
     | '/admin/brain'
+    | '/admin/communications'
+    | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
     | '/admin/import'
@@ -781,8 +877,11 @@ export interface FileRouteTypes {
     | '/finance/payments'
     | '/ids/bulk'
     | '/ids/verify'
+    | '/live/$sessionId'
+    | '/portal/me'
     | '/portal/parent'
     | '/portal/student'
+    | '/staff/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -791,6 +890,7 @@ export interface FileRouteTypes {
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
     | '/ids/student/$id'
+    | '/live/$sessionId/attendance'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -808,11 +908,13 @@ export interface FileRouteTypes {
     | '/_app/attendance'
     | '/_app/boarding'
     | '/_app/classes'
+    | '/_app/classroom'
     | '/_app/clinic'
     | '/_app/dashboard'
     | '/_app/discipline'
     | '/_app/kitchen'
     | '/_app/library'
+    | '/_app/live'
     | '/_app/security'
     | '/_app/staff'
     | '/_app/students'
@@ -832,7 +934,10 @@ export interface FileRouteTypes {
     | '/_app/academics/results'
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
+    | '/_app/admin/billing'
     | '/_app/admin/brain'
+    | '/_app/admin/communications'
+    | '/_app/admin/features'
     | '/_app/admin/field-edits'
     | '/_app/admin/grading'
     | '/_app/admin/import'
@@ -853,8 +958,11 @@ export interface FileRouteTypes {
     | '/_app/finance/payments'
     | '/_app/ids/bulk'
     | '/_app/ids/verify'
+    | '/_app/live/$sessionId'
+    | '/_app/portal/me'
     | '/_app/portal/parent'
     | '/_app/portal/student'
+    | '/_app/staff/$id'
     | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -863,6 +971,7 @@ export interface FileRouteTypes {
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
+    | '/_app/live/$sessionId/attendance'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -1020,6 +1129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSecurityRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/live': {
+      id: '/_app/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof AppLiveRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/library': {
       id: '/_app/library'
       path: '/library'
@@ -1053,6 +1169,13 @@ declare module '@tanstack/react-router' {
       path: '/clinic'
       fullPath: '/clinic'
       preLoaderRoute: typeof AppClinicRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/classroom': {
+      id: '/_app/classroom'
+      path: '/classroom'
+      fullPath: '/classroom'
+      preLoaderRoute: typeof AppClassroomRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/classes': {
@@ -1118,6 +1241,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTimetableGenerateRouteImport
       parentRoute: typeof AppTimetableRoute
     }
+    '/_app/staff/$id': {
+      id: '/_app/staff/$id'
+      path: '/$id'
+      fullPath: '/staff/$id'
+      preLoaderRoute: typeof AppStaffIdRouteImport
+      parentRoute: typeof AppStaffRoute
+    }
     '/_app/portal/student': {
       id: '/_app/portal/student'
       path: '/portal/student'
@@ -1131,6 +1261,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/portal/parent'
       preLoaderRoute: typeof AppPortalParentRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/portal/me': {
+      id: '/_app/portal/me'
+      path: '/portal/me'
+      fullPath: '/portal/me'
+      preLoaderRoute: typeof AppPortalMeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/live/$sessionId': {
+      id: '/_app/live/$sessionId'
+      path: '/$sessionId'
+      fullPath: '/live/$sessionId'
+      preLoaderRoute: typeof AppLiveSessionIdRouteImport
+      parentRoute: typeof AppLiveRoute
     }
     '/_app/ids/verify': {
       id: '/_app/ids/verify'
@@ -1272,11 +1416,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminFieldEditsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/features': {
+      id: '/_app/admin/features'
+      path: '/admin/features'
+      fullPath: '/admin/features'
+      preLoaderRoute: typeof AppAdminFeaturesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/communications': {
+      id: '/_app/admin/communications'
+      path: '/admin/communications'
+      fullPath: '/admin/communications'
+      preLoaderRoute: typeof AppAdminCommunicationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/brain': {
       id: '/_app/admin/brain'
       path: '/admin/brain'
       fullPath: '/admin/brain'
       preLoaderRoute: typeof AppAdminBrainRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/billing': {
+      id: '/_app/admin/billing'
+      path: '/admin/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof AppAdminBillingRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/activity': {
@@ -1342,6 +1507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/live/$sessionId/attendance': {
+      id: '/_app/live/$sessionId/attendance'
+      path: '/attendance'
+      fullPath: '/live/$sessionId/attendance'
+      preLoaderRoute: typeof AppLiveSessionIdAttendanceRouteImport
+      parentRoute: typeof AppLiveSessionIdRoute
+    }
     '/_app/ids/student/$id': {
       id: '/_app/ids/student/$id'
       path: '/ids/student/$id'
@@ -1380,6 +1552,40 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppLiveSessionIdRouteChildren {
+  AppLiveSessionIdAttendanceRoute: typeof AppLiveSessionIdAttendanceRoute
+}
+
+const AppLiveSessionIdRouteChildren: AppLiveSessionIdRouteChildren = {
+  AppLiveSessionIdAttendanceRoute: AppLiveSessionIdAttendanceRoute,
+}
+
+const AppLiveSessionIdRouteWithChildren =
+  AppLiveSessionIdRoute._addFileChildren(AppLiveSessionIdRouteChildren)
+
+interface AppLiveRouteChildren {
+  AppLiveSessionIdRoute: typeof AppLiveSessionIdRouteWithChildren
+}
+
+const AppLiveRouteChildren: AppLiveRouteChildren = {
+  AppLiveSessionIdRoute: AppLiveSessionIdRouteWithChildren,
+}
+
+const AppLiveRouteWithChildren =
+  AppLiveRoute._addFileChildren(AppLiveRouteChildren)
+
+interface AppStaffRouteChildren {
+  AppStaffIdRoute: typeof AppStaffIdRoute
+}
+
+const AppStaffRouteChildren: AppStaffRouteChildren = {
+  AppStaffIdRoute: AppStaffIdRoute,
+}
+
+const AppStaffRouteWithChildren = AppStaffRoute._addFileChildren(
+  AppStaffRouteChildren,
+)
+
 interface AppTimetableRouteChildren {
   AppTimetableGenerateRoute: typeof AppTimetableGenerateRoute
 }
@@ -1398,13 +1604,15 @@ interface AppRouteChildren {
   AppAttendanceRoute: typeof AppAttendanceRoute
   AppBoardingRoute: typeof AppBoardingRoute
   AppClassesRoute: typeof AppClassesRoute
+  AppClassroomRoute: typeof AppClassroomRoute
   AppClinicRoute: typeof AppClinicRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDisciplineRoute: typeof AppDisciplineRoute
   AppKitchenRoute: typeof AppKitchenRoute
   AppLibraryRoute: typeof AppLibraryRoute
+  AppLiveRoute: typeof AppLiveRouteWithChildren
   AppSecurityRoute: typeof AppSecurityRoute
-  AppStaffRoute: typeof AppStaffRoute
+  AppStaffRoute: typeof AppStaffRouteWithChildren
   AppStudentsRoute: typeof AppStudentsRoute
   AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
@@ -1414,7 +1622,10 @@ interface AppRouteChildren {
   AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminBillingRoute: typeof AppAdminBillingRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
+  AppAdminCommunicationsRoute: typeof AppAdminCommunicationsRoute
+  AppAdminFeaturesRoute: typeof AppAdminFeaturesRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminGradingRoute: typeof AppAdminGradingRoute
   AppAdminImportRoute: typeof AppAdminImportRoute
@@ -1435,6 +1646,7 @@ interface AppRouteChildren {
   AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
   AppIdsBulkRoute: typeof AppIdsBulkRoute
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
+  AppPortalMeRoute: typeof AppPortalMeRoute
   AppPortalParentRoute: typeof AppPortalParentRoute
   AppPortalStudentRoute: typeof AppPortalStudentRoute
   AppAdminLeavingCertificateIdRoute: typeof AppAdminLeavingCertificateIdRoute
@@ -1450,13 +1662,15 @@ const AppRouteChildren: AppRouteChildren = {
   AppAttendanceRoute: AppAttendanceRoute,
   AppBoardingRoute: AppBoardingRoute,
   AppClassesRoute: AppClassesRoute,
+  AppClassroomRoute: AppClassroomRoute,
   AppClinicRoute: AppClinicRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDisciplineRoute: AppDisciplineRoute,
   AppKitchenRoute: AppKitchenRoute,
   AppLibraryRoute: AppLibraryRoute,
+  AppLiveRoute: AppLiveRouteWithChildren,
   AppSecurityRoute: AppSecurityRoute,
-  AppStaffRoute: AppStaffRoute,
+  AppStaffRoute: AppStaffRouteWithChildren,
   AppStudentsRoute: AppStudentsRoute,
   AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
@@ -1466,7 +1680,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppAcademicsResultsRoute: AppAcademicsResultsRoute,
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminBillingRoute: AppAdminBillingRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
+  AppAdminCommunicationsRoute: AppAdminCommunicationsRoute,
+  AppAdminFeaturesRoute: AppAdminFeaturesRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminGradingRoute: AppAdminGradingRoute,
   AppAdminImportRoute: AppAdminImportRoute,
@@ -1487,6 +1704,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinancePaymentsRoute: AppFinancePaymentsRoute,
   AppIdsBulkRoute: AppIdsBulkRoute,
   AppIdsVerifyRoute: AppIdsVerifyRoute,
+  AppPortalMeRoute: AppPortalMeRoute,
   AppPortalParentRoute: AppPortalParentRoute,
   AppPortalStudentRoute: AppPortalStudentRoute,
   AppAdminLeavingCertificateIdRoute: AppAdminLeavingCertificateIdRoute,
