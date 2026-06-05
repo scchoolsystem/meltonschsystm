@@ -13,11 +13,8 @@ import {
   BarChart3, Lock,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_app/admin/features")({
-  component: FeaturesPage,
-});
+export const Route = createFileRoute("/_app/admin/features")({ component: FeaturesPage });
 
-// Canonical module list. `key` is the value stored in school_features.feature.
 const MODULES = [
   { key: "security",       icon: Shield,        name: "Security",       desc: "Gate passes and visitor management" },
   { key: "kitchen",        icon: ChefHat,       name: "Kitchen",        desc: "Meal plans and pantry stock alerts" },
@@ -31,7 +28,6 @@ const MODULES = [
   { key: "classroom",      icon: BookOpen,      name: "Classroom",      desc: "Classroom feed, assignments, and submissions" },
   { key: "timetable",      icon: CalendarDays,  name: "Timetable",      desc: "Class schedules and auto-generation" },
   { key: "ids",            icon: QrCode,        name: "IDs",            desc: "ID card printing and QR verification" },
-  // Extras kept from the previous build
   { key: "finance",        icon: Wallet,        name: "Finance",        desc: "Fee structures, invoices, and payments" },
   { key: "discipline",     icon: AlertTriangle, name: "Discipline",     desc: "Incident records and behavior tracking" },
   { key: "announcements",  icon: Megaphone,     name: "Announcements",  desc: "School-wide announcements and pinned notices" },
@@ -100,20 +96,13 @@ function FeaturesPage() {
     <div className="space-y-6 p-4 md:p-6">
       <div>
         <h1 className="text-2xl font-bold">School Modules</h1>
-        <p className="text-muted-foreground">
-          Enable or disable modules for your school.
-        </p>
+        <p className="text-muted-foreground">Enable or disable modules for your school.</p>
       </div>
-
       <TooltipProvider delayDuration={200}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {isLoading
             ? Array.from({ length: 12 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="pt-6">
-                    <Skeleton className="h-20 w-full" />
-                  </CardContent>
-                </Card>
+                <Card key={i}><CardContent className="pt-6"><Skeleton className="h-20 w-full" /></CardContent></Card>
               ))
             : MODULES.map((m) => {
                 const enabled = data?.get(m.key) ?? false;
@@ -122,24 +111,18 @@ function FeaturesPage() {
                   <Switch
                     checked={enabled}
                     disabled={!canToggle}
-                    onCheckedChange={(v) =>
-                      canToggle && toggleMutation.mutate({ key: m.key, enabled: v })
-                    }
+                    onCheckedChange={(v) => canToggle && toggleMutation.mutate({ key: m.key, enabled: v })}
                   />
                 );
                 return (
                   <Card key={m.key} className={enabled ? "" : "opacity-60"}>
                     <CardContent className="pt-6 flex items-start gap-3">
-                      <Icon
-                        className={`w-8 h-8 shrink-0 ${enabled ? "text-primary" : "text-muted-foreground"}`}
-                      />
+                      <Icon className={`w-8 h-8 shrink-0 ${enabled ? "text-primary" : "text-muted-foreground"}`} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold">{titleCase(m.name)}</div>
                         <div className="text-sm text-muted-foreground">{m.desc}</div>
                       </div>
-                      {canToggle ? (
-                        switchEl
-                      ) : (
+                      {canToggle ? switchEl : (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="inline-flex items-center gap-1">
@@ -147,9 +130,7 @@ function FeaturesPage() {
                               {switchEl}
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            Contact your principal to enable this module
-                          </TooltipContent>
+                          <TooltipContent>Contact your principal to enable this module</TooltipContent>
                         </Tooltip>
                       )}
                     </CardContent>

@@ -56,6 +56,7 @@ import { Route as AppFinanceInvoicesRouteImport } from './routes/_app.finance.in
 import { Route as AppFinanceGenerateRouteImport } from './routes/_app.finance.generate'
 import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
+import { Route as AppAdminSupportRouteImport } from './routes/_app.admin.support'
 import { Route as AppAdminStudentDocumentsRouteImport } from './routes/_app.admin.student-documents'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
@@ -323,6 +324,11 @@ const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminSupportRoute = AppAdminSupportRouteImport.update({
+  id: '/admin/support',
+  path: '/admin/support',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminStudentDocumentsRoute =
   AppAdminStudentDocumentsRouteImport.update({
     id: '/admin/student-documents',
@@ -546,6 +552,7 @@ export interface FileRoutesByFullPath {
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
+  '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/generate': typeof AppFinanceGenerateRoute
@@ -626,6 +633,7 @@ export interface FileRoutesByTo {
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
+  '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/generate': typeof AppFinanceGenerateRoute
@@ -708,6 +716,7 @@ export interface FileRoutesById {
   '/_app/admin/schools': typeof AppAdminSchoolsRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/student-documents': typeof AppAdminStudentDocumentsRoute
+  '/_app/admin/support': typeof AppAdminSupportRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/finance/fees': typeof AppFinanceFeesRoute
   '/_app/finance/generate': typeof AppFinanceGenerateRoute
@@ -790,6 +799,7 @@ export interface FileRouteTypes {
     | '/admin/schools'
     | '/admin/settings'
     | '/admin/student-documents'
+    | '/admin/support'
     | '/admin/users'
     | '/finance/fees'
     | '/finance/generate'
@@ -870,6 +880,7 @@ export interface FileRouteTypes {
     | '/admin/schools'
     | '/admin/settings'
     | '/admin/student-documents'
+    | '/admin/support'
     | '/admin/users'
     | '/finance/fees'
     | '/finance/generate'
@@ -951,6 +962,7 @@ export interface FileRouteTypes {
     | '/_app/admin/schools'
     | '/_app/admin/settings'
     | '/_app/admin/student-documents'
+    | '/_app/admin/support'
     | '/_app/admin/users'
     | '/_app/finance/fees'
     | '/_app/finance/generate'
@@ -1325,6 +1337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/support': {
+      id: '/_app/admin/support'
+      path: '/admin/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AppAdminSupportRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/student-documents': {
       id: '/_app/admin/student-documents'
       path: '/admin/student-documents'
@@ -1639,6 +1658,7 @@ interface AppRouteChildren {
   AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminStudentDocumentsRoute: typeof AppAdminStudentDocumentsRoute
+  AppAdminSupportRoute: typeof AppAdminSupportRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppFinanceFeesRoute: typeof AppFinanceFeesRoute
   AppFinanceGenerateRoute: typeof AppFinanceGenerateRoute
@@ -1697,6 +1717,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminSchoolsRoute: AppAdminSchoolsRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminStudentDocumentsRoute: AppAdminStudentDocumentsRoute,
+  AppAdminSupportRoute: AppAdminSupportRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppFinanceFeesRoute: AppFinanceFeesRoute,
   AppFinanceGenerateRoute: AppFinanceGenerateRoute,
