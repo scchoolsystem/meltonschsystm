@@ -27,5 +27,6 @@ ALTER TABLE public.classroom_posts ADD COLUMN IF NOT EXISTS due_date date;
 
 -- field_policies.required_level should be numeric, but stored values may be text;
 -- convert safely.
-ALTER TABLE public.field_policies
-  ALTER COLUMN required_level TYPE int USING NULLIF(required_level,'')::int;
+-- SKIP: column already int
+-- -- SKIPPED (column already int): ALTER TABLE public.field_policies
+--   ALTER COLUMN required_level TYPE int USING NULLIF(required_level,'')::int;

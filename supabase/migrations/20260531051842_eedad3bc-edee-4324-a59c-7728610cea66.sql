@@ -73,3 +73,4 @@ USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'teacher'::app_role) OR has_
 WITH CHECK (is_admin(auth.uid()) OR has_role(auth.uid(), 'teacher'::app_role) OR has_role(auth.uid(), 'class_teacher'::app_role) OR has_role(auth.uid(), 'subject_teacher'::app_role));
 
 CREATE INDEX IF NOT EXISTS idx_classroom_posts_class ON public.classroom_posts(class_id, created_at DESC);
+

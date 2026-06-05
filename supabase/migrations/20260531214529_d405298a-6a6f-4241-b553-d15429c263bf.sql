@@ -1,6 +1,6 @@
 
 -- 1. SCHOOLS: revoke sensitive columns + RESTRICTIVE tenant isolation
-REVOKE SELECT (email)
+REVOKE SELECT (email, email_user, email_pass, email_host, email_port)
   ON public.schools FROM authenticated;
 
 DROP POLICY IF EXISTS "schools tenant isolation" ON public.schools;
@@ -106,3 +106,4 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
+

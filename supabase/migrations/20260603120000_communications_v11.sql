@@ -39,3 +39,4 @@ CREATE POLICY "admin_view_notif_log" ON public.notifications_log
   WITH CHECK (school_id = public.current_user_school() AND public.is_admin(auth.uid()));
 GRANT SELECT,INSERT ON public.notifications_log TO authenticated;
 GRANT ALL ON public.notifications_log TO service_role;
+

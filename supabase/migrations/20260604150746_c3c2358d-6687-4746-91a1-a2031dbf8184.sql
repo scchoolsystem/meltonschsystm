@@ -12,7 +12,7 @@ CREATE TYPE public.app_role AS ENUM (
 );
 
 -- Profiles
-CREATE TABLE IF NOT EXISTS public.profiles (
+CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL DEFAULT '',
   phone TEXT,
@@ -25,7 +25,7 @@ GRANT ALL ON public.profiles TO service_role;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- User roles
-CREATE TABLE IF NOT EXISTS public.user_roles (
+CREATE TABLE public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role app_role NOT NULL,
@@ -47,7 +47,7 @@ RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 -- Classes
-CREATE TABLE IF NOT EXISTS public.classes (
+CREATE TABLE public.classes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   level TEXT NOT NULL CHECK (level IN ('primary','secondary')),
@@ -62,7 +62,7 @@ GRANT ALL ON public.classes TO service_role;
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 
 -- Students
-CREATE TABLE IF NOT EXISTS public.students (
+CREATE TABLE public.students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   admission_no TEXT NOT NULL UNIQUE,
   first_name TEXT NOT NULL,
@@ -84,11 +84,11 @@ CREATE TABLE IF NOT EXISTS public.students (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.students TO authenticated;
 GRANT ALL ON public.students TO service_role;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_students_class ON public.students(class_id);
-CREATE INDEX IF NOT EXISTS idx_students_status ON public.students(status);
+CREATE INDEX idx_students_class ON public.students(class_id);
+CREATE INDEX idx_students_status ON public.students(status);
 
 -- Staff
-CREATE TABLE IF NOT EXISTS public.staff (
+CREATE TABLE public.staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_no TEXT NOT NULL UNIQUE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -107,7 +107,7 @@ GRANT ALL ON public.staff TO service_role;
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 
 -- Activity logs
-CREATE TABLE IF NOT EXISTS public.activity_logs (
+CREATE TABLE public.activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   action TEXT NOT NULL,
@@ -119,62 +119,32 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
 GRANT SELECT, INSERT ON public.activity_logs TO authenticated;
 GRANT ALL ON public.activity_logs TO service_role;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON public.activity_logs(created_at DESC);
+CREATE INDEX idx_activity_logs_created ON public.activity_logs(created_at DESC);
 
 -- RLS Policies
-DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
 CREATE POLICY "users view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
-DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
 CREATE POLICY "admins view all profiles" ON public.profiles FOR SELECT USING (public.is_admin(auth.uid()));
-DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
 CREATE POLICY "users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
-DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
 CREATE POLICY "users insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
-DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
 CREATE POLICY "users see own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
-DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
-DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
 CREATE POLICY "admins see all roles" ON public.user_roles FOR SELECT USING (public.is_admin(auth.uid()));
-DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
-DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
 CREATE POLICY "admins manage roles" ON public.user_roles FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
-DROP POLICY IF EXISTS "auth view classes" ON public.classes;
-DROP POLICY IF EXISTS "auth view classes" ON public.classes;
 CREATE POLICY "auth view classes" ON public.classes FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "admins manage classes" ON public.classes;
-DROP POLICY IF EXISTS "admins manage classes" ON public.classes;
 CREATE POLICY "admins manage classes" ON public.classes FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
-DROP POLICY IF EXISTS "staff view students" ON public.students;
-DROP POLICY IF EXISTS "staff view students" ON public.students;
 CREATE POLICY "staff view students" ON public.students FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "admission staff manage students" ON public.students;
-DROP POLICY IF EXISTS "admission staff manage students" ON public.students;
 CREATE POLICY "admission staff manage students" ON public.students FOR ALL USING (
   public.is_admin(auth.uid()) OR public.has_role(auth.uid(),'admission_officer') OR public.has_role(auth.uid(),'deputy_principal')
 ) WITH CHECK (
   public.is_admin(auth.uid()) OR public.has_role(auth.uid(),'admission_officer') OR public.has_role(auth.uid(),'deputy_principal')
 );
 
-DROP POLICY IF EXISTS "auth view staff" ON public.staff;
-DROP POLICY IF EXISTS "auth view staff" ON public.staff;
 CREATE POLICY "auth view staff" ON public.staff FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "admins manage staff" ON public.staff;
-DROP POLICY IF EXISTS "admins manage staff" ON public.staff;
 CREATE POLICY "admins manage staff" ON public.staff FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
-DROP POLICY IF EXISTS "admins view logs" ON public.activity_logs;
-DROP POLICY IF EXISTS "admins view logs" ON public.activity_logs;
 CREATE POLICY "admins view logs" ON public.activity_logs FOR SELECT USING (public.is_admin(auth.uid()));
-DROP POLICY IF EXISTS "auth insert logs" ON public.activity_logs;
-DROP POLICY IF EXISTS "auth insert logs" ON public.activity_logs;
 CREATE POLICY "auth insert logs" ON public.activity_logs FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
 -- Auto profile + first-user-becomes-admin trigger
@@ -192,7 +162,6 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -216,7 +185,6 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS set_admission_no ON public.students;
 CREATE TRIGGER set_admission_no
   BEFORE INSERT ON public.students
   FOR EACH ROW EXECUTE FUNCTION public.gen_admission_no();
@@ -235,7 +203,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-DROP TRIGGER IF EXISTS set_employee_no ON public.staff;
 CREATE TRIGGER set_employee_no
   BEFORE INSERT ON public.staff
   FOR EACH ROW EXECUTE FUNCTION public.gen_employee_no();

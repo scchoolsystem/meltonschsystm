@@ -130,3 +130,4 @@ WITH CHECK (
 
 CREATE TRIGGER trg_lsa_school BEFORE INSERT ON public.live_session_attendance
   FOR EACH ROW EXECUTE FUNCTION public.stamp_school_id();
+
