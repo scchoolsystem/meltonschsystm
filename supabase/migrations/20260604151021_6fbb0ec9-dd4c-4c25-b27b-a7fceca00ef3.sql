@@ -1,5 +1,6 @@
 -- Extended RLS scoping
 DROP POLICY IF EXISTS "auth view discipline" ON public.discipline_records;
+DROP POLICY IF EXISTS "staff view discipline" ON public.discipline_records;
 CREATE POLICY "staff view discipline" ON public.discipline_records
   FOR SELECT TO authenticated
   USING (
@@ -10,6 +11,7 @@ CREATE POLICY "staff view discipline" ON public.discipline_records
   );
 
 DROP POLICY IF EXISTS "staff view students" ON public.students;
+DROP POLICY IF EXISTS "relevant staff view students" ON public.students;
 CREATE POLICY "relevant staff view students" ON public.students
   FOR SELECT TO authenticated
   USING (
@@ -29,31 +31,37 @@ CREATE POLICY "relevant staff view students" ON public.students
   );
 
 DROP POLICY IF EXISTS "auth view staff" ON public.staff;
+DROP POLICY IF EXISTS "admins or self view staff" ON public.staff;
 CREATE POLICY "admins or self view staff" ON public.staff
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR user_id = auth.uid());
 
 DROP POLICY IF EXISTS "auth view invoices" ON public.invoices;
+DROP POLICY IF EXISTS "bursar view invoices" ON public.invoices;
 CREATE POLICY "bursar view invoices" ON public.invoices
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'bursar'::app_role));
 
 DROP POLICY IF EXISTS "auth view payments" ON public.payments;
+DROP POLICY IF EXISTS "bursar view payments" ON public.payments;
 CREATE POLICY "bursar view payments" ON public.payments
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'bursar'::app_role));
 
 DROP POLICY IF EXISTS "auth view dorm asg" ON public.dorm_assignments;
+DROP POLICY IF EXISTS "matron view dorm asg" ON public.dorm_assignments;
 CREATE POLICY "matron view dorm asg" ON public.dorm_assignments
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'matron'::app_role) OR has_role(auth.uid(), 'boarding'::app_role));
 
 DROP POLICY IF EXISTS "auth view t-asg" ON public.transport_assignments;
+DROP POLICY IF EXISTS "transport view asg" ON public.transport_assignments;
 CREATE POLICY "transport view asg" ON public.transport_assignments
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'transport_officer'::app_role));
 
 DROP POLICY IF EXISTS "auth view attendance" ON public.attendance_records;
+DROP POLICY IF EXISTS "teachers view attendance" ON public.attendance_records;
 CREATE POLICY "teachers view attendance" ON public.attendance_records
   FOR SELECT TO authenticated
   USING (
@@ -65,6 +73,7 @@ CREATE POLICY "teachers view attendance" ON public.attendance_records
   );
 
 DROP POLICY IF EXISTS "auth view results" ON public.exam_results;
+DROP POLICY IF EXISTS "teachers view results" ON public.exam_results;
 CREATE POLICY "teachers view results" ON public.exam_results
   FOR SELECT TO authenticated
   USING (
@@ -76,6 +85,7 @@ CREATE POLICY "teachers view results" ON public.exam_results
   );
 
 DROP POLICY IF EXISTS "auth view loans" ON public.book_loans;
+DROP POLICY IF EXISTS "librarian view loans" ON public.book_loans;
 CREATE POLICY "librarian view loans" ON public.book_loans
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'librarian'::app_role));
@@ -132,7 +142,9 @@ INSERT INTO public.school_settings (singleton) VALUES (true) ON CONFLICT (single
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.school_settings TO authenticated;
 GRANT ALL ON public.school_settings TO service_role;
 ALTER TABLE public.school_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth read settings" ON public.school_settings;
 CREATE POLICY "auth read settings" ON public.school_settings FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admin manage settings" ON public.school_settings;
 CREATE POLICY "admin manage settings" ON public.school_settings
   FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
@@ -150,8 +162,10 @@ CREATE TABLE IF NOT EXISTS public.user_credentials (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_credentials TO authenticated;
 GRANT ALL ON public.user_credentials TO service_role;
 ALTER TABLE public.user_credentials ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "self read credentials" ON public.user_credentials;
 CREATE POLICY "self read credentials" ON public.user_credentials
   FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.is_admin(auth.uid()));
+DROP POLICY IF EXISTS "admin manage credentials" ON public.user_credentials;
 CREATE POLICY "admin manage credentials" ON public.user_credentials
   FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
@@ -175,6 +189,7 @@ CREATE TABLE IF NOT EXISTS public.unique_id_counters (
 GRANT SELECT, INSERT, UPDATE ON public.unique_id_counters TO authenticated;
 GRANT ALL ON public.unique_id_counters TO service_role;
 ALTER TABLE public.unique_id_counters ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "admin read counters" ON public.unique_id_counters;
 CREATE POLICY "admin read counters" ON public.unique_id_counters
   FOR SELECT TO authenticated USING (public.is_admin(auth.uid()));
 
@@ -245,33 +260,54 @@ RETURNS SETOF uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
   SELECT student_id FROM public.parent_student_links WHERE parent_user_id = auth.uid()
 $$;
 
+DROP POLICY IF EXISTS "admin manage parent links" ON public.parent_student_links;
 CREATE POLICY "admin manage parent links" ON public.parent_student_links
   FOR ALL TO authenticated USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "parent read own links" ON public.parent_student_links;
 CREATE POLICY "parent read own links" ON public.parent_student_links
   FOR SELECT TO authenticated USING (parent_user_id = auth.uid());
+DROP POLICY IF EXISTS "admin manage student links" ON public.student_user_links;
 CREATE POLICY "admin manage student links" ON public.student_user_links
   FOR ALL TO authenticated USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
+DROP POLICY IF EXISTS "student read own link" ON public.student_user_links;
 CREATE POLICY "student read own link" ON public.student_user_links
   FOR SELECT TO authenticated USING (user_id = auth.uid());
 
 CREATE POLICY "student self view"  ON public.students FOR SELECT TO authenticated USING (is_student(id));
 CREATE POLICY "parent child view"  ON public.students FOR SELECT TO authenticated USING (is_parent_of(id));
+DROP POLICY IF EXISTS "student self view attendance" ON public.attendance_records;
 CREATE POLICY "student self view attendance" ON public.attendance_records FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view attendance" ON public.attendance_records;
 CREATE POLICY "parent child view attendance" ON public.attendance_records FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view results" ON public.exam_results;
 CREATE POLICY "student self view results" ON public.exam_results FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view results" ON public.exam_results;
 CREATE POLICY "parent child view results" ON public.exam_results FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view invoices" ON public.invoices;
 CREATE POLICY "student self view invoices" ON public.invoices FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view invoices" ON public.invoices;
 CREATE POLICY "parent child view invoices" ON public.invoices FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view payments" ON public.payments;
 CREATE POLICY "student self view payments" ON public.payments FOR SELECT TO authenticated USING (
   EXISTS (SELECT 1 FROM public.invoices i WHERE i.id = invoice_id AND is_student(i.student_id)));
+DROP POLICY IF EXISTS "parent child view payments" ON public.payments;
 CREATE POLICY "parent child view payments" ON public.payments FOR SELECT TO authenticated USING (
   EXISTS (SELECT 1 FROM public.invoices i WHERE i.id = invoice_id AND is_parent_of(i.student_id)));
+DROP POLICY IF EXISTS "student self view loans" ON public.book_loans;
 CREATE POLICY "student self view loans" ON public.book_loans FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view loans" ON public.book_loans;
 CREATE POLICY "parent child view loans" ON public.book_loans FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view discipline" ON public.discipline_records;
 CREATE POLICY "student self view discipline" ON public.discipline_records FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view discipline" ON public.discipline_records;
 CREATE POLICY "parent child view discipline" ON public.discipline_records FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "parent child view clinic" ON public.clinic_visits;
 CREATE POLICY "parent child view clinic" ON public.clinic_visits FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view dorm" ON public.dorm_assignments;
 CREATE POLICY "student self view dorm" ON public.dorm_assignments FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view dorm" ON public.dorm_assignments;
 CREATE POLICY "parent child view dorm" ON public.dorm_assignments FOR SELECT TO authenticated USING (is_parent_of(student_id));
+DROP POLICY IF EXISTS "student self view transport" ON public.transport_assignments;
 CREATE POLICY "student self view transport" ON public.transport_assignments FOR SELECT TO authenticated USING (is_student(student_id));
+DROP POLICY IF EXISTS "parent child view transport" ON public.transport_assignments;
 CREATE POLICY "parent child view transport" ON public.transport_assignments FOR SELECT TO authenticated USING (is_parent_of(student_id));
