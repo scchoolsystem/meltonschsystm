@@ -293,6 +293,7 @@ DROP POLICY IF EXISTS "student read own link" ON public.student_user_links;
 CREATE POLICY "student read own link" ON public.student_user_links
   FOR SELECT TO authenticated USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "student self view" ON public.students;
 CREATE POLICY "student self view"  ON public.students FOR SELECT TO authenticated USING (is_student(id));
 CREATE POLICY "parent child view"  ON public.students FOR SELECT TO authenticated USING (is_parent_of(id));
 DROP POLICY IF EXISTS "student self view attendance" ON public.attendance_records;
