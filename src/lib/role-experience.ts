@@ -173,6 +173,7 @@ const ADMIN_NAV: NavGroup[] = [
   { label: "Main", items: [
     dashboard,
     { title: "Analytics", url: "/analytics" },
+    { title: "School Brain", url: "/admin/brain" },
     { title: "Students", url: "/students" },
     { title: "Staff", url: "/staff" },
     { title: "Classes", url: "/classes" },
