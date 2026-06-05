@@ -1,10 +1,10 @@
 -- Roles enum
-CREATE TYPE IF NOT EXISTS public.app_role AS ENUM (
-  'super_admin','principal','deputy_principal','class_teacher','subject_teacher',
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN CREATE TYPE public.app_role AS ENUM (
+    'super_admin','principal','deputy_principal','class_teacher','subject_teacher',
   'hod','admission_officer','bursar','librarian','sports','boarding','parent','student','staff'
-);
+); END IF; END $$;
 
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL DEFAULT '',
   phone TEXT,
@@ -14,7 +14,7 @@ CREATE TABLE public.profiles (
 );
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role app_role NOT NULL,
