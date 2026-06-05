@@ -8,7 +8,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.subjects TO authenticated;
 GRANT ALL ON public.subjects TO service_role;
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view subjects" ON public.subjects;
+DROP POLICY IF EXISTS "auth view subjects" ON public.subjects;
 CREATE POLICY "auth view subjects" ON public.subjects FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage subjects" ON public.subjects;
 DROP POLICY IF EXISTS "admins manage subjects" ON public.subjects;
 CREATE POLICY "admins manage subjects" ON public.subjects FOR ALL USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
 
@@ -24,7 +26,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.exams TO authenticated;
 GRANT ALL ON public.exams TO service_role;
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view exams" ON public.exams;
+DROP POLICY IF EXISTS "auth view exams" ON public.exams;
 CREATE POLICY "auth view exams" ON public.exams FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage exams" ON public.exams;
 DROP POLICY IF EXISTS "admins manage exams" ON public.exams;
 CREATE POLICY "admins manage exams" ON public.exams FOR ALL USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
 
@@ -40,7 +44,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.exam_results TO authenticated;
 GRANT ALL ON public.exam_results TO service_role;
 ALTER TABLE public.exam_results ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view results" ON public.exam_results;
+DROP POLICY IF EXISTS "auth view results" ON public.exam_results;
 CREATE POLICY "auth view results" ON public.exam_results FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "teachers manage results" ON public.exam_results;
 DROP POLICY IF EXISTS "teachers manage results" ON public.exam_results;
 CREATE POLICY "teachers manage results" ON public.exam_results FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'teacher'::app_role))
@@ -58,7 +64,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.fee_structures TO authenticated;
 GRANT ALL ON public.fee_structures TO service_role;
 ALTER TABLE public.fee_structures ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view fees" ON public.fee_structures;
+DROP POLICY IF EXISTS "auth view fees" ON public.fee_structures;
 CREATE POLICY "auth view fees" ON public.fee_structures FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "bursar manage fees" ON public.fee_structures;
 DROP POLICY IF EXISTS "bursar manage fees" ON public.fee_structures;
 CREATE POLICY "bursar manage fees" ON public.fee_structures FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'bursar'::app_role))
@@ -78,7 +86,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.invoices TO authenticated;
 GRANT ALL ON public.invoices TO service_role;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view invoices" ON public.invoices;
+DROP POLICY IF EXISTS "auth view invoices" ON public.invoices;
 CREATE POLICY "auth view invoices" ON public.invoices FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "bursar manage invoices" ON public.invoices;
 DROP POLICY IF EXISTS "bursar manage invoices" ON public.invoices;
 CREATE POLICY "bursar manage invoices" ON public.invoices FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'bursar'::app_role))
@@ -112,7 +122,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.payments TO authenticated;
 GRANT ALL ON public.payments TO service_role;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view payments" ON public.payments;
+DROP POLICY IF EXISTS "auth view payments" ON public.payments;
 CREATE POLICY "auth view payments" ON public.payments FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "bursar manage payments" ON public.payments;
 DROP POLICY IF EXISTS "bursar manage payments" ON public.payments;
 CREATE POLICY "bursar manage payments" ON public.payments FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'bursar'::app_role))
@@ -145,7 +157,7 @@ END $$;
 CREATE TRIGGER trg_upd_invoice_paid AFTER INSERT OR UPDATE OR DELETE ON public.payments
   FOR EACH ROW EXECUTE FUNCTION public.update_invoice_paid();
 
-CREATE UNIQUE INDEX IF NOT EXISTS IF NOT EXISTS payments_receipt_no_unique ON public.payments (receipt_no);
+CREATE UNIQUE INDEX IF NOT EXISTS IF NOT EXISTS IF NOT EXISTS payments_receipt_no_unique ON public.payments (receipt_no);
 
 -- ATTENDANCE & DISCIPLINE
 CREATE TABLE IF NOT EXISTS public.attendance_records (
@@ -161,7 +173,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_records TO authenticat
 GRANT ALL ON public.attendance_records TO service_role;
 ALTER TABLE public.attendance_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view attendance" ON public.attendance_records;
+DROP POLICY IF EXISTS "auth view attendance" ON public.attendance_records;
 CREATE POLICY "auth view attendance" ON public.attendance_records FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "teachers manage attendance" ON public.attendance_records;
 DROP POLICY IF EXISTS "teachers manage attendance" ON public.attendance_records;
 CREATE POLICY "teachers manage attendance" ON public.attendance_records FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'teacher'::app_role) OR has_role(auth.uid(),'deputy_principal'::app_role))
@@ -181,7 +195,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.discipline_records TO authenticat
 GRANT ALL ON public.discipline_records TO service_role;
 ALTER TABLE public.discipline_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view discipline" ON public.discipline_records;
+DROP POLICY IF EXISTS "auth view discipline" ON public.discipline_records;
 CREATE POLICY "auth view discipline" ON public.discipline_records FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "staff manage discipline" ON public.discipline_records;
 DROP POLICY IF EXISTS "staff manage discipline" ON public.discipline_records;
 CREATE POLICY "staff manage discipline" ON public.discipline_records FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'teacher'::app_role) OR has_role(auth.uid(),'deputy_principal'::app_role))
@@ -200,7 +216,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.books TO authenticated;
 GRANT ALL ON public.books TO service_role;
 ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view books" ON public.books;
+DROP POLICY IF EXISTS "auth view books" ON public.books;
 CREATE POLICY "auth view books" ON public.books FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "librarian manage books" ON public.books;
 DROP POLICY IF EXISTS "librarian manage books" ON public.books;
 CREATE POLICY "librarian manage books" ON public.books FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'librarian'::app_role))
@@ -219,7 +237,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.book_loans TO authenticated;
 GRANT ALL ON public.book_loans TO service_role;
 ALTER TABLE public.book_loans ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view loans" ON public.book_loans;
+DROP POLICY IF EXISTS "auth view loans" ON public.book_loans;
 CREATE POLICY "auth view loans" ON public.book_loans FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "librarian manage loans" ON public.book_loans;
 DROP POLICY IF EXISTS "librarian manage loans" ON public.book_loans;
 CREATE POLICY "librarian manage loans" ON public.book_loans FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'librarian'::app_role))
@@ -236,7 +256,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.dormitories TO authenticated;
 GRANT ALL ON public.dormitories TO service_role;
 ALTER TABLE public.dormitories ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view dorms" ON public.dormitories;
+DROP POLICY IF EXISTS "auth view dorms" ON public.dormitories;
 CREATE POLICY "auth view dorms" ON public.dormitories FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "matron manage dorms" ON public.dormitories;
 DROP POLICY IF EXISTS "matron manage dorms" ON public.dormitories;
 CREATE POLICY "matron manage dorms" ON public.dormitories FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'matron'::app_role))
@@ -252,7 +274,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.dorm_assignments TO authenticated
 GRANT ALL ON public.dorm_assignments TO service_role;
 ALTER TABLE public.dorm_assignments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view dorm asg" ON public.dorm_assignments;
+DROP POLICY IF EXISTS "auth view dorm asg" ON public.dorm_assignments;
 CREATE POLICY "auth view dorm asg" ON public.dorm_assignments FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "matron manage dorm asg" ON public.dorm_assignments;
 DROP POLICY IF EXISTS "matron manage dorm asg" ON public.dorm_assignments;
 CREATE POLICY "matron manage dorm asg" ON public.dorm_assignments FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'matron'::app_role))
@@ -271,7 +295,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.transport_routes TO authenticated
 GRANT ALL ON public.transport_routes TO service_role;
 ALTER TABLE public.transport_routes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view routes" ON public.transport_routes;
+DROP POLICY IF EXISTS "auth view routes" ON public.transport_routes;
 CREATE POLICY "auth view routes" ON public.transport_routes FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "transport manage routes" ON public.transport_routes;
 DROP POLICY IF EXISTS "transport manage routes" ON public.transport_routes;
 CREATE POLICY "transport manage routes" ON public.transport_routes FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'transport_officer'::app_role))
@@ -287,7 +313,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.transport_assignments TO authenti
 GRANT ALL ON public.transport_assignments TO service_role;
 ALTER TABLE public.transport_assignments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view t-asg" ON public.transport_assignments;
+DROP POLICY IF EXISTS "auth view t-asg" ON public.transport_assignments;
 CREATE POLICY "auth view t-asg" ON public.transport_assignments FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "transport manage asg" ON public.transport_assignments;
 DROP POLICY IF EXISTS "transport manage asg" ON public.transport_assignments;
 CREATE POLICY "transport manage asg" ON public.transport_assignments FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'transport_officer'::app_role))
@@ -306,9 +334,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.clinic_visits TO authenticated;
 GRANT ALL ON public.clinic_visits TO service_role;
 ALTER TABLE public.clinic_visits ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "medical staff view clinic" ON public.clinic_visits;
+DROP POLICY IF EXISTS "medical staff view clinic" ON public.clinic_visits;
 CREATE POLICY "medical staff view clinic" ON public.clinic_visits
   FOR SELECT TO authenticated
   USING (is_admin(auth.uid()) OR has_role(auth.uid(), 'nurse'::app_role));
+DROP POLICY IF EXISTS "nurse manage clinic" ON public.clinic_visits;
 DROP POLICY IF EXISTS "nurse manage clinic" ON public.clinic_visits;
 CREATE POLICY "nurse manage clinic" ON public.clinic_visits FOR ALL
   USING (is_admin(auth.uid()) OR has_role(auth.uid(),'nurse'::app_role))
@@ -327,7 +357,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcements TO authenticated;
 GRANT ALL ON public.announcements TO service_role;
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view announcements" ON public.announcements;
+DROP POLICY IF EXISTS "auth view announcements" ON public.announcements;
 CREATE POLICY "auth view announcements" ON public.announcements FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage announcements" ON public.announcements;
 DROP POLICY IF EXISTS "admins manage announcements" ON public.announcements;
 CREATE POLICY "admins manage announcements" ON public.announcements FOR ALL
   USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
@@ -345,7 +377,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.timetable_slots TO authenticated;
 GRANT ALL ON public.timetable_slots TO service_role;
 ALTER TABLE public.timetable_slots ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth view timetable" ON public.timetable_slots;
+DROP POLICY IF EXISTS "auth view timetable" ON public.timetable_slots;
 CREATE POLICY "auth view timetable" ON public.timetable_slots FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage timetable" ON public.timetable_slots;
 DROP POLICY IF EXISTS "admins manage timetable" ON public.timetable_slots;
 CREATE POLICY "admins manage timetable" ON public.timetable_slots FOR ALL
   USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));

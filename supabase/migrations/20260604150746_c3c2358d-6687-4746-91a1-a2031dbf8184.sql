@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS public.students (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.students TO authenticated;
 GRANT ALL ON public.students TO service_role;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_students_class ON public.students(class_id);
-CREATE INDEX IF NOT EXISTS idx_students_status ON public.students(status);
+CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_students_class ON public.students(class_id);
+CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_students_status ON public.students(status);
 
 -- Staff
 CREATE TABLE IF NOT EXISTS public.staff (
@@ -119,32 +119,43 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
 GRANT SELECT, INSERT ON public.activity_logs TO authenticated;
 GRANT ALL ON public.activity_logs TO service_role;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON public.activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_activity_logs_created ON public.activity_logs(created_at DESC);
 
 -- RLS Policies
 DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "users view own profile" ON public.profiles;
 CREATE POLICY "users view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "admins view all profiles" ON public.profiles;
 CREATE POLICY "admins view all profiles" ON public.profiles FOR SELECT USING (public.is_admin(auth.uid()));
 DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "users update own profile" ON public.profiles;
 CREATE POLICY "users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "users insert own profile" ON public.profiles;
 CREATE POLICY "users insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
+DROP POLICY IF EXISTS "users see own roles" ON public.user_roles;
 CREATE POLICY "users see own roles" ON public.user_roles FOR SELECT USING (auth.uid() = user_id);
 DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
+DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
 CREATE POLICY "admins see all roles" ON public.user_roles FOR SELECT USING (public.is_admin(auth.uid()));
+DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
 DROP POLICY IF EXISTS "admins manage roles" ON public.user_roles;
 CREATE POLICY "admins manage roles" ON public.user_roles FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "auth view classes" ON public.classes;
+DROP POLICY IF EXISTS "auth view classes" ON public.classes;
 CREATE POLICY "auth view classes" ON public.classes FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage classes" ON public.classes;
 DROP POLICY IF EXISTS "admins manage classes" ON public.classes;
 CREATE POLICY "admins manage classes" ON public.classes FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "staff view students" ON public.students;
+DROP POLICY IF EXISTS "staff view students" ON public.students;
 CREATE POLICY "staff view students" ON public.students FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admission staff manage students" ON public.students;
 DROP POLICY IF EXISTS "admission staff manage students" ON public.students;
 CREATE POLICY "admission staff manage students" ON public.students FOR ALL USING (
   public.is_admin(auth.uid()) OR public.has_role(auth.uid(),'admission_officer') OR public.has_role(auth.uid(),'deputy_principal')
@@ -153,12 +164,16 @@ CREATE POLICY "admission staff manage students" ON public.students FOR ALL USING
 );
 
 DROP POLICY IF EXISTS "auth view staff" ON public.staff;
+DROP POLICY IF EXISTS "auth view staff" ON public.staff;
 CREATE POLICY "auth view staff" ON public.staff FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "admins manage staff" ON public.staff;
 DROP POLICY IF EXISTS "admins manage staff" ON public.staff;
 CREATE POLICY "admins manage staff" ON public.staff FOR ALL USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
 DROP POLICY IF EXISTS "admins view logs" ON public.activity_logs;
+DROP POLICY IF EXISTS "admins view logs" ON public.activity_logs;
 CREATE POLICY "admins view logs" ON public.activity_logs FOR SELECT USING (public.is_admin(auth.uid()));
+DROP POLICY IF EXISTS "auth insert logs" ON public.activity_logs;
 DROP POLICY IF EXISTS "auth insert logs" ON public.activity_logs;
 CREATE POLICY "auth insert logs" ON public.activity_logs FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
