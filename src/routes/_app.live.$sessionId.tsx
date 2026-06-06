@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, useRouter, Link, useParams } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ function SessionRoom() {
     ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
   );
 
+  const router = useRouter();
   const { data: session, isLoading } = useQuery({
     queryKey: ["live-session", sessionId],
     queryFn: async () => {
@@ -92,12 +93,11 @@ function SessionRoom() {
     };
   }, [session, isStudent, myStudent, sessionId, user?.id]);
 
-  useEffect(() => {
-    if (!session || !canManage) return;
-    if (session.status === "scheduled") {
-      supabase.from("live_sessions").update({ status: "live", started_at: new Date().toISOString() }).eq("id", sessionId).then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
-    }
-  }, [session, canManage, sessionId, qc]);
+  const startSession = async () => {
+    await supabase.from("live_sessions").update({ status: "live", started_at: new Date().toISOString() }).eq("id", sessionId);
+    qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
+    toast.success("Session started");
+  };
 
   if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   if (!session) return <div className="p-6">Session not found.</div>;
@@ -109,6 +109,7 @@ function SessionRoom() {
     await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
     toast.success("Session ended");
     qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
+    router.navigate({ to: "/live" });
   };
 
   return (
@@ -137,6 +138,17 @@ function SessionRoom() {
 
       {session.status === "cancelled" || session.status === "ended" ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">This session has {session.status}. You can still adjust attendance below.</CardContent></Card>
+      ) : session.status === "scheduled" ? (
+        <Card><CardContent className="py-10 text-center space-y-4">
+          <p className="text-muted-foreground">Session not started yet.</p>
+          <p className="text-sm text-muted-foreground">Scheduled: {format(new Date(session.scheduled_start), "PPp")}</p>
+          {canManage && (
+            <Button onClick={startSession} size="lg">
+              <Video className="w-4 h-4 mr-2" />Start session
+            </Button>
+          )}
+          {!canManage && <p className="text-sm text-muted-foreground">Waiting for teacher to start the session.</p>}
+        </CardContent></Card>
       ) : (
         <Card className="overflow-hidden">
           <iframe

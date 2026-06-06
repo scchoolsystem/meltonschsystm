@@ -17,6 +17,16 @@ import { Loader2, Plus, KeyRound, Megaphone, BookOpen, FileText, Copy, Check } f
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+async function uploadClassroomFile(file: File, schoolId: string): Promise<string> {
+  const ext = file.name.split(".").pop();
+  const path = `${schoolId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from("classroom-attachments").upload(path, file, { upsert: false });
+  if (error) throw error;
+  const { data } = supabase.storage.from("classroom-attachments").getPublicUrl(path);
+  return data.publicUrl;
+}
+
+
 export const Route = createFileRoute("/_app/classroom")({ component: ClassroomPage });
 
 const KIND_META: Record<string, { icon: any; label: string; color: string }> = {

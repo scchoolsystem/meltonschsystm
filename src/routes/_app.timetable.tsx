@@ -79,7 +79,37 @@ function AddSlot({ classId, subjects, staff, onDone }: { classId: string; subjec
     mutationFn: async () => {
       const payload: any = { ...f, class_id: classId };
       if (!payload.teacher_id) delete payload.teacher_id;
-      const { error } = await supabase.from("timetable_slots").insert(payload); if (error) throw error;
+
+      // Conflict check: same class + same day + overlapping time
+      const { data: classConflicts } = await supabase
+        .from("timetable_slots")
+        .select("id, subjects(name)")
+        .eq("class_id", classId)
+        .eq("day_of_week", f.day_of_week)
+        .lt("start_time", f.end_time)
+        .gt("end_time", f.start_time);
+      if (classConflicts && classConflicts.length > 0) {
+        const name = (classConflicts[0] as any).subjects?.name ?? "another subject";
+        throw new Error(`Class conflict: ${name} is already scheduled in this slot.`);
+      }
+
+      // Conflict check: same teacher + same day + overlapping time
+      if (payload.teacher_id) {
+        const { data: teacherConflicts } = await supabase
+          .from("timetable_slots")
+          .select("id, classes(name)")
+          .eq("teacher_id", payload.teacher_id)
+          .eq("day_of_week", f.day_of_week)
+          .lt("start_time", f.end_time)
+          .gt("end_time", f.start_time);
+        if (teacherConflicts && teacherConflicts.length > 0) {
+          const cls = (teacherConflicts[0] as any).classes?.name ?? "another class";
+          throw new Error(`Teacher conflict: already assigned to ${cls} at this time.`);
+        }
+      }
+
+      const { error } = await supabase.from("timetable_slots").insert(payload);
+      if (error) throw error;
     },
     onSuccess: () => { toast.success("Slot added"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
