@@ -1,0 +1,9 @@
+{
+  "appId": "com.smartdev.app",
+  "appName": "SmartDev",
+  "webDir": "dist/client",
+  "server": {
+    "url": "https://smartdev.co.ke",
+    "cleartext": false
+  }
+}

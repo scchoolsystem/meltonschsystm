@@ -1,4 +1,4 @@
--- school_features.feature column already exists in the original schema; no rename needed.
+-- school_features.feature_key already exists in the original schema; no rename needed.
 
 -- Fix user_roles unique constraint to include school_id (multi-school support)
 ALTER TABLE public.user_roles
