@@ -95,6 +95,18 @@ function LivePage() {
 function Spinner() { return <div className="h-32 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>; }
 function Empty({ msg }: { msg: string }) { return <Card><CardContent className="py-12 text-center text-muted-foreground">{msg}</CardContent></Card>; }
 
+function SessionDescription({ description }: { description: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <CardContent className="pt-0">
+      <button onClick={() => setOpen(v => !v)} className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+        {open ? "Hide details" : "Show details"}
+      </button>
+      {open && <p className="text-sm whitespace-pre-wrap mt-1">{description}</p>}
+    </CardContent>
+  );
+}
+
 function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; onChanged: () => void }) {
   const start = new Date(s.scheduled_start);
   const isLiveWindow = Date.now() >= start.getTime() - 10 * 60_000 && (s.status === "scheduled" || s.status === "live");
@@ -134,7 +146,7 @@ function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; 
           </div>
         </div>
       </CardHeader>
-      {s.description && <CardContent className="pt-0 text-sm whitespace-pre-wrap">{s.description}</CardContent>}
+      {s.description && <SessionDescription description={s.description} />}
     </Card>
   );
 }

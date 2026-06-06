@@ -251,6 +251,31 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 space-y-0">
         <div>
           <CardTitle className="text-base">Attendance roster</CardTitle>
+          <button
+            onClick={() => {
+              const rows = [["Student Name","Unique ID","Status","Joined At","Left At","Duration (min)"]];
+              for (const s of roster as any[]) {
+                const att = attMap.get(s.id);
+                rows.push([
+                  `${s.first_name} ${s.last_name}`,
+                  s.unique_id ?? "",
+                  att?.status ?? "absent",
+                  att?.joined_at ? new Date(att.joined_at).toLocaleString() : "",
+                  att?.left_at ? new Date(att.left_at).toLocaleString() : "",
+                  att?.duration_seconds ? String(Math.round(att.duration_seconds / 60)) : "",
+                ]);
+              }
+              const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = `attendance-${sessionId}.csv`; a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="text-xs border rounded px-2 py-1 hover:bg-muted"
+          >
+            Export CSV
+          </button>
           <p className="text-xs text-muted-foreground mt-1">
             {counts.total} students · <span className="text-emerald-600">{counts.present} present</span> · <span className="text-amber-600">{counts.late} late</span> · <span className="text-destructive">{counts.absent} absent</span> · {counts.unmarked} unmarked
           </p>

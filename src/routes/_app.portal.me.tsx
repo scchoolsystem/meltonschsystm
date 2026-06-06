@@ -11,6 +11,51 @@ import {
   Mail, Phone, Building2, IdCard, Loader2,
 } from "lucide-react";
 
+function PayslipsTab({ staffId }: { staffId?: string }) {
+  const { data: slips = [], isLoading, isError } = useQuery({
+    queryKey: ["payslips", staffId],
+    enabled: !!staffId,
+    queryFn: async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("payroll_slips")
+          .select("id,month,year,net_pay,status,created_at")
+          .eq("staff_id", staffId)
+          .order("year", { ascending: false })
+          .order("month", { ascending: false });
+        if (error) return [];
+        return data ?? [];
+      } catch { return []; }
+    },
+  });
+  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Loading…</div>;
+  if (isError || slips.length === 0) return (
+    <Card><CardContent className="pt-6 text-sm text-muted-foreground">
+      Payslips are not configured for your school yet. Contact your administrator.
+    </CardContent></Card>
+  );
+  return (
+    <Card><CardContent className="pt-6 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead><tr className="border-b text-left">
+          <th className="pb-2">Month</th><th className="pb-2">Year</th>
+          <th className="pb-2">Net Pay</th><th className="pb-2">Status</th>
+        </tr></thead>
+        <tbody>
+          {(slips as any[]).map((s: any) => (
+            <tr key={s.id} className="border-b last:border-0">
+              <td className="py-2">{s.month}</td>
+              <td className="py-2">{s.year}</td>
+              <td className="py-2">KES {Number(s.net_pay ?? 0).toLocaleString()}</td>
+              <td className="py-2"><span className="px-2 py-0.5 rounded-full text-xs border">{s.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </CardContent></Card>
+  );
+}
+
 export const Route = createFileRoute("/_app/portal/me")({
   component: MyWorkspace,
 });
@@ -171,6 +216,7 @@ function MyWorkspace() {
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="classes">Classes & subjects</TabsTrigger>
           <TabsTrigger value="activity">My activity</TabsTrigger>
+          <TabsTrigger value="payslips">Payslips</TabsTrigger>
           <TabsTrigger value="news">News</TabsTrigger>
         </TabsList>
 
@@ -274,6 +320,9 @@ function MyWorkspace() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="payslips">
+          <PayslipsTab staffId={staff?.id} />
+        </TabsContent>
         <TabsContent value="news">
           <Card><CardHeader><CardTitle className="text-base flex items-center gap-2"><Megaphone className="w-4 h-4" />Announcements</CardTitle></CardHeader>
             <CardContent className="space-y-3">

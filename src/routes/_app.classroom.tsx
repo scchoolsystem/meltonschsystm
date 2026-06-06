@@ -257,6 +257,9 @@ function SubmissionsDialog({ open, onOpenChange, post, canManage }: { open: bool
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{post.title} — {canManage ? "Submissions" : "Submit your work"}</DialogTitle></DialogHeader>
+        {!canManage && post.due_date && (
+          <p className="text-sm text-muted-foreground px-6 -mt-2">Due: {format(new Date(post.due_date), "dd MMM yyyy")}</p>
+        )}
         {!canManage && (
           <div className="space-y-3">
             {myExisting && (
@@ -360,7 +363,8 @@ function NewPostDialog({ classId, onCreated }: { classId: string; onCreated: () 
           </Select>
           <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <Textarea placeholder="Details (optional)" rows={5} value={body} onChange={(e) => setBody(e.target.value)} />
-          <Input placeholder="Attachment URL (optional)" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} />
+          <Input placeholder="Resource link (optional)" value={attachmentUrl} onChange={(e) => setAttachmentUrl(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Paste a Google Drive, YouTube, or any public link.</p>
           {kind === "assignment" && (
             <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           )}
