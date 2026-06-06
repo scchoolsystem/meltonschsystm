@@ -33,6 +33,7 @@ import { Route as AppLibraryRouteImport } from './routes/_app.library'
 import { Route as AppKitchenRouteImport } from './routes/_app.kitchen'
 import { Route as AppDisciplineRouteImport } from './routes/_app.discipline'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppCocurricularRouteImport } from './routes/_app.cocurricular'
 import { Route as AppClinicRouteImport } from './routes/_app.clinic'
 import { Route as AppClassroomRouteImport } from './routes/_app.classroom'
 import { Route as AppClassesRouteImport } from './routes/_app.classes'
@@ -207,6 +208,11 @@ const AppDisciplineRoute = AppDisciplineRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCocurricularRoute = AppCocurricularRouteImport.update({
+  id: '/cocurricular',
+  path: '/cocurricular',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClinicRoute = AppClinicRouteImport.update({
@@ -511,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/classes': typeof AppClassesRoute
   '/classroom': typeof AppClassroomRoute
   '/clinic': typeof AppClinicRoute
+  '/cocurricular': typeof AppCocurricularRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
@@ -592,6 +599,7 @@ export interface FileRoutesByTo {
   '/classes': typeof AppClassesRoute
   '/classroom': typeof AppClassroomRoute
   '/clinic': typeof AppClinicRoute
+  '/cocurricular': typeof AppCocurricularRoute
   '/dashboard': typeof AppDashboardRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
@@ -675,6 +683,7 @@ export interface FileRoutesById {
   '/_app/classes': typeof AppClassesRoute
   '/_app/classroom': typeof AppClassroomRoute
   '/_app/clinic': typeof AppClinicRoute
+  '/_app/cocurricular': typeof AppCocurricularRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/discipline': typeof AppDisciplineRoute
   '/_app/kitchen': typeof AppKitchenRoute
@@ -758,6 +767,7 @@ export interface FileRouteTypes {
     | '/classes'
     | '/classroom'
     | '/clinic'
+    | '/cocurricular'
     | '/dashboard'
     | '/discipline'
     | '/kitchen'
@@ -839,6 +849,7 @@ export interface FileRouteTypes {
     | '/classes'
     | '/classroom'
     | '/clinic'
+    | '/cocurricular'
     | '/dashboard'
     | '/discipline'
     | '/kitchen'
@@ -921,6 +932,7 @@ export interface FileRouteTypes {
     | '/_app/classes'
     | '/_app/classroom'
     | '/_app/clinic'
+    | '/_app/cocurricular'
     | '/_app/dashboard'
     | '/_app/discipline'
     | '/_app/kitchen'
@@ -1174,6 +1186,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/cocurricular': {
+      id: '/_app/cocurricular'
+      path: '/cocurricular'
+      fullPath: '/cocurricular'
+      preLoaderRoute: typeof AppCocurricularRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/clinic': {
@@ -1625,6 +1644,7 @@ interface AppRouteChildren {
   AppClassesRoute: typeof AppClassesRoute
   AppClassroomRoute: typeof AppClassroomRoute
   AppClinicRoute: typeof AppClinicRoute
+  AppCocurricularRoute: typeof AppCocurricularRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDisciplineRoute: typeof AppDisciplineRoute
   AppKitchenRoute: typeof AppKitchenRoute
@@ -1684,6 +1704,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClassesRoute: AppClassesRoute,
   AppClassroomRoute: AppClassroomRoute,
   AppClinicRoute: AppClinicRoute,
+  AppCocurricularRoute: AppCocurricularRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDisciplineRoute: AppDisciplineRoute,
   AppKitchenRoute: AppKitchenRoute,

@@ -54,6 +54,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   security: [...ADMIN_ROLES, "security_admin", "security_user"],
   transport: [...ADMIN_ROLES, "transport_admin", "transport_officer"],
   sports: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
+  cocurricular: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
   discipline: [...ADMIN_ROLES, "discipline_admin", "class_teacher", "guidance_admin"],
 
   // Communication
@@ -108,5 +109,6 @@ export function moduleForPath(pathname: string): string | null {
   if (seg[0] === "finance") return "finance";
   if (seg[0] === "timetable") return "timetable";
   if (seg[0] === "ids") return "ids";
+  if (seg[0] === "cocurricular") return "cocurricular";
   return seg[0] ?? null;
 }
