@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Preferences } from "@capacitor/preferences";
 
 export type School = {
   id: string;
@@ -17,6 +18,13 @@ export type School = {
 };
 
 export const PLATFORM_SLUG = "__platform__";
+const STORAGE_KEY = "smartdev_school_slug";
+
+// Detect if running inside Capacitor (Android/iOS native shell)
+export function isNativeApp(): boolean {
+  return typeof window !== "undefined" &&
+    (window as any)?.Capacitor?.isNativePlatform?.() === true;
+}
 
 type TenantState = {
   school: School | null;
@@ -26,6 +34,9 @@ type TenantState = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  // Mobile/desktop: set school explicitly
+  setSchoolSlug: (slug: string) => Promise<void>;
+  clearSchoolSlug: () => Promise<void>;
 };
 
 const TenantContext = createContext<TenantState>({
@@ -36,21 +47,16 @@ const TenantContext = createContext<TenantState>({
   loading: true,
   error: null,
   refresh: async () => {},
+  setSchoolSlug: async () => {},
+  clearSchoolSlug: async () => {},
 });
 
 /**
- * Extract the school slug from the current hostname.
- * Rules:
- *   smartdev.co.ke              -> null  (root / marketing)
- *   admin.smartdev.co.ke        -> "__platform__" (platform admin portal)
- *   greenfield.smartdev.co.ke   -> "greenfield"
- *   (legacy) admin.erp.smartdev.co.ke / *.erp.smartdev.co.ke still supported
- *   *.lovable.app / localhost   -> null  (dev / preview)
+ * Extract the school slug from the current hostname (web only).
  */
 export function getSubdomainSlug(hostname: string): string | null {
   const host = hostname.toLowerCase().split(":")[0];
 
-  // Platform admin host
   if (host === "admin.smartdev.co.ke" || host === "admin.erp.smartdev.co.ke") {
     return PLATFORM_SLUG;
   }
@@ -58,19 +64,20 @@ export function getSubdomainSlug(hostname: string): string | null {
   if (host === "localhost" || /^[\d.]+$/.test(host)) return null;
   if (host.endsWith(".lovable.app") || host.endsWith(".lovableproject.com")) return null;
 
-  // Root domains — no school context
-  if (host === "smartdev.co.ke" || host === "www.smartdev.co.ke" || host === "erp.smartdev.co.ke") {
+  if (
+    host === "smartdev.co.ke" ||
+    host === "www.smartdev.co.ke" ||
+    host === "erp.smartdev.co.ke"
+  ) {
     return null;
   }
 
-  // Legacy *.erp.smartdev.co.ke still resolves to its slug
   const LEGACY_ROOT = "erp.smartdev.co.ke";
   if (host.endsWith("." + LEGACY_ROOT)) {
     const sub = host.slice(0, host.length - LEGACY_ROOT.length - 1);
     return sub || null;
   }
 
-  // New scheme: <slug>.smartdev.co.ke
   const ROOT = "smartdev.co.ke";
   if (host.endsWith("." + ROOT)) {
     const sub = host.slice(0, host.length - ROOT.length - 1);
@@ -82,25 +89,42 @@ export function getSubdomainSlug(hostname: string): string | null {
   return null;
 }
 
+/**
+ * Resolve the active school slug.
+ * Priority:
+ *   1. Native app  -> read from @capacitor/preferences
+ *   2. Web         -> read from subdomain hostname
+ *   3. Dev/unknown -> null (will show school picker or fallback)
+ */
+async function resolveSlug(): Promise<string | null> {
+  if (isNativeApp()) {
+    const { value } = await Preferences.get({ key: STORAGE_KEY });
+    return value ?? null;
+  }
+  if (typeof window !== "undefined") {
+    return getSubdomainSlug(window.location.hostname);
+  }
+  return null;
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [school, setSchool] = useState<School | null>(null);
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const slug = typeof window !== "undefined" ? getSubdomainSlug(window.location.hostname) : null;
+  const [slug, setSlug] = useState<string | null>(null);
+
   const isPlatformHost = slug === PLATFORM_SLUG;
 
-  const load = async () => {
+  const loadSchool = async (targetSlug: string | null) => {
     setLoading(true);
     setError(null);
     try {
-      // Platform host has no school context — short-circuit
-      if (isPlatformHost) {
+      if (!targetSlug || targetSlug === PLATFORM_SLUG) {
         setSchool(null);
         setFeatures({});
         return;
       }
-      const targetSlug = slug ?? "school-1";
       const { data, error: qErr } = await supabase
         .from("schools")
         .select("*")
@@ -108,11 +132,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (qErr) throw qErr;
       if (!data) {
-        setError(`School portal "${targetSlug}" not found`);
+        setError(`School "${targetSlug}" not found`);
         setSchool(null);
       } else {
         setSchool(data as School);
-        // Load feature flags for this school (best-effort; default to enabled)
         const { data: flags } = await supabase
           .from("school_features")
           .select("feature_key,enabled")
@@ -129,11 +152,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // On mount: resolve slug from native storage or subdomain
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+    resolveSlug().then((resolved) => {
+      setSlug(resolved);
+      void loadSchool(resolved);
+    });
+  }, []);
 
+  // Apply brand colour + document title
   useEffect(() => {
     if (school?.primary_color && typeof document !== "undefined") {
       document.documentElement.style.setProperty("--brand-primary", school.primary_color);
@@ -141,12 +168,45 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (typeof document !== "undefined") {
       document.title = isPlatformHost
         ? "Platform Admin — SmartDev ERP"
-        : school?.name ? `${school.name} — ERP` : "School ERP";
+        : school?.name
+        ? `${school.name} — ERP`
+        : "SmartDev ERP";
     }
   }, [school, isPlatformHost]);
 
+  // Called from SchoolPicker screen (mobile/desktop)
+  const setSchoolSlug = async (newSlug: string) => {
+    if (isNativeApp()) {
+      await Preferences.set({ key: STORAGE_KEY, value: newSlug });
+    }
+    setSlug(newSlug);
+    await loadSchool(newSlug);
+  };
+
+  // Called on sign-out (mobile/desktop)
+  const clearSchoolSlug = async () => {
+    if (isNativeApp()) {
+      await Preferences.remove({ key: STORAGE_KEY });
+    }
+    setSlug(null);
+    setSchool(null);
+    setFeatures({});
+  };
+
   return (
-    <TenantContext.Provider value={{ school, slug, isPlatformHost, features, loading, error, refresh: load }}>
+    <TenantContext.Provider
+      value={{
+        school,
+        slug,
+        isPlatformHost,
+        features,
+        loading,
+        error,
+        refresh: () => loadSchool(slug),
+        setSchoolSlug,
+        clearSchoolSlug,
+      }}
+    >
       {children}
     </TenantContext.Provider>
   );
