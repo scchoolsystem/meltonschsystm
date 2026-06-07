@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDev Core SaaS - Comprehensive Enterprise Legal & Compliance Suite</title>
+    <style>
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --text: #334155;
+            --text-light: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --success: #16a34a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.7;
+            color: var(--text);
+            background-color: var(--bg);
+        }
+
+        .container {
+            display: flex;
+            max-width: 1440px;
+            margin: 0 auto;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation Layout */
+        .sidebar {
+            width: 340px;
+            background-color: var(--primary);
+            color: #ffffff;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            border-right: 1px solid var(--secondary);
+            z-index: 100;
+        }
+
+        .brand {
+            margin-bottom: 2.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--secondary);
+        }
+
+        .brand h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            color: #ffffff;
+        }
+
+        .brand p {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        .nav-group {
+            margin-bottom: 2rem;
+        }
+
+        .nav-group-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-light);
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links li {
+            margin-bottom: 0.35rem;
+        }
+
+        .nav-links a {
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 0.88rem;
+            display: block;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease;
+        }
+
+        .nav-links a:hover {
+            background-color: var(--secondary);
+            color: #ffffff;
+        }
+
+        /* Main Content Panel Layout */
+        .main-content {
+            margin-left: 340px;
+            flex: 1;
+            padding: 3rem 4rem;
+            max-width: 1050px;
+        }
+
+        header {
+            margin-bottom: 4rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .global-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: var(--accent);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1.2rem;
+        }
+
+        /* Section Document Block Elements */
+        .doc-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 3rem;
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        h3 {
+            font-size: 1.75rem;
+            color: var(--primary);
+            margin: 0 0 1.5rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--border);
+            letter-spacing: -0.02em;
+        }
+
+        h4 {
+            font-size: 1.25rem;
+            color: var(--secondary);
+            margin: 2rem 0 0.75rem 0;
+            font-weight: 600;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            color: var(--text);
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin-bottom: 1.75rem;
+            padding-left: 1.75rem;
+        }
+
+        li {
+            margin-bottom: 0.75rem;
+            color: var(--text);
+        }
+
+        /* Legal Callout Framework */
+        .callout {
+            background-color: var(--bg);
+            border-left: 4px solid var(--accent);
+            padding: 1.5rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            margin: 2rem 0;
+        }
+
+        .callout-title {
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        /* Cloud Architecture Diagram Styling */
+        .diagram-container {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin: 2.5rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .diagram-node {
+            background: #ffffff;
+            border: 2px solid var(--secondary);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            text-align: center;
+            width: 28%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .diagram-node h4 {
+            color: var(--primary);
+            font-size: 1rem;
+            margin: 0 0 0.35rem 0;
+        }
+
+        .diagram-node p {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-bottom: 0;
+            text-align: center;
+        }
+
+        .diagram-arrow {
+            font-size: 1.75rem;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        /* Premium Data Matrix Grid Styling */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+        }
+
+        .data-table th, .data-table td {
+            padding: 1rem 1.25rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .data-table th {
+            background-color: var(--bg);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .meta-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+        }
+
+        .meta-card-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-light);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-card-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 0.35rem;
+        }
+
+        footer {
+            margin-top: 6rem;
+            padding-top: 2.5rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        /* Screen Responsive Rules */
+        @media (max-width: 1100px) {
+            .container { flex-direction: column; }
+            .sidebar { width: 100%; position: relative; height: auto; }
+            .main-content { margin-left: 0; padding: 2rem; }
+            .meta-grid { grid-template-columns: 1fr; gap: 0.75rem; }
+            .diagram-container { flex-direction: column; gap: 1rem; }
+            .diagram-node { width: 100%; }
+            .diagram-arrow { transform: rotate(90deg); margin: 0.5rem 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <aside class="sidebar">
+        <div class="brand">
+            <h1>SmartDev Core SaaS</h1>
+            <p>Platform Security & Legal Suite (2026)</p>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Module 1: Terms of Use</div>
+            <ul class="nav-links">
+                <li><a href="#tou-1">1. Acceptance & Framework</a></li>
+                <li><a href="#tou-2">2. Architecture & Modules</a></li>
+                <li><a href="#tou-3">3. User Commitments</a></li>
+                <li><a href="#tou-4">4. Prohibited Actions</a></li>
+                <li><a href="#tou-5">5. Institutional Autonomy</a></li>
+                <li><a href="#tou-6">6. Availability & Clusters</a></li>
+                <li><a href="#tou-7">7. Suspension Mechanisms</a></li>
+                <li><a href="#tou-8">8. Liability Limitations</a></li>
+                <li><a href="#tou-9">9. Revision Protocols</a></li>
+                <li><a href="#tou-10">10. Infrastructure Support</a></li>
+            </ul>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Module 2: Privacy Policy</div>
+            <ul class="nav-links">
+                <li><a href="#priv-11">11. Information Taxonomy</a></li>
+                <li><a href="#priv-12">12. Purpose Architecture</a></li>
+                <li><a href="#priv-13">13. Advanced Controls</a></li>
+                <li><a href="#priv-14">14. Infrastructure Nodes</a></li>
+                <li><a href="#priv-15">15. Sovereign Node Rights</a></li>
+                <li><a href="#priv-16">16. Terminal Identifiers</a></li>
+                <li><a href="#priv-17">17. Evolution Framework</a></li>
+            </ul>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Module 3: Processing & Service</div>
+            <ul class="nav-links">
+                <li><a href="#dpa-18">18. Data Processing Charter</a></li>
+                <li><a href="#sla-19">19. Technical SLA Metrics</a></li>
+                <li><a href="#billing-20">20. Commercial & Billing</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header>
+            <div class="global-badge">Official Corporate Legal Vault</div>
+            <h2>SmartDev Compliance & Policy Documentation</h2>
+            <p class="subtitle">Complete, comprehensive, ready-to-publish production texts matching internal platform schemas.</p>
+        </header>
+
+        <section id="tou-1" class="doc-section">
+            <div class="meta-grid">
+                <div class="meta-card"><div class="meta-card-label">System Entity</div><div class="meta-card-value">SmartDev Core SaaS</div></div>
+                <div class="meta-card"><div class="meta-card-label">Document Infrastructure</div><div class="meta-card-value">Version 1.0 (2026)</div></div>
+                <div class="meta-card"><div class="meta-card-label">Deployment Authority</div><div class="meta-card-value">smartdev.co.ke</div></div>
+            </div>
+            <h3>1. Acceptance of Terms & Legal Framework</h3>
+            <p>By interacting with, logging into, configuring, or actively utilizing any layer of the SmartDev platform, all institutional administration profiles, teachers, structural personnel, and system operators unequivocally agree to abide fully by the operational constraints outlined inside this framework[cite: 13]. Ongoing access establishes formal performance validation across all operational scopes[cite: 14].</p>
+            <p>This framework forms a legally binding covenant controlling system access, user profiles, platform operations, and enterprise usage definitions of the SmartDev Smart School Management ERP ecosystem across institutional client parameters[cite: 5].</p>
+            <div class="callout">
+                <div class="callout-title">Operational Validation Notice</div>
+                <p>If an administrative unit or linked operator does not consent to these rigorous structural containment mandates, all programmatic terminal interactions must cease immediately.</p>
+            </div>
+        </section>
+
+        <section id="tou-2" class="doc-section">
+            <h3>2. Platform Description & Cloud Architecture</h3>
+            <p>SmartDev operates as a highly secure, distributed multi-tenant Enterprise Cloud Software-as-a-Service (SaaS) operational framework purpose-built for comprehensive management digitization inside educational institutes across the African ecosystem[cite: 16]. The platform consolidates foundational school operations management into an atomic, performant database context minimizing administrative strain across all linked users[cite: 29].</p>
+            
+            <table class="data-table">
+                <thead>
+                    <tr><th>Architectural Component</th><th>Functional Parameter Scope</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Student Management</strong></td><td>Dynamic lifecycle capture, profile analytics, and demographic mapping frameworks[cite: 17, 18].</td></tr>
+                    <tr><td><strong>Staff Management</strong></td><td>Operational logs, instructional tracking metrics, and identity management panels[cite: 19, 20].</td></tr>
+                    <tr><td><strong>Academic Records</strong></td><td>Immutable reporting grids, grading structures, and progress reporting matrices[cite: 21, 22].</td></tr>
+                    <tr><td><strong>Reports & Analytics</strong></td><td>Real-time statistical generation for predictive institution performance tracking[cite: 23, 24].</td></tr>
+                    <tr><td><strong>Finance Management</strong></td><td>Fee balance engines, systematic generation of invoices, and transaction logs[cite: 25, 26].</td></tr>
+                    <tr><td><strong>Role Based Access Control (RBAC)</strong></td><td>Granular structural validation keys filtering institutional view parameters strictly[cite: 27, 28].</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="tou-3" class="doc-section">
+            <h3>3. User Commitments & Access Credentials</h3>
+            <p>Authorized access operators inside the platform environment explicitly commit to the following architectural and security provisions[cite: 35]:</p>
+            <ul>
+                <li>Maintain total absolute secrecy regarding user credentials, access tokens, and verification parameters[cite: 36].</li>
+                <li>Ensure real-time data submission patterns remain accurate, validated, updated, and legitimate[cite: 37].</li>
+                <li>Engage with platform infrastructure in total, complete compliance with regional and local sovereign computing codes[cite: 38].</li>
+                <li>Enforce rigorous internal data privacy standards ensuring individual user protections are preserved[cite: 39].</li>
+                <li>Deploy mitigation logic immediately upon discovery of unauthorized terminal operations or data leak indicators[cite: 40].</li>
+            </ul>
+        </section>
+
+        <section id="tou-4" class="doc-section">
+            <h3>4. Prohibited System Use & Penetration Blocks</h3>
+            <p>Strict operational prohibitions enforce that system users and external nodes are completely blocked from executing[cite: 42]:</p>
+            <ol>
+                <li>Any mechanism aiming to reverse-engineer, scan vulnerability matrices, or breach structural containment layers[cite: 43].</li>
+                <li>Modification of underlying system definitions, database schemas, or programmatic API endpoints without permission[cite: 44].</li>
+                <li>Simulated traffic generations, persistent server hammering, or actions threatening containerized resource stability[cite: 45].</li>
+                <li>Misuse, falsification, or illegal sharing of academic achievements, student identities, or records metrics[cite: 46].</li>
+                <li>Uploading compiled payloads, tracking scripts, logic blocks, or elements containing malicious software definitions[cite: 47].</li>
+            </ol>
+        </section>
+
+        <section id="tou-5" class="doc-section">
+            <h3>5. Institutional & School Autonomy</h3>
+            <p>Contracted schools operate completely independent environments inside the unified platform schema[cite: 49]. The administrative unit retains primary legal responsibility concerning micro-user lifecycle tracking, automated permission distribution matrices, input audit verification loops, and absolute regional legal governance matching statutory school compliance directives[cite: 50].</p>
+            <div class="callout">
+                <div class="callout-title">Controller Designation</div>
+                <p>Per the unified schema definition, the institutional partner remains the primary legal authority for the governance and lifecycle validation of all tenant records matching local statutory requirements.</p>
+            </div>
+        </section>
+
+        <section id="tou-6" class="doc-section">
+            <h3>6. Service Availability & Maintenance Framework</h3>
+            <p>SmartDev relies on distributed tier-1 container clusters to target exceptionally high uptime performance thresholds[cite: 56]. Standard engineering window parameters allow for occasional off-peak scheduled maintenance sequences[cite: 57]. The ecosystem is provided on a reasonably available baseline without structural representations of uninterrupted service states[cite: 58].</p>
+        </section>
+
+        <section id="tou-7" class="doc-section">
+            <h3>7. Suspension & Termination Procedures</h3>
+            <p>SmartDev maintains absolute operational autonomy to instantly deactivate account profiles, drop validation keys, or terminate institutional environments upon detection of transactional fraud patterns, continuous user abuse profiles, severe technical security violations, or material failure to satisfy standard Terms of Use statements[cite: 60].</p>
+        </section>
+
+        <section id="tou-8" class="doc-section">
+            <h3>8. Limitation of Liability Matrix</h3>
+            <p>To the highest degree validated under applicable jurisdictional laws, SmartDev assumes zero technical or financial liability for indirect platform outcomes, lost database assets, consequential record errors, or business disruptions arising from service variations[cite: 62]. The SaaS delivery structure relies on modern resilient standards[cite: 63].</p>
+        </section>
+
+        <section id="tou-9" class="doc-section">
+            <h3>9. System Amendment Protocols</h3>
+            <p>These Terms of Use retain dynamic flexibility to change over time to align with system features or state data privacy changes[cite: 65]. Active institutional environments receive notifications regarding major revisions via structural administrative bulletins[cite: 66]. Continuous interaction following modification constitutes complete and unambiguous acceptance.</p>
+        </section>
+
+        <section id="tou-10" class="doc-section">
+            <h3>10. Central Contact & Support Integration</h3>
+            <p>For official legal alignment, architectural clarity, or platform infrastructure questions, visit the administrative communication hub at: <strong>smartdev.co.ke</strong>[cite: 68]. Formal inquiries will be funneled to appropriate legal, system engineering, or security review departments.</p>
+        </section>
+
+        <section id="priv-11" class="doc-section">
+            <div class="meta-grid">
+                <div class="meta-card"><div class="meta-card-label">Protection Scope</div><div class="meta-card-value">Enterprise PII Security</div></div>
+                <div class="meta-card"><div class="meta-card-label">System State</div><div class="meta-card-value">Version 1.0 (2026)</div></div>
+                <div class="meta-card"><div class="meta-card-label">Verification Unit</div><div class="meta-card-value">smartdev.co.ke</div></div>
+            </div>
+            <h3>11. Granular Information Collection Taxonomy</h3>
+            <p>SmartDev platform processes explicit data fields strictly to generate transactional ERP actions for client institutes[cite: 83]:</p>
+            <ul>
+                <li><strong>Identity Vectors:</strong> Legal First Names, Last Names, Parent/Guardian designations[cite: 85].</li>
+                <li><strong>Communications:</strong> Validated Institutional Email Addresses, SMS Phone Contact channels[cite: 87].</li>
+                <li><strong>Academic Vectors:</strong> Student enrolment fields, continuous grading matrix values, behavior metrics[cite: 89].</li>
+                <li><strong>School Operations:</strong> Class definitions, asset tracking tallies, financial account history[cite: 91].</li>
+                <li><strong>Security Logs:</strong> Client User Roles, system interaction analytics, target IP logs, device details[cite: 93].</li>
+            </ul>
+        </section>
+
+        <section id="priv-12" class="doc-section">
+            <h3>12. Purpose Architecture (Why Data Is Processed)</h3>
+            <p>Every internal transactional record pipeline satisfies precise core system requirements[cite: 95]:</p>
+            <ol>
+                <li><strong>Identity & Authentication:</strong> Validating identity keys to accurately process multi-tenant partitions[cite: 96].</li>
+                <li><strong>ERP Functionality:</strong> Processing calculations for fee accounts, student tracking, and class data[cite: 97].</li>
+                <li><strong>Reporting Matrices:</strong> Rendering complex internal data into clear performance summaries[cite: 98].</li>
+                <li><strong>System Monitoring:</strong> Running automated logic checks to proactively isolate vector threats and tracking bugs[cite: 99].</li>
+            </ol>
+        </section>
+
+        <section id="priv-13" class="doc-section">
+            <h3>13. Advanced Data Protection Controls</h3>
+            <p>SmartDev systems deploy military-grade encryption models (AES-256 for resting volumes; TLS 1.3 transport paths) wrapped inside restricted role access parameters[cite: 101]. Automated, distributed cluster replications ensure persistent disaster recovery potential across protected hardware zones[cite: 102].</p>
+            <div class="callout">
+                <div class="callout-title">Encryption Standards Mapping</div>
+                <p>Data at Rest: AES-256 Volume Cryptography [cite: 201]<br>Data in Flight: TLS 1.3 Transport Security[cite: 201].</p>
+            </div>
+        </section>
+
+        <section id="priv-14" class="doc-section">
+            <h3>14. Third-Party Infrastructure Providers</h3>
+            <p>To provide standard enterprise-grade uptime, SmartDev works with audited service groups[cite: 108]. These include certified cloud compute networks, secure zero-trust identity layers, and performance analytics tools[cite: 109]. Every single connection layer maintains tight compliance requirements[cite: 110].</p>
+        </section>
+
+        <section id="priv-15" class="doc-section">
+            <h3>15. Sovereign User Rights & Access Profiles</h3>
+            <p>Individual system nodes maintain structural rights to request data updates or clear personal profiling logs from active screens[cite: 112]. These adjustments are balanced against institutional data retention rules, ensuring compliance with local educational record laws before updates apply[cite: 113].</p>
+        </section>
+
+        <section id="priv-16" class="doc-section">
+            <h3>16. Cookie Usage & Terminal Identifiers</h3>
+            <p>SmartDev implements functional system cookies exclusively to maintain user login states, track operational profiles across screens, and safeguard session security[cite: 115]. The platform does not deploy third-party advertising tracking scripts[cite: 116].</p>
+        </section>
+
+        <section id="priv-17" class="doc-section">
+            <h3>17. Platform Security & Policy Updates</h3>
+            <p>Security sweeps are scheduled dynamically to proactively counter emerging web application threats[cite: 118]. As system features evolve or regional data protection rules change, this policy documentation updates systematically[cite: 119].</p>
+        </section>
+
+        <section id="dpa-18" class="doc-section">
+            <div class="meta-grid">
+                <div class="meta-card"><div class="meta-card-label">Compliance Focus</div><div class="meta-card-value">Data Processor Mandate</div></div>
+                <div class="meta-card"><div class="meta-card-label">Contract Code</div><div class="meta-card-value">SLA-ENT-2026</div></div>
+                <div class="meta-card"><div class="meta-card-label">Legal Portal</div><div class="meta-card-value">smartdev.co.ke</div></div>
+            </div>
+            <h3>18. Formal Data Processing Charter (DPA)</h3>
+            <p>SmartDev acts strictly as a designated Data Processor executing systematic actions on behalf of educational institutions, who retain primary Data Controller status[cite: 170]. All calculations, records management, and database operations strictly serve the institution's operational requirements[cite: 171].</p>
+            <p>The processing architecture isolates records into three discrete data pools[cite: 172]:</p>
+            <ul>
+                <li><strong>Student Data:</strong> Enrollments, demographics, grading metrics, attendance charts, and fee accounting logs[cite: 172].</li>
+                <li><strong>Staff Data:</strong> Employment credentials, contact channels, task distributions, and internal communication histories[cite: 173].</li>
+                <li><strong>Administrative Data:</strong> System configuration tallies, performance logs, and systemic identity access histories[cite: 174].</li>
+            </ul>
+            <p>SmartDev coordinates exclusively with premium, security-audited data infrastructure providers[cite: 176]. Any modification to our subprocessor ecosystem is communicated directly to system administrators to ensure continuous data privacy compliance[cite: 177]. Following the formal termination of an institutional partnership contract, all related student, staff, and system records undergo systematic database removal after a designated window[cite: 181].</p>
+            <div class="callout">
+                <div class="callout-title">Incident Response Protocol</div>
+                <p>If a potential system vulnerability or unauthorized access vector is identified, SmartDev initiates an automated containment protocol[cite: 178]. Institutional administrators will be notified promptly alongside the delivery of mitigation telemetry logs[cite: 179].</p>
+            </div>
+        </section>
+
+        <section id="sla-19" class="doc-section">
+            <h3>19. Technical Enterprise Flow & SLA Metrics</h3>
+            <p>This Service Agreement establishes the explicit terms under which SmartDev deploys its complete, cloud-based ERP infrastructure for use by the contracting educational institution[cite: 134]. The package includes database storage, core feature sets, and functional web dashboards[cite: 135].</p>
+            
+            <div class="diagram-container">
+                <div class="diagram-node">
+                    <h4>School Terminals</h4>
+                    <p>Client Data Input [cite: 141, 142]</p>
+                </div>
+                <div class="diagram-arrow">&longrightarrow;</div>
+                <div class="diagram-node">
+                    <h4>SmartDev Gateway</h4>
+                    <p>Role & RBAC Filter [cite: 143]</p>
+                </div>
+                <div class="diagram-arrow">&longrightarrow;</div>
+                <div class="diagram-node">
+                    <h4>Secure DB Volume</h4>
+                    <p>Encrypted Storage [cite: 144]</p>
+                </div>
+            </div>
+
+            <p>SmartDev targets a 99.9% foundational system availability score annually, excluding pre-announced, off-peak maintenance sequences[cite: 153]. If a critical component drifts offline, engineering teams deploy instantly to resolve operational bottlenecks[cite: 154]. Core application updates, optimization adjustments, security improvements, and visual layout enhancements apply automatically to all active multi-tenant environments[cite: 156]. SmartDev provides comprehensive technical troubleshooting services via remote digital channels[cite: 146].</p>
+        </section>
+
+        <section id="billing-20" class="doc-section">
+            <h3>20. Commercial Agreements & Billing Procedures</h3>
+            <p>Platform integration is delivered under structured licensing tiers based on total student enrolment volume or custom enterprise modules[cite: 137]. Licenses grant a non-transferable, revocable right to run institutional processes within the platform boundary[cite: 138].</p>
+            <p>Subscription invoices generate systematically prior to the start of each service term[cite: 158]. <strong>Failure to process outstanding balances within agreed timelines may lead to temporary suspension of administrative editing permissions until accounts are settled[cite: 159].</strong></p>
+            <p>Either partner entity may terminate the active service contract by submitting a formal written notice ahead of the next renewal cycle[cite: 161]. Upon confirmation of termination, account data remains accessible for download for a designated transition window before final system deletion[cite: 162]. Any complex operational or financial disagreements regarding this contract shall initially undergo constructive resolution reviews[cite: 164]. Unresolved matters will progress to formal arbitration under designated regional legal panels[cite: 165].</p>
+        </section>
+
+        <footer>
+            <p>&copy; 2026 SmartDev. All rights reserved. SmartDev and SmartDev logo are trademarks of SmartDev[cite: 30].</p>
+        </footer>
+    </main>
+</div>
+
+</body>
+</html>
