@@ -2,20 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// Default 8 periods Mon–Fri (40-min lessons, 10:20-10:40 break, 12:40-13:30 lunch)
-const PERIODS: Array<{ start: string; end: string; type: "lesson" | "break" | "lunch" }> = [
-  { start: "08:00", end: "08:40", type: "lesson" },
-  { start: "08:40", end: "09:20", type: "lesson" },
-  { start: "09:20", end: "10:00", type: "lesson" },
-  { start: "10:00", end: "10:20", type: "break" },
-  { start: "10:20", end: "11:00", type: "lesson" },
-  { start: "11:00", end: "11:40", type: "lesson" },
-  { start: "11:40", end: "12:20", type: "lesson" },
-  { start: "12:20", end: "13:10", type: "lunch" },
-  { start: "13:10", end: "13:50", type: "lesson" },
-  { start: "13:50", end: "14:30", type: "lesson" },
-];
-
 export const generateTimetable = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -23,128 +9,83 @@ export const generateTimetable = createServerFn({ method: "POST" })
       classIds: z.array(z.string().uuid()).min(1),
       lessonsPerSubjectPerWeek: z.number().min(1).max(10).default(4),
       replaceExisting: z.boolean().default(true),
-      rooms: z.array(z.string()).optional(),
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-
-    // AuthZ: admins or academic master only — this function is destructive
     const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
       supabase.rpc("is_admin", { _user_id: userId }),
       supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
     ]);
-    if (!isAdmin && !isAcademic) {
-      throw new Error("Only admins or the academic master can generate timetables");
-    }
-
-    // Tenant scoping: verify every classId belongs to caller's school
+    if (!isAdmin && !isAcademic) throw new Error("Only admins or academic master can generate timetables");
     const { data: schoolId } = await supabase.rpc("my_school_id");
-    if (!schoolId) throw new Error("No school context for this user");
-    const { data: classRows, error: clsErr } = await supabase
-      .from("classes")
-      .select("id")
-      .eq("school_id", schoolId)
-      .in("id", data.classIds);
+    if (!schoolId) throw new Error("No school context");
+    const { data: classRows, error: clsErr } = await supabase.from("classes").select("id").eq("school_id", schoolId).in("id", data.classIds);
     if (clsErr) throw new Error(clsErr.message);
     const allowed = new Set((classRows ?? []).map((r: any) => r.id));
     const invalid = data.classIds.filter((id) => !allowed.has(id));
     if (invalid.length) throw new Error(`Classes not in your school: ${invalid.join(", ")}`);
-
-    const rooms = data.rooms?.length ? data.rooms : ["R1", "R2", "R3", "R4", "R5", "R6"];
-
-    // Load subjects + staff (scoped to caller's school)
+    const { data: periodRows = [], error: pErr } = await supabase
+      .from("period_templates").select("id,day_of_week,period_index,label,start_time,end_time,is_break")
+      .eq("school_id", schoolId).eq("is_break", false).order("day_of_week").order("period_index");
+    if (pErr) throw new Error("Could not load period templates: " + pErr.message);
+    const { data: roomRows = [], error: rErr } = await supabase
+      .from("rooms").select("id,name").eq("school_id", schoolId).eq("is_active", true).order("name");
+    if (rErr) throw new Error("Could not load rooms: " + rErr.message);
+    if (!(periodRows as any[]).length)
+      return { ok: false, error: "No period templates configured. Go to Timetable → Periods tab first.", inserted: 0, conflicts: [] };
+    const roomNames = (roomRows as any[]).map((r: any) => r.name);
+    if (!roomNames.length)
+      return { ok: false, error: "No active rooms configured. Go to Timetable → Rooms tab first.", inserted: 0, conflicts: [] };
     const [{ data: subjects = [] }, { data: staff = [] }] = await Promise.all([
       supabase.from("subjects").select("id,code,level").eq("school_id", schoolId),
-      supabase.from("staff").select("id,role,department").eq("school_id", schoolId),
+      supabase.from("staff").select("id,role").eq("school_id", schoolId),
     ]);
-
-    // Pick teachers (anyone with role teacher / subject_teacher / hod) — fallback all staff
-    const teacherPool = (staff as any[]).filter(s =>
-      ["teacher", "subject_teacher", "class_teacher", "hod", "academic_master"].includes(s.role)
-    );
+    const teacherPool = (staff as any[]).filter((s) =>
+      ["teacher", "subject_teacher", "class_teacher", "hod", "academic_master"].includes(s.role));
     const teachers = teacherPool.length ? teacherPool : (staff as any[]);
-
-    if (!subjects?.length || !teachers.length) {
-      return { ok: false, error: "Need at least one subject and one teacher", inserted: 0, conflicts: [] };
-    }
-
-    if (data.replaceExisting) {
-      await supabase.from("timetable_slots").delete().in("class_id", data.classIds);
-    }
-
-    // Track usage: key = `${day}-${start}` => teachers used, rooms used, classes used
+    if (!(subjects as any[]).length || !teachers.length)
+      return { ok: false, error: "Need at least one subject and one teacher before generating.", inserted: 0, conflicts: [] };
+    if (data.replaceExisting) await supabase.from("timetable_slots").delete().in("class_id", data.classIds);
     const usage = new Map<string, { teachers: Set<string>; rooms: Set<string>; classes: Set<string> }>();
     const slotKey = (d: number, start: string) => `${d}-${start}`;
-    const ensure = (k: string) => {
-      let u = usage.get(k);
-      if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set() }; usage.set(k, u); }
-      return u;
-    };
-
-    // Round-robin assignment per class
-    type Slot = {
-      class_id: string; subject_id: string; teacher_id: string | null;
-      day_of_week: number; start_time: string; end_time: string; room: string | null;
-    };
+    const ensure = (k: string) => { let u = usage.get(k); if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set() }; usage.set(k, u); } return u; };
+    type Slot = { class_id: string; subject_id: string; teacher_id: string | null; day_of_week: number; start_time: string; end_time: string; room: string | null; };
     const inserts: Slot[] = [];
     const conflicts: string[] = [];
-
     for (const classId of data.classIds) {
-      // Build demand list: each subject N times per week
       const demand: string[] = [];
-      (subjects as any[]).forEach(s => {
-        for (let i = 0; i < data.lessonsPerSubjectPerWeek; i++) demand.push(s.id);
-      });
-      // Shuffle (deterministic seed via classId)
+      (subjects as any[]).forEach((s) => { for (let i = 0; i < data.lessonsPerSubjectPerWeek; i++) demand.push(s.id); });
       let seed = classId.charCodeAt(0);
       demand.sort(() => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280 - 0.5; });
-
       let demandIdx = 0;
       const subjectTeacher: Record<string, string> = {};
-
-      outer:
-      for (let day = 1; day <= 5; day++) {
-        for (const p of PERIODS) {
-          if (p.type !== "lesson") continue;
-          if (demandIdx >= demand.length) break outer;
-
-          const k = slotKey(day, p.start);
-          const u = ensure(k);
-
-          if (u.classes.has(classId)) continue; // class already booked at this time
-
-          const subjectId = demand[demandIdx];
-          // Sticky teacher per subject when possible
-          let teacherId = subjectTeacher[subjectId];
-          if (!teacherId || u.teachers.has(teacherId)) {
-            const free = teachers.find(t => !u.teachers.has(t.id));
-            if (!free) { conflicts.push(`Day ${day} ${p.start}: no free teacher for class ${classId}`); demandIdx++; continue; }
-            teacherId = free.id;
-            subjectTeacher[subjectId] ||= teacherId;
-          }
-          const room = rooms.find(r => !u.rooms.has(r)) || null;
-          if (room) u.rooms.add(room);
-          u.teachers.add(teacherId);
-          u.classes.add(classId);
-
-          inserts.push({
-            class_id: classId, subject_id: subjectId, teacher_id: teacherId,
-            day_of_week: day, start_time: p.start, end_time: p.end, room,
-          });
-          demandIdx++;
+      outer: for (const period of periodRows as any[]) {
+        if (demandIdx >= demand.length) break outer;
+        const k = slotKey(period.day_of_week, period.start_time);
+        const u = ensure(k);
+        if (u.classes.has(classId)) continue;
+        const subjectId = demand[demandIdx];
+        let teacherId = subjectTeacher[subjectId];
+        if (!teacherId || u.teachers.has(teacherId)) {
+          const free = teachers.find((t) => !u.teachers.has(t.id));
+          if (!free) { conflicts.push(`${period.label ?? `Day ${period.day_of_week} ${period.start_time}`}: no free teacher`); demandIdx++; continue; }
+          teacherId = free.id;
+          subjectTeacher[subjectId] ||= teacherId;
         }
+        const room = roomNames.find((r) => !u.rooms.has(r)) || null;
+        if (room) u.rooms.add(room);
+        u.teachers.add(teacherId);
+        u.classes.add(classId);
+        inserts.push({ class_id: classId, subject_id: subjectId, teacher_id: teacherId, day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time, room });
+        demandIdx++;
       }
     }
-
-    // Insert in chunks; trigger enforces clash safety
     let inserted = 0;
     for (let i = 0; i < inserts.length; i += 50) {
       const chunk = inserts.slice(i, i + 50);
       const { error, data: rows } = await supabase.from("timetable_slots").insert(chunk).select("id");
-      if (error) conflicts.push(error.message);
-      else inserted += rows?.length ?? 0;
+      if (error) conflicts.push(error.message); else inserted += rows?.length ?? 0;
     }
-
     return { ok: true, inserted, conflicts, totalPlanned: inserts.length };
   });
