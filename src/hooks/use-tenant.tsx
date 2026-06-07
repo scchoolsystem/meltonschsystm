@@ -123,6 +123,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!targetSlug || targetSlug === PLATFORM_SLUG) {
         setSchool(null);
         setFeatures({});
+        setLoading(false);
         return;
       }
       const { data, error: qErr } = await supabase
