@@ -22,21 +22,20 @@ export const Route = createFileRoute("/platform/schools/$id")({
   component: PlatformSchoolDetail,
 });
 
-const FEATURE_LABELS: Record<string, string> = {
-  timetable: "Timetable",
-  attendance: "Attendance",
-  academics: "Academics & Exams",
-  finance: "Finance & Billing",
-  boarding: "Boarding",
-  kitchen: "Kitchen",
-  library: "Library",
-  clinic: "Clinic",
-  transport: "Transport",
-  security: "Security",
-  discipline: "Discipline",
-  announcements: "Announcements",
-  portals: "Parent / Student portals",
+const MODULE_META: Record<string, string> = {
+  timetable:"Timetable", attendance:"Attendance", academics:"Academics & Exams",
+  discipline:"Discipline", announcements:"Announcements", portals:"Parent / Student Portals",
+  finance:"Finance & Billing", ids:"Digital IDs", leaving_certs:"Leaving Certificates",
+  boarding:"Boarding", kitchen:"Kitchen", library:"Library", clinic:"Clinic",
+  transport:"Transport", security:"Security", classroom:"Classroom",
+  live_classes:"Live Classes", communications:"Communications", analytics:"Analytics",
 };
+const CATEGORIES = [
+  { label: "Core Academic",   keys: ["timetable","attendance","academics","discipline","announcements","portals"] },
+  { label: "Finance & Admin", keys: ["finance","ids","leaving_certs"] },
+  { label: "Facilities",      keys: ["boarding","kitchen","library","clinic","transport","security"] },
+  { label: "Digital",         keys: ["classroom","live_classes","communications","analytics"] },
+] as const;
 
 function PlatformSchoolDetail() {
   const { id } = Route.useParams();
@@ -103,9 +102,9 @@ function PlatformSchoolDetail() {
   const { data: features } = useQuery({
     queryKey: ["school-features", id],
     queryFn: async () => {
-      const { data } = await supabase.from("school_features").select("*").eq("school_id", id);
-      const map: Record<string, { id: string; enabled: boolean }> = {};
-      (data ?? []).forEach((f: any) => { map[f.feature_key] = { id: f.id, enabled: f.enabled }; });
+      const { data } = await supabase.from("school_features").select("id,feature_key,enabled,platform_enabled").eq("school_id", id);
+      const map: Record<string, { id: string; enabled: boolean; platform_enabled: boolean }> = {};
+      (data ?? []).forEach((f: any) => { map[f.feature_key] = { id: f.id, enabled: f.enabled, platform_enabled: f.platform_enabled ?? true }; });
       return map;
     },
   });
@@ -165,17 +164,16 @@ function PlatformSchoolDetail() {
   });
 
   const toggleFeature = useMutation({
-    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
-      const existing = features?.[key];
-      if (existing) {
-        const { error } = await supabase.from("school_features").update({ enabled }).eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("school_features").insert({ school_id: id, feature_key: key, enabled });
-        if (error) throw error;
-      }
+    mutationFn: async ({ key, platform_enabled }: { key: string; platform_enabled: boolean }) => {
+      const { error } = await (supabase as any).from("school_features")
+        .upsert({ school_id: id, feature_key: key, platform_enabled, enabled: platform_enabled }, { onConflict: "school_id,feature_key" });
+      if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["school-features", id] }),
+    onSuccess: (_d: any, vars: any) => {
+      qc.invalidateQueries({ queryKey: ["school-features", id] });
+      const name = MODULE_META[vars.key] ?? vars.key;
+      toast.success(vars.platform_enabled ? `${name} enabled for school` : `${name} disabled for school`);
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -347,16 +345,28 @@ function PlatformSchoolDetail() {
             <CardTitle>Feature modules</CardTitle>
             <CardDescription>Toggle which modules this school can use. Core (students, staff, classes) is always on.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(FEATURE_LABELS).map(([key, label]) => {
-              const enabled = features?.[key]?.enabled ?? true;
-              return (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-sm">{label}</span>
-                  <Switch checked={enabled} onCheckedChange={(v) => isOwner && toggleFeature.mutate({ key, enabled: v })} disabled={!isOwner} />
+          <CardContent className="space-y-6">
+            {CATEGORIES.map((cat) => (
+              <div key={cat.label}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{cat.label}</p>
+                <div className="space-y-2">
+                  {cat.keys.map((key) => {
+                    const f = features?.[key];
+                    const platformOn = f?.platform_enabled ?? true;
+                    return (
+                      <div key={key} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${!platformOn ? "opacity-50" : ""}`}>
+                        <div>
+                          <p className="text-sm font-medium">{MODULE_META[key] ?? key}</p>
+                          {!platformOn && <p className="text-xs text-muted-foreground">Disabled for this school</p>}
+                        </div>
+                        <Switch checked={platformOn} disabled={!isOwner}
+                          onCheckedChange={(v) => isOwner && toggleFeature.mutate({ key, platform_enabled: v })} />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
