@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { registerPushNotifications, unregisterPushToken } from "@/lib/push-notifications";
 import { useRouter } from "@tanstack/react-router";
 
 type AppRole =
@@ -41,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       if (s?.user) {
-        setTimeout(() => loadProfile(s.user.id), 0);
+        setTimeout(() => {
+        loadProfile(s.user.id);
+        registerPushNotifications();
+      }, 0);
       } else {
         setRoles([]); setFullName("");
       }
@@ -75,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasRole: (r) => roles.includes(r),
     isAdmin: roles.includes("super_admin") || roles.includes("principal"),
     signOut: async () => {
+      await unregisterPushToken();
       await supabase.auth.signOut();
       window.location.href = "/login";
     },
