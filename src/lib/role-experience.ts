@@ -159,7 +159,6 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
 // Role aliasing — multiple roles share a nav template
 const ROLE_ALIASES: Record<string, string> = {
   subject_teacher: "teacher",
-  hod: "teacher",
   academic_master: "teacher",
   finance_admin: "bursar",
   finance_user: "bursar",
@@ -220,6 +219,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Verify ID", url: "/ids/verify" },
   ]},
   { label: "Administration", items: [
+    { title: "Departments", url: "/admin/departments" },
     { title: "School Brain", url: "/admin/brain" },
     { title: "Users & Credentials", url: "/admin/users" },
     { title: "Portal Links", url: "/admin/links" },
