@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX IF NOT EXISTS payments_receipt_no_unique ON public.payments (receipt_no);

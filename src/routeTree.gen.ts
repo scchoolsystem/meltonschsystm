@@ -61,8 +61,10 @@ import { Route as AppAdminSupportRouteImport } from './routes/_app.admin.support
 import { Route as AppAdminStudentDocumentsRouteImport } from './routes/_app.admin.student-documents'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
 import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
+import { Route as AppAdminRoomsRouteImport } from './routes/_app.admin.rooms'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.permissions'
+import { Route as AppAdminPeriodsRouteImport } from './routes/_app.admin.periods'
 import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overrides'
 import { Route as AppAdminLinksRouteImport } from './routes/_app.admin.links'
 import { Route as AppAdminLifecycleRouteImport } from './routes/_app.admin.lifecycle'
@@ -351,6 +353,11 @@ const AppAdminSchoolsRoute = AppAdminSchoolsRouteImport.update({
   path: '/admin/schools',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRoomsRoute = AppAdminRoomsRouteImport.update({
+  id: '/admin/rooms',
+  path: '/admin/rooms',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   id: '/admin/roles',
   path: '/admin/roles',
@@ -359,6 +366,11 @@ const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
 const AppAdminPermissionsRoute = AppAdminPermissionsRouteImport.update({
   id: '/admin/permissions',
   path: '/admin/permissions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminPeriodsRoute = AppAdminPeriodsRouteImport.update({
+  id: '/admin/periods',
+  path: '/admin/periods',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminOverridesRoute = AppAdminOverridesRouteImport.update({
@@ -554,8 +566,10 @@ export interface FileRoutesByFullPath {
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
+  '/admin/periods': typeof AppAdminPeriodsRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
@@ -636,8 +650,10 @@ export interface FileRoutesByTo {
   '/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/admin/links': typeof AppAdminLinksRoute
   '/admin/overrides': typeof AppAdminOverridesRoute
+  '/admin/periods': typeof AppAdminPeriodsRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
@@ -720,8 +736,10 @@ export interface FileRoutesById {
   '/_app/admin/lifecycle': typeof AppAdminLifecycleRoute
   '/_app/admin/links': typeof AppAdminLinksRoute
   '/_app/admin/overrides': typeof AppAdminOverridesRoute
+  '/_app/admin/periods': typeof AppAdminPeriodsRoute
   '/_app/admin/permissions': typeof AppAdminPermissionsRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
+  '/_app/admin/rooms': typeof AppAdminRoomsRoute
   '/_app/admin/schools': typeof AppAdminSchoolsRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/student-documents': typeof AppAdminStudentDocumentsRoute
@@ -804,8 +822,10 @@ export interface FileRouteTypes {
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
+    | '/admin/periods'
     | '/admin/permissions'
     | '/admin/roles'
+    | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
     | '/admin/student-documents'
@@ -886,8 +906,10 @@ export interface FileRouteTypes {
     | '/admin/lifecycle'
     | '/admin/links'
     | '/admin/overrides'
+    | '/admin/periods'
     | '/admin/permissions'
     | '/admin/roles'
+    | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
     | '/admin/student-documents'
@@ -969,8 +991,10 @@ export interface FileRouteTypes {
     | '/_app/admin/lifecycle'
     | '/_app/admin/links'
     | '/_app/admin/overrides'
+    | '/_app/admin/periods'
     | '/_app/admin/permissions'
     | '/_app/admin/roles'
+    | '/_app/admin/rooms'
     | '/_app/admin/schools'
     | '/_app/admin/settings'
     | '/_app/admin/student-documents'
@@ -1384,6 +1408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSchoolsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/rooms': {
+      id: '/_app/admin/rooms'
+      path: '/admin/rooms'
+      fullPath: '/admin/rooms'
+      preLoaderRoute: typeof AppAdminRoomsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/roles': {
       id: '/_app/admin/roles'
       path: '/admin/roles'
@@ -1396,6 +1427,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/permissions'
       fullPath: '/admin/permissions'
       preLoaderRoute: typeof AppAdminPermissionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/periods': {
+      id: '/_app/admin/periods'
+      path: '/admin/periods'
+      fullPath: '/admin/periods'
+      preLoaderRoute: typeof AppAdminPeriodsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/overrides': {
@@ -1673,8 +1711,10 @@ interface AppRouteChildren {
   AppAdminLifecycleRoute: typeof AppAdminLifecycleRoute
   AppAdminLinksRoute: typeof AppAdminLinksRoute
   AppAdminOverridesRoute: typeof AppAdminOverridesRoute
+  AppAdminPeriodsRoute: typeof AppAdminPeriodsRoute
   AppAdminPermissionsRoute: typeof AppAdminPermissionsRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
+  AppAdminRoomsRoute: typeof AppAdminRoomsRoute
   AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminStudentDocumentsRoute: typeof AppAdminStudentDocumentsRoute
@@ -1733,8 +1773,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminLifecycleRoute: AppAdminLifecycleRoute,
   AppAdminLinksRoute: AppAdminLinksRoute,
   AppAdminOverridesRoute: AppAdminOverridesRoute,
+  AppAdminPeriodsRoute: AppAdminPeriodsRoute,
   AppAdminPermissionsRoute: AppAdminPermissionsRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
+  AppAdminRoomsRoute: AppAdminRoomsRoute,
   AppAdminSchoolsRoute: AppAdminSchoolsRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminStudentDocumentsRoute: AppAdminStudentDocumentsRoute,
