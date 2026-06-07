@@ -12,7 +12,7 @@ CREATE TYPE public.app_role AS ENUM (
 );
 
 -- Profiles
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL DEFAULT '',
   phone TEXT,
@@ -25,7 +25,7 @@ GRANT ALL ON public.profiles TO service_role;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- User roles
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   role app_role NOT NULL,
@@ -47,7 +47,7 @@ RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS
 $$;
 
 -- Classes
-CREATE TABLE public.classes (
+CREATE TABLE IF NOT EXISTS public.classes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   level TEXT NOT NULL CHECK (level IN ('primary','secondary')),
@@ -62,7 +62,7 @@ GRANT ALL ON public.classes TO service_role;
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 
 -- Students
-CREATE TABLE public.students (
+CREATE TABLE IF NOT EXISTS public.students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   admission_no TEXT NOT NULL UNIQUE,
   first_name TEXT NOT NULL,
@@ -88,7 +88,7 @@ CREATE INDEX idx_students_class ON public.students(class_id);
 CREATE INDEX idx_students_status ON public.students(status);
 
 -- Staff
-CREATE TABLE public.staff (
+CREATE TABLE IF NOT EXISTS public.staff (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_no TEXT NOT NULL UNIQUE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -107,7 +107,7 @@ GRANT ALL ON public.staff TO service_role;
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 
 -- Activity logs
-CREATE TABLE public.activity_logs (
+CREATE TABLE IF NOT EXISTS public.activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   action TEXT NOT NULL,

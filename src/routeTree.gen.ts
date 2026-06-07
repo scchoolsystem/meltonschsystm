@@ -32,6 +32,7 @@ import { Route as AppLiveRouteImport } from './routes/_app.live'
 import { Route as AppLibraryRouteImport } from './routes/_app.library'
 import { Route as AppKitchenRouteImport } from './routes/_app.kitchen'
 import { Route as AppDisciplineRouteImport } from './routes/_app.discipline'
+import { Route as AppDepartmentRouteImport } from './routes/_app.department'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCocurricularRouteImport } from './routes/_app.cocurricular'
 import { Route as AppClinicRouteImport } from './routes/_app.clinic'
@@ -74,6 +75,7 @@ import { Route as AppAdminImportRouteImport } from './routes/_app.admin.import'
 import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminFeaturesRouteImport } from './routes/_app.admin.features'
+import { Route as AppAdminDepartmentsRouteImport } from './routes/_app.admin.departments'
 import { Route as AppAdminCommunicationsRouteImport } from './routes/_app.admin.communications'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
@@ -205,6 +207,11 @@ const AppKitchenRoute = AppKitchenRouteImport.update({
 const AppDisciplineRoute = AppDisciplineRouteImport.update({
   id: '/discipline',
   path: '/discipline',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDepartmentRoute = AppDepartmentRouteImport.update({
+  id: '/department',
+  path: '/department',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -419,6 +426,11 @@ const AppAdminFeaturesRoute = AppAdminFeaturesRouteImport.update({
   path: '/admin/features',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
+  id: '/admin/departments',
+  path: '/admin/departments',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminCommunicationsRoute = AppAdminCommunicationsRouteImport.update({
   id: '/admin/communications',
   path: '/admin/communications',
@@ -531,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/clinic': typeof AppClinicRoute
   '/cocurricular': typeof AppCocurricularRoute
   '/dashboard': typeof AppDashboardRoute
+  '/department': typeof AppDepartmentRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
@@ -557,6 +570,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -615,6 +629,7 @@ export interface FileRoutesByTo {
   '/clinic': typeof AppClinicRoute
   '/cocurricular': typeof AppCocurricularRoute
   '/dashboard': typeof AppDashboardRoute
+  '/department': typeof AppDepartmentRoute
   '/discipline': typeof AppDisciplineRoute
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
@@ -641,6 +656,7 @@ export interface FileRoutesByTo {
   '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -701,6 +717,7 @@ export interface FileRoutesById {
   '/_app/clinic': typeof AppClinicRoute
   '/_app/cocurricular': typeof AppCocurricularRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/department': typeof AppDepartmentRoute
   '/_app/discipline': typeof AppDisciplineRoute
   '/_app/kitchen': typeof AppKitchenRoute
   '/_app/library': typeof AppLibraryRoute
@@ -727,6 +744,7 @@ export interface FileRoutesById {
   '/_app/admin/billing': typeof AppAdminBillingRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
   '/_app/admin/communications': typeof AppAdminCommunicationsRoute
+  '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/features': typeof AppAdminFeaturesRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/grading': typeof AppAdminGradingRoute
@@ -787,6 +805,7 @@ export interface FileRouteTypes {
     | '/clinic'
     | '/cocurricular'
     | '/dashboard'
+    | '/department'
     | '/discipline'
     | '/kitchen'
     | '/library'
@@ -813,6 +832,7 @@ export interface FileRouteTypes {
     | '/admin/billing'
     | '/admin/brain'
     | '/admin/communications'
+    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -871,6 +891,7 @@ export interface FileRouteTypes {
     | '/clinic'
     | '/cocurricular'
     | '/dashboard'
+    | '/department'
     | '/discipline'
     | '/kitchen'
     | '/library'
@@ -897,6 +918,7 @@ export interface FileRouteTypes {
     | '/admin/billing'
     | '/admin/brain'
     | '/admin/communications'
+    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -956,6 +978,7 @@ export interface FileRouteTypes {
     | '/_app/clinic'
     | '/_app/cocurricular'
     | '/_app/dashboard'
+    | '/_app/department'
     | '/_app/discipline'
     | '/_app/kitchen'
     | '/_app/library'
@@ -982,6 +1005,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing'
     | '/_app/admin/brain'
     | '/_app/admin/communications'
+    | '/_app/admin/departments'
     | '/_app/admin/features'
     | '/_app/admin/field-edits'
     | '/_app/admin/grading'
@@ -1203,6 +1227,13 @@ declare module '@tanstack/react-router' {
       path: '/discipline'
       fullPath: '/discipline'
       preLoaderRoute: typeof AppDisciplineRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/department': {
+      id: '/_app/department'
+      path: '/department'
+      fullPath: '/department'
+      preLoaderRoute: typeof AppDepartmentRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -1499,6 +1530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminFeaturesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/departments': {
+      id: '/_app/admin/departments'
+      path: '/admin/departments'
+      fullPath: '/admin/departments'
+      preLoaderRoute: typeof AppAdminDepartmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/communications': {
       id: '/_app/admin/communications'
       path: '/admin/communications'
@@ -1684,6 +1722,7 @@ interface AppRouteChildren {
   AppClinicRoute: typeof AppClinicRoute
   AppCocurricularRoute: typeof AppCocurricularRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDepartmentRoute: typeof AppDepartmentRoute
   AppDisciplineRoute: typeof AppDisciplineRoute
   AppKitchenRoute: typeof AppKitchenRoute
   AppLibraryRoute: typeof AppLibraryRoute
@@ -1702,6 +1741,7 @@ interface AppRouteChildren {
   AppAdminBillingRoute: typeof AppAdminBillingRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
   AppAdminCommunicationsRoute: typeof AppAdminCommunicationsRoute
+  AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminFeaturesRoute: typeof AppAdminFeaturesRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminGradingRoute: typeof AppAdminGradingRoute
@@ -1746,6 +1786,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppClinicRoute: AppClinicRoute,
   AppCocurricularRoute: AppCocurricularRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDepartmentRoute: AppDepartmentRoute,
   AppDisciplineRoute: AppDisciplineRoute,
   AppKitchenRoute: AppKitchenRoute,
   AppLibraryRoute: AppLibraryRoute,
@@ -1764,6 +1805,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminBillingRoute: AppAdminBillingRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
   AppAdminCommunicationsRoute: AppAdminCommunicationsRoute,
+  AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminFeaturesRoute: AppAdminFeaturesRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminGradingRoute: AppAdminGradingRoute,

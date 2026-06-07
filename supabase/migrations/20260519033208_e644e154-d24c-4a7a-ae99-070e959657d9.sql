@@ -1,3 +1,4 @@
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS email_domain text;
 CREATE OR REPLACE FUNCTION public.current_school_email_domain()
 RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public

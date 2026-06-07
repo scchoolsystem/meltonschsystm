@@ -1,3 +1,8 @@
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS email_user text;
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS email_pass text;
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS email_host text;
+ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS email_port integer;
+
 
 -- 1. SCHOOLS: revoke sensitive columns + RESTRICTIVE tenant isolation
 REVOKE SELECT (email, email_user, email_pass, email_host, email_port)
