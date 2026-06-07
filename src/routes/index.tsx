@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useTenant, isNativeApp } from "@/hooks/use-tenant";
+import { useTenant } from "@/hooks/use-tenant";
 import { SchoolPicker } from "@/components/SchoolPicker";
 import { Loader2 } from "lucide-react";
 
@@ -11,35 +11,45 @@ export const Route = createFileRoute("/")({
 function IndexPage() {
   const { slug, loading } = useTenant();
   const [checked, setChecked] = useState(false);
-  const native = isNativeApp();
 
   useEffect(() => {
+    console.log("DEBUG - loading:", loading);
+    console.log("DEBUG - slug:", slug);
     if (!loading) setChecked(true);
   }, [loading]);
 
-  // Still resolving stored slug
   if (!checked) {
     return (
-      <div className="min-h-screen grid place-items-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" />
+        <p className="ml-2">Loading... (loading: {String(loading)}, checked: {String(checked)})</p>
       </div>
     );
   }
 
-  // Native app with no school selected -> show picker
-  if (native && !slug) {
-    return <SchoolPicker onPicked={() => window.location.replace("/login")} />;
+  if (!slug) {
+    console.log("DEBUG - Rendering SchoolPicker because slug is null");
+    return (
+      <div>
+        <div className="bg-yellow-200 p-4 text-center">
+          <strong>Debug:</strong> slug is null, showing school picker
+        </div>
+        <SchoolPicker onPicked={(pickedSlug) => {
+          console.log("DEBUG - onPicked called with:", pickedSlug);
+          if (pickedSlug && typeof window !== "undefined") {
+            const host = window.location.hostname;
+            const parts = host.split(".");
+            const root = parts.length >= 2 ? parts.slice(-2).join(".") : host;
+            const redirectUrl = "https://" + pickedSlug + "." + root + "/login";
+            console.log("DEBUG - redirecting to:", redirectUrl);
+            window.location.href = redirectUrl;
+          }
+        }} />
+      </div>
+    );
   }
 
-  // Web with no subdomain -> redirect to marketing site or show picker
-  if (!native && !slug) {
-    if (typeof window !== "undefined") {
-      window.location.replace("https://smartdev.co.ke");
-    }
-    return null;
-  }
-
-  // School resolved -> go to login
+  console.log("DEBUG - slug exists, redirecting to /login");
   if (typeof window !== "undefined") {
     window.location.replace("/login");
   }

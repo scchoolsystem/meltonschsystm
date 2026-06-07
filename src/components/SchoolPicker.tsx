@@ -8,7 +8,7 @@ import { Loader2, Search, Building2, ChevronRight } from "lucide-react";
 
 type SchoolRow = { id: string; slug: string; name: string; logo_url: string | null; status: string };
 
-export function SchoolPicker({ onPicked }: { onPicked?: () => void }) {
+export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }) {
   const { setSchoolSlug } = useTenant();
   const [schools, setSchools] = useState<SchoolRow[]>([]);
   const [filtered, setFiltered] = useState<SchoolRow[]>([]);
@@ -38,7 +38,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: () => void }) {
   const pick = async (slug: string) => {
     setSelecting(slug);
     await setSchoolSlug(slug);
-    onPicked?.();
+    onPicked?.(slug);
   };
 
   return (
@@ -107,3 +107,6 @@ export function SchoolPicker({ onPicked }: { onPicked?: () => void }) {
     </div>
   );
 }
+// Add debug logging
+console.log("SchoolPicker component mounted");
+console.log("Supabase client:", supabase);

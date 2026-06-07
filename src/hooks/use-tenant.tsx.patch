@@ -1,0 +1,8 @@
+// Add this to the loadSchool function after line 126
+// When no slug is found on root domain, set loading to false
+if (!targetSlug || targetSlug === PLATFORM_SLUG) {
+  setSchool(null);
+  setFeatures({});
+  setLoading(false);  // Make sure this line exists
+  return;
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Login - Greenfield Academy</title>
+    <script>
+        // Supabase configuration
+        const supabaseUrl = 'https://vpikrrytxeyybfhnozyt.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaWtycnl0eGV5eWJmaG5venl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTEwMzcsImV4cCI6MjA5NDY2NzAzN30.093gsEOCH5R1XKzhCr0mbrIEhydJc5Mv8TxUWga7iy0';
+        
+        async function login(email, password) {
+            const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await response.json();
+            if (data.access_token) {
+                localStorage.setItem('sb-access-token', data.access_token);
+                localStorage.setItem('sb-refresh-token', data.refresh_token);
+                alert('Login successful! Redirecting...');
+                window.location.href = '/dashboard';
+            } else {
+                alert('Login failed: ' + (data.error_description || 'Invalid credentials'));
+            }
+        }
+        
+        function handleSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            login(email, password);
+        }
+    </script>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0f0f0; }
+        .login-box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        h2 { text-align: center; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2>Greenfield Academy Login</h2>
+        <form onsubmit="handleSubmit(event)">
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p style="text-align:center; margin-top:15px;">
+            <a href="#" onclick="alert('Contact school admin for credentials')">Forgot password?</a>
+        </p>
+    </div>
+</body>
+</html>
