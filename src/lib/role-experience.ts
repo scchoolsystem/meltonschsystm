@@ -200,11 +200,6 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Auto-generate", url: "/timetable/generate" },
     { title: "Periods Setup", url: "/admin/periods" },
     { title: "Rooms", url: "/admin/rooms" },
-    { title: "Periods Setup", url: "/admin/periods" },
-    { title: "Rooms", url: "/admin/rooms" },
-    { title: "Periods Setup", url: "/admin/periods" },
-    { title: "Rooms", url: "/admin/rooms" },
-  ]},
   { label: "Operations", items: [
     { title: "Attendance", url: "/attendance" },
     { title: "Discipline", url: "/discipline" },
