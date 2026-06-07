@@ -342,6 +342,7 @@ function Landing() {
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#portals" className="hover:text-foreground">School portals</a>
             <a href="#contact" className="hover:text-foreground">Contact</a>
+      <a href="/legal.html" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">Legal</a>
             {clicks >= 5 && (
               <a href="https://admin.smartdev.co.ke" className="text-primary hover:underline">Platform admin</a>
             )}
