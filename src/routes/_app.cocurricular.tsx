@@ -497,7 +497,7 @@ function CreateActivityDialog({ onDone }: { onDone: () => void }) {
 
   const createFn = useServerFn(createActivity);
   const mut = useMutation({
-    mutationFn: () => createFn({ data: { name, department_id: deptId || undefined } }),
+    mutationFn: () => createFn({ data: { name, department_id: deptId === "none" ? undefined : deptId || undefined } }),
     onSuccess: () => {
       toast.success("Activity created");
       qc.invalidateQueries({ queryKey: ["co-curricular-activities"] });
@@ -528,7 +528,7 @@ function CreateActivityDialog({ onDone }: { onDone: () => void }) {
               <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="none">None</SelectItem>
               {(departments as any[]).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
@@ -567,7 +567,7 @@ function EditActivityDialog({ activity, onDone }: { activity: any; onDone: () =>
   const updateFn = useServerFn(updateActivity);
   const mut = useMutation({
     mutationFn: () =>
-      updateFn({ data: { id: activity.id, name, department_id: deptId || undefined } }),
+      updateFn({ data: { id: activity.id, name, department_id: deptId === "none" ? undefined : deptId || undefined } }),
     onSuccess: () => {
       toast.success("Activity updated");
       onDone();
@@ -596,7 +596,7 @@ function EditActivityDialog({ activity, onDone }: { activity: any; onDone: () =>
               <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="none">None</SelectItem>
               {(departments as any[]).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}

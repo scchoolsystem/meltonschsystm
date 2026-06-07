@@ -60,7 +60,7 @@ export const createActivity = createServerFn({ method: "POST" })
       .insert({
         name: data.name,
         school_id: schoolId,
-        department_id: data.department_id || null,
+        department_id: (data.department_id === "none" || !data.department_id) ? null : data.department_id,
       })
       .select("id, name")
       .single();
@@ -84,7 +84,7 @@ export const updateActivity = createServerFn({ method: "POST" })
 
     const { error } = await supabaseAdmin
       .from("co_curricular_activities")
-      .update({ name: data.name, department_id: data.department_id || null })
+      .update({ name: data.name, department_id: (data.department_id === "none" || !data.department_id) ? null : data.department_id })
       .eq("id", data.id)
       .eq("school_id", schoolId);
     if (error) throw new Error(error.message);
