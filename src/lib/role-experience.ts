@@ -239,6 +239,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Settings", url: "/admin/settings" },
     { title: "Communications", url: "/admin/communications", feature: "communications" },
     { title: "Feature Modules", url: "/admin/features" },
+    { title: "Support Tickets", url: "/admin/support" },
   ]},
 ];
 
