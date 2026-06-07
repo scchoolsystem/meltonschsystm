@@ -47,3 +47,5 @@ android-sdk/
 android/keystore.properties
 android/app/release-key.jks
 android-sdk/
+.env
+.env.*
