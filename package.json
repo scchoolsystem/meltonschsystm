@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "build:android": "bash scripts/build-android.sh",
     "deploy": "pnpm build && node scripts/prepare-deploy.cjs && npx wrangler deploy --config dist/server/wrangler.json",
-    "release": "pnpm deploy && bash scripts/build-android.sh"
+    "release": "pnpm deploy && bash scripts/build-android.sh",
+    "desktop:dev": "pnpm tauri dev",
+    "desktop:build": "pnpm tauri build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
@@ -94,6 +96,8 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "1.7.0",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
