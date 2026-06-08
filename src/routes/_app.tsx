@@ -17,10 +17,10 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
-  const { loading, session, roles } = useAuth();
+  const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
 
-  if (loading || !session) {
+  if (loading || !session || !rolesLoaded) {
     return (
       <div className="min-h-screen grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -28,8 +28,6 @@ function AppLayout() {
     );
   }
 
-  // Centralized route guard: block direct-URL access to unauthorized modules.
-  // Admins bypass implicitly inside canAccessRoute(). Dashboard is always allowed.
   const appRoles = roles as AppRole[];
   if (path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
     return <Navigate to="/dashboard" />;
@@ -55,4 +53,3 @@ function AppLayout() {
     </SidebarProvider>
   );
 }
-

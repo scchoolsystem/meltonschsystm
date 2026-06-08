@@ -24,6 +24,7 @@ interface AuthCtx {
   roles: AppRole[];
   fullName: string;
   loading: boolean;
+  rolesLoaded: boolean;
   hasRole: (r: AppRole) => boolean;
   isAdmin: boolean;
   signOut: () => Promise<void>;
@@ -37,19 +38,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       if (s?.user) {
         setTimeout(() => {
-        loadProfile(s.user.id);
-        registerPushNotifications();
-      }, 0);
+          loadProfile(s.user.id);
+          registerPushNotifications();
+        }, 0);
       } else {
-        setRoles([]); setFullName("");
+        setRoles([]);
+        setFullName("");
+        setRolesLoaded(false);
+        router.invalidate();
       }
-      router.invalidate();
     });
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -68,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     setRoles((rolesData ?? []).map((r) => r.role as AppRole));
     setFullName(prof?.full_name ?? "");
+    setRolesLoaded(true);
   }
 
   const value: AuthCtx = {
@@ -76,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     fullName,
     loading,
+    rolesLoaded,
     hasRole: (r) => roles.includes(r),
     isAdmin: roles.includes("super_admin") || roles.includes("principal"),
     signOut: async () => {
