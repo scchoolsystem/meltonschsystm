@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useTenant, isNativeApp } from "@/hooks/use-tenant";
+import { useTenant } from "@/hooks/use-tenant";
 import { SchoolPicker } from "@/components/SchoolPicker";
 import { Loader2 } from "lucide-react";
 
@@ -11,9 +11,10 @@ export const Route = createFileRoute("/")({
 function IndexPage() {
   const { slug, loading } = useTenant();
   const [checked, setChecked] = useState(false);
-  const native = isNativeApp();
 
   useEffect(() => {
+    console.log("DEBUG - loading:", loading);
+    console.log("DEBUG - slug:", slug);
     if (!loading) setChecked(true);
   }, [loading]);
 
@@ -21,47 +22,36 @@ function IndexPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" />
+        <p className="ml-2">Loading... (loading: {String(loading)}, checked: {String(checked)})</p>
       </div>
     );
   }
 
-  if (native && !slug) {
+  if (!slug) {
+    console.log("DEBUG - Rendering SchoolPicker because slug is null");
     return (
-      <SchoolPicker
-        onPicked={(pickedSlug) => {
+      <div>
+        <div className="bg-yellow-200 p-4 text-center">
+          <strong>Debug:</strong> slug is null, showing school picker
+        </div>
+        <SchoolPicker onPicked={(pickedSlug) => {
+          console.log("DEBUG - onPicked called with:", pickedSlug);
           if (pickedSlug && typeof window !== "undefined") {
-            window.location.replace(`https://${pickedSlug}.smartdev.co.ke/login`);
+            const host = window.location.hostname;
+            const parts = host.split(".");
+            const root = parts.length >= 2 ? parts.slice(-2).join(".") : host;
+            const redirectUrl = "https://" + pickedSlug + "." + root + "/login";
+            console.log("DEBUG - redirecting to:", redirectUrl);
+            window.location.href = redirectUrl;
           }
-        }}
-      />
+        }} />
+      </div>
     );
   }
 
-  if (slug) {
-    if (typeof window !== "undefined") {
-      window.location.replace("/login");
-    }
-    return null;
+  console.log("DEBUG - slug exists, redirecting to /login");
+  if (typeof window !== "undefined") {
+    window.location.replace("/login");
   }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background via-muted to-background p-6 text-center">
-      <div className="max-w-md space-y-6">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-primary text-primary-foreground shadow-lg text-4xl font-bold">
-          S
-        </div>
-        <h1 className="text-4xl font-bold tracking-tight">SmartDev ERP</h1>
-        <p className="text-muted-foreground text-lg">School management made simple.</p>
-        <div className="bg-muted rounded-xl p-5 text-left space-y-2">
-          <p className="font-semibold text-sm">To sign in, visit your school portal:</p>
-          <code className="block text-primary text-sm bg-background rounded px-3 py-2">
-            yourschool.smartdev.co.ke
-          </code>
-          <p className="text-xs text-muted-foreground">
-            Contact your school administrator if you do not know your school address.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
