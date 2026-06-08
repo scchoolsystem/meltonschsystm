@@ -3,12 +3,17 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 function createSupabaseClient() {
+  const g = globalThis as any;
   const SUPABASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL)
     || process.env.VITE_SUPABASE_URL
-    || process.env.SUPABASE_URL;
+    || process.env.SUPABASE_URL
+    || g.__env__?.SUPABASE_URL
+    || g.__env__?.VITE_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY)
     || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
-    || process.env.SUPABASE_PUBLISHABLE_KEY;
+    || process.env.SUPABASE_PUBLISHABLE_KEY
+    || g.__env__?.SUPABASE_PUBLISHABLE_KEY
+    || g.__env__?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [
