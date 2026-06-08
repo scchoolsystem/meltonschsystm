@@ -50,5 +50,3 @@ android-sdk/
 .env
 .env.*
 .wrangler/deploy/
-android/app/google-services.json
-ios/App/GoogleService-Info.plist
