@@ -51,16 +51,14 @@ function IndexPage() {
           S
         </div>
         <h1 className="text-4xl font-bold tracking-tight">SmartDev ERP</h1>
-        <p className="text-muted-foreground text-lg">
-          School management made simple.
-        </p>
+        <p className="text-muted-foreground text-lg">School management made simple.</p>
         <div className="bg-muted rounded-xl p-5 text-left space-y-2">
           <p className="font-semibold text-sm">To sign in, visit your school portal:</p>
           <code className="block text-primary text-sm bg-background rounded px-3 py-2">
             yourschool.smartdev.co.ke
           </code>
           <p className="text-xs text-muted-foreground">
-            Contact your school administrator if you don't know your school's address.
+            Contact your school administrator if you do not know your school address.
           </p>
         </div>
       </div>

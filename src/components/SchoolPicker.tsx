@@ -50,52 +50,29 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
           <h1 className="text-3xl font-bold">SmartDev ERP</h1>
           <p className="text-sm text-muted-foreground mt-1">Select your school to continue</p>
         </div>
-
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search schools..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Search schools..." value={query} onChange={(e) => setQuery(e.target.value)} className="pl-9" />
         </div>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Available Schools</CardTitle>
             <CardDescription>{filtered.length} school{filtered.length !== 1 ? "s" : ""} found</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            {loading && (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            {!loading && filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">No schools found.</p>
-            )}
+            {loading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}
+            {!loading && filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No schools found.</p>}
             <ul className="divide-y max-h-72 overflow-auto">
               {filtered.map((school) => (
                 <li key={school.id}>
-                  <button
-                    onClick={() => pick(school.slug)}
-                    disabled={!!selecting}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
-                  >
+                  <button onClick={() => pick(school.slug)} disabled={!!selecting} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left">
                     {school.logo_url ? (
                       <img src={school.logo_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-8 h-8 rounded bg-primary/10 grid place-items-center flex-shrink-0">
-                        <Building2 className="w-4 h-4 text-primary" />
-                      </div>
+                      <div className="w-8 h-8 rounded bg-primary/10 grid place-items-center flex-shrink-0"><Building2 className="w-4 h-4 text-primary" /></div>
                     )}
                     <span className="flex-1 text-sm font-medium truncate">{school.name}</span>
-                    {selecting === school.slug ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    )}
+                    {selecting === school.slug ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                   </button>
                 </li>
               ))}
