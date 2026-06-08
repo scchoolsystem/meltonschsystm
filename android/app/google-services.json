@@ -1,0 +1,22 @@
+{
+  "project_info": {
+    "project_number": "114215373712",
+    "project_id": "smartdev-dd1e0",
+    "storage_bucket": "smartdev-dd1e0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:114215373712:android:4eb8b14c62c39fa9e24115",
+        "android_info": {
+          "package_name": "ke.co.smartdev.app"
+        }
+      },
+      "api_key": [{ "current_key": "IzaSyC8ymRQJqLJm8tykpUqFg9q2AyW92xZyf8" }],
+      "services": {
+        "appinvite_service": { "other_platform_oauth_client": [] }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
