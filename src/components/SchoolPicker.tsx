@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, Search, Building2, ChevronRight } from "lucide-react";
@@ -107,6 +106,3 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
     </div>
   );
 }
-// Add debug logging
-console.log("SchoolPicker component mounted");
-console.log("Supabase client:", supabase);
