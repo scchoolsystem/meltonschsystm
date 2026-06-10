@@ -28,7 +28,7 @@ const NAV = [
 ] as const;
 
 function PlatformLayout() {
-  const { loading, session, roles, signOut } = useAuth();
+  const { loading, session, roles, rolesLoaded, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,7 +37,7 @@ function PlatformLayout() {
     return <Outlet />;
   }
 
-  if (loading || !session) {
+  if (loading || !session || !rolesLoaded) {
     return (
       <div className="min-h-screen grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

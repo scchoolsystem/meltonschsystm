@@ -108,5 +108,3 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   );
 }
 // Add debug logging
-console.log("SchoolPicker component mounted");
-console.log("Supabase client:", supabase);

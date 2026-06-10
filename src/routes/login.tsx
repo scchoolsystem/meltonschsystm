@@ -24,15 +24,27 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [clicks, setClicks] = useState(0);
   const settings = school ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url } : null;
-  const isRootHost = !isPlatformHost && !slug;
+
+  // Only treat as root host AFTER tenant has finished loading
+  const isRootHost = !tenantLoading && !isPlatformHost && !slug;
 
   useEffect(() => {
+    if (tenantLoading) return; // wait for tenant before any redirect
     if (isPlatformHost) { navigate({ to: session ? "/platform/dashboard" : "/platform/login" }); return; }
     if (isRootHost) { navigate({ to: "/" }); return; }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate, isPlatformHost, isRootHost]);
+  }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading]);
 
-  if (!tenantLoading && !isPlatformHost && slug && (tenantError || !school)) {
+  // Still loading tenant — show spinner, don't flash anything
+  if (tenantLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isPlatformHost && slug && (tenantError || !school)) {
     return (<div className="min-h-screen grid place-items-center p-6 text-center"><div className="max-w-md space-y-4"><GraduationCap className="w-10 h-10 mx-auto text-destructive" /><h1 className="text-2xl font-bold">School portal not found</h1><p className="text-sm text-muted-foreground">The school portal <code className="px-1 py-0.5 rounded bg-muted">{slug}.smartdev.co.ke</code> does not exist.</p></div></div>);
   }
 

@@ -1,13 +1,14 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
 import { SchoolPicker } from "@/components/SchoolPicker";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GraduationCap, Users, BookOpen, BarChart3, ShieldCheck, ArrowRight, Building2, CreditCard, Mail, Phone, Lock, IdCard, CalendarDays, Video, MessageSquare, Globe, CheckCircle, Star } from "lucide-react";
+import { GraduationCap, Users, ShieldCheck, ArrowRight, Phone, Mail } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: IndexPage });
 
@@ -15,15 +16,38 @@ const ROOT = "smartdev.co.ke";
 
 function IndexPage() {
   const { slug, loading } = useTenant();
-  const [ready, setReady] = React.useState(false);
+  const navigate = useNavigate();
   const native = isNativeApp();
-  React.useEffect(() => { if (!loading) setReady(true); }, [loading]);
-  if (!ready) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (native && !slug) return <SchoolPicker onPicked={(s) => { if (s) window.location.replace(`https://${s}.smartdev.co.ke/login`); }} />;
-  if (slug && slug !== "__platform__") { if (typeof window !== "undefined") window.location.replace("/login"); return null; }
+
+  useEffect(() => {
+    if (loading) return;
+    // School subdomain — go directly to login, no hard redirect
+    if (slug && slug !== "__platform__") {
+      navigate({ to: "/login" });
+      return;
+    }
+    // Native app with no school picked yet — show picker
+    // Platform host or root — show landing (handled below)
+  }, [loading, slug, navigate]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin" />
+    </div>
+  );
+
+  if (native && !slug) return (
+    <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />
+  );
+
+  if (slug && slug !== "__platform__") return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin" />
+    </div>
+  );
+
   return <Landing />;
 }
-
 
 function Landing() {
   const { session, loading } = useAuth();
