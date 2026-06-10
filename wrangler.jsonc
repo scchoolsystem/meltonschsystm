@@ -2,22 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "smartdev",
   "compatibility_date": "2026-06-10",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
   "routes": [
-    {
-      "pattern": "smartdev.co.ke/*",
-      "zone_name": "smartdev.co.ke"
-    },
-    {
-      "pattern": "www.smartdev.co.ke/*",
-      "zone_name": "smartdev.co.ke"
-    },
-    {
-      "pattern": "*.smartdev.co.ke/*",
-      "zone_name": "smartdev.co.ke"
-    }
+    { "pattern": "smartdev.co.ke/*", "zone_name": "smartdev.co.ke" },
+    { "pattern": "www.smartdev.co.ke/*", "zone_name": "smartdev.co.ke" },
+    { "pattern": "*.smartdev.co.ke/*", "zone_name": "smartdev.co.ke" }
   ]
 }
