@@ -29,6 +29,21 @@ function SessionRoom() {
   );
 
   const router = useRouter();
+
+  // Auto-start if teacher/admin opens room at or after scheduled start time
+  useEffect(() => {
+    if (!session || !canManage) return;
+    if (
+      session.status === "scheduled" &&
+      Date.now() >= new Date(session.scheduled_start).getTime()
+    ) {
+      supabase
+        .from("live_sessions")
+        .update({ status: "live", started_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
+    }
+  }, [session?.id, canManage]);
   const { data: session, isLoading } = useQuery({
     queryKey: ["live-session", sessionId],
     queryFn: async () => {
@@ -135,6 +150,13 @@ function SessionRoom() {
           )}
         </div>
       </div>
+
+
+      {isStudent && myStudent === null && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm text-amber-800 dark:text-amber-300">
+          ⚠ Your account is not linked to a student record — your attendance will not be tracked automatically. Contact your administrator.
+        </div>
+      )}
 
       {session.status === "cancelled" || session.status === "ended" ? (
         <Card><CardContent className="py-10 text-center text-muted-foreground">This session has {session.status}. You can still adjust attendance below.</CardContent></Card>

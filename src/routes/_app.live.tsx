@@ -109,7 +109,7 @@ function SessionDescription({ description }: { description: string }) {
 
 function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; onChanged: () => void }) {
   const start = new Date(s.scheduled_start);
-  const isLiveWindow = Date.now() >= start.getTime() - 10 * 60_000 && (s.status === "scheduled" || s.status === "live");
+  const isLiveWindow = s.status === "live" || (s.status === "scheduled" && Date.now() >= start.getTime() - 10 * 60_000);
   const cancel = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("live_sessions").update({ status: "cancelled" }).eq("id", s.id);
