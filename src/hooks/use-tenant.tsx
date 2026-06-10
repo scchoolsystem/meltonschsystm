@@ -159,6 +159,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setSlug(resolved);
       void loadSchool(resolved);
     });
+    // Safety timeout — never hang forever
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Apply brand colour + document title
