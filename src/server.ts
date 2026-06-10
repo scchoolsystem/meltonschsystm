@@ -61,7 +61,7 @@ export default {
     // process.env.SUPABASE_URL etc. work in SSR code.
     if (env && typeof env === "object") {
       for (const [key, value] of Object.entries(env as Env)) {
-        if (typeof value === "string" && !process.env[key]) {
+        if (typeof value === "string") {
           process.env[key] = value;
         }
       }
