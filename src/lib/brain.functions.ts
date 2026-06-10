@@ -32,7 +32,6 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     const totalPaid = (invoices.data ?? []).reduce((a, b) => a + Number(b.paid || 0), 0);
     const overdue = (invoices.data ?? []).filter((i) => i.status !== "paid" && i.due_date && new Date(i.due_date) < new Date());
 
-    // Attendance per student
     const attMap = new Map<string, { p: number; t: number }>();
     for (const a of attend.data ?? []) {
       const e = attMap.get(a.student_id) ?? { p: 0, t: 0 };
@@ -42,25 +41,24 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     }
     const absentees = Array.from(attMap.entries()).filter(([, v]) => v.t >= 5 && v.p / v.t < 0.6);
 
-    // Discipline escalation
     const discMap = new Map<string, number>();
     for (const d of disc.data ?? []) discMap.set(d.student_id, (discMap.get(d.student_id) ?? 0) + (d.severity === "major" ? 3 : 1));
     const discRisks = Array.from(discMap.entries()).filter(([, v]) => v >= 4);
 
-    // Anomaly: repeated overrides by same actor
     const ovMap = new Map<string, number>();
     for (const o of overrides.data ?? []) ovMap.set(o.actor_id, (ovMap.get(o.actor_id) ?? 0) + 1);
     const overrideAbuse = Array.from(ovMap.entries()).filter(([, v]) => v >= 5);
 
+    const scores = (examScores.data ?? []).map((r) => Number(r.score || 0));
+    const academicHealth = scores.length === 0
+      ? 100
+      : Math.round(
+          (scores.reduce((a, b) => a + b, 0) / scores.length) * 0.6 +
+          (scores.filter((s) => s >= 50).length / scores.length) * 100 * 0.4
+        );
+
     const indices = {
-      academicHealth: (() => {
-        const scores = (examScores.data ?? []).map((r: any) => Number(r.score || 0));
-        if (scores.length === 0) return 100;
-        const avg = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
-        // Scale: avg 0=0, avg 50=50, avg 100=100 — pass rate boosts score
-        const passRate = scores.filter((s: number) => s >= 50).length / scores.length;
-        return Math.round((avg * 0.6) + (passRate * 100 * 0.4));
-      })()
+      academicHealth,
       financeStability: totalInv > 0 ? Math.round((totalPaid / totalInv) * 100) : 100,
       attendanceStability: attMap.size > 0
         ? Math.round((Array.from(attMap.values()).reduce((a, v) => a + (v.p / v.t), 0) / attMap.size) * 100)
@@ -69,7 +67,6 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     };
     const schoolHealth = Math.round((indices.academicHealth + indices.financeStability + indices.attendanceStability + indices.disciplineRisk) / 4);
 
-    // Governance metrics
     const polRows = policies.data ?? [];
     const governance = {
       totalPolicies: polRows.length,
