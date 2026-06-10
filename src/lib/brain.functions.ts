@@ -13,7 +13,7 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
 
     const since7 = new Date(Date.now() - 7 * 864e5).toISOString();
     const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
-    const [students, invoices, attend, disc, overrides, policies, edits, alertsRow, pendingLinks, lifecycle] = await Promise.all([
+    const [students, invoices, attend, disc, overrides, policies, edits, alertsRow, pendingLinks, lifecycle, examScores] = await Promise.all([
       supabaseAdmin.from("students").select("id, lifecycle_status, class_id").eq("school_id", schoolId),
       supabaseAdmin.from("invoices").select("id, student_id, amount, paid, status, due_date").eq("school_id", schoolId),
       supabaseAdmin.from("attendance_records").select("student_id, status, date").eq("school_id", schoolId).gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
@@ -24,6 +24,7 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       supabaseAdmin.from("smart_alerts").select("id, category, severity, title, body, resolved, created_at").eq("school_id", schoolId).eq("resolved", false).order("created_at", { ascending: false }).limit(20),
       supabaseAdmin.from("pending_parent_links").select("id, status").eq("status", "pending"),
       supabaseAdmin.from("lifecycle_events").select("target_type, to_status, created_at").gte("created_at", since30),
+      supabaseAdmin.from("exam_results").select("score").eq("school_id", schoolId),
     ]);
 
     const activeStudents = (students.data ?? []).filter((s) => s.lifecycle_status === "active");
@@ -52,7 +53,14 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
     const overrideAbuse = Array.from(ovMap.entries()).filter(([, v]) => v >= 5);
 
     const indices = {
-      academicHealth: 100, // placeholder until exam_results have full coverage
+      academicHealth: (() => {
+        const scores = (examScores.data ?? []).map((r: any) => Number(r.score || 0));
+        if (scores.length === 0) return 100;
+        const avg = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
+        // Scale: avg 0=0, avg 50=50, avg 100=100 — pass rate boosts score
+        const passRate = scores.filter((s: number) => s >= 50).length / scores.length;
+        return Math.round((avg * 0.6) + (passRate * 100 * 0.4));
+      })()
       financeStability: totalInv > 0 ? Math.round((totalPaid / totalInv) * 100) : 100,
       attendanceStability: attMap.size > 0
         ? Math.round((Array.from(attMap.values()).reduce((a, v) => a + (v.p / v.t), 0) / attMap.size) * 100)

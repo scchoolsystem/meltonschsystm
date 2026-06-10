@@ -20,7 +20,7 @@ export async function registerPushNotifications(): Promise<void> {
 
     // Save FCM token to Supabase when received
     await PushNotifications.addListener("registration", async (token) => {
-      console.log("[Push] FCM token:", token.value);
+      console.log("[Push] FCM token registered"); // token value intentionally omitted from logs
       await savePushToken(token.value);
     });
 
