@@ -1,3 +1,13 @@
+-- Idempotency: drop constraints before recreating them
+ALTER TABLE public.student_user_links
+  DROP CONSTRAINT IF EXISTS student_user_links_student_school_uniq;
+ALTER TABLE public.student_user_links
+  DROP CONSTRAINT IF EXISTS student_user_links_user_school_uniq;
+ALTER TABLE public.student_user_links
+  DROP CONSTRAINT IF EXISTS student_user_links_user_id_key;
+ALTER TABLE public.student_user_links
+  DROP CONSTRAINT IF EXISTS student_user_links_student_id_key;
+
 -- Fix: drop individual unique constraints on student_user_links that break
 -- multi-school inserts, replace with composite constraints per school.
 

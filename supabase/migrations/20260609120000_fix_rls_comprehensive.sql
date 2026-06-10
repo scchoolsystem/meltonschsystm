@@ -1,3 +1,28 @@
+-- Idempotency cleanup: drop all policies this migration creates before recreating them
+DROP POLICY IF EXISTS "admins manage classes" ON public.classes;
+DROP POLICY IF EXISTS "admins manage subjects" ON public.subjects;
+DROP POLICY IF EXISTS "admins manage staff" ON public.staff;
+DROP POLICY IF EXISTS "admins manage exams" ON public.exams;
+DROP POLICY IF EXISTS "teaching staff manage results" ON public.exam_results;
+DROP POLICY IF EXISTS "admins see all roles" ON public.user_roles;
+DROP POLICY IF EXISTS "admins manage students" ON public.students;
+DROP POLICY IF EXISTS "teaching staff manage attendance" ON public.attendance_records;
+DROP POLICY IF EXISTS "finance manage invoices" ON public.invoices;
+DROP POLICY IF EXISTS "finance manage fee_structures" ON public.fee_structures;
+DROP POLICY IF EXISTS "staff manage announcements" ON public.announcements;
+DROP POLICY IF EXISTS "staff manage discipline" ON public.discipline_records;
+DROP POLICY IF EXISTS "librarians manage books" ON public.books;
+DROP POLICY IF EXISTS "librarians manage book_loans" ON public.book_loans;
+DROP POLICY IF EXISTS "boarding manage dormitories" ON public.dormitories;
+DROP POLICY IF EXISTS "boarding manage dorm_assignments" ON public.dorm_assignments;
+DROP POLICY IF EXISTS "nurses manage clinic_visits" ON public.clinic_visits;
+DROP POLICY IF EXISTS "transport manage routes" ON public.transport_routes;
+DROP POLICY IF EXISTS "transport manage assignments" ON public.transport_assignments;
+DROP POLICY IF EXISTS "admins manage timetable" ON public.timetable_slots;
+DROP POLICY IF EXISTS "security manage gate_passes" ON public.gate_passes;
+DROP POLICY IF EXISTS "admins manage rooms" ON public.rooms;
+DROP POLICY IF EXISTS "admins manage period_templates" ON public.period_templates;
+
 -- Expand is_admin() to include all admin-tier roles
 CREATE OR REPLACE FUNCTION public.is_admin(_user_id UUID)
 RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
