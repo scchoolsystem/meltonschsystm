@@ -37,12 +37,12 @@ export const changeMyPassword = createServerFn({ method: "POST" })
     // the publishable key. Cheapest path: use admin update + reject if the
     // verification fails by re-attempting a sign-in.
     const verify = await fetch(
-      `${process.env.SUPABASE_URL}/auth/v1/token?grant_type=password`,
+      `${process.env.SUPABASE_URL ?? (globalThis as any).__env__?.SUPABASE_URL}/auth/v1/token?grant_type=password`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+          apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? (globalThis as any).__env__?.SUPABASE_PUBLISHABLE_KEY ?? "",
         },
         body: JSON.stringify({ email, password: data.current_password }),
       },

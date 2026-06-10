@@ -12,17 +12,18 @@ async function resolveSchoolId(ctx: { supabase: any }) {
 }
 
 function getResend() {
-  if (!process.env.RESEND_API_KEY) return null;
-  return new Resend(process.env.RESEND_API_KEY);
+  const RESEND_API_KEY = process.env.RESEND_API_KEY ?? (globalThis as any).__env__?.RESEND_API_KEY;
+  if (!RESEND_API_KEY) return null;
+  return new Resend(RESEND_API_KEY);
 }
 
-const FROM = process.env.RESEND_FROM_EMAIL || "SmartDev <onboarding@resend.dev>";
+const getFrom = () => process.env.RESEND_FROM_EMAIL || (globalThis as any).__env__?.RESEND_FROM_EMAIL || "SmartDev <onboarding@resend.dev>";
 
 async function sendOne(to: string, subject: string, html: string) {
   const r = getResend();
   if (!r) return false;
   try {
-    await r.emails.send({ from: FROM, to, subject, html });
+    await r.emails.send({ from: getFrom(), to, subject, html });
     return true;
   } catch {
     return false;
