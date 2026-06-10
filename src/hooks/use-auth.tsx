@@ -72,13 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   async function loadProfile(uid: string) {
-    const [{ data: rolesData }, { data: prof }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-      supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
-    ]);
-    setRoles((rolesData ?? []).map((r) => r.role as AppRole));
-    setFullName(prof?.full_name ?? "");
-    setRolesLoaded(true);
+    try {
+      const [{ data: rolesData }, { data: prof }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+        supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
+      ]);
+      setRoles((rolesData ?? []).map((r) => r.role as AppRole));
+      setFullName(prof?.full_name ?? "");
+    } catch (err) {
+      console.error("[useAuth] loadProfile failed:", err);
+    } finally {
+      setRolesLoaded(true);
+    }
   }
 
   const value: AuthCtx = {
