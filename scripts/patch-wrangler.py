@@ -1,5 +1,5 @@
 import json, sys
-f = "dist/server/wrangler.json"
+f = "dist/client/wrangler.json"
 w = json.load(open(f))
 w["routes"] = [
   {"pattern": "smartdev.co.ke/*", "zone_name": "smartdev.co.ke"},
