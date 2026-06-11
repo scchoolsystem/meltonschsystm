@@ -46,6 +46,9 @@ jobs:
       - name: Copy web assets to Android
         run: npx cap sync android
 
+      - name: Decode google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
+
       - name: Decode keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/smartdev-release.keystore
 
