@@ -55,6 +55,20 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+// Strip Cloudflare challenge scripts injected into HTML responses.
+// These break React hydration by blocking script execution.
+async function stripCfChallengeScripts(response: Response): Promise<Response> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("text/html")) return response;
+  let html = await response.text();
+  // Remove the CF Browser Integrity Check iframe injection script
+  html = html.replace(/<script>\(function\(\)\{function c\(\)\{var b=a\.contentDocument[\s\S]*?challenge-platform[\s\S]*?\}\)\(\);<\/script>/g, "");
+  return new Response(html, {
+    status: response.status,
+    headers: response.headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     // Bridge Cloudflare Worker vars/secrets into process.env so that
@@ -70,7 +84,8 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return await stripCfChallengeScripts(normalized);
     } catch (error) {
       console.error(error);
       return brandedErrorResponse();
