@@ -44,7 +44,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
 
       - name: Copy web assets to Android
-        run: npx cap copy android
+        run: npx cap sync android
 
       - name: Decode keystore
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/smartdev-release.keystore
