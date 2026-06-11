@@ -45,13 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       if (s?.user) {
         setTimeout(() => {
-          loadProfile(s.user.id);
+          loadProfile(s.user.id).finally(() => setLoading(false));
           registerPushNotifications();
         }, 0);
       } else {
         setRoles([]);
         setFullName("");
         setRolesLoaded(false);
+        setLoading(false);
         router.invalidate();
       }
     });
@@ -68,7 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Safety: never leave loading=true forever
+    const safetyTimer = setTimeout(() => setLoading(false), 5000);
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimer);
+    };
   }, [router]);
 
   async function loadProfile(uid: string) {

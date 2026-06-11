@@ -20,7 +20,7 @@ function AppLayout() {
   const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
 
-  if (loading || !session || !rolesLoaded) {
+  if (loading || !session) {
     return (
       <div className="min-h-screen grid place-items-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
