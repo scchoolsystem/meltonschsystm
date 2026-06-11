@@ -30,20 +30,6 @@ function SessionRoom() {
 
   const router = useRouter();
 
-  // Auto-start if teacher/admin opens room at or after scheduled start time
-  useEffect(() => {
-    if (!session || !canManage) return;
-    if (
-      session.status === "scheduled" &&
-      Date.now() >= new Date(session.scheduled_start).getTime()
-    ) {
-      supabase
-        .from("live_sessions")
-        .update({ status: "live", started_at: new Date().toISOString() })
-        .eq("id", sessionId)
-        .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
-    }
-  }, [session?.id, canManage]);
   const { data: session, isLoading } = useQuery({
     queryKey: ["live-session", sessionId],
     queryFn: async () => {
