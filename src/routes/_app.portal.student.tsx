@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_app/portal/student")({
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function StudentPortal() {
-  const { user, fullName, loading } = useAuth();
+  const { user, fullName, loading: authLoading } = useAuth();
   const [student, setStudent] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
@@ -38,7 +38,7 @@ function StudentPortal() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || loading) return;
+    if (!user || authLoading) return;
     (async () => {
       const { data: link } = await supabase
         .from("student_user_links")
@@ -122,7 +122,7 @@ function StudentPortal() {
 
       setLoading(false);
     })();
-  }, [user, loading]);
+  }, [user, authLoading]);
 
   const today = new Date();
   const todayDow = ((today.getDay() + 6) % 7) + 1; // Mon=1..Sun=7
