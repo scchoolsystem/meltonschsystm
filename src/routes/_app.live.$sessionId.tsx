@@ -66,6 +66,21 @@ function SessionRoom() {
     },
   });
 
+  // Auto-start if teacher/admin opens room at or after scheduled start time
+  useEffect(() => {
+    if (!session || !canManage) return;
+    if (
+      session.status === "scheduled" &&
+      Date.now() >= new Date(session.scheduled_start).getTime()
+    ) {
+      supabase
+        .from("live_sessions")
+        .update({ status: "live", started_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
+    }
+  }, [session?.id, session?.status, canManage]);
+
   // Auto-track attendance on join/leave; auto-derive present vs late
   const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
   useEffect(() => {
