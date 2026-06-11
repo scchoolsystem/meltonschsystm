@@ -15,17 +15,18 @@ export const Route = createFileRoute("/platform/login")({
 
 function PlatformLoginPage() {
   const navigate = useNavigate();
-  const { session, roles, loading } = useAuth();
+  const { session, roles, loading, rolesLoaded } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) {
+    if (!loading && session && rolesLoaded) {
       const isPlatform = roles.includes("platform_owner") || roles.includes("platform_support");
       if (isPlatform) navigate({ to: "/platform/dashboard" });
+      else navigate({ to: "/platform/dashboard" }); // let dashboard handle auth
     }
-  }, [session, roles, loading, navigate]);
+  }, [session, roles, loading, rolesLoaded, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

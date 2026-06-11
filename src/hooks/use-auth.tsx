@@ -39,6 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
   const [rolesLoaded, setRolesLoaded] = useState(false);
+  // Safety: never hang on loading state
+  useEffect(() => {
+    const t = setTimeout(() => setRolesLoaded(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
