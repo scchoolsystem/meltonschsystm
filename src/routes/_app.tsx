@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
-  const { loading, session, roles, rolesLoaded } = useAuth();
+  const { loading, session, roles } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
 
   if (loading || !session) {
