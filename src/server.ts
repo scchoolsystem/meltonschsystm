@@ -61,8 +61,17 @@ async function stripCfChallengeScripts(response: Response): Promise<Response> {
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("text/html")) return response;
   let html = await response.text();
-  // Remove the CF Browser Integrity Check iframe injection script
+
+  // Remove CF Browser Integrity Check iframe injection (breaks React hydration)
   html = html.replace(/<script>\(function\(\)\{function c\(\)\{var b=a\.contentDocument[\s\S]*?challenge-platform[\s\S]*?\}\)\(\);<\/script>/g, "");
+
+  // Ensure the TanStack entry module script is always present.
+  // The $_TSR bootstrap sometimes fails to inject it on subdomain requests.
+  const entryMatch = html.match(/["'](\/assets\/index-[^"']+\.js)["']/);
+  if (entryMatch && !html.includes('<script type="module" src="' + entryMatch[1])) {
+    html = html.replace("</body>", `<script type="module" src="${entryMatch[1]}"></script></body>`);
+  }
+
   return new Response(html, {
     status: response.status,
     headers: response.headers,
