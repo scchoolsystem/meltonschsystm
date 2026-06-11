@@ -25,9 +25,6 @@
         ],
         "security": {
             "csp": null
-        },
-        "updater": {
-            "active": false
         }
     },
     "bundle": {
@@ -42,7 +39,7 @@
         ],
         "resources": [],
         "externalBin": [],
-        "copyright": "© 2026 SmartDev",
+        "copyright": "\u00a9 2026 SmartDev",
         "category": "Education",
         "shortDescription": "School Management ERP",
         "longDescription": "SmartDev ERP - Multi-tenant school management platform for Kenyan schools"
