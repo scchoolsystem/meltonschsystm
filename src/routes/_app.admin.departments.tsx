@@ -18,7 +18,7 @@ function AdminDepartmentsPage() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState("");
-  const [kind, setKind] = useState("academic");
+  const [kind, setKind] = useState("academics");
 
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ["admin-departments"],
@@ -63,7 +63,7 @@ function AdminDepartmentsPage() {
             <Card key={dept.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-bold">{dept.name}</CardTitle>
-                <Badge variant={dept.kind === "academic" ? "default" : "secondary"}>{dept.kind}</Badge>
+                <Badge variant={dept.kind === "academics" ? "default" : "secondary"}>{dept.kind}</Badge>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-xs text-muted-foreground">
@@ -103,8 +103,9 @@ function AdminDepartmentsPage() {
                 id="kind" value={kind} onChange={(e) => setKind(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="academic">Academic</option>
-                <option value="administrative">Administrative</option>
+                <option value="academics">Academic</option>
+                <option value="administration">Administration</option>
+                <option value="co_curricular">Co-Curricular</option>
                 <option value="support">Support</option>
               </select>
             </div>
