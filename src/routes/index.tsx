@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GraduationCap, Users, ShieldCheck, ArrowRight, Phone, Mail } from "lucide-react";
+import { GraduationCap, Users, ShieldCheck, ArrowRight, Phone, Mail, Smartphone, Monitor, Download } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: IndexPage });
 
@@ -78,9 +78,9 @@ function Landing() {
           </button>
           <nav className="flex items-center gap-2 text-sm">
             <a href="#features" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">Features</a>
-            <a href="#portals" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">School portals</a>
+            <a href="#download" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">School portals</a>
             <a href="#contact" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">Contact</a>
-            <a href="#portals"><Button size="sm">Open my school portal</Button></a>
+            <a href="#download"><Button size="sm">Download App</Button></a>
           </nav>
         </div>
       </header>
@@ -96,7 +96,7 @@ function Landing() {
           From admissions to graduation — academics, fees, boarding, library, clinic, transport, communications and more.
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <a href="#portals"><Button size="lg" className="gap-2">Open my school portal <ArrowRight className="w-4 h-4" /></Button></a>
+          <a href="#download"><Button size="lg" className="gap-2">Download App <ArrowRight className="w-4 h-4" /></Button></a>
           <a href="#contact"><Button size="lg" variant="outline" className="gap-2"><Phone className="w-4 h-4" /> Get in touch</Button></a>
         </div>
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
@@ -148,7 +148,7 @@ function Landing() {
         <div className="container mx-auto px-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SmartDev ERP · School management for East Africa</span>
           <span className="flex items-center gap-3">
-            <a href="#portals" className="hover:text-foreground">School portals</a>
+            <a href="#download" className="hover:text-foreground">School portals</a>
             <a href="#contact" className="hover:text-foreground">Contact</a>
             {clicks >= 5 && <a href="https://admin.smartdev.co.ke" className="text-primary hover:underline">Platform admin</a>}
           </span>
