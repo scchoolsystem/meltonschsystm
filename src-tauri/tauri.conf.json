@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "identifier": "ke.co.smartdev",
     "build": {
-        "frontendDist": "../dist/client",
+        "frontendDist": "https://app.smartdev.co.ke",
         "devUrl": "http://localhost:3000",
         "beforeDevCommand": "",
         "beforeBuildCommand": ""
@@ -39,7 +39,7 @@
         ],
         "resources": [],
         "externalBin": [],
-        "copyright": "© 2025 SmartDev",
+        "copyright": "\u00a9 2025 SmartDev",
         "category": "Business",
         "shortDescription": "School Management ERP",
         "longDescription": "SmartDev ERP is a complete school management system for African schools, covering students, staff, fees, timetables, and more.",

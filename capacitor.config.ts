@@ -3,8 +3,9 @@ const config: CapacitorConfig = {
   appId: 'ke.co.smartdev.app',
   appName: 'SmartDev',
   webDir: 'dist/client',
-  android: {
-    allowMixedContent: false,
+  server: {
+    url: 'https://app.smartdev.co.ke',
+    cleartext: false,
   },
 };
 export default config;
