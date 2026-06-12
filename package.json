@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "build:android": "bash scripts/build-android.sh",
     "deploy": "pnpm build && npx wrangler deploy --config dist/server/wrangler.json",
-    "release": "pnpm deploy && bash scripts/build-android.sh"
+    "release": "pnpm deploy && bash scripts/build-android.sh",
+    "build:desktop": "vite build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
