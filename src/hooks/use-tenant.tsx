@@ -34,7 +34,6 @@ type TenantState = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  // Mobile/desktop: set school explicitly
   setSchoolSlug: (slug: string) => Promise<void>;
   clearSchoolSlug: () => Promise<void>;
 };
@@ -116,6 +115,25 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [slug, setSlug] = useState<string | null>(null);
 
   const isPlatformHost = slug === PLATFORM_SLUG;
+
+  // Redirect school subdomains to app.smartdev.co.ke
+  useEffect(() => {
+    if (isNativeApp()) return;
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase().split(":")[0];
+    const allowed = [
+      "smartdev.co.ke",
+      "www.smartdev.co.ke",
+      "app.smartdev.co.ke",
+      "admin.smartdev.co.ke",
+      "localhost",
+    ];
+    const isSchoolSubdomain =
+      host.endsWith(".smartdev.co.ke") && !allowed.includes(host);
+    if (isSchoolSubdomain) {
+      window.location.href = "https://app.smartdev.co.ke";
+    }
+  }, []);
 
   const loadSchool = async (targetSlug: string | null) => {
     setLoading(true);
