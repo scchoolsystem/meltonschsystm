@@ -31,7 +31,7 @@ jobs:
         run: pnpm build
 
       - name: Install Tauri CLI
-        run: pnpm add -D @tauri-apps/cli
+        run: pnpm add -D -w @tauri-apps/cli
 
       - name: Build Tauri Windows app
         run: pnpm tauri build
