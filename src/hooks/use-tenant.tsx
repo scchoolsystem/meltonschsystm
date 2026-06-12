@@ -67,6 +67,7 @@ export function getSubdomainSlug(hostname: string): string | null {
   if (
     host === "smartdev.co.ke" ||
     host === "www.smartdev.co.ke" ||
+    host === "app.smartdev.co.ke" ||
     host === "erp.smartdev.co.ke"
   ) {
     return null;
