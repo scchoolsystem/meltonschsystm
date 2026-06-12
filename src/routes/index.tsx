@@ -7,45 +7,25 @@ import { SchoolPicker } from "@/components/SchoolPicker";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { GraduationCap, Users, ShieldCheck, ArrowRight, Phone, Mail, Smartphone, Monitor, Download } from "lucide-react";
+import { GraduationCap, Users, ShieldCheck, Phone, Mail, Smartphone, Monitor, Download } from "lucide-react";
 
 export const Route = createFileRoute("/")({ component: IndexPage });
 
 const ROOT = "smartdev.co.ke";
+const APK_URL = "https://github.com/scchoolsystem/meltonschsystm/releases/latest/download/app-release.apk";
+const WINDOWS_URL = "https://github.com/scchoolsystem/meltonschsystm/releases/latest";
 
 function IndexPage() {
   const { slug, loading } = useTenant();
   const navigate = useNavigate();
   const native = isNativeApp();
-
   useEffect(() => {
     if (loading) return;
-    // School subdomain — go directly to login, no hard redirect
-    if (slug && slug !== "__platform__") {
-      navigate({ to: "/login" });
-      return;
-    }
-    // Native app with no school picked yet — show picker
-    // Platform host or root — show landing (handled below)
+    if (slug && slug !== "__platform__") { navigate({ to: "/login" }); return; }
   }, [loading, slug, navigate]);
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin" />
-    </div>
-  );
-
-  if (native && !slug) return (
-    <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />
-  );
-
-  if (slug && slug !== "__platform__") return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin" />
-    </div>
-  );
-
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  if (native && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
+  if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   return <Landing />;
 }
 
@@ -53,21 +33,11 @@ function Landing() {
   const { session, loading } = useAuth();
   const { isPlatformHost } = useTenant();
   const navigate = useNavigate();
-  const [slug, setSlug] = useState("");
   const [clicks, setClicks] = useState(0);
-
   useEffect(() => {
     if (isPlatformHost) { navigate({ to: session ? "/platform/dashboard" : "/platform/login" }); return; }
     if (!loading && session) navigate({ to: "/dashboard" });
   }, [session, loading, isPlatformHost, navigate]);
-
-  function goToSchool(e: React.FormEvent) {
-    e.preventDefault();
-    const s = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
-    if (!s) return;
-    window.location.href = `https://${s}.${ROOT}/login`;
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
@@ -78,13 +48,12 @@ function Landing() {
           </button>
           <nav className="flex items-center gap-2 text-sm">
             <a href="#features" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">Features</a>
-            <a href="#download" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">School portals</a>
+            <a href="#download" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">Download</a>
             <a href="#contact" className="hidden sm:inline text-muted-foreground hover:text-foreground px-3 py-2 rounded-md hover:bg-muted transition-colors">Contact</a>
-            <a href="#download"><Button size="sm">Download App</Button></a>
+            <a href="#download"><Button size="sm"><Download className="w-3.5 h-3.5 mr-1" />Download App</Button></a>
           </nav>
         </div>
       </header>
-
       <section className="container mx-auto px-6 py-20 md:py-28 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-secondary text-secondary-foreground px-4 py-1.5 text-xs font-medium mb-6">
           <ShieldCheck className="w-3.5 h-3.5" /> Cloud school ERP for Kenya &amp; East Africa
@@ -92,11 +61,9 @@ function Landing() {
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-3xl mx-auto leading-tight">
           One platform to run your <span className="text-primary">entire school</span>
         </h1>
-        <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-          From admissions to graduation — academics, fees, boarding, library, clinic, transport, communications and more.
-        </p>
+        <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">From admissions to graduation — academics, fees, boarding, library, clinic, transport, communications and more.</p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <a href="#download"><Button size="lg" className="gap-2">Download App <ArrowRight className="w-4 h-4" /></Button></a>
+          <a href="#download"><Button size="lg" className="gap-2"><Download className="w-4 h-4" /> Download the App</Button></a>
           <a href="#contact"><Button size="lg" variant="outline" className="gap-2"><Phone className="w-4 h-4" /> Get in touch</Button></a>
         </div>
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
@@ -108,24 +75,32 @@ function Landing() {
           ))}
         </div>
       </section>
-
-      <section id="portals" className="py-16 bg-muted/30 border-y">
+      <section id="download" className="py-16 bg-primary/5 border-y">
         <div className="container mx-auto px-6 max-w-3xl text-center">
-          <h2 className="text-3xl font-bold">Find your school portal</h2>
-          <p className="mt-3 text-muted-foreground">Your school has a dedicated address like <code className="px-1.5 py-0.5 rounded bg-muted border text-sm">yourschool.{ROOT}</code>.</p>
-          <form onSubmit={goToSchool} className="mt-8 flex flex-col sm:flex-row gap-2 max-w-xl mx-auto">
-            <div className="flex-1 flex items-stretch rounded-md border bg-background overflow-hidden">
-              <Input value={slug} onChange={e => setSlug(e.target.value)} placeholder="yourschool" className="border-0 focus-visible:ring-0" />
-              <span className="px-3 flex items-center text-sm text-muted-foreground border-l bg-muted">.{ROOT}</span>
+          <h2 className="text-3xl font-bold">Download SmartDev</h2>
+          <p className="mt-3 text-muted-foreground">Available on Android and Windows. Install and log in with your school credentials.</p>
+          <div className="mt-10 grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <div className="rounded-xl border bg-card p-6 flex flex-col items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center"><Smartphone className="w-7 h-7 text-green-600" /></div>
+              <div><div className="font-bold text-lg">Android App</div><div className="text-sm text-muted-foreground mt-1">For phones and tablets</div></div>
+              <a href={APK_URL} className="w-full"><Button className="w-full gap-2 bg-green-600 hover:bg-green-700"><Download className="w-4 h-4" /> Download APK</Button></a>
+              <p className="text-xs text-muted-foreground">Allow "Install from unknown sources" when prompted.</p>
             </div>
-            <Button type="submit" className="gap-2">Go to portal <ArrowRight className="w-4 h-4" /></Button>
-          </form>
-          <div className="mt-12 grid sm:grid-cols-3 gap-4 text-left">
-            {[
-              { icon: GraduationCap, title: "Students", desc: "View results, timetable, attendance, fees and join live classes." },
-              { icon: Users, title: "Parents", desc: "Track your child's performance, fees, discipline and communications." },
-              { icon: ShieldCheck, title: "Staff & Admin", desc: "Full management tools based on your role." },
-            ].map(r => (
+            <div className="rounded-xl border bg-card p-6 flex flex-col items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center"><Monitor className="w-7 h-7 text-blue-600" /></div>
+              <div><div className="font-bold text-lg">Windows Desktop</div><div className="text-sm text-muted-foreground mt-1">For computers and laptops</div></div>
+              <a href={WINDOWS_URL} target="_blank" rel="noreferrer" className="w-full"><Button className="w-full gap-2 bg-blue-600 hover:bg-blue-700"><Download className="w-4 h-4" /> Download for Windows</Button></a>
+              <p className="text-xs text-muted-foreground">Run the .exe installer on your Windows PC.</p>
+            </div>
+          </div>
+          <p className="mt-8 text-sm text-muted-foreground">Need help? Call <a href="tel:+254792991222" className="text-primary hover:underline">+254 792 991 222</a></p>
+        </div>
+      </section>
+      <section id="features" className="py-16">
+        <div className="container mx-auto px-6 max-w-3xl text-center">
+          <h2 className="text-3xl font-bold">Everything your school needs</h2>
+          <div className="mt-10 grid sm:grid-cols-3 gap-4 text-left">
+            {[{ icon: GraduationCap, title: "Students", desc: "View results, timetable, attendance, fees and join live classes." }, { icon: Users, title: "Parents", desc: "Track your child's performance, fees, discipline and communications." }, { icon: ShieldCheck, title: "Staff & Admin", desc: "Full management tools based on your role." }].map(r => (
               <div key={r.title} className="rounded-xl border bg-card p-5">
                 <div className="flex items-center gap-2 mb-2"><r.icon className="w-4 h-4 text-primary" /><span className="font-semibold text-sm">{r.title}</span></div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{r.desc}</p>
@@ -134,7 +109,6 @@ function Landing() {
           </div>
         </div>
       </section>
-
       <section id="contact" className="container mx-auto px-6 py-16 text-center">
         <h2 className="text-2xl font-bold">Want SmartDev for your school?</h2>
         <p className="mt-2 text-muted-foreground">Get in touch — we'll set up your portal and onboard your team.</p>
@@ -143,12 +117,11 @@ function Landing() {
           <a href="tel:+254792991222" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-muted transition-colors"><Phone className="w-4 h-4 text-primary" /><span>+254 792 991 222</span></a>
         </div>
       </section>
-
       <footer className="border-t py-6">
         <div className="container mx-auto px-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} SmartDev ERP · School management for East Africa</span>
           <span className="flex items-center gap-3">
-            <a href="#download" className="hover:text-foreground">School portals</a>
+            <a href="#download" className="hover:text-foreground">Download</a>
             <a href="#contact" className="hover:text-foreground">Contact</a>
             {clicks >= 5 && <a href="https://admin.smartdev.co.ke" className="text-primary hover:underline">Platform admin</a>}
           </span>
