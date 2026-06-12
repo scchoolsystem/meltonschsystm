@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { lookupLoginEmail } from "@/lib/auth-admin.functions";
-import { useTenant } from "@/hooks/use-tenant";
+import { useTenant, isNativeApp } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,14 +26,15 @@ function LoginPage() {
   const settings = school ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url } : null;
 
   // Only treat as root host AFTER tenant has finished loading
-  const isRootHost = !tenantLoading && !isPlatformHost && !slug;
+  const isRootHost = !tenantLoading && !isPlatformHost && !slug && !isNativeApp();
 
   useEffect(() => {
     if (tenantLoading) return; // wait for tenant before any redirect
     if (isPlatformHost) { navigate({ to: session ? "/platform/dashboard" : "/platform/login" }); return; }
     if (isRootHost) { navigate({ to: "/" }); return; }
+    if (isNativeApp() && !isPlatformHost && !slug) { navigate({ to: "/" }); return; }
     if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading]);
+  }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading, slug]);
 
   // Still loading tenant — show spinner, don't flash anything
   if (tenantLoading) {
