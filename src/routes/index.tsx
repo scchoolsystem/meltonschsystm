@@ -25,12 +25,15 @@ function IndexPage() {
   const { slug, loading } = useTenant();
   const navigate = useNavigate();
   const native = isNativeApp();
+  const isAppSubdomain = typeof window !== "undefined" && window.location.hostname === "app.smartdev.co.ke";
+
   useEffect(() => {
     if (loading) return;
     if (slug && slug !== "__platform__") { navigate({ to: "/login" }); return; }
   }, [loading, slug, navigate]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (native && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
+  if ((native || isAppSubdomain) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
   if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   return <Landing />;
 }
