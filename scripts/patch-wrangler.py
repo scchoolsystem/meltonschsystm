@@ -7,4 +7,4 @@ w["routes"] = [
   {"pattern": "*.smartdev.co.ke/*", "zone_name": "smartdev.co.ke"},
 ]
 json.dump(w, open(f, "w"), indent=2)
-print("✓ wrangler.json routes patched")
+print("Done: wrangler.json routes patched")
