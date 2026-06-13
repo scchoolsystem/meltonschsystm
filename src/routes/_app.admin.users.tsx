@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -18,7 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, Copy, KeyRound, Ban, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Plus, Loader2, Copy, KeyRound, Ban, CheckCircle2, ShieldAlert, ExternalLink, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -54,16 +54,25 @@ function UsersPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["all-credentials"],
     queryFn: async () => {
-      const [{ data: creds }, { data: profiles }, { data: roles }] = await Promise.all([
+      const [{ data: creds }, { data: profiles }, { data: roles }, { data: staffRows }, { data: studentRows }] = await Promise.all([
         supabase.from("user_credentials").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("user_roles").select("user_id, role"),
+        supabase.from("staff").select("id, user_id"),
+        supabase.from("students").select("id, user_id, unique_id, admission_no"),
       ]);
-      return (creds ?? []).map((c) => ({
-        ...c,
-        full_name: profiles?.find((p) => p.id === c.user_id)?.full_name ?? "—",
-        roles: (roles ?? []).filter((r) => r.user_id === c.user_id).map((r) => r.role),
-      }));
+      return (creds ?? []).map((c) => {
+        const staffRow = (staffRows ?? []).find((s: any) => s.user_id === c.user_id);
+        const studentRow = (studentRows ?? []).find((s: any) => s.user_id === c.user_id);
+        return {
+          ...c,
+          full_name: profiles?.find((p) => p.id === c.user_id)?.full_name ?? "—",
+          roles: (roles ?? []).filter((r) => r.user_id === c.user_id).map((r) => r.role),
+          staff_id: staffRow?.id ?? null,
+          student_id: studentRow?.id ?? null,
+          student_search: studentRow?.admission_no ?? studentRow?.unique_id ?? null,
+        };
+      });
     },
     enabled: isAdmin,
   });
@@ -189,6 +198,19 @@ function UsersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right space-x-2">
+                        {u.staff_id ? (
+                          <Link to="/staff/$id" params={{ id: u.staff_id }}>
+                            <Button size="sm" variant="ghost" title="Open staff profile">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Button>
+                          </Link>
+                        ) : u.student_id ? (
+                          <Link to="/students" search={{ q: u.student_search ?? "" } as any}>
+                            <Button size="sm" variant="ghost" title="Open student record">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Button>
+                          </Link>
+                        ) : null}
                         <Button size="sm" variant="outline" onClick={() => handleReset(u.user_id, u.unique_id)}>
                           <KeyRound className="w-3.5 h-3.5 mr-1" />Reset
                         </Button>
