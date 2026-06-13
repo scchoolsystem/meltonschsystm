@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     rolesLoaded,
     hasRole: (r) => roles.includes(r),
-    isAdmin: roles.includes("super_admin") || roles.includes("principal"),
+    isAdmin: roles.includes("super_admin") || roles.includes("principal") || roles.includes("platform_owner"),
     signOut: async () => {
       await unregisterPushToken();
       await supabase.auth.signOut();
