@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,28 +25,39 @@ export const Route = createFileRoute("/_app/live")({
 
 function LivePage() {
   const { roles, isAdmin } = useAuth();
+  const { isTeacherScoped, classIds } = useTeacherScope();
   const qc = useQueryClient();
   const canManage = isAdmin || roles.some((r) =>
     ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
   );
 
   const { data: classes = [] } = useQuery({
-    queryKey: ["live-classes"],
+    queryKey: ["live-classes", isTeacherScoped, classIds.join(",")],
     queryFn: async () => {
-      const { data, error } = await supabase.from("classes").select("id, name").order("name");
+      let q = supabase.from("classes").select("id, name").order("name");
+      if (isTeacherScoped) {
+        if (classIds.length === 0) return [];
+        q = q.in("id", classIds);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
   });
 
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ["live-sessions"],
+    queryKey: ["live-sessions", isTeacherScoped, classIds.join(",")],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("live_sessions")
         .select("*, classes!inner(name)")
         .order("scheduled_start", { ascending: false })
         .limit(200);
+      if (isTeacherScoped) {
+        if (classIds.length === 0) return [];
+        q = q.in("class_id", classIds);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
