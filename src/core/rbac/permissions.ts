@@ -46,20 +46,28 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   analytics: [...ADMIN_ROLES, "academic_master"],
 
   // Operations
-  finance: [...ADMIN_ROLES, "bursar", "finance_admin", "finance_user"],
-  library: [...ADMIN_ROLES, "librarian", "library_admin", "library_user"],
+  // Wave 2: parent allowed (RLS scopes to own children's invoices only).
+  finance: [...ADMIN_ROLES, "bursar", "finance_admin", "finance_user", "parent"],
+  // Wave 2: student allowed (read-only catalog; RLS scopes loans).
+  library: [...ADMIN_ROLES, "librarian", "library_admin", "library_user", "student"],
   boarding: [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
   kitchen: [...ADMIN_ROLES, "kitchen_admin", "kitchen_user"],
   clinic: [...ADMIN_ROLES, "nurse", "clinic_admin", "clinic_user"],
   security: [...ADMIN_ROLES, "security_admin", "security_user"],
+  // Wave 2: Inventory / Store module.
+  inventory: [...ADMIN_ROLES, "store_admin", "store_user", "bursar"],
   transport: [...ADMIN_ROLES, "transport_admin", "transport_officer"],
   sports: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
   cocurricular: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
-  discipline: [...ADMIN_ROLES, "discipline_admin", "class_teacher", "guidance_admin"],
+  // Wave 2: parent allowed (RLS scopes to own children's incidents only).
+  discipline: [...ADMIN_ROLES, "discipline_admin", "class_teacher", "guidance_admin", "parent"],
 
   // Communication
   announcements: [], // everyone authenticated
   classroom: [], // everyone authenticated — students see classes they joined; teachers post
+  // Wave 1, Fix C-4: register `live` (live classes / streaming) so the
+  // teacher/student/parent sidebar entries stop bouncing to /dashboard.
+  live: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   ids: [...ADMIN_ROLES, "admission_officer", "security_admin", "security_user"],
 
   // Portals (role-specific)
