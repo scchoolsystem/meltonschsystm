@@ -5,6 +5,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { joinClassByCode } from "@/lib/classroom.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,20 +38,27 @@ const KIND_META: Record<string, { icon: any; label: string; color: string }> = {
 
 function ClassroomPage() {
   const { roles, isAdmin, user } = useAuth();
+  const { isTeacherScoped, classIds } = useTeacherScope();
   const qc = useQueryClient();
   const canPost = isAdmin || roles.some((r) =>
     ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
   );
   const isStudent = roles.includes("student" as any);
 
-  // Classes the user can see (RLS filters automatically for tenant)
+  // Classes the user can see. Teachers see only classes they teach or own;
+  // admins/students fall back to RLS-filtered school-wide list.
   const { data: classes = [], isLoading: classesLoading } = useQuery({
-    queryKey: ["classroom-classes"],
+    queryKey: ["classroom-classes", isTeacherScoped, classIds.join(",")],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("classes")
         .select("id, name, level, stream, join_code, class_teacher_id")
         .order("name");
+      if (isTeacherScoped) {
+        if (classIds.length === 0) return [];
+        q = q.in("id", classIds);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
