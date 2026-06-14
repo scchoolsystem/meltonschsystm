@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Save, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
 
 export const Route = createFileRoute("/_app/academics/marks")({ component: Page });
 
@@ -22,6 +23,7 @@ function gradeFor(s: number) {
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { isTeacherScoped, classIds, subjectIdsByClass, allSubjectIds } = useTeacherScope();
   const canEnter = isAdmin || hasRole("teacher") || hasRole("subject_teacher") || hasRole("exams_admin") || hasRole("academic_master");
   const canVerify = isAdmin || hasRole("exams_admin") || hasRole("academic_master");
 
@@ -31,8 +33,41 @@ function Page() {
   const [scores, setScores] = useState<Record<string, { id?: string; score: string; verified: boolean }>>({});
 
   const { data: exams = [] } = useQuery({ queryKey: ["exams-marks"], queryFn: async () => (await supabase.from("exams").select("id,name,term,year").order("created_at", { ascending: false })).data ?? [] });
-  const { data: classes = [] } = useQuery({ queryKey: ["classes-marks"], queryFn: async () => (await supabase.from("classes").select("id,name").order("name")).data ?? [] });
-  const { data: subjects = [] } = useQuery({ queryKey: ["subjects-marks"], queryFn: async () => (await supabase.from("subjects").select("id,code,name").order("code")).data ?? [] });
+  const { data: classes = [] } = useQuery({
+    queryKey: ["classes-marks", isTeacherScoped, classIds.join(",")],
+    queryFn: async () => {
+      let q = supabase.from("classes").select("id,name").order("name");
+      if (isTeacherScoped) {
+        if (classIds.length === 0) return [];
+        q = q.in("id", classIds);
+      }
+      return (await q).data ?? [];
+    },
+  });
+  const allowedSubjectIds = useMemo(() => {
+    if (!isTeacherScoped) return null;
+    if (classId && subjectIdsByClass[classId]?.length) return subjectIdsByClass[classId];
+    return allSubjectIds;
+  }, [isTeacherScoped, classId, subjectIdsByClass, allSubjectIds]);
+
+  const { data: subjects = [] } = useQuery({
+    queryKey: ["subjects-marks", isTeacherScoped, (allowedSubjectIds ?? []).join(",")],
+    queryFn: async () => {
+      let q = supabase.from("subjects").select("id,code,name").order("code");
+      if (isTeacherScoped) {
+        if (!allowedSubjectIds || allowedSubjectIds.length === 0) return [];
+        q = q.in("id", allowedSubjectIds);
+      }
+      return (await q).data ?? [];
+    },
+  });
+
+  // Reset subject if it leaves the allowed list after class change
+  useEffect(() => {
+    if (isTeacherScoped && subjectId && allowedSubjectIds && !allowedSubjectIds.includes(subjectId)) {
+      setSubjectId("");
+    }
+  }, [isTeacherScoped, subjectId, allowedSubjectIds]);
 
   const { data: students, isFetching: loadingStudents } = useQuery({
     queryKey: ["students-class-marks", classId],
@@ -70,7 +105,6 @@ function Page() {
         .map(([student_id, v]) => ({
           exam_id: examId, subject_id: subjectId, student_id,
           score: Number(v.score), grade: gradeFor(Number(v.score)),
-          // resetting verification when score changes
           verified: false, verified_by: null, verified_at: null,
         }));
       if (!rows.length) throw new Error("Nothing to save");
@@ -117,7 +151,7 @@ function Page() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold">Bulk Mark Entry</h1>
-        <p className="text-sm text-muted-foreground mt-1">Subject teachers enter scores. Exams department verifies.</p>
+        <p className="text-sm text-muted-foreground mt-1">Subject teachers enter scores. Exams department verifies.{isTeacherScoped ? " Only your assigned classes and subjects are shown." : ""}</p>
       </div>
 
       <Card>
@@ -135,7 +169,7 @@ function Page() {
           <div>
             <Label>Class</Label>
             <Select value={classId} onValueChange={setClassId}>
-              <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={isTeacherScoped && (classes as any[]).length === 0 ? "No classes assigned" : "Choose class"} /></SelectTrigger>
               <SelectContent>
                 {(classes as any[]).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
@@ -144,7 +178,7 @@ function Page() {
           <div>
             <Label>Subject</Label>
             <Select value={subjectId} onValueChange={setSubjectId}>
-              <SelectTrigger><SelectValue placeholder="Choose subject" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={isTeacherScoped && (subjects as any[]).length === 0 ? "No subjects assigned" : "Choose subject"} /></SelectTrigger>
               <SelectContent>
                 {(subjects as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.code} – {s.name}</SelectItem>)}
               </SelectContent>
