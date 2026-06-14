@@ -91,6 +91,20 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
       { title: "Announcements", url: "/announcements" },
     ],
   }],
+  // Wave 1, Fix C-5: matron previously aliased to nurse and saw only the
+  // Clinic group. Give matrons the boarding-house surface they actually run.
+  matron: [{
+    label: "Boarding",
+    items: [
+      dashboard,
+      { title: "Boarding", url: "/boarding" },
+      { title: "Dormitories", url: "/boarding/dormitories" },
+      { title: "Night Attendance", url: "/boarding/attendance" },
+      { title: "Students", url: "/students" },
+      { title: "Clinic", url: "/clinic" },
+      { title: "Announcements", url: "/announcements" },
+    ],
+  }],
   discipline_admin: [{
     label: "Discipline",
     items: [
@@ -154,6 +168,67 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
       { title: "Documents", url: "/admin/student-documents" },
     ],
   }],
+  // Wave 2: dedicated nav groups for previously-blank sidebars.
+  hod: [{
+    label: "Department",
+    items: [
+      dashboard,
+      { title: "My Department", url: "/admin/departments" },
+      { title: "Subjects", url: "/academics/subjects" },
+      { title: "Staff", url: "/staff" },
+      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Results", url: "/academics/results" },
+      { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Analytics", url: "/analytics" },
+      { title: "Announcements", url: "/announcements" },
+    ],
+  }],
+  ict_admin: [{
+    label: "ICT",
+    items: [
+      dashboard,
+      { title: "Users & Credentials", url: "/admin/users" },
+      { title: "User Roles", url: "/admin/roles" },
+      { title: "Field Permissions", url: "/admin/permissions" },
+      { title: "Portal Links", url: "/admin/links" },
+      { title: "Activity Log", url: "/admin/activity" },
+      { title: "CSV Import", url: "/admin/import" },
+      { title: "Feature Modules", url: "/admin/features" },
+      { title: "Support Tickets", url: "/admin/support" },
+      { title: "Settings", url: "/admin/settings" },
+    ],
+  }],
+  exams_admin: [{
+    label: "Examinations",
+    items: [
+      dashboard,
+      { title: "Exams", url: "/academics/exams" },
+      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Results", url: "/academics/results" },
+      { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Grading Scale", url: "/admin/grading" },
+      { title: "Subjects", url: "/academics/subjects" },
+      { title: "Analytics", url: "/analytics" },
+    ],
+  }],
+  store_admin: [{
+    label: "Store / Inventory",
+    items: [
+      dashboard,
+      { title: "Inventory", url: "/inventory" },
+      { title: "Announcements", url: "/announcements" },
+    ],
+  }],
+  guidance_admin: [{
+    label: "Guidance & Counselling",
+    items: [
+      dashboard,
+      { title: "Discipline", url: "/discipline" },
+      { title: "Students", url: "/students" },
+      { title: "Announcements", url: "/announcements" },
+      { title: "Analytics", url: "/analytics" },
+    ],
+  }],
 };
 
 // Role aliasing — multiple roles share a nav template
@@ -162,10 +237,8 @@ const ROLE_ALIASES: Record<string, string> = {
   academic_master: "teacher",
   finance_admin: "bursar",
   finance_user: "bursar",
-  matron: "nurse",
   clinic_admin: "nurse",
   clinic_user: "nurse",
-  guidance_admin: "discipline_admin",
   security_user: "security_admin",
   library_admin: "librarian",
   library_user: "librarian",
@@ -207,6 +280,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Clinic", url: "/clinic" },
     { title: "Security", url: "/security" },
     { title: "Co-curricular", url: "/cocurricular" },
+    { title: "Inventory", url: "/inventory" },
   ]},
   { label: "Finance", items: [
     { title: "Fee Structures", url: "/finance/fees" },

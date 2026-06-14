@@ -9,6 +9,10 @@ export type DashboardWidgetKey =
   | "admin.kpis"
   | "admin.studentsPerClass"
   | "admin.schoolStructure"
+  // Wave 2: deputy principal focus widgets
+  | "deputy.attendanceToday"
+  | "deputy.disciplineToday"
+  | "deputy.staffOnLeave"
   // Teaching staff
   | "teacher.myClasses"
   | "teacher.todayTimetable"
@@ -62,6 +66,24 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
   }
 
   if (isAdminRole(userRoles)) {
+    // Wave 2: differentiate deputy_principal — they own daily ops
+    // (attendance, discipline, staff leave) rather than KPI overview.
+    const isDeputyOnly =
+      userRoles.includes("deputy_principal") &&
+      !userRoles.includes("super_admin") &&
+      !userRoles.includes("principal") &&
+      !userRoles.includes("school_admin");
+    if (isDeputyOnly) {
+      return {
+        greeting: "admin",
+        widgets: [
+          "deputy.attendanceToday",
+          "deputy.disciplineToday",
+          "deputy.staffOnLeave",
+          "admin.studentsPerClass",
+        ],
+      };
+    }
     return { greeting: "admin", widgets: ADMIN_WIDGETS };
   }
 
