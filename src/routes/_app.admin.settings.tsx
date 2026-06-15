@@ -1,3 +1,4 @@
+import { MpesaSettingsCard } from "@/components/MpesaSettingsCard";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -191,6 +192,7 @@ function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+     <MpesaSettingsCard />
     </div>
   );
 }
