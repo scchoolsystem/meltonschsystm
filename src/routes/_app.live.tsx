@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useParams } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,10 +18,18 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_app/live")({
-  component: LivePage,
+  component: LiveShell,
   errorComponent: ({ error }) => <div className="p-6 text-destructive">Couldn't load: {error.message}</div>,
   notFoundComponent: () => <div className="p-6">Not found</div>,
 });
+
+function LiveShell() {
+  const params = useParams({ strict: false }) as { sessionId?: string };
+  if (params.sessionId) {
+    return <Outlet />;
+  }
+  return <LivePage />;
+}
 
 function LivePage() {
   const { roles, isAdmin } = useAuth();
@@ -30,15 +38,6 @@ function LivePage() {
   const canManage = isAdmin || roles.some((r) =>
     ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
   );
-
-  // ✅ FIX: If we're on a child route (/live/$sessionId or /live/$sessionId/attendance),
-  // render that child page instead of this listing. Without this the session room
-  // was never visible — the parent swallowed it because there was no <Outlet />.
-  const matchRoute = useMatchRoute();
-  const onChildRoute =
-    matchRoute({ to: "/live/$sessionId" }) ||
-    matchRoute({ to: "/live/$sessionId/attendance" });
-  if (onChildRoute) return <Outlet />;
 
   const { data: classes = [] } = useQuery({
     queryKey: ["live-classes", isTeacherScoped, classIds.join(",")],
