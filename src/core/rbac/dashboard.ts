@@ -66,8 +66,6 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
   }
 
   if (isAdminRole(userRoles)) {
-    // Wave 2: differentiate deputy_principal — they own daily ops
-    // (attendance, discipline, staff leave) rather than KPI overview.
     const isDeputyOnly =
       userRoles.includes("deputy_principal") &&
       !userRoles.includes("super_admin") &&
@@ -93,6 +91,7 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
   const has = (r: AppRole) => userRoles.includes(r);
   const hasAny = (rs: AppRole[]) => rs.some((r) => userRoles.includes(r));
 
+  // ── Teaching staff ────────────────────────────────────────────────────────
   if (hasAny(["class_teacher", "subject_teacher", "teacher", "hod", "academic_master"])) {
     greeting = "teacher";
     widgets.add("teacher.myClasses");
@@ -100,6 +99,12 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
     widgets.add("teacher.pendingMarks");
   }
 
+  // ── Exams staff ───────────────────────────────────────────────────────────
+  if (hasAny(["exams_admin", "exams_user"])) {
+    widgets.add("teacher.pendingMarks"); // reuse — shows pending mark sheets
+  }
+
+  // ── Student ───────────────────────────────────────────────────────────────
   if (has("student")) {
     greeting = greeting === "staff" ? "student" : greeting;
     widgets.add("student.summary");
@@ -107,35 +112,76 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
     widgets.add("student.recentResults");
   }
 
+  // ── Parent ────────────────────────────────────────────────────────────────
   if (has("parent")) {
     greeting = greeting === "staff" ? "parent" : greeting;
     widgets.add("parent.children");
     widgets.add("parent.outstandingFees");
   }
 
+  // ── Finance ───────────────────────────────────────────────────────────────
   if (hasAny(["bursar", "finance_admin", "finance_user"])) {
     widgets.add("finance.collections");
     widgets.add("finance.outstanding");
   }
 
+  // ── Clinic / health ───────────────────────────────────────────────────────
   if (hasAny(["nurse", "clinic_admin", "clinic_user", "matron"])) {
     widgets.add("clinic.todayVisits");
   }
 
+  // ── Discipline / guidance ─────────────────────────────────────────────────
   if (hasAny(["discipline_admin", "guidance_admin"])) {
     widgets.add("discipline.recentIncidents");
   }
 
+  // ── Library ───────────────────────────────────────────────────────────────
   if (hasAny(["librarian", "library_admin", "library_user"])) {
     widgets.add("library.activeLoans");
   }
 
-  if (hasAny(["boarding_admin", "boarding_user"])) {
+  // ── Boarding ──────────────────────────────────────────────────────────────
+  if (hasAny(["boarding_admin", "boarding_user", "boarding", "matron"])) {
     widgets.add("boarding.occupancy");
   }
 
+  // ── Security ──────────────────────────────────────────────────────────────
   if (hasAny(["security_admin", "security_user"])) {
     widgets.add("security.recentLogs");
+  }
+
+  // ── Sports / co-curricular ────────────────────────────────────────────────
+  // sports_admin, sports_user, sports — previously got empty dashboard
+  if (hasAny(["sports_admin", "sports_user", "sports"])) {
+    // Show student count overview (useful for coaches) + discipline incidents
+    // (useful for welfare tracking). Reuses existing widgets.
+    widgets.add("admin.studentsPerClass");
+    widgets.add("discipline.recentIncidents");
+  }
+
+  // ── Transport ─────────────────────────────────────────────────────────────
+  // transport_admin, transport_officer — previously got empty dashboard
+  if (hasAny(["transport_admin", "transport_officer"])) {
+    widgets.add("admin.studentsPerClass"); // shows class/student numbers
+  }
+
+  // ── Kitchen / store ───────────────────────────────────────────────────────
+  // kitchen_admin, kitchen_user, store_admin, store_user — empty before
+  if (hasAny(["kitchen_admin", "kitchen_user", "store_admin", "store_user"])) {
+    widgets.add("admin.studentsPerClass"); // headcount useful for catering
+  }
+
+  // ── Admission ─────────────────────────────────────────────────────────────
+  if (has("admission_officer")) {
+    widgets.add("admin.studentsPerClass");
+    widgets.add("admin.schoolStructure");
+  }
+
+  // ── IT / HR / general staff ───────────────────────────────────────────────
+  // Catch-all: any remaining authenticated staff with no specific widgets
+  // get a minimal overview so they don't see the empty state.
+  if (has("staff") && widgets.size === 0) {
+    widgets.add("admin.studentsPerClass");
   }
 
   return { greeting, widgets: Array.from(widgets) };
