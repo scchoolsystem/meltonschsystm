@@ -1,337 +1,335 @@
-import { createFileRoute, Link, Outlet, useParams } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { createFileRoute, useRouter, Link, useParams } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Video, Users, Calendar, Clock } from "lucide-react";
+import { Loader2, ArrowLeft, Video, Check, Clock, X } from "lucide-react";
 import { toast } from "sonner";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, differenceInMinutes } from "date-fns";
 
-export const Route = createFileRoute("/_app/live")({
-  component: LiveShell,
+export const Route = createFileRoute("/_app/live/$sessionId")({
+  component: SessionRoom,
   errorComponent: ({ error }) => <div className="p-6 text-destructive">Couldn't load: {error.message}</div>,
-  notFoundComponent: () => <div className="p-6">Not found</div>,
+  notFoundComponent: () => <div className="p-6">Session not found</div>,
 });
 
-function LiveShell() {
-  const params = useParams({ strict: false }) as { sessionId?: string };
-  if (params.sessionId) {
-    return <Outlet />;
-  }
-  return <LivePage />;
-}
+const APP_ID = "vpaas-magic-cookie-4a083eba049749ae87f826711753fcfc";
 
-function LivePage() {
-  const { roles, isAdmin } = useAuth();
-  const { isTeacherScoped, classIds } = useTeacherScope();
+type AttendStatus = "present" | "late" | "absent";
+
+function SessionRoom() {
+  const { sessionId } = useParams({ from: "/_app/live/$sessionId" });
+  const { user, roles, isAdmin } = useAuth();
   const qc = useQueryClient();
+  const isStudent = roles.includes("student" as any);
   const canManage = isAdmin || roles.some((r) =>
     ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
   );
+  const router = useRouter();
+  const [jaasToken, setJaasToken] = useState<string | null>(null);
+  const [tokenLoading, setTokenLoading] = useState(false);
 
-  const { data: classes = [] } = useQuery({
-    queryKey: ["live-classes", isTeacherScoped, classIds.join(",")],
-    queryFn: async () => {
-      let q = supabase.from("classes").select("id, name").order("name");
-      if (isTeacherScoped) {
-        if (classIds.length === 0) return [];
-        q = q.in("id", classIds);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ["live-sessions", isTeacherScoped, classIds.join(",")],
-    queryFn: async () => {
-      let q = supabase
-        .from("live_sessions")
-        .select("*, classes!inner(name)")
-        .order("scheduled_start", { ascending: false })
-        .limit(200);
-      if (isTeacherScoped) {
-        if (classIds.length === 0) return [];
-        q = q.in("class_id", classIds);
-      }
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const now = Date.now();
-  const upcoming = useMemo(() => (sessions as any[]).filter(s => s.status !== "ended" && s.status !== "cancelled" && new Date(s.scheduled_start).getTime() > now - 15 * 60_000).sort((a,b)=>+new Date(a.scheduled_start)-+new Date(b.scheduled_start)), [sessions, now]);
-  const past = useMemo(() => (sessions as any[]).filter(s => s.status === "ended" || s.status === "cancelled" || new Date(s.scheduled_start).getTime() <= now - 15 * 60_000), [sessions, now]);
-
-  return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Live Classes</h1>
-          <p className="text-sm text-muted-foreground mt-1">Scheduled online lessons — join directly in-app.</p>
-        </div>
-        {canManage && classes.length > 0 && (
-          <NewSessionDialog classes={classes as any[]} onCreated={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />
-        )}
-      </div>
-
-      <Tabs defaultValue="upcoming">
-        <TabsList>
-          <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
-          <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
-          {canManage && <TabsTrigger value="reports">Attendance reports</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="upcoming" className="space-y-3 mt-4">
-          {isLoading ? <Spinner /> : upcoming.length === 0 ? <Empty msg="No upcoming sessions." /> : upcoming.map(s => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />)}
-        </TabsContent>
-
-        <TabsContent value="past" className="space-y-3 mt-4">
-          {isLoading ? <Spinner /> : past.length === 0 ? <Empty msg="No past sessions yet." /> : past.map(s => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />)}
-        </TabsContent>
-
-        {canManage && (
-          <TabsContent value="reports" className="mt-4">
-            <AttendanceReports sessions={sessions as any[]} />
-          </TabsContent>
-        )}
-      </Tabs>
-    </div>
-  );
-}
-
-function Spinner() { return <div className="h-32 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>; }
-function Empty({ msg }: { msg: string }) { return <Card><CardContent className="py-12 text-center text-muted-foreground">{msg}</CardContent></Card>; }
-
-function SessionDescription({ description }: { description: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <CardContent className="pt-0">
-      <button onClick={() => setOpen(v => !v)} className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
-        {open ? "Hide details" : "Show details"}
-      </button>
-      {open && <p className="text-sm whitespace-pre-wrap mt-1">{description}</p>}
-    </CardContent>
-  );
-}
-
-function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; onChanged: () => void }) {
-  const start = new Date(s.scheduled_start);
-  const isLiveWindow = s.status === "live" || s.status === "scheduled";
-  const cancel = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("live_sessions").update({ status: "cancelled" }).eq("id", s.id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Cancelled"); onChanged(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Video className="w-4 h-4 text-primary" />{s.title}
-            </CardTitle>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
-              <span className="flex items-center gap-1"><Badge variant="outline">{s.classes?.name}</Badge></span>
-              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{format(start, "PPp")}</span>
-              <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDistanceToNow(start, { addSuffix: true })}</span>
-              <StatusPill status={s.status} />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {isLiveWindow && (
-              <Button asChild size="sm"><Link to="/live/$sessionId" params={{ sessionId: s.id }}><Video className="w-4 h-4 mr-2" />Join</Link></Button>
-            )}
-            {canManage && s.status !== "cancelled" && s.status !== "ended" && (
-              <Button variant="ghost" size="sm" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel</Button>
-            )}
-            {canManage && (
-              <Button asChild variant="outline" size="sm"><Link to="/live/$sessionId/attendance" params={{ sessionId: s.id }}><Users className="w-4 h-4 mr-2" />Attendance</Link></Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      {s.description && <SessionDescription description={s.description} />}
-    </Card>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    scheduled: "bg-blue-500/10 text-blue-700",
-    live: "bg-emerald-500/10 text-emerald-700 animate-pulse",
-    ended: "bg-muted text-muted-foreground",
-    cancelled: "bg-destructive/10 text-destructive",
-  };
-  return <span className={`text-[10px] uppercase tracking-wider rounded px-2 py-0.5 ${map[status] || "bg-muted"}`}>{status}</span>;
-}
-
-function NewSessionDialog({ classes, onCreated }: { classes: any[]; onCreated: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [classId, setClassId] = useState(classes[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [start, setStart] = useState(() => {
-    const d = new Date(Date.now() + 30 * 60_000);
-    d.setSeconds(0, 0);
-    return d.toISOString().slice(0, 16);
-  });
-  const [end, setEnd] = useState("");
-
-  const create = useMutation({
-    mutationFn: async () => {
-      const room = `melton-${classId.slice(0, 8)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("live_sessions").insert({
-        class_id: classId,
-        title: title.trim(),
-        description: description.trim() || null,
-        room_name: room,
-        scheduled_start: new Date(start).toISOString(),
-        scheduled_end: end ? new Date(end).toISOString() : null,
-        created_by: user?.id ?? null,
-      } as any);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Session scheduled"); setOpen(false); setTitle(""); setDescription(""); onCreated(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Schedule live class</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Schedule a live class</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <Select value={classId} onValueChange={setClassId}>
-            <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
-            <SelectContent>
-              {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Input placeholder="Title (e.g. Algebra revision)" value={title} onChange={e => setTitle(e.target.value)} />
-          <Textarea placeholder="Description (optional)" rows={3} value={description} onChange={e => setDescription(e.target.value)} />
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-muted-foreground">Start</label>
-              <Input type="datetime-local" value={start} onChange={e => setStart(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">End (optional)</label>
-              <Input type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={() => create.mutate()} disabled={!classId || !title.trim() || !start || create.isPending}>
-            {create.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Schedule
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AttendanceReports({ sessions }: { sessions: any[] }) {
-  const sessionIds = sessions.map(s => s.id);
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["live-attendance-all", sessionIds.length],
-    enabled: sessionIds.length > 0,
+  const { data: session, isLoading } = useQuery({
+    queryKey: ["live-session", sessionId],
     queryFn: async () => {
       const { data, error } = await supabase
+        .from("live_sessions")
+        .select("*, classes!inner(name)")
+        .eq("id", sessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: myStudent } = useQuery({
+    queryKey: ["my-student-link", user?.id],
+    enabled: !!user?.id && isStudent,
+    queryFn: async () => {
+      const { data } = await supabase.from("student_user_links").select("student_id").eq("user_id", user!.id).maybeSingle();
+      return data?.student_id ?? null;
+    },
+  });
+
+  // Fetch JaaS JWT token from Cloudflare Worker when session is live
+  useEffect(() => {
+    if (!session || session.status !== "live" || jaasToken) return;
+    setTokenLoading(true);
+    const displayName = encodeURIComponent(user?.email?.split("@")[0] ?? "User");
+    const email = encodeURIComponent(user?.email ?? "");
+    const moderator = canManage ? "true" : "false";
+    fetch(`/api/jaas-token?room=${session.room_name}&displayName=${displayName}&email=${email}&moderator=${moderator}`)
+      .then(r => r.json())
+      .then((d: any) => { if (d.token) setJaasToken(d.token); })
+      .catch(e => console.error("jaas token error", e))
+      .finally(() => setTokenLoading(false));
+  }, [session?.status, session?.room_name, user?.email, canManage]);
+
+  // Auto-start if teacher/admin opens room at or after scheduled start time
+  useEffect(() => {
+    if (!session || !canManage) return;
+    if (session.status === "scheduled" && Date.now() >= new Date(session.scheduled_start).getTime()) {
+      supabase
+        .from("live_sessions")
+        .update({ status: "live", started_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
+    }
+  }, [session?.id, session?.status, canManage]);
+
+  // Auto-track attendance
+  const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  useEffect(() => {
+    if (!session || !isStudent || !myStudent) return;
+    let active = true;
+    (async () => {
+      const joinedAt = Date.now();
+      const minsLate = differenceInMinutes(new Date(joinedAt), new Date(session.scheduled_start));
+      const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
+      const { data, error } = await supabase
         .from("live_session_attendance")
-        .select("session_id, student_id, joined_at, left_at, duration_seconds, status, students!inner(first_name, last_name, unique_id, class_id)")
-        .in("session_id", sessionIds);
+        .upsert({
+          session_id: sessionId,
+          student_id: myStudent,
+          user_id: user?.id ?? null,
+          joined_at: new Date(joinedAt).toISOString(),
+          left_at: null,
+          duration_seconds: null,
+          status: autoStatus,
+        } as any, { onConflict: "session_id,student_id" })
+        .select("id")
+        .maybeSingle();
+      if (error) { console.warn("attendance insert", error); return; }
+      if (active && data) attendanceRef.current = { id: data.id, joinedAt };
+    })();
+    const markLeft = () => {
+      const { id, joinedAt } = attendanceRef.current;
+      if (!id || !joinedAt) return;
+      const dur = Math.round((Date.now() - joinedAt) / 1000);
+      supabase.from("live_session_attendance").update({ left_at: new Date().toISOString(), duration_seconds: dur }).eq("id", id).then(() => {});
+    };
+    window.addEventListener("beforeunload", markLeft);
+    return () => { active = false; markLeft(); window.removeEventListener("beforeunload", markLeft); };
+  }, [session, isStudent, myStudent, sessionId, user?.id]);
+
+  const startSession = async () => {
+    await supabase.from("live_sessions").update({ status: "live", started_at: new Date().toISOString() }).eq("id", sessionId);
+    qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
+    toast.success("Session started");
+  };
+
+  const endSession = async () => {
+    await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
+    toast.success("Session ended");
+    qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
+    router.navigate({ to: "/live" });
+  };
+
+  if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  if (!session) return <div className="p-6">Session not found.</div>;
+
+  const jaasUrl = jaasToken
+    ? `https://8x8.vc/${APP_ID}/${session.room_name}?jwt=${jaasToken}#config.prejoinPageEnabled=false&config.disableDeepLinking=true`
+    : null;
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <Button asChild variant="ghost" size="sm"><Link to="/live"><ArrowLeft className="w-4 h-4 mr-2" />All sessions</Link></Button>
+          <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Video className="w-6 h-6 text-primary" />{session.title}</h1>
+          <div className="text-sm text-muted-foreground mt-1 flex gap-2 flex-wrap items-center">
+            <Badge variant="outline">{session.classes?.name}</Badge>
+            <span>{format(new Date(session.scheduled_start), "PPp")}</span>
+            <Badge>{session.status}</Badge>
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {canManage && (
+            <Button asChild variant="outline">
+              <Link to="/live/$sessionId/attendance" params={{ sessionId }}>Correct attendance</Link>
+            </Button>
+          )}
+          {canManage && session.status !== "ended" && (
+            <Button variant="destructive" onClick={endSession}>End session</Button>
+          )}
+        </div>
+      </div>
+
+      {isStudent && myStudent === null && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm text-amber-800 dark:text-amber-300">
+          ⚠ Your account is not linked to a student record — attendance will not be tracked automatically. Contact your administrator.
+        </div>
+      )}
+
+      {session.status === "cancelled" || session.status === "ended" ? (
+        <Card><CardContent className="py-10 text-center text-muted-foreground">This session has {session.status}. You can still adjust attendance below.</CardContent></Card>
+      ) : session.status === "scheduled" ? (
+        <Card><CardContent className="py-10 text-center space-y-4">
+          <p className="text-muted-foreground">Session not started yet.</p>
+          <p className="text-sm text-muted-foreground">Scheduled: {format(new Date(session.scheduled_start), "PPp")}</p>
+          {canManage && <Button onClick={startSession} size="lg"><Video className="w-4 h-4 mr-2" />Start session</Button>}
+          {!canManage && <p className="text-sm text-muted-foreground">Waiting for teacher to start the session.</p>}
+        </CardContent></Card>
+      ) : tokenLoading || !jaasUrl ? (
+        <Card><CardContent className="py-10 flex items-center justify-center gap-3 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />Connecting to video call…
+        </CardContent></Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <iframe
+            title={session.title}
+            src={jaasUrl}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            className="w-full"
+            style={{ height: "70vh", minHeight: 480, border: 0 }}
+          />
+        </Card>
+      )}
+
+      {canManage && <AttendanceRoster sessionId={sessionId} classId={session.class_id} sessionEnded={session.status === "ended"} />}
+    </div>
+  );
+}
+
+function statusBadge(s: AttendStatus) {
+  if (s === "present") return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" variant="outline">Present</Badge>;
+  if (s === "late") return <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" variant="outline">Late</Badge>;
+  return <Badge className="bg-destructive/15 text-destructive border-destructive/30" variant="outline">Absent</Badge>;
+}
+
+function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: string; classId: string; sessionEnded: boolean }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: roster = [], isLoading: rosterLoading } = useQuery({
+    queryKey: ["class-roster", classId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("students").select("id, first_name, last_name, unique_id").eq("class_id", classId).order("last_name");
       if (error) throw error;
       return data || [];
     },
   });
 
-  const byStudent = useMemo(() => {
-    const m = new Map<string, { name: string; uid: string; present: number; late: number; absent: number; durationMin: number }>();
-    (rows as any[]).forEach(r => {
-      const k = r.student_id;
-      const cur = m.get(k) || { name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim(), uid: r.students?.unique_id ?? "", present: 0, late: 0, absent: 0, durationMin: 0 };
-      if (r.status === "present") cur.present += 1;
-      else if (r.status === "late") cur.late += 1;
-      else if (r.status === "absent") cur.absent += 1;
-      cur.durationMin += Math.round((r.duration_seconds || 0) / 60);
-      m.set(k, cur);
-    });
-    return Array.from(m.values()).sort((a,b) => (b.present + b.late) - (a.present + a.late));
-  }, [rows]);
+  const { data: attendance = [], isLoading: attLoading } = useQuery({
+    queryKey: ["live-session-attendance", sessionId],
+    refetchInterval: sessionEnded ? false : 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("live_session_attendance").select("id, student_id, joined_at, left_at, duration_seconds, status").eq("session_id", sessionId);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
-  const bySession = useMemo(() => {
-    const m = new Map<string, { present: number; late: number; absent: number }>();
-    (rows as any[]).forEach(r => {
-      const cur = m.get(r.session_id) || { present: 0, late: 0, absent: 0 };
-      if (r.status === "present") cur.present++;
-      else if (r.status === "late") cur.late++;
-      else if (r.status === "absent") cur.absent++;
-      m.set(r.session_id, cur);
-    });
-    return sessions.map(s => ({ ...s, stats: m.get(s.id) || { present: 0, late: 0, absent: 0 } }));
-  }, [rows, sessions]);
+  const attMap = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const a of attendance as any[]) m.set(a.student_id, a);
+    return m;
+  }, [attendance]);
 
-  if (isLoading) return <Spinner />;
+  const setStatus = async (studentId: string, status: AttendStatus) => {
+    const existing = attMap.get(studentId);
+    const payload: any = { session_id: sessionId, student_id: studentId, status, marked_by: user?.id ?? null, marked_at: new Date().toISOString() };
+    if (status === "absent" && !existing) payload.joined_at = null;
+    const { error } = await supabase.from("live_session_attendance").upsert(payload, { onConflict: "session_id,student_id" });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+  };
+
+  const markAllUnjoined = async (status: AttendStatus) => {
+    const targets = (roster as any[]).filter(s => !attMap.has(s.id));
+    if (!targets.length) { toast.info("Everyone is already marked"); return; }
+    const rows = targets.map(s => ({ session_id: sessionId, student_id: s.id, status, marked_by: user?.id ?? null, marked_at: new Date().toISOString(), joined_at: status === "absent" ? null : new Date().toISOString() }));
+    const { error } = await supabase.from("live_session_attendance").upsert(rows as any, { onConflict: "session_id,student_id" });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Marked ${rows.length} as ${status}`);
+    qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+  };
+
+  const counts = useMemo(() => {
+    let present = 0, late = 0, absent = 0, unmarked = 0;
+    for (const s of roster as any[]) {
+      const a = attMap.get(s.id);
+      if (!a) { unmarked++; continue; }
+      if (a.status === "present") present++;
+      else if (a.status === "late") late++;
+      else if (a.status === "absent") absent++;
+    }
+    return { present, late, absent, unmarked, total: (roster as any[]).length };
+  }, [roster, attMap]);
 
   return (
-    <div className="grid md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader><CardTitle className="text-base">By student</CardTitle></CardHeader>
-        <CardContent>
-          {byStudent.length === 0 ? <p className="text-sm text-muted-foreground">No attendance yet.</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead className="text-right">Present</TableHead><TableHead className="text-right">Late</TableHead><TableHead className="text-right">Absent</TableHead><TableHead className="text-right">Min</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {byStudent.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell><div className="font-medium">{r.name}</div><div className="text-xs text-muted-foreground">{r.uid}</div></TableCell>
-                    <TableCell className="text-right text-emerald-600">{r.present}</TableCell>
-                    <TableCell className="text-right text-amber-600">{r.late}</TableCell>
-                    <TableCell className="text-right text-destructive">{r.absent}</TableCell>
-                    <TableCell className="text-right">{r.durationMin}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle className="text-base">By session</CardTitle></CardHeader>
-        <CardContent>
-          {bySession.length === 0 ? <p className="text-sm text-muted-foreground">No sessions.</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Session</TableHead><TableHead className="text-right">P / L / A</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {bySession.slice(0, 50).map((s) => (
+    <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 space-y-0">
+        <div>
+          <CardTitle className="text-base">Attendance roster</CardTitle>
+          <button
+            onClick={() => {
+              const rows = [["Student Name","Unique ID","Status","Joined At","Left At","Duration (min)"]];
+              for (const s of roster as any[]) {
+                const att = attMap.get(s.id);
+                rows.push([`${s.first_name} ${s.last_name}`, s.unique_id ?? "", att?.status ?? "absent", att?.joined_at ? new Date(att.joined_at).toLocaleString() : "", att?.left_at ? new Date(att.left_at).toLocaleString() : "", att?.duration_seconds ? String(Math.round(att.duration_seconds / 60)) : ""]);
+              }
+              const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = `attendance-${sessionId}.csv`; a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="text-xs border rounded px-2 py-1 hover:bg-muted mt-1"
+          >Export CSV</button>
+          <p className="text-xs text-muted-foreground mt-1">
+            {counts.total} students · <span className="text-emerald-600">{counts.present} present</span> · <span className="text-amber-600">{counts.late} late</span> · <span className="text-destructive">{counts.absent} absent</span> · {counts.unmarked} unmarked
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("absent")}>Mark remaining absent</Button>
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("present")}>Mark remaining present</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {(rosterLoading || attLoading) ? (
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        ) : (roster as any[]).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No students in this class yet.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead><TableHead>Joined</TableHead><TableHead>Left</TableHead><TableHead>Minutes</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Mark</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(roster as any[]).map((s) => {
+                const a = attMap.get(s.id);
+                const status: AttendStatus = (a?.status as AttendStatus) ?? "absent";
+                const hasRecord = !!a;
+                return (
                   <TableRow key={s.id}>
-                    <TableCell><div className="font-medium truncate max-w-[220px]">{s.title}</div><div className="text-xs text-muted-foreground">{s.classes?.name} • {format(new Date(s.scheduled_start), "PP")}</div></TableCell>
-                    <TableCell className="text-right text-sm"><span className="text-emerald-600">{s.stats.present}</span> / <span className="text-amber-600">{s.stats.late}</span> / <span className="text-destructive">{s.stats.absent}</span></TableCell>
+                    <TableCell><div className="font-medium">{s.first_name} {s.last_name}</div><div className="text-xs text-muted-foreground">{s.unique_id}</div></TableCell>
+                    <TableCell className="text-sm">{a?.joined_at ? format(new Date(a.joined_at), "p") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a?.left_at ? format(new Date(a.left_at), "p") : (hasRecord && status !== "absent" ? <Badge variant="secondary">In room</Badge> : "—")}</TableCell>
+                    <TableCell className="text-sm">{a?.duration_seconds ? Math.round(a.duration_seconds / 60) : "—"}</TableCell>
+                    <TableCell>{hasRecord ? statusBadge(status) : <span className="text-xs text-muted-foreground">Unmarked</span>}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex rounded-md border overflow-hidden">
+                        <Button size="sm" variant={status === "present" ? "default" : "ghost"} className="h-8 rounded-none px-2" onClick={() => setStatus(s.id, "present")} title="Present"><Check className="w-4 h-4" /></Button>
+                        <Button size="sm" variant={status === "late" ? "default" : "ghost"} className="h-8 rounded-none px-2 border-l" onClick={() => setStatus(s.id, "late")} title="Late"><Clock className="w-4 h-4" /></Button>
+                        <Button size="sm" variant={status === "absent" ? "destructive" : "ghost"} className="h-8 rounded-none px-2 border-l" onClick={() => setStatus(s.id, "absent")} title="Absent"><X className="w-4 h-4" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+        {sessionEnded && <p className="text-xs text-muted-foreground mt-3">Session has ended — corrections made here are saved immediately.</p>}
+      </CardContent>
+    </Card>
   );
 }
