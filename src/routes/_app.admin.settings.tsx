@@ -1,4 +1,4 @@
-import { MpesaSettingsCard } from "@/components/MpesaSettingsCard";
+import { MpesaSettingsCard } from "@/components/MpesaSettingsCard.tsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
