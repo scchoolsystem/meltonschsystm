@@ -1,13 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
  * Record an M-Pesa STK push intent for an invoice.
  *
- * If MPESA_CONSUMER_KEY / MPESA_CONSUMER_SECRET / MPESA_SHORTCODE /
- * MPESA_PASSKEY are configured, this performs a real Daraja STK push;
- * otherwise it just records the intent so the school can demo the flow.
+ * Credentials are loaded PER-SCHOOL from the `school_mpesa_config` table.
+ * If a school has not configured Daraja credentials (or has enabled=false),
+ * the intent is recorded in demo mode so the flow can be tested.
+ *
  * The actual payment is reconciled by /api/public/mpesa-callback.
  */
 export const initiateMpesaPayment = createServerFn({ method: "POST" })
@@ -59,15 +61,25 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
       .single();
     if (insErr) throw new Error(insErr.message);
 
-    const consumerKey = process.env.MPESA_CONSUMER_KEY;
-    const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-    const shortcode = process.env.MPESA_SHORTCODE;
-    const passkey = process.env.MPESA_PASSKEY;
-    const callbackToken = process.env.MPESA_CALLBACK_TOKEN;
-    const publicHost = process.env.PUBLIC_HOST;
+    // ── Load per-school Daraja credentials ───────────────────────────────────
+    // Use supabaseAdmin (service role) so RLS doesn't block the server reading
+    // the config — the caller's permission was already verified above via RLS
+    // on the invoice. Never expose raw credentials to the client.
+    const { data: cfg, error: cfgErr } = await supabaseAdmin
+      .rpc("get_school_mpesa_config", { p_school_id: inv.school_id })
+      .maybeSingle();
 
-    if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackToken || !publicHost) {
-      // Demo / sandbox mode — intent recorded only.
+    const consumerKey     = cfg?.consumer_key     ?? process.env.MPESA_CONSUMER_KEY;
+    const consumerSecret  = cfg?.consumer_secret  ?? process.env.MPESA_CONSUMER_SECRET;
+    const shortcode       = cfg?.shortcode        ?? process.env.MPESA_SHORTCODE;
+    const passkey         = cfg?.passkey          ?? process.env.MPESA_PASSKEY;
+    const callbackToken   = cfg?.callback_token   ?? process.env.MPESA_CALLBACK_TOKEN;
+    const mpesaEnv        = cfg?.env              ?? process.env.MPESA_ENV ?? "sandbox";
+    const publicHost      = process.env.PUBLIC_HOST;
+    const schoolEnabled   = cfg?.enabled ?? false;
+
+    // Demo mode: no credentials configured OR school has not enabled MPesa yet
+    if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackToken || !publicHost || (!schoolEnabled && !process.env.MPESA_CONSUMER_KEY)) {
       await supabase
         .from("mpesa_payment_intents")
         .update({ status: "pending", error: "STK push not configured (demo mode)" })
@@ -75,15 +87,18 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
       return {
         ok: true,
         demo: true,
-        message:
-          "Demo mode: STK push not configured. The school admin must configure Daraja credentials.",
+        message: cfg
+          ? "Demo mode: M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it."
+          : "Demo mode: STK push not configured. The school admin must configure Daraja credentials.",
       };
     }
 
+    // ── Fire real STK push ───────────────────────────────────────────────────
     try {
-      const base = process.env.MPESA_ENV === "production"
+      const base = mpesaEnv === "production"
         ? "https://api.safaricom.co.ke"
         : "https://sandbox.safaricom.co.ke";
+
       const tokenRes = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
         headers: { Authorization: `Basic ${btoa(`${consumerKey}:${consumerSecret}`)}` },
       });
@@ -96,7 +111,7 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
         .replace(/[^0-9]/g, "")
         .slice(0, 14);
       const password = btoa(`${shortcode}${passkey}${ts}`);
-      const callbackUrl = `${publicHost.replace(/\/$/, "")}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}`;
+      const callbackUrl = `${publicHost.replace(/\/$/, "")}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}&school=${inv.school_id}`;
 
       const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
         method: "POST",
@@ -118,6 +133,7 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
           TransactionDesc: `Fee invoice ${inv.id.slice(0, 8)}`,
         }),
       });
+
       const stkJson: any = await stkRes.json();
       if (stkJson.ResponseCode !== "0") {
         await supabase
@@ -126,10 +142,12 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
           .eq("id", intent.id);
         throw new Error(stkJson.errorMessage || "STK push failed");
       }
+
       await supabase
         .from("mpesa_payment_intents")
         .update({ status: "sent", checkout_request_id: stkJson.CheckoutRequestID })
         .eq("id", intent.id);
+
       return { ok: true, demo: false, message: "Check your phone to approve the M-Pesa payment." };
     } catch (e: any) {
       await supabase
@@ -138,4 +156,63 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
         .eq("id", intent.id);
       throw e;
     }
+  });
+
+// ── Save per-school MPesa config ─────────────────────────────────────────────
+export const saveMpesaConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      shortcode:       z.string().min(4, "Shortcode required"),
+      consumer_key:    z.string().min(10, "Consumer key required"),
+      consumer_secret: z.string().min(10, "Consumer secret required"),
+      passkey:         z.string().min(10, "Passkey required"),
+      callback_token:  z.string().min(8, "Callback token required"),
+      env:             z.enum(["sandbox", "production"]),
+      enabled:         z.boolean(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    // Get school_id for this admin
+    const { data: schoolIdRaw } = await supabase.rpc("current_user_school");
+    const schoolId = schoolIdRaw as unknown as string | null;
+    if (!schoolId) throw new Error("No school found for your account");
+
+    const { error } = await supabase
+      .from("school_mpesa_config")
+      .upsert({
+        school_id:       schoolId,
+        shortcode:       data.shortcode,
+        consumer_key:    data.consumer_key,
+        consumer_secret: data.consumer_secret,
+        passkey:         data.passkey,
+        callback_token:  data.callback_token,
+        env:             data.env,
+        enabled:         data.enabled,
+      }, { onConflict: "school_id" });
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── Load per-school MPesa config (for settings page) ─────────────────────────
+export const loadMpesaConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+
+    const { data: schoolIdRaw } = await supabase.rpc("current_user_school");
+    const schoolId = schoolIdRaw as unknown as string | null;
+    if (!schoolId) return null;
+
+    const { data, error } = await supabase
+      .from("school_mpesa_config")
+      .select("shortcode, consumer_key, consumer_secret, passkey, callback_token, env, enabled")
+      .eq("school_id", schoolId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return data;
   });
