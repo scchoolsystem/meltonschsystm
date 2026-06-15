@@ -1,4 +1,5 @@
 import { MpesaSettingsCard } from "@/components/MpesaSettingsCard.tsx";
+import { ReportCardSettingsCard } from "@/components/ReportCardSettingsCard.tsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,6 @@ function SettingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["school-settings"],
     queryFn: async () => {
-      // Read the current school directly from `schools`. RLS scopes us to our row.
       const { data: schoolIdRow } = await supabase.rpc("current_user_school");
       const schoolId = schoolIdRow as unknown as string | null;
       if (!schoolId) return null;
@@ -192,7 +192,9 @@ function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-     <MpesaSettingsCard />
+
+      <MpesaSettingsCard />
+      <ReportCardSettingsCard />
     </div>
   );
 }
