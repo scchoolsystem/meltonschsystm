@@ -109,7 +109,7 @@ function Page() {
   const overallRemarks = summary?.overall_remarks
     ?? rcSettings?.grade_remarks?.[overallGrade]
     ?? "—";
-  const position = summary?.position;
+  const position = summary?.class_position;
 
   const principalName = rcSettings?.principal_name ?? "";
   const principalTitle = rcSettings?.principal_title ?? "Principal";
