@@ -14,7 +14,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  */
 export const initiateMpesaPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z
       .object({
         invoice_id: z.string().uuid(),
@@ -161,7 +161,7 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
 // ── Save per-school MPesa config ─────────────────────────────────────────────
 export const saveMpesaConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       shortcode:       z.string().min(4, "Shortcode required"),
       consumer_key:    z.string().min(10, "Consumer key required"),
