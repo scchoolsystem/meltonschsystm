@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, ArrowLeft, Video, Check, Clock, X, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, Video, Check, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInMinutes } from "date-fns";
 
@@ -67,7 +67,7 @@ function SessionRoom() {
     }
   }, [session?.id, session?.status, canManage]);
 
-  // Auto-track attendance on join; auto-derive present vs late
+  // Auto-track attendance on join/leave; auto-derive present vs late
   const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
   useEffect(() => {
     if (!session || !isStudent || !myStudent) return;
@@ -115,18 +115,18 @@ function SessionRoom() {
     toast.success("Session started");
   };
 
+  if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  if (!session) return <div className="p-6">Session not found.</div>;
+
+  const displayName = encodeURIComponent(user?.email?.split("@")[0] || "Student");
+  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName=%22${displayName}%22&config.prejoinPageEnabled=false&config.disableDeepLinking=true`;
+
   const endSession = async () => {
     await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
     toast.success("Session ended");
     qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
     router.navigate({ to: "/live" });
   };
-
-  if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-  if (!session) return <div className="p-6">Session not found.</div>;
-
-  const displayName = encodeURIComponent(user?.email?.split("@")[0] || "Student");
-  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName=%22${displayName}%22&config.prejoinPageEnabled=false&config.disableDeepLinking=true`;
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
@@ -152,6 +152,7 @@ function SessionRoom() {
         </div>
       </div>
 
+
       {isStudent && myStudent === null && (
         <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm text-amber-800 dark:text-amber-300">
           ⚠ Your account is not linked to a student record — your attendance will not be tracked automatically. Contact your administrator.
@@ -172,23 +173,14 @@ function SessionRoom() {
           {!canManage && <p className="text-sm text-muted-foreground">Waiting for teacher to start the session.</p>}
         </CardContent></Card>
       ) : (
-        // ✅ Open Jitsi in a new tab — no iframe limits, no 5-min disconnect, free forever
-        <Card>
-          <CardContent className="py-12 flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Video className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold">Session is live</h2>
-              <p className="text-sm text-muted-foreground mt-1">Click below to join the video call. It opens in a new tab.</p>
-            </div>
-            <Button size="lg" onClick={() => window.open(jitsiUrl, "_blank", "noopener,noreferrer")}>
-              <ExternalLink className="w-4 h-4 mr-2" />Join video call
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Room: <span className="font-mono">{session.room_name}</span>
-            </p>
-          </CardContent>
+        <Card className="overflow-hidden">
+          <iframe
+            title={session.title}
+            src={jitsiUrl}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            className="w-full"
+            style={{ height: "70vh", minHeight: 480, border: 0 }}
+          />
         </Card>
       )}
 
@@ -315,7 +307,7 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
               a.href = url; a.download = `attendance-${sessionId}.csv`; a.click();
               URL.revokeObjectURL(url);
             }}
-            className="text-xs border rounded px-2 py-1 hover:bg-muted mt-1"
+            className="text-xs border rounded px-2 py-1 hover:bg-muted"
           >
             Export CSV
           </button>
