@@ -37,7 +37,7 @@ function Page() {
   });
   const { data: loans = [], isLoading: lLoading } = useQuery({
     queryKey: ["library-loans"],
-    queryFn: async () => (await supabase.from("book_loans").select("*, books(title,author), students(first_name,last_name,admission_no)").order("borrowed_date", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () => (await supabase.from("book_loans").select("*, books(title,author), students(first_name,last_name,admission_no)").order("borrowed_on", { ascending: false }).limit(200)).data ?? [],
   });
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -102,7 +102,7 @@ function Page() {
           <Card><CardHeader /><CardContent>
             {bLoading ? <Loader2 className="animate-spin mx-auto" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>ISBN</TableHead><TableHead>Genre</TableHead><TableHead>Availability</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>Author</TableHead><TableHead>ISBN</TableHead><TableHead>Category</TableHead><TableHead>Availability</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredBooks.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No books found.</TableCell></TableRow>}
                   {filteredBooks.map((b: any) => {
@@ -112,7 +112,7 @@ function Page() {
                         <TableCell className="font-medium">{b.title}</TableCell>
                         <TableCell>{b.author ?? "—"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{b.isbn ?? "—"}</TableCell>
-                        <TableCell>{b.genre ?? "—"}</TableCell>
+                        <TableCell>{b.category ?? "—"}</TableCell>
                         <TableCell><Badge variant={onLoan ? "secondary" : "default"}>{onLoan ? "On Loan" : "Available"}</Badge></TableCell>
                       </TableRow>
                     );
@@ -139,7 +139,7 @@ function Page() {
                       <TableRow key={l.id} className={isOverdue ? "bg-red-50" : ""}>
                         <TableCell className="font-medium">{l.students?.first_name} {l.students?.last_name}<div className="text-xs text-muted-foreground">{l.students?.admission_no}</div></TableCell>
                         <TableCell>{l.books?.title}</TableCell>
-                        <TableCell className="text-xs">{l.borrowed_date}</TableCell>
+                        <TableCell className="text-xs">{l.borrowed_on}</TableCell>
                         <TableCell className={`text-xs ${isOverdue ? "text-red-600 font-medium" : ""}`}>{l.due_date}</TableCell>
                         <TableCell><Badge variant={l.status === "returned" ? "secondary" : isOverdue ? "destructive" : "default"}>{l.status}</Badge></TableCell>
                         <TableCell>{can && l.status === "active" && <Button size="sm" variant="outline" className="h-8" onClick={() => returnMutation.mutate(l.id)}>Return</Button>}</TableCell>
@@ -184,7 +184,7 @@ function Page() {
 }
 
 function BookDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ title: "", author: "", isbn: "", genre: "", total_copies: "1" });
+  const [f, setF] = useState({ title: "", author: "", isbn: "", category: "", total_copies: "1" });
   const m = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("books").insert({ ...f, total_copies: Number(f.total_copies) });
@@ -198,7 +198,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
         <div><Label>Title *</Label><Input required value={f.title} onChange={e => setF(p => ({ ...p, title: e.target.value }))} /></div>
         <div><Label>Author</Label><Input value={f.author} onChange={e => setF(p => ({ ...p, author: e.target.value }))} /></div>
         <div><Label>ISBN</Label><Input value={f.isbn} onChange={e => setF(p => ({ ...p, isbn: e.target.value }))} /></div>
-        <div><Label>Genre</Label><Input value={f.genre} onChange={e => setF(p => ({ ...p, genre: e.target.value }))} /></div>
+        <div><Label>Category</Label><Input value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))} /></div>
         <div><Label>Copies</Label><Input type="number" min={1} value={f.total_copies} onChange={e => setF(p => ({ ...p, total_copies: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
       </form>
@@ -207,7 +207,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
 }
 
 function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
-  const [f, setF] = useState({ student_id: "", book_id: "", borrowed_date: format(new Date(), "yyyy-MM-dd"), due_date: "" });
+  const [f, setF] = useState({ student_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_date: "" });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-library"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {
@@ -229,7 +229,7 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
             <SelectContent>{books.map(b => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div><Label>Borrowed Date</Label><Input type="date" value={f.borrowed_date} onChange={e => setF(p => ({ ...p, borrowed_date: e.target.value }))} /></div>
+        <div><Label>Borrowed Date</Label><Input type="date" value={f.borrowed_on} onChange={e => setF(p => ({ ...p, borrowed_on: e.target.value }))} /></div>
         <div><Label>Due Date *</Label><Input required type="date" value={f.due_date} onChange={e => setF(p => ({ ...p, due_date: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.book_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue</Button></DialogFooter>
       </form>

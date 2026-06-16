@@ -89,7 +89,7 @@ function Page() {
   });
 
   const activeAssignments = (assignments as any[]).filter(a => a.active !== false);
-  const dormAssignees = (dormId: string) => activeAssignments.filter(a => a.dorm_id === dormId);
+  const dormAssignees = (dormId: string) => activeAssignments.filter(a => a.dormitory_id === dormId);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -303,7 +303,7 @@ function DormDialog({ onDone }: { onDone: () => void }) {
 }
 
 function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
-  const [f, setF] = useState({ student_id: "", dorm_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
+  const [f, setF] = useState({ student_id: "", dormitory_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => { const { error } = await supabase.from("dorm_assignments").insert(f); if (error) throw error; },
@@ -318,13 +318,13 @@ function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
           </Select>
         </div>
         <div><Label>Dorm</Label>
-          <Select value={f.dorm_id} onValueChange={v => setF(p => ({ ...p, dorm_id: v }))}><SelectTrigger><SelectValue placeholder="Choose dorm" /></SelectTrigger>
+          <Select value={f.dormitory_id} onValueChange={v => setF(p => ({ ...p, dormitory_id: v }))}><SelectTrigger><SelectValue placeholder="Choose dorm" /></SelectTrigger>
             <SelectContent>{dorms.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div><Label>Bed Number</Label><Input value={f.bed_no} onChange={e => setF(p => ({ ...p, bed_no: e.target.value }))} /></div>
         <div><Label>Assigned On</Label><Input type="date" value={f.assigned_on} onChange={e => setF(p => ({ ...p, assigned_on: e.target.value }))} /></div>
-        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.dorm_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Assign</Button></DialogFooter>
+        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.dormitory_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Assign</Button></DialogFooter>
       </form>
     </DialogContent>
   );
