@@ -20,6 +20,11 @@ function AdminDepartmentsPage() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState("academics");
 
+  // Sub-department dialog state
+  const [subOpen, setSubOpen] = useState(false);
+  const [subDeptId, setSubDeptId] = useState<string | null>(null);
+  const [subName, setSubName] = useState("");
+
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: getDepartments,
@@ -36,10 +41,29 @@ function AdminDepartmentsPage() {
       setName("");
       queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to create department");
-    },
+    onError: (err: any) => toast.error(err.message || "Failed to create department"),
   });
+
+  const subMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("sub_departments").insert([{ name: subName, department_id: subDeptId }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Sub-department added");
+      setSubOpen(false);
+      setSubName("");
+      setSubDeptId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to add sub-department"),
+  });
+
+  function openSubDialog(deptId: string) {
+    setSubDeptId(deptId);
+    setSubName("");
+    setSubOpen(true);
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -70,9 +94,14 @@ function AdminDepartmentsPage() {
                   Created {new Date(dept.created_at).toLocaleDateString()}
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5" /> Sub-departments
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5" /> Sub-departments
+                    </h4>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={() => openSubDialog(dept.id)}>
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </div>
                   {dept.sub_departments && dept.sub_departments.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {dept.sub_departments.map((sub: any) => (
@@ -89,6 +118,7 @@ function AdminDepartmentsPage() {
         </div>
       )}
 
+      {/* Add Department Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Create Department</DialogTitle></DialogHeader>
@@ -114,6 +144,25 @@ function AdminDepartmentsPage() {
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
             <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !name}>
               {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Sub-department Dialog */}
+      <Dialog open={subOpen} onOpenChange={setSubOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Sub-department</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Sub-department Name</Label>
+              <Input value={subName} onChange={(e) => setSubName(e.target.value)} placeholder="e.g. Pure Mathematics" autoFocus />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubOpen(false)}>Cancel</Button>
+            <Button onClick={() => subMutation.mutate()} disabled={subMutation.isPending || !subName}>
+              {subMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Add
             </Button>
           </DialogFooter>
         </DialogContent>
