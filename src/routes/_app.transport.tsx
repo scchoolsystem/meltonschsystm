@@ -252,7 +252,7 @@ function LogDialog({ routes, onDone }: { routes: any[]; onDone: () => void }) {
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("transport_daily_log").upsert({ ...f, boarded_count: Number(f.boarded_count), logged_by: u.user?.id }, { onConflict: "route_id,log_date" });
+      const { error } = await supabase.from("transport_daily_log").upsert({ ...f, boarded_count: Number(f.boarded_count) }, { onConflict: "route_id,log_date" });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Log saved"); onDone(); }, onError: (e: any) => toast.error(e.message),

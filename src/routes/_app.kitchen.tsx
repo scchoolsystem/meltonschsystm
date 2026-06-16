@@ -59,7 +59,7 @@ function Page() {
     const map: Record<string, Record<string, any>> = {};
     for (const d of weekDates) map[d] = {};
     for (const m of meals as any[]) {
-      if (weekDates.includes(m.meal_date)) map[m.meal_date][m.meal_type] = m;
+      if (weekDates.includes(m.meal_date)) map[m.meal_date][m.meal] = m;
     }
     return map;
   }, [meals, weekDates]);
@@ -72,7 +72,7 @@ function Page() {
         if (error) throw error;
       } else {
         const { data: u } = await supabase.auth.getUser();
-        const { error } = await supabase.from("meal_plans").insert({ meal_date: date, meal_type: type, menu, cost_per_meal: cost_per_meal || null, logged_by: u.user?.id });
+        const { error } = await supabase.from("meal_plans").insert({ meal_date: date, meal: type, menu, cost_per_meal: cost_per_meal || null, posted_by: u.user?.id });
         if (error) throw error;
       }
     },
@@ -177,7 +177,7 @@ function Page() {
                   {(meals as any[]).map((m: any) => (
                     <TableRow key={m.id}>
                       <TableCell>{m.meal_date}</TableCell>
-                      <TableCell className="capitalize">{m.meal_type}</TableCell>
+                      <TableCell className="capitalize">{m.meal}</TableCell>
                       <TableCell>{m.menu}</TableCell>
                       <TableCell>{m.served_count ?? "—"}</TableCell>
                       <TableCell>{m.cost_per_meal != null ? `KES ${m.cost_per_meal}` : "—"}</TableCell>
@@ -252,11 +252,11 @@ function PlannerCellDialog({ date, type, existing, onSave }: { date: string; typ
 }
 
 function MealDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ meal_date: format(new Date(), "yyyy-MM-dd"), meal_type: "lunch", menu: "", served_count: "", cost_per_meal: "" });
+  const [f, setF] = useState({ meal_date: format(new Date(), "yyyy-MM-dd"), meal: "lunch", menu: "", served_count: "", cost_per_meal: "" });
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("meal_plans").insert({ ...f, served_count: f.served_count ? Number(f.served_count) : null, cost_per_meal: f.cost_per_meal ? Number(f.cost_per_meal) : null, logged_by: u.user?.id });
+      const { error } = await supabase.from("meal_plans").insert({ ...f, served_count: f.served_count ? Number(f.served_count) : null, cost_per_meal: f.cost_per_meal ? Number(f.cost_per_meal) : null, posted_by: u.user?.id });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Meal logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -266,7 +266,7 @@ function MealDialog({ onDone }: { onDone: () => void }) {
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Date</Label><Input type="date" value={f.meal_date} onChange={e => setF(p => ({ ...p, meal_date: e.target.value }))} /></div>
         <div><Label>Meal Type</Label>
-          <Select value={f.meal_type} onValueChange={v => setF(p => ({ ...p, meal_type: v }))}>
+          <Select value={f.meal} onValueChange={v => setF(p => ({ ...p, meal: v }))}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{MEAL_TYPES.map(t => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
           </Select>
