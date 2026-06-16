@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createAccount,
@@ -13,39 +13,112 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, Copy, KeyRound, Ban, CheckCircle2, ShieldAlert, ExternalLink, Eye } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Plus,
+  Loader2,
+  Copy,
+  KeyRound,
+  Ban,
+  CheckCircle2,
+  ShieldAlert,
+  ExternalLink,
+  Search,
+  Users,
+  GraduationCap,
+  Briefcase,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/admin/users")({ component: UsersPage });
 
-const ALL_ROLES = [
-  "super_admin","school_admin","principal","deputy_principal","academic_master",
-  "class_teacher","subject_teacher","teacher","hod","staff",
-  "exams_admin","exams_user",
-  "finance_admin","finance_user","bursar",
-  "boarding_admin","boarding_user","matron",
-  "kitchen_admin","kitchen_user",
-  "security_admin","security_user",
-  "library_admin","library_user","librarian",
-  "clinic_admin","clinic_user","nurse",
-  "sports_admin","sports_user","sports",
-  "store_admin","store_user",
-  "transport_admin","transport_officer",
-  "guidance_admin","ict_admin","discipline_admin",
-  "admission_officer","parent","student",
-];
+// ─── Role catalogue ──────────────────────────────────────────────────────────
+const ROLE_GROUPS: Record<string, { label: string; roles: string[] }> = {
+  admin: {
+    label: "Administration",
+    roles: [
+      "super_admin", "school_admin", "principal", "deputy_principal",
+      "academic_master", "admission_officer", "guidance_admin", "ict_admin",
+    ],
+  },
+  teaching: {
+    label: "Teaching Staff",
+    roles: [
+      "hod", "class_teacher", "subject_teacher", "teacher",
+    ],
+  },
+  exams: {
+    label: "Exams",
+    roles: ["exams_admin", "exams_user"],
+  },
+  finance: {
+    label: "Finance",
+    roles: ["finance_admin", "finance_user", "bursar"],
+  },
+  support: {
+    label: "Support Staff",
+    roles: [
+      "boarding_admin", "boarding_user", "matron",
+      "kitchen_admin", "kitchen_user",
+      "security_admin", "security_user",
+      "library_admin", "library_user", "librarian",
+      "clinic_admin", "clinic_user", "nurse",
+      "sports_admin", "sports_user", "sports",
+      "store_admin", "store_user",
+      "transport_admin", "transport_officer",
+      "discipline_admin",
+    ],
+  },
+  portal: {
+    label: "Portals",
+    roles: ["parent", "student"],
+  },
+};
 
+const STAFF_ROLES = [
+  ...ROLE_GROUPS.admin.roles,
+  ...ROLE_GROUPS.teaching.roles,
+  ...ROLE_GROUPS.exams.roles,
+  ...ROLE_GROUPS.finance.roles,
+  ...ROLE_GROUPS.support.roles,
+];
+const ALL_ROLES = [...STAFF_ROLES, ...ROLE_GROUPS.portal.roles];
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 function UsersPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
   const [creds, setCreds] = useState<{ uniqueId: string; password: string; title: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [tab, setTab] = useState("all");
 
   const createFn = useServerFn(createAccount);
   const resetFn = useServerFn(resetPassword);
@@ -54,23 +127,36 @@ function UsersPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["all-credentials"],
     queryFn: async () => {
-      const [{ data: creds }, { data: profiles }, { data: roles }, { data: staffRows }, { data: studentRows }] = await Promise.all([
+      const [
+        { data: creds },
+        { data: profiles },
+        { data: roles },
+        { data: staffRows },
+        { data: studentRows },
+        { data: classRows },
+      ] = await Promise.all([
         supabase.from("user_credentials").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, full_name"),
         supabase.from("user_roles").select("user_id, role"),
-        supabase.from("staff").select("id, user_id"),
-        supabase.from("students").select("id, user_id, unique_id, admission_no"),
+        supabase.from("staff").select("id, user_id, staff_category, department_id, role"),
+        supabase.from("students").select("id, user_id, unique_id, admission_no, class_id, year_of_admission"),
+        supabase.from("classes").select("id, name, level"),
       ]);
       return (creds ?? []).map((c) => {
         const staffRow = (staffRows ?? []).find((s: any) => s.user_id === c.user_id);
         const studentRow = (studentRows ?? []).find((s: any) => s.user_id === c.user_id);
+        const classRow = (classRows ?? []).find((cl: any) => cl.id === studentRow?.class_id);
         return {
           ...c,
           full_name: profiles?.find((p) => p.id === c.user_id)?.full_name ?? "—",
           roles: (roles ?? []).filter((r) => r.user_id === c.user_id).map((r) => r.role),
           staff_id: staffRow?.id ?? null,
+          staff_category: staffRow?.staff_category ?? null,
           student_id: studentRow?.id ?? null,
           student_search: studentRow?.admission_no ?? studentRow?.unique_id ?? null,
+          class_name: classRow?.name ?? null,
+          class_level: classRow?.level ?? null,
+          year_of_admission: studentRow?.year_of_admission ?? null,
         };
       });
     },
@@ -80,10 +166,12 @@ function UsersPage() {
   if (!isAdmin) {
     return (
       <div className="p-6">
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <ShieldAlert className="w-10 h-10 mx-auto mb-2 opacity-40" />
-          Super admin only.
-        </CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <ShieldAlert className="w-10 h-10 mx-auto mb-2 opacity-40" />
+            Super admin only.
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -104,13 +192,50 @@ function UsersPage() {
     } catch (e: any) { toast.error(e.message); }
   }
 
+  // Derived lists by category
+  const staffData = useMemo(() => (data ?? []).filter((u) =>
+    u.category === "staff" || STAFF_ROLES.some((r) => u.roles.includes(r))
+  ), [data]);
+  const studentData = useMemo(() => (data ?? []).filter((u) =>
+    u.category === "student" || u.roles.includes("student")
+  ), [data]);
+
+  function applyFilters(rows: typeof data) {
+    return (rows ?? []).filter((u) => {
+      const matchSearch =
+        !search ||
+        u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        u.unique_id?.toLowerCase().includes(search.toLowerCase()) ||
+        u.synthetic_email?.toLowerCase().includes(search.toLowerCase());
+      const matchRole =
+        roleFilter === "all" || u.roles.includes(roleFilter);
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && u.is_active) ||
+        (statusFilter === "revoked" && !u.is_active);
+      return matchSearch && matchRole && matchStatus;
+    });
+  }
+
+  const tabData = tab === "staff"
+    ? applyFilters(staffData)
+    : tab === "students"
+    ? applyFilters(studentData)
+    : applyFilters(data);
+
+  // Stats
+  const total = data?.length ?? 0;
+  const activeCount = data?.filter((u) => u.is_active).length ?? 0;
+  const revokedCount = data?.filter((u) => !u.is_active).length ?? 0;
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Users & Credentials</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Every user is created with a system-generated Unique ID and password
+            Manage system accounts — staff, students, and external users
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -128,120 +253,247 @@ function UsersPage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">All accounts</CardTitle></CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="h-40 grid place-items-center">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Unique ID</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Synthetic email</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Last reset</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data?.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
-                      No accounts yet.
-                    </TableCell></TableRow>
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total accounts", value: total, icon: Users },
+          { label: "Staff accounts", value: staffData.length, icon: Briefcase },
+          { label: "Student accounts", value: studentData.length, icon: GraduationCap },
+          { label: "Revoked", value: revokedCount, icon: Ban },
+        ].map(({ label, value, icon: Icon }) => (
+          <Card key={label}>
+            <CardContent className="pt-4 pb-3 flex items-center gap-3">
+              <Icon className="w-5 h-5 text-muted-foreground shrink-0" />
+              <div>
+                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-xs text-muted-foreground">{label}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-8 w-56"
+            placeholder="Search name or ID…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="All roles" /></SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value="all">All roles</SelectItem>
+            {Object.entries(ROLE_GROUPS).map(([, group]) => (
+              <div key={group.label}>
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {group.label}
+                </div>
+                {group.roles.map((r) => (
+                  <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>
+                ))}
+              </div>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="revoked">Revoked</SelectItem>
+          </SelectContent>
+        </Select>
+        {(search || roleFilter !== "all" || statusFilter !== "all") && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setRoleFilter("all"); setStatusFilter("all"); }}>
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="all">All ({(data ?? []).length})</TabsTrigger>
+          <TabsTrigger value="staff">
+            <Briefcase className="w-3.5 h-3.5 mr-1" />Staff ({staffData.length})
+          </TabsTrigger>
+          <TabsTrigger value="students">
+            <GraduationCap className="w-3.5 h-3.5 mr-1" />Students ({studentData.length})
+          </TabsTrigger>
+        </TabsList>
+
+        {["all", "staff", "students"].map((t) => (
+          <TabsContent key={t} value={t} className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {tabData.length} account{tabData.length !== 1 ? "s" : ""}
+                  {(search || roleFilter !== "all" || statusFilter !== "all") && (
+                    <span className="text-muted-foreground font-normal text-sm ml-2">(filtered)</span>
                   )}
-                  {data?.map((u) => (
-                    <TableRow key={u.user_id}>
-                      <TableCell className="font-mono text-xs">{u.unique_id}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{u.category ?? "—"}</Badge></TableCell>
-                      <TableCell className="font-medium">{u.full_name}</TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          className="font-mono text-[11px] hover:underline inline-flex items-center gap-1"
-                          onClick={() => { if (u.synthetic_email) { navigator.clipboard.writeText(u.synthetic_email); toast.success("Email copied"); } }}
-                          title="Click to copy"
-                        >
-                          {u.synthetic_email ?? "—"}
-                          {u.synthetic_email && <Copy className="w-3 h-3 opacity-50" />}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {u.roles.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
-                          {u.roles.map((r) => (
-                            <Badge key={r} variant="secondary" className="text-[10px]">{r.replace(/_/g," ")}</Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {u.last_reset_at ? new Date(u.last_reset_at).toLocaleDateString() : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {u.is_active ? (
-                            <Badge variant="outline" className="bg-success/15 text-success border-success/30">active</Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30">revoked</Badge>
-                          )}
-                          {u.password_reset_required && (
-                            <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-[10px]">
-                              Password Reset Required
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {u.staff_id ? (
-                          <Link to="/staff/$id" params={{ id: u.staff_id }}>
-                            <Button size="sm" variant="ghost" title="Open staff profile">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </Button>
-                          </Link>
-                        ) : u.student_id ? (
-                          <Link to="/students" search={{ q: u.student_search ?? "" } as any}>
-                            <Button size="sm" variant="ghost" title="Open student record">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </Button>
-                          </Link>
-                        ) : null}
-                        <Button size="sm" variant="outline" onClick={() => handleReset(u.user_id, u.unique_id)}>
-                          <KeyRound className="w-3.5 h-3.5 mr-1" />Reset
-                        </Button>
-                        {u.is_active ? (
-                          <Button size="sm" variant="outline" onClick={() => handleToggle(u.user_id, false)}>
-                            <Ban className="w-3.5 h-3.5 mr-1" />Revoke
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => handleToggle(u.user_id, true)}>
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Restore
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-40 grid place-items-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <AccountTable
+                    rows={tabData}
+                    showClass={t === "students"}
+                    onReset={handleReset}
+                    onToggle={handleToggle}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
 
       <CredentialsDialog creds={creds} onClose={() => setCreds(null)} />
     </div>
   );
 }
 
+// ─── Account table ────────────────────────────────────────────────────────────
+function AccountTable({
+  rows,
+  showClass,
+  onReset,
+  onToggle,
+}: {
+  rows: any[];
+  showClass?: boolean;
+  onReset: (uid: string, label: string) => void;
+  onToggle: (uid: string, active: boolean) => void;
+}) {
+  return (
+    <div className="rounded-md border overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Unique ID</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Category</TableHead>
+            {showClass && <TableHead>Class / Year</TableHead>}
+            <TableHead>Roles</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={showClass ? 7 : 6} className="text-center py-8 text-sm text-muted-foreground">
+                No accounts match your filters.
+              </TableCell>
+            </TableRow>
+          )}
+          {rows.map((u) => (
+            <TableRow key={u.user_id}>
+              <TableCell className="font-mono text-xs">{u.unique_id}</TableCell>
+              <TableCell className="font-medium">
+                <div>{u.full_name}</div>
+                <button
+                  type="button"
+                  className="font-mono text-[10px] text-muted-foreground hover:underline inline-flex items-center gap-1"
+                  onClick={() => { if (u.synthetic_email) { navigator.clipboard.writeText(u.synthetic_email); toast.success("Email copied"); } }}
+                >
+                  {u.synthetic_email ?? "—"}
+                  {u.synthetic_email && <Copy className="w-2.5 h-2.5" />}
+                </button>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-[10px]">{u.category ?? u.staff_category ?? "—"}</Badge>
+              </TableCell>
+              {showClass && (
+                <TableCell className="text-xs">
+                  <div>{u.class_name ?? "—"}</div>
+                  {u.year_of_admission && (
+                    <div className="text-muted-foreground">Admitted {u.year_of_admission}</div>
+                  )}
+                </TableCell>
+              )}
+              <TableCell>
+                <RoleBadges roles={u.roles} />
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-col gap-1">
+                  {u.is_active ? (
+                    <Badge variant="outline" className="bg-success/15 text-success border-success/30 w-fit">active</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 w-fit">revoked</Badge>
+                  )}
+                  {u.password_reset_required && (
+                    <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-[10px] w-fit">
+                      Reset required
+                    </Badge>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-right space-x-1">
+                {u.staff_id ? (
+                  <Link to="/staff/$id" params={{ id: u.staff_id }}>
+                    <Button size="sm" variant="ghost" title="Open staff profile">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
+                ) : u.student_id ? (
+                  <Link to="/students" search={{ q: u.student_search ?? "" } as any}>
+                    <Button size="sm" variant="ghost" title="Open student record">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
+                ) : null}
+                <Button size="sm" variant="outline" onClick={() => onReset(u.user_id, u.unique_id)}>
+                  <KeyRound className="w-3.5 h-3.5 mr-1" />Reset
+                </Button>
+                {u.is_active ? (
+                  <Button size="sm" variant="outline" onClick={() => onToggle(u.user_id, false)}>
+                    <Ban className="w-3.5 h-3.5 mr-1" />Revoke
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => onToggle(u.user_id, true)}>
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Restore
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Role badges grouped by category
+function RoleBadges({ roles }: { roles: string[] }) {
+  if (!roles.length) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1 max-w-[200px]">
+      {roles.map((r) => (
+        <Badge key={r} variant="secondary" className="text-[10px]">{r.replace(/_/g, " ")}</Badge>
+      ))}
+    </div>
+  );
+}
+
+// ─── Create dialog ─────────────────────────────────────────────────────────
 function CreateDialog({
-  onDone, createFn,
-}: { onDone: (c: { uniqueId: string; password: string }) => void; createFn: (args: { data: { full_name: string; role: string; email?: string } }) => Promise<{ uniqueId: string; password: string }> }) {
-  const [form, setForm] = useState({ full_name: "", role: "staff", email: "" });
+  onDone,
+  createFn,
+}: {
+  onDone: (c: { uniqueId: string; password: string }) => void;
+  createFn: (args: { data: { full_name: string; role: string; email?: string } }) => Promise<{ uniqueId: string; password: string }>;
+}) {
+  const [form, setForm] = useState({ full_name: "", role: "teacher", email: "" });
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -261,19 +513,30 @@ function CreateDialog({
         <DialogTitle>Create new account</DialogTitle>
         <DialogDescription>System will generate a Unique ID and strong password.</DialogDescription>
       </DialogHeader>
-      <form onSubmit={submit} className="space-y-3">
-        <div><Label>Full name</Label><Input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
+      <form onSubmit={submit} className="space-y-4">
+        <div><Label>Full name</Label>
+          <Input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+        </div>
         <div>
           <Label>Role</Label>
           <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent className="max-h-72">
-              {ALL_ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g," ")}</SelectItem>)}
+              {Object.entries(ROLE_GROUPS).map(([, group]) => (
+                <div key={group.label}>
+                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {group.label}
+                  </div>
+                  {group.roles.map((r) => (
+                    <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>
+                  ))}
+                </div>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label>Contact email <span className="text-muted-foreground text-xs">(optional — used to deliver credentials when email is enabled)</span></Label>
+          <Label>Contact email <span className="text-muted-foreground text-xs">(optional)</span></Label>
           <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         <DialogFooter>
@@ -287,8 +550,10 @@ function CreateDialog({
   );
 }
 
+// ─── Credentials reveal dialog ─────────────────────────────────────────────
 function CredentialsDialog({
-  creds, onClose,
+  creds,
+  onClose,
 }: { creds: { uniqueId: string; password: string; title: string } | null; onClose: () => void }) {
   function copyBoth() {
     if (!creds) return;
