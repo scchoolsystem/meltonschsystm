@@ -187,6 +187,7 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
     label: "ICT",
     items: [
       dashboard,
+      { title: "ICT Overview", url: "/admin/ict" },
       { title: "Users & Credentials", url: "/admin/users" },
       { title: "User Roles", url: "/admin/roles" },
       { title: "Field Permissions", url: "/admin/permissions" },
@@ -313,6 +314,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Communications", url: "/admin/communications", feature: "communications" },
     { title: "Feature Modules", url: "/admin/features" },
     { title: "Support Tickets", url: "/admin/support" },
+    { title: "ICT Overview", url: "/admin/ict" },
   ]},
 ];
 
