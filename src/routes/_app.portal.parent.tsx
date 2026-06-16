@@ -171,6 +171,8 @@ function ParentPortal() {
             ))}
           </CardContent></Card>
         </TabsContent>
+
+        <TabsContent value="attendance">
           <Card><CardContent className="pt-6 space-y-1">
             {data.attendance.length === 0 && <p className="text-sm text-muted-foreground">No records.</p>}
             {data.attendance.map((a: any) => (
