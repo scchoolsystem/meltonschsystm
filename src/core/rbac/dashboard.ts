@@ -37,6 +37,21 @@ export type DashboardWidgetKey =
   | "boarding.occupancy"
   // Security
   | "security.recentLogs"
+  // Sports / co-curricular
+  | "sports.summary"
+  // Transport
+  | "transport.routeSummary"
+  // Kitchen
+  | "kitchen.todaySummary"
+  // Admin extras
+  | "admin.attendanceToday"
+  | "admin.pendingActions"
+  | "admin.newStudentsThisWeek"
+  | "admin.overdueFees"
+  // ICT admin
+  | "ict.featureFlags"
+  | "ict.activeUsers"
+  | "ict.supportTickets"
   // Platform
   | "platform.tenants";
 
@@ -49,6 +64,10 @@ const ADMIN_WIDGETS: DashboardWidgetKey[] = [
   "admin.kpis",
   "admin.studentsPerClass",
   "admin.schoolStructure",
+  "admin.attendanceToday",
+  "admin.pendingActions",
+  "admin.newStudentsThisWeek",
+  "admin.overdueFees",
 ];
 
 /**
@@ -151,30 +170,31 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
   }
 
   // ── Sports / co-curricular ────────────────────────────────────────────────
-  // sports_admin, sports_user, sports — previously got empty dashboard
   if (hasAny(["sports_admin", "sports_user", "sports"])) {
-    // Show student count overview (useful for coaches) + discipline incidents
-    // (useful for welfare tracking). Reuses existing widgets.
-    widgets.add("admin.studentsPerClass");
-    widgets.add("discipline.recentIncidents");
+    widgets.add("sports.summary");
   }
 
   // ── Transport ─────────────────────────────────────────────────────────────
-  // transport_admin, transport_officer — previously got empty dashboard
   if (hasAny(["transport_admin", "transport_officer"])) {
-    widgets.add("admin.studentsPerClass"); // shows class/student numbers
+    widgets.add("transport.routeSummary");
   }
 
   // ── Kitchen / store ───────────────────────────────────────────────────────
-  // kitchen_admin, kitchen_user, store_admin, store_user — empty before
   if (hasAny(["kitchen_admin", "kitchen_user", "store_admin", "store_user"])) {
-    widgets.add("admin.studentsPerClass"); // headcount useful for catering
+    widgets.add("kitchen.todaySummary");
   }
 
   // ── Admission ─────────────────────────────────────────────────────────────
   if (has("admission_officer")) {
     widgets.add("admin.studentsPerClass");
     widgets.add("admin.schoolStructure");
+  }
+
+  // ── ICT admin ─────────────────────────────────────────────────────────────
+  if (has("ict_admin")) {
+    widgets.add("ict.featureFlags");
+    widgets.add("ict.activeUsers");
+    widgets.add("ict.supportTickets");
   }
 
   // ── IT / HR / general staff ───────────────────────────────────────────────
