@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Users, Pencil, Trash2, UserCheck } from "lucide-react";
+import { Plus, Loader2, Users, Pencil, Trash2, UserCheck, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -45,7 +46,6 @@ function ClassesPage() {
         .select("*, students(count), class_teacher:staff!classes_class_teacher_id_fkey(id, first_name, last_name)")
         .order("level").order("name");
       if (error) {
-        // Fallback if FK alias differs
         const fb = await supabase.from("classes").select("*, students(count)").order("level").order("name");
         if (fb.error) throw fb.error;
         return fb.data as any[];
@@ -85,7 +85,7 @@ function ClassesPage() {
             const fillPct = Math.min(100, Math.round((count / (c.capacity || 40)) * 100));
             const teacher = c.class_teacher;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div>
@@ -107,13 +107,16 @@ function ClassesPage() {
                     <UserCheck className="w-3.5 h-3.5" />
                     {teacher ? `Class teacher: ${teacher.first_name} ${teacher.last_name}` : "No class teacher assigned"}
                   </div>
-                  <div className="text-xs text-muted-foreground">Year {c.year}</div>
-                  {isAdmin && (
-                    <div className="flex gap-2 pt-2">
-                      <EditClassDialog cls={c} onDone={refresh} />
-                      <DeleteClassButton cls={c} count={count} onDone={refresh} />
-                    </div>
-                  )}
+                  {c.year && <div className="text-xs text-muted-foreground">Year {c.year}</div>}
+                  <div className="flex gap-2 pt-2 flex-wrap">
+                    <ClassMembersDialog cls={c} />
+                    {isAdmin && (
+                      <>
+                        <EditClassDialog cls={c} onDone={refresh} />
+                        <DeleteClassButton cls={c} count={count} onDone={refresh} />
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -121,6 +124,115 @@ function ClassesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ClassMembersDialog({ cls }: { cls: any }) {
+  const [open, setOpen] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["class-members", cls.id],
+    enabled: open,
+    queryFn: async () => {
+      const [studentsRes, subjectsRes] = await Promise.all([
+        supabase
+          .from("students")
+          .select("id, first_name, last_name, admission_no, gender, unique_id")
+          .eq("class_id", cls.id)
+          .order("first_name"),
+        supabase
+          .from("class_subjects")
+          .select("subjects(name, code), staff(first_name, last_name)")
+          .eq("class_id", cls.id),
+      ]);
+      return {
+        students: studentsRes.data ?? [],
+        subjects: subjectsRes.data ?? [],
+      };
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="flex-1 gap-1">
+          <Users className="w-3.5 h-3.5" /> Members
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4" /> {cls.name} — Members
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-12 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : (
+          <div className="space-y-6 pt-2">
+            {/* Class teacher */}
+            {cls.class_teacher && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Class Teacher</div>
+                <div className="flex items-center gap-3 border rounded-md px-3 py-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>{cls.class_teacher.first_name?.[0]}{cls.class_teacher.last_name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{cls.class_teacher.first_name} {cls.class_teacher.last_name}</span>
+                  <Badge variant="secondary" className="ml-auto">Class Teacher</Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Subjects taught */}
+            {data?.subjects && data.subjects.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Subjects ({data.subjects.length})
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {data.subjects.map((s: any, i: number) => (
+                    <Badge key={i} variant="outline">
+                      {s.subjects?.code && <span className="font-mono mr-1">{s.subjects.code}</span>}
+                      {s.subjects?.name}
+                      {s.staff && <span className="text-muted-foreground ml-1">· {s.staff.first_name} {s.staff.last_name}</span>}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Students list */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Students ({data?.students?.length ?? 0})
+              </div>
+              {data?.students?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No students enrolled in this class yet.</p>
+              ) : (
+                <div className="divide-y border rounded-md">
+                  {data?.students?.map((s: any, i: number) => (
+                    <div key={s.id} className="flex items-center gap-3 px-3 py-2">
+                      <span className="text-xs text-muted-foreground w-6 text-right">{i + 1}</span>
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="text-xs">{s.first_name?.[0]}{s.last_name?.[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{s.first_name} {s.last_name}</div>
+                        <div className="text-xs text-muted-foreground">{s.admission_no ?? s.unique_id}</div>
+                      </div>
+                      {s.gender && (
+                        <Badge variant="outline" className="text-xs capitalize">{s.gender}</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
