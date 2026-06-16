@@ -61,11 +61,11 @@ function Page() {
     });
   }, [loans, loanSearch]);
 
-  const overdueLoans = useMemo(() => (loans as any[]).filter(l => l.status === "active" && l.due_date < today), [loans, today]);
+  const overdueLoans = useMemo(() => (loans as any[]).filter(l => l.status === "active" && l.due_on < today), [loans, today]);
 
   const returnMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("book_loans").update({ status: "returned", return_date: today }).eq("id", id);
+      const { error } = await supabase.from("book_loans").update({ status: "returned", returned_on: today }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["library-loans"] }); toast.success("Book returned"); },
@@ -134,13 +134,13 @@ function Page() {
                 <TableBody>
                   {filteredLoans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No loans.</TableCell></TableRow>}
                   {filteredLoans.map((l: any) => {
-                    const isOverdue = l.status === "active" && l.due_date < today;
+                    const isOverdue = l.status === "active" && l.due_on < today;
                     return (
                       <TableRow key={l.id} className={isOverdue ? "bg-red-50" : ""}>
                         <TableCell className="font-medium">{l.students?.first_name} {l.students?.last_name}<div className="text-xs text-muted-foreground">{l.students?.admission_no}</div></TableCell>
                         <TableCell>{l.books?.title}</TableCell>
                         <TableCell className="text-xs">{l.borrowed_on}</TableCell>
-                        <TableCell className={`text-xs ${isOverdue ? "text-red-600 font-medium" : ""}`}>{l.due_date}</TableCell>
+                        <TableCell className={`text-xs ${isOverdue ? "text-red-600 font-medium" : ""}`}>{l.due_on}</TableCell>
                         <TableCell><Badge variant={l.status === "returned" ? "secondary" : isOverdue ? "destructive" : "default"}>{l.status}</Badge></TableCell>
                         <TableCell>{can && l.status === "active" && <Button size="sm" variant="outline" className="h-8" onClick={() => returnMutation.mutate(l.id)}>Return</Button>}</TableCell>
                       </TableRow>
@@ -160,13 +160,13 @@ function Page() {
                 <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Book</TableHead><TableHead>Due Date</TableHead><TableHead>Days Overdue</TableHead><TableHead>Fine (KES)</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {overdueLoans.map((l: any) => {
-                    const days = differenceInDays(new Date(), new Date(l.due_date));
+                    const days = differenceInDays(new Date(), new Date(l.due_on));
                     const fine = days * FINE_PER_DAY;
                     return (
                       <TableRow key={l.id} className="bg-red-50">
                         <TableCell className="font-medium">{l.students?.first_name} {l.students?.last_name}<div className="text-xs text-muted-foreground">{l.students?.admission_no}</div></TableCell>
                         <TableCell>{l.books?.title}</TableCell>
-                        <TableCell className="text-xs text-red-700">{l.due_date}</TableCell>
+                        <TableCell className="text-xs text-red-700">{l.due_on}</TableCell>
                         <TableCell><Badge variant="destructive">{days} day{days !== 1 ? "s" : ""}</Badge></TableCell>
                         <TableCell className="font-medium text-red-700">KES {fine.toLocaleString()}</TableCell>
                         <TableCell>{can && <Button size="sm" variant="outline" className="h-8" onClick={() => returnMutation.mutate(l.id)}>Return</Button>}</TableCell>
@@ -184,10 +184,10 @@ function Page() {
 }
 
 function BookDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ title: "", author: "", isbn: "", category: "", total_copies: "1" });
+  const [f, setF] = useState({ title: "", author: "", isbn: "", category: "", copies_total: "1" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("books").insert({ ...f, total_copies: Number(f.total_copies) });
+      const { error } = await supabase.from("books").insert({ ...f, copies_total: Number(f.copies_total) });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Book added"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -199,7 +199,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
         <div><Label>Author</Label><Input value={f.author} onChange={e => setF(p => ({ ...p, author: e.target.value }))} /></div>
         <div><Label>ISBN</Label><Input value={f.isbn} onChange={e => setF(p => ({ ...p, isbn: e.target.value }))} /></div>
         <div><Label>Category</Label><Input value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))} /></div>
-        <div><Label>Copies</Label><Input type="number" min={1} value={f.total_copies} onChange={e => setF(p => ({ ...p, total_copies: e.target.value }))} /></div>
+        <div><Label>Copies</Label><Input type="number" min={1} value={f.copies_total} onChange={e => setF(p => ({ ...p, copies_total: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
       </form>
     </DialogContent>
@@ -207,7 +207,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
 }
 
 function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
-  const [f, setF] = useState({ student_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_date: "" });
+  const [f, setF] = useState({ student_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-library"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {
@@ -230,7 +230,7 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
           </Select>
         </div>
         <div><Label>Borrowed Date</Label><Input type="date" value={f.borrowed_on} onChange={e => setF(p => ({ ...p, borrowed_on: e.target.value }))} /></div>
-        <div><Label>Due Date *</Label><Input required type="date" value={f.due_date} onChange={e => setF(p => ({ ...p, due_date: e.target.value }))} /></div>
+        <div><Label>Due Date *</Label><Input required type="date" value={f.due_on} onChange={e => setF(p => ({ ...p, due_on: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.book_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue</Button></DialogFooter>
       </form>
     </DialogContent>
