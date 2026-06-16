@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import {
   Users, GraduationCap, BookOpen, TrendingUp, CalendarDays,
   ClipboardList, Wallet, Stethoscope, ShieldAlert, Library,
-  BedDouble, ShieldCheck, Building2, Loader2,
+  BedDouble, ShieldCheck, Building2, Loader2, Bus, Utensils,
+  Trophy, AlertTriangle, UserPlus, Settings,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -518,6 +519,275 @@ export function PlatformTenantsWidget() {
       table="schools"
       icon={Building2}
       hint="All registered schools"
+    />
+  );
+}
+
+// ---------- ADMIN: attendance / pending actions / new students / fees ----------
+export function AdminAttendanceTodayWidget() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-admin-attendance-today", today],
+    queryFn: async () => {
+      const { data } = await supabase.from("attendance_records").select("status").eq("date", today);
+      const rows = data ?? [];
+      const present = rows.filter((r: any) => r.status === "present").length;
+      const absent = rows.filter((r: any) => r.status === "absent").length;
+      const late = rows.filter((r: any) => r.status === "late").length;
+      const total = rows.length;
+      return { present, absent, late, total, pct: total ? Math.round((present / total) * 100) : 0 };
+    },
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Attendance Today</CardTitle>
+        <CalendarDays className="w-4 h-4 text-chart-2" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : data?.total ? (
+          <>
+            <div className="text-2xl font-bold">{data.pct}% present</div>
+            <div className="w-full bg-muted rounded-full h-2 mt-2 overflow-hidden">
+              <div className="h-2 bg-chart-1 rounded-full" style={{ width: `${data.pct}%` }} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">{data.present} present · {data.absent} absent · {data.late} late</p>
+          </>
+        ) : <EmptyState>No attendance recorded today.</EmptyState>}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AdminPendingActionsWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-admin-pending-actions"],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const [gp, tickets, disc, loans] = await Promise.all([
+        supabase.from("gate_passes").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
+        supabase.from("discipline_records").select("id", { count: "exact", head: true }).eq("parent_notified", false),
+        supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("status", "active").lt("due_date", today),
+      ]);
+      return {
+        gatePasses: gp.count ?? 0,
+        tickets: tickets.count ?? 0,
+        discipline: disc.count ?? 0,
+        loans: loans.count ?? 0,
+      };
+    },
+  });
+  const items = data ? [
+    { label: "Pending gate passes", value: data.gatePasses },
+    { label: "Open support tickets", value: data.tickets },
+    { label: "Unnotified discipline cases", value: data.discipline },
+    { label: "Overdue library loans", value: data.loans },
+  ] : [];
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Pending Actions</CardTitle>
+        <ClipboardList className="w-4 h-4 text-chart-4" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : (
+          <div className="space-y-2">
+            {items.map((it) => (
+              <div key={it.label} className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{it.label}</span>
+                <span className={`font-semibold px-2 py-0.5 rounded-full text-xs ${it.value > 0 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>{it.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AdminNewStudentsThisWeekWidget() {
+  const since = new Date(); since.setDate(since.getDate() - 7);
+  return (
+    <SimpleCountWidget
+      title="New Students (7d)"
+      table="students"
+      filter={(q) => q.gte("created_at", since.toISOString())}
+      icon={UserPlus}
+    />
+  );
+}
+
+export function AdminOverdueFeesWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-admin-overdue-fees"],
+    queryFn: async () => {
+      const { data } = await supabase.from("invoices").select("amount, paid").neq("status", "paid");
+      const total = (data ?? []).reduce((sum: number, inv: any) => sum + ((inv.amount ?? 0) - (inv.paid ?? 0)), 0);
+      return total;
+    },
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Fees</CardTitle>
+        <Wallet className="w-4 h-4 text-chart-1" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : <div className="text-2xl font-bold">KES {Math.round(data ?? 0).toLocaleString()}</div>}
+        <p className="text-xs text-muted-foreground mt-1">Across all unpaid invoices</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- TRANSPORT ----------
+export function TransportRouteSummaryWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-transport-summary"],
+    queryFn: async () => {
+      const [routes, assignments] = await Promise.all([
+        supabase.from("transport_routes").select("id, capacity"),
+        supabase.from("transport_assignments").select("route_id"),
+      ]);
+      const routeList = routes.data ?? [];
+      const assignList = assignments.data ?? [];
+      const atCapacity = routeList.filter((r: any) => {
+        const used = assignList.filter((a: any) => a.route_id === r.id).length;
+        return r.capacity && used >= r.capacity;
+      }).length;
+      return { totalRoutes: routeList.length, totalAssigned: assignList.length, atCapacity };
+    },
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Transport Summary</CardTitle>
+        <Bus className="w-4 h-4 text-chart-2" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : (
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Routes</span><span className="font-semibold">{data?.totalRoutes}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Students assigned</span><span className="font-semibold">{data?.totalAssigned}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Routes at capacity</span><span className="font-semibold">{data?.atCapacity}</span></div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- KITCHEN ----------
+export function KitchenTodaySummaryWidget() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-kitchen-today", today],
+    queryFn: async () => {
+      const [meals, stock] = await Promise.all([
+        supabase.from("meal_plans").select("meal_type, menu, served_count").eq("meal_date", today),
+        supabase.from("kitchen_stock").select("quantity, reorder_level"),
+      ]);
+      const mealRows = meals.data ?? [];
+      const totalServed = mealRows.reduce((s: number, m: any) => s + (m.served_count ?? 0), 0);
+      const lowStock = (stock.data ?? []).filter((s: any) => s.quantity <= s.reorder_level).length;
+      return { meals: mealRows, totalServed, lowStock };
+    },
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Kitchen Today</CardTitle>
+        <Utensils className="w-4 h-4 text-chart-3" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : (
+          <div className="space-y-1 text-sm">
+            {(["breakfast", "lunch", "dinner"] as const).map((t) => {
+              const m = data?.meals.find((x: any) => x.meal_type === t);
+              return <div key={t} className="flex justify-between"><span className="capitalize text-muted-foreground">{t}</span><span className="font-medium">{m?.menu ?? "—"}</span></div>;
+            })}
+            <div className="flex justify-between pt-1 border-t mt-1"><span className="text-muted-foreground">Served today</span><span className="font-semibold">{data?.totalServed}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Low stock items</span><span className={`font-semibold ${data?.lowStock ? "text-destructive" : ""}`}>{data?.lowStock}</span></div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- SPORTS ----------
+export function SportsSummaryWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-sports-summary"],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const [activities, enrolled, fixtures] = await Promise.all([
+        supabase.from("co_curricular_activities").select("id", { count: "exact", head: true }),
+        supabase.from("student_co_curricular").select("id", { count: "exact", head: true }),
+        supabase.from("sports_fixtures").select("id", { count: "exact", head: true }).gte("fixture_date", today),
+      ]);
+      return { activities: activities.count ?? 0, enrolled: enrolled.count ?? 0, fixtures: fixtures.count ?? 0 };
+    },
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Sports Summary</CardTitle>
+        <Trophy className="w-4 h-4 text-chart-4" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : (
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Activities</span><span className="font-semibold">{data?.activities}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Enrolled students</span><span className="font-semibold">{data?.enrolled}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Upcoming fixtures</span><span className="font-semibold">{data?.fixtures}</span></div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------- ICT ADMIN ----------
+export function IctFeatureFlagsWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-ict-features"],
+    queryFn: async () => (await supabase.from("school_features").select("feature, enabled")).data ?? [],
+  });
+  const enabled = (data ?? []).filter((f: any) => f.enabled).length;
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Feature Flags</CardTitle>
+        <Settings className="w-4 h-4 text-chart-2" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : <div className="text-2xl font-bold">{enabled}/{(data ?? []).length} enabled</div>}
+        <p className="text-xs text-muted-foreground mt-1">Read-only — managed by Admin</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function IctActiveUsersWidget() {
+  return (
+    <SimpleCountWidget
+      title="Active Users"
+      table="school_members"
+      icon={Users}
+      hint="school_members for this school"
+    />
+  );
+}
+
+export function IctSupportTicketsWidget() {
+  return (
+    <SimpleCountWidget
+      title="Open Support Tickets"
+      table="support_tickets"
+      filter={(q) => q.in("status", ["open", "in_progress"])}
+      icon={AlertTriangle}
     />
   );
 }
