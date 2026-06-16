@@ -93,6 +93,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.leaving-certificates": [...ADMIN_ROLES],
   "admin.insurance": [...ADMIN_ROLES, "bursar", "finance_admin"],
   "admin.student-documents": [...ADMIN_ROLES, "admission_officer"],
+  "admin.ict": [...ADMIN_ROLES, "ict_admin"],
 
   // Platform
   platform: PLATFORM_ROLES,
