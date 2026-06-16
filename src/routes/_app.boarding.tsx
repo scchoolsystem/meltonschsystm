@@ -306,7 +306,7 @@ function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", dormitory_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from("dorm_assignments").insert(f); if (error) throw error; },
+    mutationFn: async () => { const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? Number(f.bed_no) : null }); if (error) throw error; },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
   return (
