@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { redeemParentCode, autoLinkParent } from "@/lib/parent-link.functions";
 import { toast } from "sonner";
+import { Bus, Heart, Bed, DoorOpen, ClipboardList, Award } from "lucide-react";
+
+const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export const Route = createFileRoute("/_app/portal/parent")({
   component: ParentPortal,
@@ -47,7 +50,7 @@ function ParentPortal() {
       const classId = stu?.classes?.id ?? null;
       const since = new Date(Date.now() - 7 * 864e5).toISOString();
       const until = new Date(Date.now() + 14 * 864e5).toISOString();
-      const [a, r, i, lu, la, dr] = await Promise.all([
+      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt] = await Promise.all([
         supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(30),
         supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(50),
         supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }),
@@ -56,8 +59,19 @@ function ParentPortal() {
           : Promise.resolve({ data: [] } as any),
         (supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30),
         supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20),
+        (supabase as any).from("transport_assignments").select("*, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, pickup_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20),
+        supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20),
+        (supabase as any).from("student_co_curricular").select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)").eq("student_id", activeId),
+        classId
+          ? supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time")
+          : Promise.resolve({ data: [] } as any),
       ]);
-      setData({ attendance: a.data ?? [], results: r.data ?? [], invoices: i.data ?? [], liveUpcoming: lu.data ?? [], liveAttendance: la.data ?? [], discipline: dr.data ?? [] });
+      setData({
+        attendance: a.data ?? [], results: r.data ?? [], invoices: i.data ?? [], liveUpcoming: lu.data ?? [], liveAttendance: la.data ?? [], discipline: dr.data ?? [],
+        transport: (tr as any).data ?? null, clinic: cv.data ?? [], dorm: (da as any).data ?? null, gatePasses: gp.data ?? [], coCurricular: (cc as any).data ?? [], timetable: (tt as any).data ?? [],
+      });
     })();
   }, [activeId, children]);
 
@@ -68,6 +82,14 @@ function ParentPortal() {
   const totalDue = data.invoices.reduce((s: number, i: any) => s + Number(i.amount) - Number(i.paid), 0);
   const present = data.attendance.filter((a: any) => a.status === "present").length;
   const attRate = data.attendance.length ? Math.round((present / data.attendance.length) * 100) : 0;
+
+  const reportCardExams = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const r of (data.results ?? [])) {
+      if (r.exams && r.exam_id) map.set(r.exam_id, r.exams);
+    }
+    return Array.from(map.entries()).map(([id, exam]) => ({ id, ...exam }));
+  }, [data.results]);
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -92,13 +114,22 @@ function ParentPortal() {
         <StatCard label="Class" value={active?.classes?.name ?? "—"} />
         <StatCard label="Attendance" value={`${attRate}%`} hint={`${present}/${data.attendance.length} days`} />
         <StatCard label="Outstanding Fees" value={`KES ${totalDue.toLocaleString()}`} hint={`${data.invoices.length} invoice(s)`} />
+        {data.dorm?.dormitories?.name && <StatCard label="Dorm" value={data.dorm.dormitories.name} hint={data.dorm.bed_no ? `Bed ${data.dorm.bed_no}` : undefined} />}
+        {data.transport?.transport_routes?.name && <StatCard label="Transport Route" value={data.transport.transport_routes.name} />}
       </div>
 
       <Tabs defaultValue="results">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="results">Results</TabsTrigger>
+          <TabsTrigger value="reportcards">Report Cards</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
+          <TabsTrigger value="timetable">Timetable</TabsTrigger>
+          <TabsTrigger value="transport">Transport</TabsTrigger>
+          <TabsTrigger value="clinic">Clinic</TabsTrigger>
+          <TabsTrigger value="boarding">Boarding</TabsTrigger>
+          <TabsTrigger value="gate">Gate Passes</TabsTrigger>
+          <TabsTrigger value="cocurricular">Co-curricular</TabsTrigger>
           <TabsTrigger value="live">Live Classes</TabsTrigger>
           <TabsTrigger value="discipline">Discipline</TabsTrigger>
           <TabsTrigger value="news">School News</TabsTrigger>
@@ -122,7 +153,24 @@ function ParentPortal() {
           </CardContent></Card>
         </TabsContent>
 
-        <TabsContent value="attendance">
+        <TabsContent value="reportcards">
+          <Card><CardContent className="pt-6 space-y-2">
+            {reportCardExams.length === 0 && <p className="text-sm text-muted-foreground">No report cards available yet.</p>}
+            {reportCardExams.map((e: any) => (
+              <div key={e.id} className="flex items-center justify-between border-b py-2">
+                <div>
+                  <div className="font-medium">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">{e.term} {e.year}</div>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/academics/report-card/$studentId/$examId" params={{ studentId: activeId, examId: e.id }}>
+                    <ClipboardList className="w-4 h-4 mr-1" /> Open Report Card
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent></Card>
+        </TabsContent>
           <Card><CardContent className="pt-6 space-y-1">
             {data.attendance.length === 0 && <p className="text-sm text-muted-foreground">No records.</p>}
             {data.attendance.map((a: any) => (
@@ -149,6 +197,119 @@ function ParentPortal() {
                 </div>
               </div>
             ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="timetable">
+          <Card><CardContent className="pt-6">
+            {(data.timetable ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No timetable published for this class yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((dow) => {
+                  const slots = (data.timetable ?? []).filter((s: any) => s.day_of_week === dow);
+                  if (slots.length === 0) return null;
+                  return (
+                    <div key={dow}>
+                      <div className="text-sm font-semibold mb-1">{DAYS[dow]}</div>
+                      <div className="space-y-1">
+                        {slots.map((s: any) => (
+                          <div key={s.id} className="flex justify-between border-b py-1 text-sm">
+                            <span className="font-mono text-xs text-muted-foreground w-24">{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</span>
+                            <span className="flex-1">{s.subjects?.name}</span>
+                            <span className="text-xs text-muted-foreground">{s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="transport">
+          <Card><CardContent className="pt-6">
+            {!data.transport ? (
+              <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Bus className="w-4 h-4" /> No transport route assigned.</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-base font-medium"><Bus className="w-4 h-4" /> {data.transport.transport_routes?.name ?? "Route"}</div>
+                <div><span className="text-muted-foreground">Pickup point:</span> {data.transport.pickup_point ?? data.transport.transport_routes?.pickup_point ?? "—"}</div>
+                <div><span className="text-muted-foreground">Driver:</span> {data.transport.transport_routes?.driver_name ?? "—"} {data.transport.transport_routes?.driver_phone ? `· ${data.transport.transport_routes.driver_phone}` : ""}</div>
+                <div><span className="text-muted-foreground">Monthly fee:</span> KES {Number(data.transport.transport_routes?.monthly_fee ?? 0).toLocaleString()}</div>
+              </div>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="clinic">
+          <Card><CardContent className="pt-6 space-y-2">
+            {(data.clinic ?? []).length === 0 && <p className="text-sm text-muted-foreground">No clinic visits.</p>}
+            {(data.clinic ?? []).map((c: any) => (
+              <div key={c.id} className="border-b py-2">
+                <div className="flex justify-between">
+                  <div className="font-medium inline-flex items-center gap-1"><Heart className="w-3 h-3" /> {c.visit_date}</div>
+                  {c.referred_to && <Badge variant="outline">Referred: {c.referred_to}</Badge>}
+                </div>
+                <div className="text-sm mt-1"><span className="text-muted-foreground">Symptoms:</span> {c.symptoms}</div>
+                {c.diagnosis && <div className="text-sm"><span className="text-muted-foreground">Diagnosis:</span> {c.diagnosis}</div>}
+                {c.treatment && <div className="text-sm"><span className="text-muted-foreground">Treatment:</span> {c.treatment}</div>}
+              </div>
+            ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="boarding">
+          <Card><CardContent className="pt-6">
+            {!data.dorm ? (
+              <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Bed className="w-4 h-4" /> Not assigned to a dormitory.</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-base font-medium"><Bed className="w-4 h-4" /> {data.dorm.dormitories?.name ?? "Dorm"}</div>
+                <div><span className="text-muted-foreground">Bed number:</span> {data.dorm.bed_no ?? "—"}</div>
+                <div><span className="text-muted-foreground">Assigned on:</span> {data.dorm.assigned_on ?? "—"}</div>
+              </div>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="gate">
+          <Card><CardContent className="pt-6 space-y-2">
+            {(data.gatePasses ?? []).length === 0 && <p className="text-sm text-muted-foreground">No gate passes on record.</p>}
+            {(data.gatePasses ?? []).map((g: any) => (
+              <div key={g.id} className="border-b py-2">
+                <div className="flex justify-between">
+                  <div className="font-medium inline-flex items-center gap-1"><DoorOpen className="w-3 h-3" /> {g.reason}</div>
+                  <Badge variant={g.status === "out" ? "destructive" : "default"}>{g.status}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Out: {g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}
+                  {g.return_time && ` · Back: ${new Date(g.return_time).toLocaleString()}`}
+                </div>
+              </div>
+            ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="cocurricular">
+          <Card><CardContent className="pt-6 space-y-2">
+            {(data.coCurricular ?? []).length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any co-curricular activities.</p>}
+            {(data.coCurricular ?? []).map((c: any) => {
+              const a = c.co_curricular_activities;
+              return (
+                <div key={c.id} className="border-b py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium inline-flex items-center gap-1"><Award className="w-3 h-3" /> {a?.name ?? "—"}</div>
+                    {a?.category && <Badge variant="outline">{a.category}</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {a?.schedule_day != null ? `${DAYS[a.schedule_day]} ` : ""}{a?.schedule_time ?? ""}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent></Card>
         </TabsContent>
 

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CalendarDays, BookOpen, ClipboardList, Megaphone, Users,
-  Mail, Phone, Building2, IdCard, Loader2,
+  Mail, Phone, Building2, IdCard, Loader2, CheckCircle2, AlertCircle, XCircle,
 } from "lucide-react";
 
 function PayslipsTab({ staffId }: { staffId?: string }) {
@@ -90,10 +90,10 @@ function MyWorkspace() {
 
       const [
         myClasses, todayTT, weekTT, subjects, activities,
-        recentMarks, recentAttendance, announcements,
+        recentMarks, recentAttendance, announcements, activeExams,
       ] = await Promise.all([
         staffId
-          ? supabase.from("classes").select("id, name, year, students(count)").eq("class_teacher_id", staffId)
+          ? supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId)
           : Promise.resolve({ data: [] }),
         staffId
           ? supabase.from("timetable_slots")
@@ -107,7 +107,7 @@ function MyWorkspace() {
           : Promise.resolve({ data: [] }),
         staffId
           ? supabase.from("teacher_subjects")
-              .select("subjects(name), classes(name)").eq("staff_id", staffId)
+              .select("subject_id, subjects(id, name)").eq("staff_id", staffId)
           : Promise.resolve({ data: [] }),
         staffId
           ? supabase.from("staff_co_curricular")
@@ -121,19 +121,63 @@ function MyWorkspace() {
           .eq("recorded_by", uid).gte("date", todayStr).limit(20),
         supabase.from("announcements")
           .select("id, title, body, pinned, created_at")
-          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(8),
+          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20),
+        supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }),
       ]);
+
+      const myClassesData = myClasses.data ?? [];
+      const classIds = myClassesData.map((c: any) => c.id);
+      const totalStudentsCount = myClassesData.reduce((s: number, c: any) => s + (c.students?.[0]?.count ?? 0), 0);
+
+      // Today's attendance summary, per class
+      const classAttendance = classIds.length
+        ? (await supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr)).data ?? []
+        : [];
+      const attendanceSummary = myClassesData.map((c: any) => {
+        const recs = classAttendance.filter((r: any) => r.class_id === c.id);
+        return {
+          classId: c.id,
+          className: c.name,
+          total: c.students?.[0]?.count ?? 0,
+          present: recs.filter((r: any) => r.status === "present").length,
+          absent: recs.filter((r: any) => r.status === "absent").length,
+          late: recs.filter((r: any) => r.status === "late").length,
+        };
+      });
+
+      // Pending marks: for each (subject, exam) combo, count results entered
+      const mySubjects = subjects.data ?? [];
+      const exams = activeExams.data ?? [];
+      const pendingMarks: any[] = [];
+      for (const exam of exams) {
+        for (const ts of mySubjects) {
+          const subjectId = ts.subject_id;
+          if (!subjectId) continue;
+          const { count } = await supabase
+            .from("exam_results")
+            .select("id", { count: "exact", head: true })
+            .eq("exam_id", exam.id)
+            .eq("subject_id", subjectId);
+          let status = "No results";
+          if ((count ?? 0) > 0) status = (count ?? 0) >= totalStudentsCount && totalStudentsCount > 0 ? "Complete" : "Partial";
+          pendingMarks.push({
+            examId: exam.id, examName: exam.name, subjectId, subjectName: (ts as any).subjects?.name ?? "—", status,
+          });
+        }
+      }
 
       return {
         staff,
-        myClasses: myClasses.data ?? [],
+        myClasses: myClassesData,
         todayTT: todayTT.data ?? [],
         weekTT: weekTT.data ?? [],
-        subjects: subjects.data ?? [],
+        subjects: mySubjects,
         activities: activities.data ?? [],
         recentMarks: recentMarks.data ?? [],
         recentAttendance: recentAttendance.data ?? [],
         announcements: announcements.data ?? [],
+        attendanceSummary,
+        pendingMarks,
       };
     },
   });
@@ -211,13 +255,16 @@ function MyWorkspace() {
       </div>
 
       <Tabs defaultValue="day">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="day">My day</TabsTrigger>
-          <TabsTrigger value="timetable">Timetable</TabsTrigger>
+          <TabsTrigger value="myclasses">My Classes</TabsTrigger>
+          <TabsTrigger value="timetable">My Timetable</TabsTrigger>
           <TabsTrigger value="classes">Classes & subjects</TabsTrigger>
+          <TabsTrigger value="pending">Pending Marks</TabsTrigger>
+          <TabsTrigger value="attendance">Attendance Summary</TabsTrigger>
           <TabsTrigger value="activity">My activity</TabsTrigger>
           <TabsTrigger value="payslips">Payslips</TabsTrigger>
-          <TabsTrigger value="news">News</TabsTrigger>
+          <TabsTrigger value="news">Announcements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="day" className="space-y-3">
@@ -229,6 +276,23 @@ function MyWorkspace() {
                   <span className="font-mono text-xs text-muted-foreground w-24">{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</span>
                   <span className="flex-1 truncate">{s.subjects?.name ?? "—"} · {s.classes?.name ?? "—"}</span>
                   <span className="text-xs text-muted-foreground">{s.room ?? ""}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="myclasses">
+          <Card><CardHeader><CardTitle className="text-base">My classes</CardTitle></CardHeader>
+            <CardContent className="space-y-1">
+              {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
+              {data?.myClasses.map((c: any) => (
+                <div key={c.id} className="flex items-center justify-between border-b py-2 text-sm">
+                  <div>
+                    <div className="font-medium">{c.name}</div>
+                    <div className="text-xs text-muted-foreground">{c.level ?? "—"}{c.stream ? ` · ${c.stream}` : ""}</div>
+                  </div>
+                  <Badge variant="secondary">{c.students?.[0]?.count ?? 0} students</Badge>
                 </div>
               ))}
             </CardContent>
@@ -289,6 +353,48 @@ function MyWorkspace() {
                 <div key={`a-${i}`} className="text-sm flex justify-between border-b py-1">
                   <span>{a.co_curricular_activities?.name ?? "—"}</span>
                   <Badge variant="outline" className="text-[10px]">{a.role ?? a.co_curricular_activities?.category}</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pending">
+          <Card><CardHeader><CardTitle className="text-base">Pending marks entry</CardTitle><CardDescription>Subject + exam combinations awaiting results for your subjects.</CardDescription></CardHeader>
+            <CardContent className="space-y-1">
+              {(data?.pendingMarks ?? []).length === 0 && <Empty>No active exams or assigned subjects.</Empty>}
+              {data?.pendingMarks.map((p: any, i: number) => (
+                <div key={i} className="flex items-center justify-between border-b py-2 text-sm">
+                  <div>
+                    <div className="font-medium">{p.subjectName}</div>
+                    <div className="text-xs text-muted-foreground">{p.examName}</div>
+                  </div>
+                  <Badge
+                    variant={p.status === "Complete" ? "default" : p.status === "Partial" ? "secondary" : "destructive"}
+                    className="inline-flex items-center gap-1"
+                  >
+                    {p.status === "Complete" ? <CheckCircle2 className="w-3 h-3" /> : p.status === "Partial" ? <AlertCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                    {p.status}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          <Card><CardHeader><CardTitle className="text-base">Today's attendance — my classes</CardTitle></CardHeader>
+            <CardContent className="space-y-1">
+              {(data?.attendanceSummary ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
+              {data?.attendanceSummary.map((s: any) => (
+                <div key={s.classId} className="flex items-center justify-between border-b py-2 text-sm">
+                  <div className="font-medium">{s.className}</div>
+                  <div className="flex gap-2 text-xs">
+                    <Badge variant="outline">{s.total} total</Badge>
+                    <Badge variant="default">{s.present} present</Badge>
+                    <Badge variant="destructive">{s.absent} absent</Badge>
+                    <Badge variant="secondary">{s.late} late</Badge>
+                  </div>
                 </div>
               ))}
             </CardContent>

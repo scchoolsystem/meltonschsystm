@@ -56,8 +56,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Loader2, Pencil, Trash2, UserPlus, UserMinus, Users, Trophy } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, UserPlus, UserMinus, Users, Trophy, Calendar, Award } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 export const Route = createFileRoute("/_app/cocurricular")({
   component: CoCurricularPage,
@@ -110,55 +111,73 @@ function CoCurricularPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity list */}
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
-            Activities ({(activities as any[]).length})
-          </p>
-          {isLoading && (
-            <div className="flex items-center gap-2 text-muted-foreground p-4">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-            </div>
-          )}
-          {!isLoading && (activities as any[]).length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                No activities yet. {canEdit && "Create one to get started."}
-              </CardContent>
-            </Card>
-          )}
-          {(activities as any[]).map((act) => (
-            <ActivityCard
-              key={act.id}
-              activity={act}
-              selected={selectedActivityId === act.id}
-              canEdit={canEdit}
-              onSelect={() =>
-                setSelectedActivityId(act.id === selectedActivityId ? null : act.id)
-              }
-            />
-          ))}
-        </div>
+      <Tabs defaultValue="activities">
+        <TabsList>
+          <TabsTrigger value="activities">Activities</TabsTrigger>
+          <TabsTrigger value="fixtures"><Calendar className="w-3.5 h-3.5 mr-1" />Fixtures</TabsTrigger>
+          <TabsTrigger value="achievements"><Award className="w-3.5 h-3.5 mr-1" />Achievements</TabsTrigger>
+        </TabsList>
 
-        {/* Detail panel */}
-        <div className="lg:col-span-2">
-          {!selectedActivity ? (
-            <Card>
-              <CardContent className="py-16 text-center text-muted-foreground text-sm">
-                <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                Select an activity to view coaches and enrolled students
-              </CardContent>
-            </Card>
-          ) : (
-            <ActivityDetail
-              activity={selectedActivity}
-              canManage={canManage}
-              canEdit={canEdit}
-            />
-          )}
-        </div>
-      </div>
+        <TabsContent value="activities">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Activity list */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+                Activities ({(activities as any[]).length})
+              </p>
+              {isLoading && (
+                <div className="flex items-center gap-2 text-muted-foreground p-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                </div>
+              )}
+              {!isLoading && (activities as any[]).length === 0 && (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                    No activities yet. {canEdit && "Create one to get started."}
+                  </CardContent>
+                </Card>
+              )}
+              {(activities as any[]).map((act) => (
+                <ActivityCard
+                  key={act.id}
+                  activity={act}
+                  selected={selectedActivityId === act.id}
+                  canEdit={canEdit}
+                  onSelect={() =>
+                    setSelectedActivityId(act.id === selectedActivityId ? null : act.id)
+                  }
+                />
+              ))}
+            </div>
+
+            {/* Detail panel */}
+            <div className="lg:col-span-2">
+              {!selectedActivity ? (
+                <Card>
+                  <CardContent className="py-16 text-center text-muted-foreground text-sm">
+                    <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    Select an activity to view coaches and enrolled students
+                  </CardContent>
+                </Card>
+              ) : (
+                <ActivityDetail
+                  activity={selectedActivity}
+                  canManage={canManage}
+                  canEdit={canEdit}
+                />
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="fixtures">
+          <FixturesTab can={canManage} />
+        </TabsContent>
+
+        <TabsContent value="achievements">
+          <AchievementsTab can={canManage} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -799,6 +818,158 @@ function EnrolStudentDialog({
           Enrol
         </Button>
       </DialogFooter>
+    </DialogContent>
+  );
+}
+
+// ============================================================
+// ADDITIONS: Fixtures + Achievements tabs appended to existing file
+// These are imported as named exports and wired into the page
+// by replacing the existing Tabs section below.
+// ============================================================
+export function FixturesTab({ can }: { can: boolean }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const { data: activities = [] } = useQuery({ queryKey: ["co-curricular-activities-min"], queryFn: async () => (await supabase.from("co_curricular_activities").select("id,name").order("name")).data ?? [] });
+  const { data: fixtures = [], isLoading } = useQuery({
+    queryKey: ["sports-fixtures"],
+    queryFn: async () => (await supabase.from("sports_fixtures").select("*, co_curricular_activities(name)").order("fixture_date", { ascending: false }).limit(100)).data ?? [],
+  });
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        {can && <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-2" />Add Fixture</Button></DialogTrigger>
+          <FixtureDialog activities={activities as any[]} onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["sports-fixtures"] }); }} />
+        </Dialog>}
+      </div>
+      <Card><CardContent className="pt-4">
+        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Activity</TableHead><TableHead>Opponent/Event</TableHead><TableHead>Date</TableHead><TableHead>Venue</TableHead><TableHead>Result</TableHead><TableHead>Notes</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(fixtures as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No fixtures yet.</TableCell></TableRow>}
+              {(fixtures as any[]).map((f: any) => (
+                <TableRow key={f.id}>
+                  <TableCell>{f.co_curricular_activities?.name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{f.opponent}</TableCell>
+                  <TableCell>{f.fixture_date}</TableCell>
+                  <TableCell>{f.venue ?? "—"}</TableCell>
+                  <TableCell><Badge variant={f.result === "win" ? "default" : f.result === "loss" ? "destructive" : f.result === "draw" ? "secondary" : "outline"}>{f.result}</Badge></TableCell>
+                  <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">{f.notes ?? ""}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
+    </div>
+  );
+}
+
+export function AchievementsTab({ can }: { can: boolean }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const { data: activities = [] } = useQuery({ queryKey: ["co-curricular-activities-min-ach"], queryFn: async () => (await supabase.from("co_curricular_activities").select("id,name").order("name")).data ?? [] });
+  const { data: achievements = [], isLoading } = useQuery({
+    queryKey: ["sports-achievements"],
+    queryFn: async () => (await supabase.from("sports_achievements").select("*, students(first_name,last_name,admission_no), co_curricular_activities(name)").order("achievement_date", { ascending: false }).limit(100)).data ?? [],
+  });
+  return (
+    <div>
+      <div className="flex justify-end mb-4">
+        {can && <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-2" />Log Achievement</Button></DialogTrigger>
+          <AchievementDialog activities={activities as any[]} onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["sports-achievements"] }); }} />
+        </Dialog>}
+      </div>
+      <Card><CardContent className="pt-4">
+        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Activity</TableHead><TableHead>Description</TableHead><TableHead>Level</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(achievements as any[]).length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No achievements logged yet.</TableCell></TableRow>}
+              {(achievements as any[]).map((a: any) => (
+                <TableRow key={a.id}>
+                  <TableCell className="font-medium">{a.students?.first_name} {a.students?.last_name}<div className="text-xs text-muted-foreground">{a.students?.admission_no}</div></TableCell>
+                  <TableCell>{a.co_curricular_activities?.name ?? "—"}</TableCell>
+                  <TableCell className="max-w-[200px]">{a.description}</TableCell>
+                  <TableCell><Badge variant={a.award_level === "national" || a.award_level === "international" ? "default" : "secondary"} className="capitalize">{a.award_level}</Badge></TableCell>
+                  <TableCell>{a.achievement_date}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
+    </div>
+  );
+}
+
+function FixtureDialog({ activities, onDone }: { activities: any[]; onDone: () => void }) {
+  const [f, setF] = useState({ activity_id: "", opponent: "", fixture_date: "", venue: "", result: "TBD", notes: "" });
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("sports_fixtures").insert(f);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Fixture added"); onDone(); }, onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent><DialogHeader><DialogTitle>Add Fixture</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div><Label>Activity</Label>
+          <Select value={f.activity_id} onValueChange={v => setF(p => ({ ...p, activity_id: v }))}><SelectTrigger><SelectValue placeholder="Choose activity" /></SelectTrigger>
+            <SelectContent>{activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div><Label>Opponent / Event *</Label><Input required value={f.opponent} onChange={e => setF(p => ({ ...p, opponent: e.target.value }))} /></div>
+        <div><Label>Date *</Label><Input required type="date" value={f.fixture_date} onChange={e => setF(p => ({ ...p, fixture_date: e.target.value }))} /></div>
+        <div><Label>Venue</Label><Input value={f.venue} onChange={e => setF(p => ({ ...p, venue: e.target.value }))} /></div>
+        <div><Label>Result</Label>
+          <Select value={f.result} onValueChange={v => setF(p => ({ ...p, result: v }))}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="TBD">TBD</SelectItem><SelectItem value="win">Win</SelectItem><SelectItem value="draw">Draw</SelectItem><SelectItem value="loss">Loss</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <div><Label>Notes</Label><Input value={f.notes} onChange={e => setF(p => ({ ...p, notes: e.target.value }))} /></div>
+        <DialogFooter><Button type="submit" disabled={m.isPending || !f.activity_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+function AchievementDialog({ activities, onDone }: { activities: any[]; onDone: () => void }) {
+  const [f, setF] = useState({ student_id: "", activity_id: "", description: "", award_level: "school", achievement_date: format(new Date(), "yyyy-MM-dd") });
+  const { data: students = [] } = useQuery({ queryKey: ["students-min-ach"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const m = useMutation({
+    mutationFn: async () => {
+      const payload: any = { ...f };
+      if (!payload.activity_id) delete payload.activity_id;
+      const { error } = await supabase.from("sports_achievements").insert(payload);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Achievement logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent><DialogHeader><DialogTitle>Log Achievement</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div><Label>Student</Label>
+          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
+            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div><Label>Activity</Label>
+          <Select value={f.activity_id} onValueChange={v => setF(p => ({ ...p, activity_id: v }))}><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+            <SelectContent>{activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div><Label>Description *</Label><Input required value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))} /></div>
+        <div><Label>Award Level</Label>
+          <Select value={f.award_level} onValueChange={v => setF(p => ({ ...p, award_level: v }))}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="school">School</SelectItem><SelectItem value="county">County</SelectItem><SelectItem value="national">National</SelectItem><SelectItem value="international">International</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <div><Label>Date</Label><Input type="date" value={f.achievement_date} onChange={e => setF(p => ({ ...p, achievement_date: e.target.value }))} /></div>
+        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
+      </form>
     </DialogContent>
   );
 }

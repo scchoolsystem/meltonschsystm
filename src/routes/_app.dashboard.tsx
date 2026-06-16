@@ -22,6 +22,16 @@ import {
   BoardingOccupancyWidget,
   SecurityRecentLogsWidget,
   PlatformTenantsWidget,
+  AdminAttendanceTodayWidget,
+  AdminPendingActionsWidget,
+  AdminNewStudentsThisWeekWidget,
+  AdminOverdueFeesWidget,
+  TransportRouteSummaryWidget,
+  KitchenTodaySummaryWidget,
+  SportsSummaryWidget,
+  IctFeatureFlagsWidget,
+  IctActiveUsersWidget,
+  IctSupportTicketsWidget,
 } from "@/components/dashboard/widgets";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -57,6 +67,16 @@ const WIDGETS: Record<DashboardWidgetKey, React.ComponentType> = {
   "boarding.occupancy": BoardingOccupancyWidget,
   "security.recentLogs": SecurityRecentLogsWidget,
   "platform.tenants": PlatformTenantsWidget,
+  "admin.attendanceToday": AdminAttendanceTodayWidget,
+  "admin.pendingActions": AdminPendingActionsWidget,
+  "admin.newStudentsThisWeek": AdminNewStudentsThisWeekWidget,
+  "admin.overdueFees": AdminOverdueFeesWidget,
+  "transport.routeSummary": TransportRouteSummaryWidget,
+  "kitchen.todaySummary": KitchenTodaySummaryWidget,
+  "sports.summary": SportsSummaryWidget,
+  "ict.featureFlags": IctFeatureFlagsWidget,
+  "ict.activeUsers": IctActiveUsersWidget,
+  "ict.supportTickets": IctSupportTicketsWidget,
 };
 
 function Dashboard() {
@@ -70,6 +90,12 @@ function Dashboard() {
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         <Header greeting={greeting} fullName={fullName} roles={roles} />
         <AdminKpisWidget />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <AdminAttendanceTodayWidget />
+          <AdminPendingActionsWidget />
+          <AdminNewStudentsThisWeekWidget />
+          <AdminOverdueFeesWidget />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <AdminStudentsPerClassWidget />
           <AdminSchoolStructureWidget />

@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
-import { Calendar, Clock, MapPin, User, GraduationCap, Heart, Bed, DoorOpen, Video, FileText, ExternalLink, Bus } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, Clock, MapPin, User, GraduationCap, Heart, Bed, DoorOpen, Video, FileText, ExternalLink, Bus, Utensils, Award, ClipboardList } from "lucide-react";
+import { format, startOfWeek, endOfWeek } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
 import { AttendanceHeatmap } from "@/components/AttendanceHeatmap";
 
@@ -35,6 +35,9 @@ function StudentPortal() {
   const [liveAttendance, setLiveAttendance] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [transport, setTransport] = useState<any | null>(null);
+  const [weekMeals, setWeekMeals] = useState<any[]>([]);
+  const [coCurricular, setCoCurricular] = useState<any[]>([]);
+  const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,6 +123,49 @@ function StudentPortal() {
         .maybeSingle();
       setTransport(tr ?? null);
 
+      // Meal plans for this week
+      const today0 = new Date();
+      const weekStart = format(startOfWeek(today0, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const weekEnd = format(endOfWeek(today0, { weekStartsOn: 1 }), "yyyy-MM-dd");
+      const { data: meals } = await supabase
+        .from("meal_plans")
+        .select("*")
+        .gte("meal_date", weekStart)
+        .lte("meal_date", weekEnd)
+        .order("meal_date")
+        .order("meal_type");
+      setWeekMeals(meals ?? []);
+
+      // Co-curricular activities for this student
+      const { data: cc } = await (supabase as any)
+        .from("student_co_curricular")
+        .select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)")
+        .eq("student_id", sid);
+      const ccList = cc ?? [];
+      const activityIds = ccList.map((c: any) => c.co_curricular_activities?.id).filter(Boolean);
+      let coaches: any[] = [];
+      if (activityIds.length) {
+        const { data: cd } = await (supabase as any)
+          .from("staff_co_curricular")
+          .select("activity_id, role, staff(first_name, last_name)")
+          .in("activity_id", activityIds);
+        coaches = cd ?? [];
+      }
+      setCoCurricular(ccList.map((c: any) => ({
+        ...c,
+        coach: coaches.find((co: any) => co.activity_id === c.co_curricular_activities?.id),
+      })));
+
+      // Next exam
+      const { data: ne } = await supabase
+        .from("exams")
+        .select("*")
+        .gte("start_date", format(today0, "yyyy-MM-dd"))
+        .order("start_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      setNextExam(ne ?? null);
+
       setLoading(false);
     })();
   }, [user]);
@@ -139,7 +185,19 @@ function StudentPortal() {
     return todaySlots.find((s) => toMin(s.end_time) > nowMin) ?? null;
   }, [todaySlots, nowMin]);
 
-  if (loading) return <div className="p-6 text-muted-foreground">Loading your portal…</div>;
+  const todayStr = format(today, "yyyy-MM-dd");
+  const todayMeals = useMemo(() => weekMeals.filter((m) => m.meal_date === todayStr), [weekMeals, todayStr]);
+  const mealFor = (type: string) => todayMeals.find((m) => m.meal_type === type);
+
+  const reportCardExams = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const r of results) {
+      if (r.exams && r.exam_id) map.set(r.exam_id, r.exams);
+    }
+    return Array.from(map.entries()).map(([id, exam]) => ({ id, ...exam }));
+  }, [results]);
+
+
   if (!student) return (
     <div className="p-6">
       <Card><CardContent className="py-12 text-center text-muted-foreground">
@@ -200,8 +258,11 @@ function StudentPortal() {
           <TabsTrigger value="today">My Day</TabsTrigger>
           <TabsTrigger value="timetable">Timetable</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
+          <TabsTrigger value="reportcards">Report Cards</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="fees">Fees</TabsTrigger>
+          <TabsTrigger value="meals">Meals</TabsTrigger>
+          <TabsTrigger value="cocurricular">Co-curricular</TabsTrigger>
           <TabsTrigger value="library">Library</TabsTrigger>
           <TabsTrigger value="discipline">Discipline</TabsTrigger>
           <TabsTrigger value="clinic">Clinic</TabsTrigger>
@@ -240,6 +301,35 @@ function StudentPortal() {
               })}
             </CardContent>
           </Card>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><Utensils className="w-4 h-4" /> Today's meals</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(["breakfast", "lunch", "dinner"] as const).map((type) => {
+                const m = mealFor(type);
+                return (
+                  <div key={type} className="border rounded-md p-3">
+                    <div className="text-xs uppercase text-muted-foreground">{type}</div>
+                    <div className="text-sm mt-1">{m?.menu ?? "Not posted yet"}</div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {nextExam && (
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="w-4 h-4" /> Next exam</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="font-medium">{nextExam.name}</div>
+                <div className="text-xs text-muted-foreground">{nextExam.term} {nextExam.year} · starts {nextExam.start_date}</div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="timetable">
@@ -288,6 +378,75 @@ function StudentPortal() {
                 </div>
               </div>
             ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="reportcards">
+          <Card><CardContent className="pt-6 space-y-2">
+            {reportCardExams.length === 0 && <p className="text-sm text-muted-foreground">No report cards available yet.</p>}
+            {reportCardExams.map((e) => (
+              <div key={e.id} className="flex items-center justify-between border-b py-2">
+                <div>
+                  <div className="font-medium">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">{e.term} {e.year}</div>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/academics/report-card/$studentId/$examId" params={{ studentId: student.id, examId: e.id }}>
+                    <ClipboardList className="w-4 h-4 mr-1" /> View Report Card
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="meals">
+          <Card><CardContent className="pt-6">
+            {weekMeals.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No meal plans posted for this week.</p>
+            ) : (
+              <div className="space-y-4">
+                {Array.from(new Set(weekMeals.map((m) => m.meal_date))).map((date) => (
+                  <div key={date}>
+                    <div className="text-sm font-semibold mb-1 flex items-center gap-2">
+                      {date}
+                      {date === todayStr && <Badge variant="secondary">Today</Badge>}
+                    </div>
+                    <div className="space-y-1">
+                      {weekMeals.filter((m) => m.meal_date === date).map((m) => (
+                        <div key={m.id} className="flex justify-between border-b py-1 text-sm">
+                          <span className="capitalize w-24 text-muted-foreground">{m.meal_type}</span>
+                          <span className="flex-1">{m.menu}</span>
+                          <span className="text-xs text-muted-foreground">{m.served_count != null ? `${m.served_count} served` : ""}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="cocurricular">
+          <Card><CardContent className="pt-6 space-y-2">
+            {coCurricular.length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any co-curricular activities.</p>}
+            {coCurricular.map((c: any) => {
+              const a = c.co_curricular_activities;
+              const coach = c.coach?.staff;
+              return (
+                <div key={c.id} className="border-b py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium inline-flex items-center gap-1"><Award className="w-3 h-3" /> {a?.name ?? "—"}</div>
+                    {a?.category && <Badge variant="outline">{a.category}</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {a?.schedule_day != null ? `${DAYS[a.schedule_day]} ` : ""}{a?.schedule_time ?? ""}
+                    {coach ? ` · Coach: ${coach.first_name} ${coach.last_name}` : ""}
+                  </div>
+                </div>
+              );
+            })}
           </CardContent></Card>
         </TabsContent>
 

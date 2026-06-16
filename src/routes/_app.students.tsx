@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Loader2, Download } from "lucide-react";
+import { Plus, Search, Loader2, Download, FileText, UserCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrackedDelete } from "@/hooks/useTrackedDelete";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { toast } from "sonner";
@@ -46,6 +47,8 @@ function StudentsPage() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
+  const isAdmissionOfficer = isAdmin || hasRole("admission_officer");
+  const REQUIRED_DOCS = ["birth_certificate", "report_form", "passport_photo"] as const;
   const deleteMutation = useTrackedDelete();
   const [schoolId, setSchoolId] = useState<string | null>(null);
   useEffect(() => { supabase.rpc("current_user_school").then(({ data }) => setSchoolId(data as string)); }, []);
@@ -96,6 +99,32 @@ function StudentsPage() {
   // Server-side search via `q` in queryKey; no client-side filter.
   const filtered = students;
 
+  const { data: pendingDocsList = [], isLoading: pendingLoading } = useQuery({
+    queryKey: ["students-pending-docs"],
+    enabled: isAdmissionOfficer,
+    queryFn: async () => {
+      const { data: allStudents } = await supabase.from("students").select("id, admission_no, first_name, last_name, status").eq("status", "active");
+      const ids = (allStudents ?? []).map((s: any) => s.id);
+      if (ids.length === 0) return [];
+      const { data: docs } = await supabase.from("student_documents").select("student_id, doc_type").in("student_id", ids);
+      return (allStudents ?? []).map((s: any) => {
+        const have = new Set((docs ?? []).filter((d: any) => d.student_id === s.id).map((d: any) => d.doc_type));
+        const missing = REQUIRED_DOCS.filter((d) => !have.has(d));
+        return { ...s, missing };
+      }).filter((s: any) => s.missing.length > 0);
+    },
+  });
+
+  const sinceDate = new Date(); sinceDate.setDate(sinceDate.getDate() - 30);
+  const { data: recentlyAdmitted = [], isLoading: recentLoading } = useQuery({
+    queryKey: ["students-recently-admitted"],
+    enabled: isAdmissionOfficer,
+    queryFn: async () => {
+      const { data } = await supabase.from("students").select("id, admission_no, first_name, last_name, created_at, classes(name)").gte("created_at", sinceDate.toISOString()).order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
   function exportCsv() {
     const rows = [
       ["Admission No", "Unique ID", "First Name", "Last Name", "Gender", "Class", "Status", "Parent Phone"],
@@ -129,7 +158,79 @@ function StudentsPage() {
         </div>
       </div>
 
-      <Card>
+      {isAdmissionOfficer ? (
+        <Tabs defaultValue="all">
+          <TabsList>
+            <TabsTrigger value="all">All Students</TabsTrigger>
+            <TabsTrigger value="pending"><FileText className="w-3.5 h-3.5 mr-1" />Pending Documents {pendingDocsList.length > 0 && <Badge variant="destructive" className="ml-2">{pendingDocsList.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="recent"><UserCheck className="w-3.5 h-3.5 mr-1" />Recently Admitted</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all">
+            <StudentsTableCard {...{ q, setQ, setPage, isLoading, filtered, canEdit, isAdmin, schoolId, deleteMutation, page, pageCount, totalCount }} />
+          </TabsContent>
+
+          <TabsContent value="pending">
+            <Card><CardContent className="pt-6">
+              {pendingLoading ? <Loader2 className="animate-spin mx-auto" /> : pendingDocsList.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">All active students have their required documents on file.</p>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Missing Documents</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {pendingDocsList.map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.first_name} {s.last_name}<div className="text-xs text-muted-foreground">{s.admission_no}</div></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {s.missing.map((m: string) => <Badge key={m} variant="outline" className="capitalize text-xs">{m.replace(/_/g, " ")}</Badge>)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button asChild size="sm" variant="outline">
+                            <a href={`/students/${s.id}/documents`}>Upload Documents</a>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent></Card>
+          </TabsContent>
+
+          <TabsContent value="recent">
+            <Card><CardContent className="pt-6">
+              {recentLoading ? <Loader2 className="animate-spin mx-auto" /> : recentlyAdmitted.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No students admitted in the last 30 days.</p>
+              ) : (
+                <Table>
+                  <TableHeader><TableRow><TableHead>Admission No</TableHead><TableHead>Name</TableHead><TableHead>Class</TableHead><TableHead>Admitted</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(recentlyAdmitted as any[]).map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-mono text-xs">{s.admission_no}</TableCell>
+                        <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
+                        <TableCell>{s.classes?.name ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent></Card>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <StudentsTableCard {...{ q, setQ, setPage, isLoading, filtered, canEdit, isAdmin, schoolId, deleteMutation, page, pageCount, totalCount }} />
+      )}
+    </div>
+  );
+}
+
+function StudentsTableCard({ q, setQ, setPage, isLoading, filtered, canEdit, isAdmin, schoolId, deleteMutation, page, pageCount, totalCount }: any) {
+  return (
+    <Card>
         <CardHeader>
           <div className="relative max-w-sm">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -196,7 +297,6 @@ function StudentsPage() {
           <Pager page={page} pageCount={pageCount} total={totalCount} onChange={setPage} />
         </CardContent>
       </Card>
-    </div>
   );
 }
 
