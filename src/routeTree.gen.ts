@@ -48,6 +48,7 @@ import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/em
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppStaffIdRouteImport } from './routes/_app.staff.$id'
+import { Route as AppStudentsIdRouteImport } from './routes/_app.students.$id'
 import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
 import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
 import { Route as AppPortalMeRouteImport } from './routes/_app.portal.me'
@@ -289,6 +290,11 @@ const AppStaffIdRoute = AppStaffIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => AppStaffRoute,
+} as any)
+const AppStudentsIdRoute = AppStudentsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppStudentsRoute,
 } as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
   id: '/portal/student',
@@ -557,7 +563,7 @@ export interface FileRoutesByFullPath {
   '/live': typeof AppLiveRouteWithChildren
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRouteWithChildren
-  '/students': typeof AppStudentsRoute
+  '/students': typeof AppStudentsRouteWithChildren
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -607,6 +613,7 @@ export interface FileRoutesByFullPath {
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
   '/staff/$id': typeof AppStaffIdRoute
+  '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -644,7 +651,7 @@ export interface FileRoutesByTo {
   '/live': typeof AppLiveRouteWithChildren
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRouteWithChildren
-  '/students': typeof AppStudentsRoute
+  '/students': typeof AppStudentsRouteWithChildren
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -694,6 +701,7 @@ export interface FileRoutesByTo {
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
   '/staff/$id': typeof AppStaffIdRoute
+  '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -733,7 +741,7 @@ export interface FileRoutesById {
   '/_app/live': typeof AppLiveRouteWithChildren
   '/_app/security': typeof AppSecurityRoute
   '/_app/staff': typeof AppStaffRouteWithChildren
-  '/_app/students': typeof AppStudentsRoute
+  '/_app/students': typeof AppStudentsRouteWithChildren
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
@@ -783,6 +791,7 @@ export interface FileRoutesById {
   '/_app/portal/parent': typeof AppPortalParentRoute
   '/_app/portal/student': typeof AppPortalStudentRoute
   '/_app/staff/$id': typeof AppStaffIdRoute
+  '/_app/students/$id': typeof AppStudentsIdRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
@@ -872,6 +881,7 @@ export interface FileRouteTypes {
     | '/portal/parent'
     | '/portal/student'
     | '/staff/$id'
+    | '/students/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -959,6 +969,7 @@ export interface FileRouteTypes {
     | '/portal/parent'
     | '/portal/student'
     | '/staff/$id'
+    | '/students/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -1047,6 +1058,7 @@ export interface FileRouteTypes {
     | '/_app/portal/parent'
     | '/_app/portal/student'
     | '/_app/staff/$id'
+    | '/_app/students/$id'
     | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
     | '/lovable/email/suppression'
@@ -1353,6 +1365,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/staff/$id'
       preLoaderRoute: typeof AppStaffIdRouteImport
       parentRoute: typeof AppStaffRoute
+    }
+    '/_app/students/$id': {
+      id: '/_app/students/$id'
+      path: '/$id'
+      fullPath: '/students/$id'
+      preLoaderRoute: typeof AppStudentsIdRouteImport
+      parentRoute: typeof AppStudentsRoute
     }
     '/_app/portal/student': {
       id: '/_app/portal/student'
@@ -1720,6 +1739,18 @@ const AppStaffRouteWithChildren = AppStaffRoute._addFileChildren(
   AppStaffRouteChildren,
 )
 
+interface AppStudentsRouteChildren {
+  AppStudentsIdRoute: typeof AppStudentsIdRoute
+}
+
+const AppStudentsRouteChildren: AppStudentsRouteChildren = {
+  AppStudentsIdRoute: AppStudentsIdRoute,
+}
+
+const AppStudentsRouteWithChildren = AppStudentsRoute._addFileChildren(
+  AppStudentsRouteChildren,
+)
+
 interface AppTimetableRouteChildren {
   AppTimetableGenerateRoute: typeof AppTimetableGenerateRoute
 }
@@ -1749,7 +1780,7 @@ interface AppRouteChildren {
   AppLiveRoute: typeof AppLiveRouteWithChildren
   AppSecurityRoute: typeof AppSecurityRoute
   AppStaffRoute: typeof AppStaffRouteWithChildren
-  AppStudentsRoute: typeof AppStudentsRoute
+  AppStudentsRoute: typeof AppStudentsRouteWithChildren
   AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
@@ -1813,7 +1844,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppLiveRoute: AppLiveRouteWithChildren,
   AppSecurityRoute: AppSecurityRoute,
   AppStaffRoute: AppStaffRouteWithChildren,
-  AppStudentsRoute: AppStudentsRoute,
+  AppStudentsRoute: AppStudentsRouteWithChildren,
   AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
