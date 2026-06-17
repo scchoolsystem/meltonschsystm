@@ -116,7 +116,7 @@ function StudentPortal() {
 
       const { data: tr } = await (supabase as any)
         .from("transport_assignments")
-        .select("*, transport_routes(name, pickup_point, dropoff_point, driver_name, driver_phone, vehicle_reg)")
+        .select("*, pickup_point, transport_routes(name, dropoff_point, driver_name, driver_phone, vehicle_reg, pickup_point)")
         .eq("student_id", sid)
         .order("assigned_on", { ascending: false })
         .limit(1)
@@ -570,7 +570,7 @@ function StudentPortal() {
             ) : (
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-base font-medium"><Bus className="w-4 h-4" /> {transport.transport_routes?.name ?? "Route"}</div>
-                <div><span className="text-muted-foreground">Pickup:</span> {transport.transport_routes?.pickup_point ?? "—"}</div>
+                <div><span className="text-muted-foreground">Pickup:</span> {transport.pickup_point ?? transport.transport_routes?.pickup_point ?? "—"}</div>
                 <div><span className="text-muted-foreground">Drop-off:</span> {transport.transport_routes?.dropoff_point ?? "—"}</div>
                 <div><span className="text-muted-foreground">Vehicle:</span> {transport.transport_routes?.vehicle_reg ?? "—"}</div>
                 <div><span className="text-muted-foreground">Driver:</span> {transport.transport_routes?.driver_name ?? "—"} {transport.transport_routes?.driver_phone ? `· ${transport.transport_routes.driver_phone}` : ""}</div>

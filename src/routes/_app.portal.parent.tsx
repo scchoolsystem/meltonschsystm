@@ -59,7 +59,7 @@ function ParentPortal() {
           : Promise.resolve({ data: [] } as any),
         (supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30),
         supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20),
-        (supabase as any).from("transport_assignments").select("*, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, pickup_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
+        (supabase as any).from("transport_assignments").select("*, pickup_point, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, dropoff_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20),
         supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20),
