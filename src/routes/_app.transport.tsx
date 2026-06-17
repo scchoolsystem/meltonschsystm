@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,7 +101,11 @@ function Page() {
                               <TableBody>
                                 {enrolled.map((a: any) => (
                                   <TableRow key={a.id}>
-                                    <TableCell>{a.students?.first_name} {a.students?.last_name}</TableCell>
+                                    <TableCell>
+                                      <Link to="/students/$id" params={{ id: a.students?.id }} className="hover:underline">
+                                        {a.students?.first_name} {a.students?.last_name}
+                                      </Link>
+                                    </TableCell>
                                     <TableCell className="text-muted-foreground">{a.students?.admission_no}</TableCell>
                                     <TableCell>{a.pickup_point ?? "—"}</TableCell>
                                     <TableCell>{a.students?.classes?.name ?? "—"}</TableCell>
@@ -129,11 +133,16 @@ function Page() {
                   {(assignments as any[]).length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No assignments yet.</TableCell></TableRow>}
                   {(assignments as any[]).map((a: any) => (
                     <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.students?.first_name} {a.students?.last_name}<div className="text-xs text-muted-foreground">{a.students?.admission_no}</div></TableCell>
+                      <TableCell className="font-medium">
+                        <Link to="/students/$id" params={{ id: a.students?.id }} className="hover:underline">
+                          {a.students?.first_name} {a.students?.last_name}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">{a.students?.admission_no}</div>
+                      </TableCell>
                       <TableCell>{a.transport_routes?.name ?? "—"}</TableCell>
                       <TableCell>{a.pickup_point ?? "—"}</TableCell>
                       <TableCell>KES {Number(a.transport_routes?.monthly_fee ?? 0).toLocaleString()}
-                        {Number(a.transport_routes?.monthly_fee ?? 0) > 0 && <div className="text-xs text-amber-600">Transport fee will be added to student's next invoice</div>}
+                        {Number(a.transport_routes?.monthly_fee ?? 0) > 0 && <div className="text-xs text-emerald-600">Invoiced automatically on assignment</div>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{a.assigned_on ?? "—"}</TableCell>
                     </TableRow>
@@ -239,7 +248,7 @@ function AssignDialog({ routes, onDone }: { routes: any[]; onDone: () => void })
             <SelectContent>{routes.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        {selectedRoute?.monthly_fee > 0 && <p className="text-xs text-amber-600">Transport fee will be added to student's next invoice</p>}
+        {selectedRoute?.monthly_fee > 0 && <p className="text-xs text-emerald-600">An invoice of KES {Number(selectedRoute.monthly_fee).toLocaleString()} will be created for this student automatically.</p>}
         <div><Label>Pickup Point</Label><Input value={f.pickup_point} onChange={e => setF(p => ({ ...p, pickup_point: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.route_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Assign</Button></DialogFooter>
       </form>
