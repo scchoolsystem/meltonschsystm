@@ -33,17 +33,35 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   profile: [],
 
   // Academics
-  students: [...ADMIN_ROLES, ...TEACHING_ROLES, "admission_officer"],
+  // Widened to match every role role-experience.ts gives a Students nav link to:
+  // matron, librarian, boarding staff, transport staff, sports staff,
+  // discipline_admin, and guidance_admin all link to /students.
+  students: [
+    ...ADMIN_ROLES, ...TEACHING_ROLES, "admission_officer",
+    "matron", "librarian", "library_admin", "library_user",
+    "boarding", "boarding_admin", "boarding_user",
+    "transport_admin", "transport_officer",
+    "sports", "sports_admin", "sports_user",
+    "discipline_admin", "guidance_admin",
+  ],
   staff: [...ADMIN_ROLES, "hod"],
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
-  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
+  // exams_admin also gets a Subjects link in their nav group.
+  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "student", "parent"],
   exams: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
   marks: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user"],
   results: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
   "report-cards": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master", "student", "parent"],
   attendance: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
-  analytics: [...ADMIN_ROLES, "academic_master"],
+  // Widened to match every role role-experience.ts gives an Analytics/Reports
+  // nav link to: bursar (+ finance aliases), discipline_admin, hod, exams_admin,
+  // guidance_admin.
+  analytics: [
+    ...ADMIN_ROLES, "academic_master", "exams_admin",
+    "bursar", "finance_admin", "finance_user",
+    "discipline_admin", "hod", "guidance_admin",
+  ],
 
   // Operations
   // Wave 2: parent allowed (RLS scopes to own children's invoices only).
@@ -52,7 +70,8 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   library: [...ADMIN_ROLES, "librarian", "library_admin", "library_user", "student"],
   boarding: [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
   kitchen: [...ADMIN_ROLES, "kitchen_admin", "kitchen_user"],
-  clinic: [...ADMIN_ROLES, "nurse", "clinic_admin", "clinic_user"],
+  // matron's nav group also links to /clinic.
+  clinic: [...ADMIN_ROLES, "nurse", "clinic_admin", "clinic_user", "matron"],
   security: [...ADMIN_ROLES, "security_admin", "security_user"],
   // Wave 2: Inventory / Store module.
   inventory: [...ADMIN_ROLES, "store_admin", "store_user", "bursar"],
@@ -71,6 +90,65 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   live: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   ids: [...ADMIN_ROLES, "admission_officer", "security_admin", "security_user"],
 
+  // Portals (role-specific)
+  "portal.student": ["student"],
+  "portal.parent": ["parent"],
+  "portal.me": [], // any authenticated user
+
+  // Admin
+  admin: [...ADMIN_ROLES],
+  // ict_admin's nav group links to several admin.* pages it wasn't allowed
+  // into: users, roles, permissions, links, activity, import, settings.
+  "admin.users": [...ADMIN_ROLES, "ict_admin"],
+  "admin.roles": [...ADMIN_ROLES, "ict_admin"],
+  "admin.schools": ["super_admin", ...PLATFORM_ROLES],
+  "admin.settings": [...ADMIN_ROLES, "ict_admin"],
+  "admin.permissions": [...ADMIN_ROLES, "ict_admin"],
+  "admin.activity": [...ADMIN_ROLES, "ict_admin"],
+  "admin.brain": [...ADMIN_ROLES],
+  "admin.grading": [...ADMIN_ROLES, "academic_master", "exams_admin"],
+  // admission_officer and ict_admin both link to CSV Import.
+  "admin.import": [...ADMIN_ROLES, "admission_officer", "ict_admin"],
+  "admin.lifecycle": [...ADMIN_ROLES],
+  "admin.links": [...ADMIN_ROLES, "ict_admin"],
+  "admin.overrides": ["super_admin", "principal"],
+  "admin.field-edits": [...ADMIN_ROLES],
+  "admin.leaving-certificates": [...ADMIN_ROLES],
+  "admin.insurance": [...ADMIN_ROLES, "bursar", "finance_admin"],
+  "admin.student-documents": [...ADMIN_ROLES, "admission_officer"],
+  "admin.ict": [...ADMIN_ROLES, "ict_admin"],
+  // New modules: previously missing entirely, so canAccess() fell back to
+  // "admin only" even though role-experience.ts links hod/ict_admin here.
+  "admin.departments": [...ADMIN_ROLES, "hod"],
+  "admin.features": [...ADMIN_ROLES, "ict_admin"],
+  "admin.support": [...ADMIN_ROLES, "ict_admin"],
+
+  // Platform
+  platform: PLATFORM_ROLES,
+};
+
+export type ModuleKey = keyof typeof MODULE_PERMISSIONS;
+
+/** Map a route path (e.g. "/finance/fees" or "/admin/users") to a module key. */
+export function moduleForPath(pathname: string): string | null {
+  const p = pathname.replace(/^\/+/, "").split("?")[0].split("#")[0];
+  if (!p) return "dashboard";
+  const seg = p.split("/");
+  // /admin/users → "admin.users", /portal/parent → "portal.parent"
+  if (seg[0] === "admin" && seg[1]) return `admin.${seg[1]}`;
+  if (seg[0] === "portal" && seg[1]) return `portal.${seg[1]}`;
+  if (seg[0] === "academics" && seg[1]) {
+    if (seg[1] === "exams") return "exams";
+    if (seg[1] === "marks") return "marks";
+    if (seg[1] === "results" || seg[1] === "report-card" || seg[1] === "report-cards") return "results";
+    if (seg[1] === "subjects") return "subjects";
+  }
+  if (seg[0] === "finance") return "finance";
+  if (seg[0] === "timetable") return "timetable";
+  if (seg[0] === "ids") return "ids";
+  if (seg[0] === "cocurricular") return "cocurricular";
+  return seg[0] ?? null;
+}
   // Portals (role-specific)
   "portal.student": ["student"],
   "portal.parent": ["parent"],
