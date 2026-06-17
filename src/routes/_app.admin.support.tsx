@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, MessageSquare, Plus, Send, ShieldAlert } from "lucide-react";
+import { Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
@@ -24,16 +24,7 @@ const STATUS_STYLE: Record<string, string> = {
   resolved: "bg-green-500/15 text-green-700 border-green-500/30",
 };
 
-const ALLOWED = new Set(["super_admin","principal","deputy_principal","admission_officer","school_admin"]);
-
 function SupportPage() {
-  const { roles } = useAuth();
-  const canAccess = (roles ?? []).some((r) => ALLOWED.has(r as string));
-  if (!canAccess) return (
-    <div className="p-6 flex items-center gap-2 text-muted-foreground">
-      <ShieldAlert className="w-5 h-5" /> You do not have access to this page.
-    </div>
-  );
   return <SupportInner />;
 }
 
