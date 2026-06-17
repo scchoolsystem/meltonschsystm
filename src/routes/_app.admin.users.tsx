@@ -112,7 +112,12 @@ const ALL_ROLES = [...STAFF_ROLES, ...ROLE_GROUPS.portal.roles];
 // ─── Main page ────────────────────────────────────────────────────────────────
 function UsersPage() {
   const qc = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin: isTopAdmin, hasRole } = useAuth();
+  // The backend is_admin() RLS function already treats "school_admin" as a
+  // full admin for writes (account creation, role changes, etc.). The
+  // client-side isAdmin flag did not, which locked school_admin users out
+  // of this page entirely even though their database writes would succeed.
+  const isAdmin = isTopAdmin || hasRole("school_admin");
   const [open, setOpen] = useState(false);
   const [creds, setCreds] = useState<{ uniqueId: string; password: string; title: string } | null>(null);
   const [search, setSearch] = useState("");

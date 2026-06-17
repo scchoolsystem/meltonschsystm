@@ -88,6 +88,15 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const endAssignmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("dorm_assignments").update({ active: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["dorm-assignments"] }); toast.success("Assignment ended"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const activeAssignments = (assignments as any[]).filter(a => a.active !== false);
   const dormAssignees = (dormId: string) => activeAssignments.filter(a => a.dormitory_id === dormId);
 
@@ -135,9 +144,9 @@ function Page() {
           <Card><CardHeader /><CardContent>
             {aLoading ? <Loader2 className="animate-spin mx-auto" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Dorm</TableHead><TableHead>Bed No</TableHead><TableHead>Assigned</TableHead><TableHead>Welfare Notes</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Dorm</TableHead><TableHead>Bed No</TableHead><TableHead>Assigned</TableHead><TableHead>Welfare Notes</TableHead>{can && <TableHead className="text-right">Action</TableHead>}</TableRow></TableHeader>
                 <TableBody>
-                  {activeAssignments.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No assignments.</TableCell></TableRow>}
+                  {activeAssignments.length === 0 && <TableRow><TableCell colSpan={can ? 6 : 5} className="text-center text-muted-foreground py-8">No assignments.</TableCell></TableRow>}
                   {activeAssignments.map((a: any) => (
                     <TableRow key={a.id}>
                       <TableCell className="font-medium">{a.students?.first_name} {a.students?.last_name}<div className="text-xs text-muted-foreground">{a.students?.admission_no}</div></TableCell>
@@ -149,6 +158,22 @@ function Page() {
                           {a.welfare_notes ? a.welfare_notes.slice(0, 40) + (a.welfare_notes.length > 40 ? "…" : "") : <span className="text-muted-foreground">{can ? "Add note" : "—"}</span>}
                         </button>
                       </TableCell>
+                      {can && (
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={endAssignmentMutation.isPending}
+                            onClick={() => {
+                              if (window.confirm(`End ${a.students?.first_name} ${a.students?.last_name}'s dorm assignment?`)) {
+                                endAssignmentMutation.mutate(a.id);
+                              }
+                            }}
+                          >
+                            End
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -306,7 +331,13 @@ function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", dormitory_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? Number(f.bed_no) : null }); if (error) throw error; },
+    mutationFn: async () => {
+      // Retire any existing active assignment for this student first —
+      // otherwise they'd show up as a current boarder in two dorms at once.
+      await supabase.from("dorm_assignments").update({ active: false }).eq("student_id", f.student_id).eq("active", true);
+      const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? Number(f.bed_no) : null, active: true });
+      if (error) throw error;
+    },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
   return (
