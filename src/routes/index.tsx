@@ -1,9 +1,11 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
 import { SchoolPicker } from "@/components/SchoolPicker";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,14 +19,108 @@ import {
 
 export const Route = createFileRoute("/")({ component: IndexPage });
 
-const APK_URL = "https://github.com/scchoolsystem/meltonschsystm/releases/latest/download/app-release.apk";
-const WINDOWS_URL = "https://github.com/scchoolsystem/meltonschsystm/releases/latest";
-const EMAIL_HELLO = "hello@smartdev.co.ke";
-const EMAIL_SUPPORT = "support@smartdev.co.ke";
-const EMAIL_SALES = "sales@smartdev.co.ke";
-const EMAIL_LEGAL = "legal@smartdev.co.ke";
-const PHONE_PRIMARY = "+254 792 991 222";
-const PHONE_SUPPORT = "+254 711 222 333";
+const GITHUB_REPO = "scchoolsystem/meltonschsystm";
+const APK_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download/app-release.apk`;
+const WINDOWS_RELEASES_PAGE = `https://github.com/${GITHUB_REPO}/releases/latest`;
+
+// Defaults used until the editable site content loads (and as a safety net
+// if any field is left blank in the admin panel). The platform owner edits
+// the live values from Platform Admin → Website Content.
+const SITE_DEFAULTS = {
+  brand_name: "SMART DEV",
+  tagline: "Cloud school ERP for Kenya & East Africa",
+  footer_credit: "Developed by Melton Konchella · Founder & Developer · Nairobi, Kenya",
+  email_hello: "hello@smartdev.co.ke",
+  email_support: "support@smartdev.co.ke",
+  email_sales: "sales@smartdev.co.ke",
+  email_legal: "admin@smartdev.co.ke",
+  email_admin: "admin@smartdev.co.ke",
+  phone_primary: "+254 792 991 222",
+  phone_support: "+254 792 991 222",
+  location: "Nairobi, Kenya",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Site-wide editable content (read from Supabase, falls back to SITE_DEFAULTS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useSiteMeta() {
+  const { data } = useQuery({
+    queryKey: ["landing-content", "site_meta"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("landing_content")
+        .select("content")
+        .eq("section", "site_meta")
+        .maybeSingle();
+      if (error) return SITE_DEFAULTS;
+      return { ...SITE_DEFAULTS, ...(data?.content ?? {}) };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return data ?? SITE_DEFAULTS;
+}
+
+function useLandingContent<T>(section: string, fallback: T): T {
+  const { data } = useQuery({
+    queryKey: ["landing-content", section],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("landing_content")
+        .select("content")
+        .eq("section", section)
+        .maybeSingle();
+      if (error) return fallback;
+      return { ...fallback, ...(data?.content ?? {}) };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return (data as T) ?? fallback;
+}
+
+function useGalleryPhotos(placement: string, fallback: { src: string; caption?: string }[]) {
+  const { data } = useQuery({
+    queryKey: ["landing-gallery-public", placement],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("landing_gallery")
+        .select("image_url,caption,alt_text")
+        .eq("placement", placement)
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error || !data || data.length === 0) return null;
+      return data
+        .filter((d: any) => d.image_url)
+        .map((d: any) => ({ src: d.image_url as string, caption: d.caption ?? d.alt_text ?? "" }));
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  return data && data.length > 0 ? data : fallback;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Direct Windows desktop download — resolves the real installer asset from
+// the GitHub Releases API so the button downloads the .exe immediately
+// instead of sending people to the releases page to click around.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useWindowsDownloadUrl() {
+  const { data } = useQuery({
+    queryKey: ["github-latest-release", GITHUB_REPO],
+    queryFn: async () => {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const assets: { name: string; browser_download_url: string }[] = json?.assets ?? [];
+      const exe = assets.find((a) => /\.exe$/i.test(a.name) || /setup\.exe$/i.test(a.name));
+      const msi = assets.find((a) => /\.msi$/i.test(a.name));
+      return (exe ?? msi)?.browser_download_url ?? null;
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  return data ?? null;
+}
 
 function getOS() {
   const ua = navigator.userAgent;
@@ -54,16 +150,24 @@ function IndexPage() {
 function DownloadButton({ size = "lg" }: { size?: "sm" | "lg" }) {
   const [os, setOs] = useState("other");
   useEffect(() => { setOs(getOS()); }, []);
+  const windowsDirectUrl = useWindowsDownloadUrl();
+  const windowsHref = windowsDirectUrl ?? WINDOWS_RELEASES_PAGE;
+  const windowsIsDirect = Boolean(windowsDirectUrl);
+
   if (os === "android") return (
     <a href={APK_URL}><Button size={size} className="gap-2 bg-green-600 hover:bg-green-700 text-white"><Smartphone className="w-5 h-5" /> Download for Android</Button></a>
   );
   if (os === "windows") return (
-    <a href={WINDOWS_URL} target="_blank" rel="noreferrer"><Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Download for Windows</Button></a>
+    <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"}>
+      <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Download for Windows</Button>
+    </a>
   );
   return (
     <div className="flex flex-wrap justify-center gap-3">
       <a href={APK_URL}><Button size={size} className="gap-2 bg-green-600 hover:bg-green-700 text-white"><Smartphone className="w-5 h-5" /> Android APK</Button></a>
-      <a href={WINDOWS_URL} target="_blank" rel="noreferrer"><Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Windows Desktop</Button></a>
+      <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"}>
+        <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Windows Desktop</Button>
+      </a>
     </div>
   );
 }
@@ -247,7 +351,7 @@ function Landing() {
   const navigate = useNavigate();
   const [page, setPage] = useState<Page>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [clicks, setClicks] = useState(0);
+  const site = useSiteMeta();
 
   useEffect(() => {
     if (isPlatformHost) { navigate({ to: session ? "/platform/dashboard" : "/platform/login" }); return; }
@@ -284,11 +388,11 @@ function Landing() {
       {/* ── NAVBAR ── */}
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <button type="button" onClick={() => { setClicks(c => c + 1); goTo("home"); }} className="flex items-center gap-2">
+          <button type="button" onClick={() => goTo("home")} className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
               <GraduationCap className="w-5 h-5" />
             </div>
-            <span className="font-bold text-lg">SMART DEV</span>
+            <span className="font-bold text-lg tracking-tight">{site.brand_name}</span>
           </button>
 
           {/* Desktop nav */}
@@ -337,13 +441,13 @@ function Landing() {
 
       {/* ── PAGE CONTENT ── */}
       <main>
-        {page === "home" && <HomePage goTo={goTo} />}
+        {page === "home" && <HomePage goTo={goTo} site={site} />}
         {page === "modules" && <ModulesPage />}
         {page === "story" && <StoryPage />}
-        {page === "pricing" && <PricingPage goTo={goTo} />}
-        {page === "download" && <DownloadPage />}
-        {page === "contact" && <ContactPage />}
-        {page === "legal" && <LegalPage />}
+        {page === "pricing" && <PricingPage goTo={goTo} site={site} />}
+        {page === "download" && <DownloadPage site={site} />}
+        {page === "contact" && <ContactPage site={site} />}
+        {page === "legal" && <LegalPage site={site} />}
       </main>
 
       {/* ── FOOTER ── */}
@@ -355,15 +459,15 @@ function Landing() {
                 <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
                   <GraduationCap className="w-4 h-4" />
                 </div>
-                <span className="font-bold">SMART DEV</span>
+                <span className="font-bold tracking-tight">{site.brand_name}</span>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">Cloud school ERP for Kenya &amp; East Africa. Every department, one platform.</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{site.tagline}</p>
               <div className="mt-3 flex flex-col gap-1.5">
-                <a href={`mailto:${EMAIL_HELLO}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
-                  <Mail className="w-3 h-3" />{EMAIL_HELLO}
+                <a href={`mailto:${site.email_hello}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
+                  <Mail className="w-3 h-3" />{site.email_hello}
                 </a>
-                <a href={`tel:${PHONE_PRIMARY.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
-                  <Phone className="w-3 h-3" />{PHONE_PRIMARY}
+                <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
+                  <Phone className="w-3 h-3" />{site.phone_primary}
                 </a>
               </div>
             </div>
@@ -387,20 +491,19 @@ function Landing() {
             <div>
               <div className="font-semibold text-sm mb-3">Contact</div>
               <div className="flex flex-col gap-2">
-                <a href={`mailto:${EMAIL_SALES}`} className="text-xs text-muted-foreground hover:text-primary">{EMAIL_SALES}</a>
-                <a href={`mailto:${EMAIL_SUPPORT}`} className="text-xs text-muted-foreground hover:text-primary">{EMAIL_SUPPORT}</a>
-                <a href={`mailto:${EMAIL_LEGAL}`} className="text-xs text-muted-foreground hover:text-primary">{EMAIL_LEGAL}</a>
-                <a href={`tel:${PHONE_SUPPORT.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary">{PHONE_SUPPORT}</a>
+                <a href={`mailto:${site.email_sales}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_sales}</a>
+                <a href={`mailto:${site.email_support}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_support}</a>
+                <a href={`mailto:${site.email_admin}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_admin}</a>
+                <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary">{site.phone_primary}</a>
               </div>
             </div>
           </div>
           <div className="border-t pt-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>© {new Date().getFullYear()} SmartDev ERP · Developed by On Point Systems · Nairobi, Kenya</span>
+            <span>© {new Date().getFullYear()} SmartDev ERP · {site.footer_credit}</span>
             <div className="flex items-center gap-4">
               <button type="button" onClick={() => goTo("legal")} className="hover:text-foreground">Privacy Policy</button>
               <button type="button" onClick={() => goTo("legal")} className="hover:text-foreground">Terms of Use</button>
               <button type="button" onClick={() => goTo("legal")} className="hover:text-foreground">Legal</button>
-              {clicks >= 5 && <a href="https://admin.smartdev.co.ke" className="text-primary hover:underline">Platform admin</a>}
             </div>
           </div>
         </div>
@@ -413,23 +516,33 @@ function Landing() {
 // HOME PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function HomePage({ goTo }: { goTo: (p: Page) => void }) {
+function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
   const [heroImg, setHeroImg] = useState(0);
+  const hero = useLandingContent("hero", {
+    badge: "Cloud school ERP for Kenya & East Africa",
+    heading_line1: "One platform to run your",
+    heading_highlight: "entire school",
+    subheading: "From admissions to graduation — 35+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
+    stats: [{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
+  });
+  const heroPhotos = useGalleryPhotos("hero", HERO_PHOTOS.map((src) => ({ src })));
+  const galleryPhotos = useGalleryPhotos("gallery", GALLERY_PHOTOS);
+
   useEffect(() => {
-    const t = setInterval(() => setHeroImg(i => (i + 1) % HERO_PHOTOS.length), 5000);
+    const t = setInterval(() => setHeroImg(i => (i + 1) % heroPhotos.length), 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [heroPhotos.length]);
 
   return (
     <div>
       {/* Hero */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden">
         <div className="absolute inset-0">
-          {HERO_PHOTOS.map((src, i) => (
+          {heroPhotos.map((p, i) => (
             <img
-              key={src}
-              src={src}
-              alt="School"
+              key={p.src}
+              src={p.src}
+              alt={p.caption || "Kenyan school"}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === heroImg ? "opacity-100" : "opacity-0"}`}
             />
           ))}
@@ -437,13 +550,13 @@ function HomePage({ goTo }: { goTo: (p: Page) => void }) {
         </div>
         <div className="relative container mx-auto px-6 py-20 text-center text-white">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-xs font-medium mb-6">
-            <ShieldCheck className="w-3.5 h-3.5" /> Cloud school ERP for Kenya &amp; East Africa
+            <ShieldCheck className="w-3.5 h-3.5" /> {hero.badge}
           </div>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
-            One platform to run your <span className="text-primary">entire school</span>
+            {hero.heading_line1} <span className="text-primary">{hero.heading_highlight}</span>
           </h1>
           <p className="mt-6 text-lg text-white/80 max-w-2xl mx-auto">
-            From admissions to graduation — 35+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.
+            {hero.subheading}
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <DownloadButton />
@@ -454,7 +567,7 @@ function HomePage({ goTo }: { goTo: (p: Page) => void }) {
             </button>
           </div>
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            {[{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }].map(s => (
+            {hero.stats.map((s: any) => (
               <div key={s.label} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur p-4 text-center">
                 <div className="text-2xl font-bold text-primary">{s.value}</div>
                 <div className="text-xs text-white/70 mt-1">{s.label}</div>
@@ -500,12 +613,14 @@ function HomePage({ goTo }: { goTo: (p: Page) => void }) {
         <div className="container mx-auto px-6">
           <h2 className="text-3xl font-bold text-center mb-10">Built for schools like yours</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-5xl mx-auto">
-            {GALLERY_PHOTOS.map(p => (
-              <div key={p.src} className="relative rounded-xl overflow-hidden aspect-video">
-                <img src={p.src} alt={p.caption} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                  <span className="text-white text-xs">{p.caption}</span>
-                </div>
+            {galleryPhotos.map((p, i) => (
+              <div key={`${p.src}-${i}`} className="relative rounded-xl overflow-hidden aspect-video">
+                <img src={p.src} alt={p.caption || "Kenyan school"} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                {p.caption && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3">
+                    <span className="text-white text-xs">{p.caption}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -513,25 +628,12 @@ function HomePage({ goTo }: { goTo: (p: Page) => void }) {
       </section>
 
       {/* Mission teaser */}
-      <section className="py-16 bg-primary text-primary-foreground">
-        <div className="container mx-auto px-6 text-center">
-          <Target className="w-10 h-10 mx-auto mb-4 opacity-80" />
-          <h2 className="text-3xl font-bold max-w-2xl mx-auto">Our mission: make every Kenyan school paperless by 2030</h2>
-          <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">
-            We believe schools should spend less time on administration and more time on education. SmartDev exists to make that possible for every school — regardless of size or budget.
-          </p>
-          <button type="button" onClick={() => goTo("story")} className="mt-8 inline-block">
-            <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
-              Read our story <ArrowRight className="w-4 h-4" />
-            </Button>
-          </button>
-        </div>
-      </section>
+      <MissionTeaser goTo={goTo} />
 
       {/* Pricing teaser */}
       <section className="py-16">
         <div className="container mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold">From KES 2,500/month</h2>
+          <h2 className="text-3xl font-bold">{site.brand_name} pricing made simple</h2>
           <p className="mt-3 text-muted-foreground">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
           <button type="button" onClick={() => goTo("pricing")} className="mt-6 inline-block">
             <Button className="gap-2">See all plans <ArrowRight className="w-4 h-4" /></Button>
@@ -539,6 +641,27 @@ function HomePage({ goTo }: { goTo: (p: Page) => void }) {
         </div>
       </section>
     </div>
+  );
+}
+
+function MissionTeaser({ goTo }: { goTo: (p: Page) => void }) {
+  const mission = useLandingContent("mission_teaser", {
+    heading: "Our mission: make every Kenyan school paperless by 2030",
+    body: "We believe schools should spend less time on administration and more time on education. SmartDev exists to make that possible for every school — regardless of size or budget.",
+  });
+  return (
+    <section className="py-16 bg-primary text-primary-foreground">
+      <div className="container mx-auto px-6 text-center">
+        <Target className="w-10 h-10 mx-auto mb-4 opacity-80" />
+        <h2 className="text-3xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
+        <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
+        <button type="button" onClick={() => goTo("story")} className="mt-8 inline-block">
+          <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
+            Read our story <ArrowRight className="w-4 h-4" />
+          </Button>
+        </button>
+      </div>
+    </section>
   );
 }
 
