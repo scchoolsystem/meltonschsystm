@@ -35,14 +35,14 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // Academics
   students: [...ADMIN_ROLES, ...TEACHING_ROLES, "admission_officer"],
   staff: [...ADMIN_ROLES, "hod"],
-  classes: [...ADMIN_ROLES, ...TEACHING_ROLES],
-  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master"],
-  exams: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master"],
+  classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
+  exams: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
   marks: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user"],
-  results: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master"],
-  "report-cards": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master"],
-  attendance: [...ADMIN_ROLES, ...TEACHING_ROLES],
-  timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master"],
+  results: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
+  "report-cards": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master", "student", "parent"],
+  attendance: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
   analytics: [...ADMIN_ROLES, "academic_master"],
 
   // Operations
@@ -64,6 +64,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
 
   // Communication
   announcements: [], // everyone authenticated
+  support: [], // everyone authenticated can submit a ticket
   classroom: [], // everyone authenticated — students see classes they joined; teachers post
   // Wave 1, Fix C-4: register `live` (live classes / streaming) so the
   // teacher/student/parent sidebar entries stop bouncing to /dashboard.
