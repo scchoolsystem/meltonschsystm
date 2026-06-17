@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Loader2, Download, FileText, UserCheck } from "lucide-react";
+import { Plus, Search, Loader2, Download, FileText, UserCheck, Eye } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrackedDelete } from "@/hooks/useTrackedDelete";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
@@ -253,12 +253,12 @@ function StudentsTableCard({ q, setQ, setPage, isLoading, filtered, canEdit, isA
                     <TableHead>Parent Phone</TableHead>
                     <TableHead>Admitted</TableHead>
                     <TableHead>Status</TableHead>
-                    {canEdit && <TableHead className="text-right">Actions</TableHead>}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 && (
-                    <TableRow><TableCell colSpan={canEdit ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">No students found.</TableCell></TableRow>
                   )}
                   {filtered.map((s) => (
                     <TableRow key={s.id}>
@@ -282,12 +282,19 @@ function StudentsTableCard({ q, setQ, setPage, isLoading, filtered, canEdit, isA
                           )}
                         </div>
                       </TableCell>
-                      {canEdit && (
-                        <TableCell className="text-right">
-                          <LifecycleActions kind="student" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="students" />
-                          {isAdmin && <DeleteConfirmDialog label={`${s.first_name} ${s.last_name}`} isPending={deleteMutation.isPending} onConfirm={() => schoolId && deleteMutation.mutate({ id: s.id, schoolId, table: "students", entity: "student", label: `${s.first_name} ${s.last_name}`, invalidateKeys: ["students"] })} />}
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button size="sm" variant="ghost" className="gap-1" asChild>
+                          <Link to="/students/$id" params={{ id: s.id }}>
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </Link>
+                        </Button>
+                        {canEdit && (
+                          <>
+                            <LifecycleActions kind="student" id={s.id} currentStatus={s.lifecycle_status ?? "active"} queryKey="students" />
+                            {isAdmin && <DeleteConfirmDialog label={`${s.first_name} ${s.last_name}`} isPending={deleteMutation.isPending} onConfirm={() => schoolId && deleteMutation.mutate({ id: s.id, schoolId, table: "students", entity: "student", label: `${s.first_name} ${s.last_name}`, invalidateKeys: ["students"] })} />}
+                          </>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -28,6 +28,10 @@ function PlatformSupport() {
       const { data } = await supabase
         .from("support_tickets")
         .select("*, schools(name, slug)")
+        // Internal school-only categories (e.g. teacher "Raise Concern" tickets)
+        // must never reach the platform inbox — only genuine platform-facing
+        // tickets do.
+        .in("category", ["billing", "technical", "general"])
         .order("updated_at", { ascending: false });
       return data ?? [];
     },

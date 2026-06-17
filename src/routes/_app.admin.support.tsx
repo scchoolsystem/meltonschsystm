@@ -56,7 +56,7 @@ function SupportInner() {
       if (!selectedId) return [];
       const { data } = await supabase
         .from("support_messages")
-        .select("id,body,sender_role,created_at")
+        .select("id,body,author_id,is_platform_reply,created_at")
         .eq("ticket_id", selectedId)
         .order("created_at", { ascending: true });
       return data ?? [];
@@ -69,8 +69,9 @@ function SupportInner() {
   const sendReply = async () => {
     if (!replyText.trim() || !selectedId) return;
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Not authenticated"); return; }
     const { error } = await supabase.from("support_messages").insert({
-      ticket_id: selectedId, body: replyText.trim(), sender_role: "school", sent_by: user?.id,
+      ticket_id: selectedId, body: replyText.trim(), author_id: user.id, is_platform_reply: false,
     } as any);
     if (error) { toast.error("Failed to send"); return; }
     setReplyText("");
@@ -85,11 +86,11 @@ function SupportInner() {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: ticket, error } = await supabase
         .from("support_tickets")
-        .insert({ school_id: schoolId as any, subject: form.subject, category: form.category, status: "open" } as any)
+        .insert({ school_id: schoolId as any, subject: form.subject, category: form.category, status: "open", opened_by: user?.id } as any)
         .select("id").single();
       if (error) throw error;
       await supabase.from("support_messages").insert({
-        ticket_id: ticket.id, body: form.message, sender_role: "school", sent_by: user?.id,
+        ticket_id: ticket.id, body: form.message, author_id: user?.id, is_platform_reply: false,
       } as any);
       toast.success("Ticket submitted");
       setForm({ subject: "", category: "general", message: "" });
@@ -151,11 +152,11 @@ function SupportInner() {
                       <ScrollArea className="max-h-72 p-3">
                         {(messages as any[]).length === 0 && <div className="text-sm text-muted-foreground">No messages yet.</div>}
                         {(messages as any[]).map((m) => (
-                          <div key={m.id} className={`flex mb-2 ${m.sender_role === "school" ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.sender_role === "school" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                          <div key={m.id} className={`flex mb-2 ${!m.is_platform_reply ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${!m.is_platform_reply ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                               {m.body}
                               <div className="text-[9px] opacity-60 mt-0.5">
-                                {m.sender_role === "platform" ? "SmartDev Support" : "You"} · {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                                {m.is_platform_reply ? "SmartDev Support" : "You"} · {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
                               </div>
                             </div>
                           </div>

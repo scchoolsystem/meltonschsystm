@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Loader2, Users, Pencil, Trash2, UserCheck, BookOpen } from "lucide-react";
+import { Plus, Loader2, Users, Pencil, Trash2, UserCheck, BookOpen, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -224,6 +224,11 @@ function ClassMembersDialog({ cls }: { cls: any }) {
                       {s.gender && (
                         <Badge variant="outline" className="text-xs capitalize">{s.gender}</Badge>
                       )}
+                      <Button size="sm" variant="ghost" className="gap-1 shrink-0" asChild>
+                        <Link to="/students/$id" params={{ id: s.id }}>
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </Link>
+                      </Button>
                     </div>
                   ))}
                 </div>
