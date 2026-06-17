@@ -567,8 +567,12 @@ export function AdminPendingActionsWidget() {
       const [gp, tickets, disc, loans] = await Promise.all([
         supabase.from("gate_passes").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
-        supabase.from("discipline_records").select("id", { count: "exact", head: true }).eq("parent_notified", false),
-        supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("status", "active").lt("due_date", today),
+        // NOTE: "parent_notified" column does not exist on discipline_records.
+        // Original query was broken (always 400'd). Until a real notified-flag
+        // is added to the schema, this counts all discipline records in the
+        // last 7 days as a rough placeholder for "needs attention".
+        supabase.from("discipline_records").select("id", { count: "exact", head: true }).gte("incident_date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+        supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("status", "active").lt("due_on", today),
       ]);
       return {
         gatePasses: gp.count ?? 0,
