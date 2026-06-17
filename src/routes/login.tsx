@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { GraduationCap, Loader2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +25,11 @@ function LoginPage() {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [clicks, setClicks] = useState(0);
+  const [showSupport, setShowSupport] = useState(false);
+  const [supportName, setSupportName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportMsg, setSupportMsg] = useState("");
+  const [supportBusy, setSupportBusy] = useState(false);
   const settings = school ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url } : null;
 
   // Only treat as root host AFTER tenant has finished loading
@@ -86,6 +93,26 @@ function LoginPage() {
     } catch (err: any) { toast.error(err.message ?? "Login failed"); } finally { setBusy(false); }
   }
 
+
+  async function handleSupportSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supportName || !supportEmail || !supportMsg) return;
+    setSupportBusy(true);
+    try {
+      const { error } = await supabase.from("support_tickets").insert({
+        subject: `Login help from ${supportName} (${supportEmail})`,
+        status: "open",
+        school_id: null,
+      } as any);
+      if (error) throw error;
+      toast.success("Request sent. We will be in touch shortly.");
+      setShowSupport(false);
+      setSupportName(""); setSupportEmail(""); setSupportMsg("");
+    } catch {
+      toast.error("Failed to send. Please email support@smartdev.co.ke directly.");
+    } finally { setSupportBusy(false); }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-background p-4">
       <div className="w-full max-w-md">
@@ -107,6 +134,7 @@ function LoginPage() {
               <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} /></div>
               <Button type="submit" className="w-full" disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Sign in</Button>
               <p className="text-xs text-muted-foreground text-center">Lost your password? Contact your school admin to reset it.</p>
+              <p className="text-xs text-muted-foreground text-center mt-1">Having trouble? <button type="button" onClick={() => setShowSupport(true)} className="text-primary underline">Submit a support request</button></p>
             </form>
           </CardContent>
         </Card>
@@ -115,6 +143,21 @@ function LoginPage() {
           {clicks >= 5 && (<>{" · "}<a href="https://admin.smartdev.co.ke" className="hover:underline text-primary">Platform admin</a>{" · "}<Link to="/sys/control-room" className="hover:underline text-primary">Control room</Link></>)}
         </p>
       </div>
+
+      <Dialog open={showSupport} onOpenChange={setShowSupport}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Submit a Support Request</DialogTitle></DialogHeader>
+          <form onSubmit={handleSupportSubmit} className="space-y-3 mt-2">
+            <div><Label htmlFor="sn">Your name</Label><Input id="sn" required value={supportName} onChange={e => setSupportName(e.target.value)} placeholder="e.g. John Mwangi" /></div>
+            <div><Label htmlFor="se">Your email</Label><Input id="se" type="email" required value={supportEmail} onChange={e => setSupportEmail(e.target.value)} placeholder="your@email.com" /></div>
+            <div><Label htmlFor="sm">Describe your issue</Label><Textarea id="sm" required rows={4} value={supportMsg} onChange={e => setSupportMsg(e.target.value)} placeholder="What do you need help with?" /></div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowSupport(false)}>Cancel</Button>
+              <Button type="submit" disabled={supportBusy}>{supportBusy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Send</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
