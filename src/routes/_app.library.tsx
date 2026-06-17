@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,36 @@ export const Route = createFileRoute("/_app/library")({ component: () => (<Featu
 
 const FINE_PER_DAY = 5; // KES — ideally from school settings
 
+function BorrowerCell({ loan }: { loan: any }) {
+  if (loan.staff) {
+    return (
+      <div>
+        <Link to="/staff/$id" params={{ id: loan.staff.id }} className="font-medium hover:underline">
+          {loan.staff.first_name} {loan.staff.last_name}
+        </Link>
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <Badge variant="outline" className="text-[10px] px-1 py-0">Staff</Badge>
+          {loan.staff.employee_no}{loan.staff.position_title ? ` · ${loan.staff.position_title}` : ""}
+        </div>
+      </div>
+    );
+  }
+  if (loan.students) {
+    return (
+      <div>
+        <Link to="/students/$id" params={{ id: loan.students.id }} className="font-medium hover:underline">
+          {loan.students.first_name} {loan.students.last_name}
+        </Link>
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <Badge variant="outline" className="text-[10px] px-1 py-0">Student</Badge>
+          {loan.students.admission_no}
+        </div>
+      </div>
+    );
+  }
+  return <span className="text-muted-foreground">—</span>;
+}
+
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
@@ -37,7 +67,7 @@ function Page() {
   });
   const { data: loans = [], isLoading: lLoading } = useQuery({
     queryKey: ["library-loans"],
-    queryFn: async () => (await supabase.from("book_loans").select("*, books(title,author), students(first_name,last_name,admission_no)").order("borrowed_on", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () => (await supabase.from("book_loans").select("*, books(title,author), students(id,first_name,last_name,admission_no), staff(id,first_name,last_name,employee_no,position_title)").order("borrowed_on", { ascending: false }).limit(200)).data ?? [],
   });
 
   const today = format(new Date(), "yyyy-MM-dd");
@@ -55,9 +85,11 @@ function Page() {
     if (!loanSearch.trim()) return loans as any[];
     const q = loanSearch.toLowerCase();
     return (loans as any[]).filter(l => {
-      const name = `${l.students?.first_name ?? ""} ${l.students?.last_name ?? ""}`.toLowerCase();
+      const studentName = `${l.students?.first_name ?? ""} ${l.students?.last_name ?? ""}`.toLowerCase();
+      const staffName = `${l.staff?.first_name ?? ""} ${l.staff?.last_name ?? ""}`.toLowerCase();
       const adm = (l.students?.admission_no ?? "").toLowerCase();
-      return name.includes(q) || adm.includes(q);
+      const emp = (l.staff?.employee_no ?? "").toLowerCase();
+      return studentName.includes(q) || staffName.includes(q) || adm.includes(q) || emp.includes(q);
     });
   }, [loans, loanSearch]);
 
@@ -130,14 +162,14 @@ function Page() {
           <Card><CardHeader /><CardContent>
             {lLoading ? <Loader2 className="animate-spin mx-auto" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Book</TableHead><TableHead>Borrowed</TableHead><TableHead>Due</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Borrower</TableHead><TableHead>Book</TableHead><TableHead>Borrowed</TableHead><TableHead>Due</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredLoans.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No loans.</TableCell></TableRow>}
                   {filteredLoans.map((l: any) => {
                     const isOverdue = l.status === "active" && l.due_on < today;
                     return (
                       <TableRow key={l.id} className={isOverdue ? "bg-red-50" : ""}>
-                        <TableCell className="font-medium">{l.students?.first_name} {l.students?.last_name}<div className="text-xs text-muted-foreground">{l.students?.admission_no}</div></TableCell>
+                        <TableCell><BorrowerCell loan={l} /></TableCell>
                         <TableCell>{l.books?.title}</TableCell>
                         <TableCell className="text-xs">{l.borrowed_on}</TableCell>
                         <TableCell className={`text-xs ${isOverdue ? "text-red-600 font-medium" : ""}`}>{l.due_on}</TableCell>
@@ -157,14 +189,14 @@ function Page() {
           {overdueLoans.length > 0 && (
             <Card><CardHeader /><CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Book</TableHead><TableHead>Due Date</TableHead><TableHead>Days Overdue</TableHead><TableHead>Fine (KES)</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Borrower</TableHead><TableHead>Book</TableHead><TableHead>Due Date</TableHead><TableHead>Days Overdue</TableHead><TableHead>Fine (KES)</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {overdueLoans.map((l: any) => {
                     const days = differenceInDays(new Date(), new Date(l.due_on));
                     const fine = days * FINE_PER_DAY;
                     return (
                       <TableRow key={l.id} className="bg-red-50">
-                        <TableCell className="font-medium">{l.students?.first_name} {l.students?.last_name}<div className="text-xs text-muted-foreground">{l.students?.admission_no}</div></TableCell>
+                        <TableCell><BorrowerCell loan={l} /></TableCell>
                         <TableCell>{l.books?.title}</TableCell>
                         <TableCell className="text-xs text-red-700">{l.due_on}</TableCell>
                         <TableCell><Badge variant="destructive">{days} day{days !== 1 ? "s" : ""}</Badge></TableCell>
@@ -207,23 +239,52 @@ function BookDialog({ onDone }: { onDone: () => void }) {
 }
 
 function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
-  const [f, setF] = useState({ student_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
+  const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
+  const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-library"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const { data: staffList = [] } = useQuery({ queryKey: ["staff-min-library"], queryFn: async () => (await supabase.from("staff").select("id,employee_no,first_name,last_name,position_title").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("book_loans").insert({ ...f, status: "active" });
+      const payload: any = {
+        book_id: f.book_id,
+        borrowed_on: f.borrowed_on,
+        due_on: f.due_on,
+        status: "active",
+        student_id: borrowerType === "student" ? f.student_id : null,
+        staff_id: borrowerType === "staff" ? f.staff_id : null,
+      };
+      const { error } = await supabase.from("book_loans").insert(payload);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Loan issued"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
+  const borrowerChosen = borrowerType === "student" ? !!f.student_id : !!f.staff_id;
   return (
     <DialogContent><DialogHeader><DialogTitle>Issue Loan</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-        <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+        <div>
+          <Label>Borrower Type</Label>
+          <Select value={borrowerType} onValueChange={(v: "student" | "staff") => { setBorrowerType(v); setF(p => ({ ...p, student_id: "", staff_id: "" })); }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="student">Student</SelectItem>
+              <SelectItem value="staff">Staff / Teacher</SelectItem>
+            </SelectContent>
           </Select>
         </div>
+        {borrowerType === "student" ? (
+          <div><Label>Student</Label>
+            <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
+              <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div><Label>Staff / Teacher</Label>
+            <Select value={f.staff_id} onValueChange={v => setF(p => ({ ...p, staff_id: v }))}><SelectTrigger><SelectValue placeholder="Choose staff member" /></SelectTrigger>
+              <SelectContent>{(staffList as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.employee_no} – {s.first_name} {s.last_name}{s.position_title ? ` (${s.position_title})` : ""}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        )}
         <div><Label>Book</Label>
           <Select value={f.book_id} onValueChange={v => setF(p => ({ ...p, book_id: v }))}><SelectTrigger><SelectValue placeholder="Choose book" /></SelectTrigger>
             <SelectContent>{books.map(b => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent>
@@ -231,7 +292,7 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
         </div>
         <div><Label>Borrowed Date</Label><Input type="date" value={f.borrowed_on} onChange={e => setF(p => ({ ...p, borrowed_on: e.target.value }))} /></div>
         <div><Label>Due Date *</Label><Input required type="date" value={f.due_on} onChange={e => setF(p => ({ ...p, due_on: e.target.value }))} /></div>
-        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.book_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue</Button></DialogFooter>
+        <DialogFooter><Button type="submit" disabled={m.isPending || !borrowerChosen || !f.book_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue</Button></DialogFooter>
       </form>
     </DialogContent>
   );
