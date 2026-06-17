@@ -288,7 +288,7 @@ function ParentPortal() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Out: {g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}
-                  {g.return_time && ` · Back: ${new Date(g.return_time).toLocaleString()}`}
+                  {g.actual_return && ` · Back: ${new Date(g.actual_return).toLocaleString()}`}
                 </div>
               </div>
             ))}

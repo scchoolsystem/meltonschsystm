@@ -39,11 +39,11 @@ function Page() {
   });
   const { data: totalStudents = 0 } = useQuery({
     queryKey: ["total-active-students"],
-    queryFn: async () => { const { count } = await supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true); return count ?? 0; },
+    queryFn: async () => { const { count } = await supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "active"); return count ?? 0; },
   });
 
   const pendingPasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "pending"), [gatePasses]);
-  const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.exit_time?.startsWith(today) && !g.return_time), [gatePasses, today]);
+  const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.exit_time?.startsWith(today) && !g.actual_return), [gatePasses, today]);
   const studentsOnCampus = (typeof totalStudents === "number" ? totalStudents : 0) - openGatePasses.length;
 
   const approvalMutation = useMutation({
@@ -127,7 +127,7 @@ function Page() {
                       <TableCell className="font-medium">{g.students?.first_name} {g.students?.last_name}<div className="text-xs text-muted-foreground">{g.students?.admission_no}</div></TableCell>
                       <TableCell>{g.reason}</TableCell>
                       <TableCell className="text-xs">{g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}</TableCell>
-                      <TableCell className="text-xs">{g.return_time ? new Date(g.return_time).toLocaleString() : "—"}</TableCell>
+                      <TableCell className="text-xs">{g.actual_return ? new Date(g.actual_return).toLocaleString() : "—"}</TableCell>
                       <TableCell>
                         {can && (
                           <div className="flex gap-2">
@@ -155,7 +155,7 @@ function Page() {
                     <TableCell className="font-medium">{g.students?.first_name} {g.students?.last_name}</TableCell>
                     <TableCell>{g.reason}</TableCell>
                     <TableCell className="text-xs">{g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}</TableCell>
-                    <TableCell className="text-xs">{g.return_time ? new Date(g.return_time).toLocaleString() : "—"}</TableCell>
+                    <TableCell className="text-xs">{g.actual_return ? new Date(g.actual_return).toLocaleString() : "—"}</TableCell>
                     <TableCell><Badge variant={g.status === "approved" ? "default" : g.status === "denied" ? "destructive" : "secondary"}>{g.status}</Badge></TableCell>
                   </TableRow>
                 ))}

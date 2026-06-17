@@ -40,7 +40,7 @@ function Page() {
   });
   const { data: stock = [], isLoading: sLoading } = useQuery({
     queryKey: ["kitchen-stock"],
-    queryFn: async () => (await supabase.from("kitchen_stock").select("*").order("item_name")).data ?? [],
+    queryFn: async () => (await supabase.from("kitchen_stock").select("*").order("item")).data ?? [],
   });
   const { data: boarderCount } = useQuery({
     queryKey: ["boarder-count"],
@@ -50,7 +50,7 @@ function Page() {
     },
   });
 
-  const lowStock = useMemo(() => (stock as any[]).filter(s => s.quantity <= s.reorder_level), [stock]);
+  const lowStock = useMemo(() => (stock as any[]).filter(s => s.quantity <= s.low_threshold), [stock]);
   const todayMeals = useMemo(() => (meals as any[]).filter(m => m.meal_date === today), [meals, today]);
   const totalServedToday = useMemo(() => todayMeals.reduce((sum: number, m: any) => sum + (m.served_count ?? 0), 0), [todayMeals]);
   const totalCostToday = useMemo(() => todayMeals.reduce((sum: number, m: any) => sum + ((m.cost_per_meal ?? 0) * (m.served_count ?? 0)), 0), [todayMeals]);
@@ -194,7 +194,7 @@ function Page() {
           {lowStock.length > 0 && (
             <div className="mb-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              {lowStock.length} item(s) at or below reorder level: {lowStock.map((s: any) => s.item_name).join(", ")}
+              {lowStock.length} item(s) at or below reorder level: {lowStock.map((s: any) => s.item).join(", ")}
             </div>
           )}
           <Card><CardHeader /><CardContent>
@@ -204,13 +204,13 @@ function Page() {
                 <TableBody>
                   {(stock as any[]).length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No stock items.</TableCell></TableRow>}
                   {(stock as any[]).map((s: any) => {
-                    const isLow = s.quantity <= s.reorder_level;
+                    const isLow = s.quantity <= s.low_threshold;
                     return (
                       <TableRow key={s.id} className={isLow ? "bg-red-50" : ""}>
-                        <TableCell className="font-medium">{s.item_name}</TableCell>
+                        <TableCell className="font-medium">{s.item}</TableCell>
                         <TableCell className={isLow ? "text-red-700 font-bold" : ""}>{s.quantity}</TableCell>
                         <TableCell>{s.unit ?? "—"}</TableCell>
-                        <TableCell>{s.reorder_level ?? "—"}</TableCell>
+                        <TableCell>{s.low_threshold ?? "—"}</TableCell>
                         <TableCell>{isLow ? <Badge variant="destructive" className="inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Low Stock</Badge> : <Badge variant="secondary">OK</Badge>}</TableCell>
                       </TableRow>
                     );
@@ -281,10 +281,10 @@ function MealDialog({ onDone }: { onDone: () => void }) {
 }
 
 function StockDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ item_name: "", quantity: "", unit: "", reorder_level: "" });
+  const [f, setF] = useState({ item: "", quantity: "", unit: "", low_threshold: "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("kitchen_stock").insert({ ...f, quantity: Number(f.quantity), reorder_level: f.reorder_level ? Number(f.reorder_level) : null });
+      const { error } = await supabase.from("kitchen_stock").insert({ ...f, quantity: Number(f.quantity), low_threshold: f.low_threshold ? Number(f.low_threshold) : null });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Stock item added"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -292,10 +292,10 @@ function StockDialog({ onDone }: { onDone: () => void }) {
   return (
     <DialogContent><DialogHeader><DialogTitle>Add Stock Item</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-        <div><Label>Item Name *</Label><Input required value={f.item_name} onChange={e => setF(p => ({ ...p, item_name: e.target.value }))} /></div>
+        <div><Label>Item Name *</Label><Input required value={f.item} onChange={e => setF(p => ({ ...p, item: e.target.value }))} /></div>
         <div><Label>Quantity *</Label><Input required type="number" value={f.quantity} onChange={e => setF(p => ({ ...p, quantity: e.target.value }))} /></div>
         <div><Label>Unit</Label><Input placeholder="kg, litres, bags…" value={f.unit} onChange={e => setF(p => ({ ...p, unit: e.target.value }))} /></div>
-        <div><Label>Reorder Level</Label><Input type="number" value={f.reorder_level} onChange={e => setF(p => ({ ...p, reorder_level: e.target.value }))} /></div>
+        <div><Label>Reorder Level</Label><Input type="number" value={f.low_threshold} onChange={e => setF(p => ({ ...p, low_threshold: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
       </form>
     </DialogContent>

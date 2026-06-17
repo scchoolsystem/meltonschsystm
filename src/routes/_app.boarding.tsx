@@ -45,7 +45,7 @@ function Page() {
   });
   const { data: gatePasses = [] } = useQuery({
     queryKey: ["gate-passes-tonight"],
-    queryFn: async () => (await supabase.from("gate_passes").select("*, students(first_name,last_name,admission_no)").gte("exit_time", today).is("return_time", null).order("exit_time", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.from("gate_passes").select("*, students(first_name,last_name,admission_no)").gte("exit_time", today).is("actual_return", null).order("exit_time", { ascending: false })).data ?? [],
   });
 
   const [addDorm, setAddDorm] = useState(false);
