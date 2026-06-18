@@ -55,6 +55,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+
       - name: Build frontend
         run: pnpm build
         env:
@@ -67,7 +70,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # macOS code signing (optional — leave secrets empty to skip)
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
