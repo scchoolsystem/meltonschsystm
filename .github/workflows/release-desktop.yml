@@ -58,8 +58,9 @@ jobs:
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
 
+      # Use build:desktop — skips patch-wrangler.py which is server-only
       - name: Build frontend
-        run: pnpm build
+        run: pnpm build:desktop
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
