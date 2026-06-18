@@ -76,7 +76,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
         </Button>
         <p className="text-xs text-muted-foreground">
           Already know your school's portal?{" "}
-          <span className="font-medium">yourschool.smartdev.co.ke</span>
+          <span className="font-medium">smartdev.co.ke</span>
         </p>
       </section>
 
