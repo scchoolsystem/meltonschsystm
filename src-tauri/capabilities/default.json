@@ -8,10 +8,6 @@
     "opener:default",
     "core:window:allow-start-dragging",
     "core:window:allow-set-focus",
-    "core:webview:allow-set-webview-focus",
-    "notification:default",
-    "notification:allow-notify",
-    "notification:allow-request-permission",
-    "notification:allow-is-permission-granted"
+    "core:webview:allow-set-webview-focus"
   ]
 }
