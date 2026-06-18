@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { Resend } from "resend";
 
 const AudienceSchema = z.object({
   type: z.enum(["all_students", "all_parents", "class", "custom"]),
@@ -129,6 +128,15 @@ export const sendBulkSms = createServerFn({ method: "POST" })
     return { sent: numbers.length, status };
   });
 
+async function resolveSchoolName(schoolId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("schools")
+    .select("name")
+    .eq("id", schoolId)
+    .single();
+  return data?.name ?? "SmartDev ERP";
+}
+
 async function resolveEmails(
   schoolId: string,
   audience: z.infer<typeof AudienceSchema>
@@ -169,7 +177,10 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const schoolId = await resolveSchoolId(context);
-    const emails = await resolveEmails(schoolId, data.audience);
+    const [emails, schoolName] = await Promise.all([
+      resolveEmails(schoolId, data.audience),
+      resolveSchoolName(schoolId),
+    ]);
 
     let status = "sent";
     let errorMsg: string | null = null;
@@ -177,25 +188,37 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
     if (emails.length === 0) {
       status = "failed";
       errorMsg = "No recipients";
-    } else if (process.env.RESEND_API_KEY) {
+    } else {
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        const from = process.env.RESEND_FROM_EMAIL || "SmartDev <onboarding@resend.dev>";
-        for (let i = 0; i < emails.length; i += 50) {
-          const batch = emails.slice(i, i + 50);
-          await resend.emails.send({
-            from,
-            to: batch,
-            subject: data.subject,
-            html: `<div>${data.body.replace(/\n/g, "<br/>")}</div>`,
+        const domain = "smartdev.co.ke";
+        const from = `${schoolName} <noreply@${domain}>`;
+        const htmlBody = `<div>${data.body.replace(/\n/g, "<br/>")}</div>`;
+
+        // Enqueue each recipient through the same queue the transactional emails use
+        for (const email of emails) {
+          const messageId = crypto.randomUUID();
+          const { error: enqueueError } = await (supabaseAdmin as any).rpc("enqueue_email", {
+            queue_name: "transactional_emails",
+            payload: {
+              message_id: messageId,
+              to: email,
+              from,
+              subject: data.subject,
+              html: htmlBody,
+              text: data.body,
+              purpose: "blast",
+              label: "email-blast",
+              idempotency_key: `blast-${schoolId}-${messageId}`,
+              queued_at: new Date().toISOString(),
+            },
           });
+          if (enqueueError) throw enqueueError;
         }
+        status = "queued";
       } catch (e: any) {
         status = "failed";
-        errorMsg = e?.message ?? "Send failed";
+        errorMsg = e?.message ?? "Enqueue failed";
       }
-    } else {
-      status = "queued";
     }
 
     await (supabaseAdmin as any).from("notifications_log").insert({
