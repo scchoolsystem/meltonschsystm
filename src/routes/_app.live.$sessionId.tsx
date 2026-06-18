@@ -19,14 +19,56 @@ export const Route = createFileRoute("/_app/live/$sessionId")({
 
 type AttendStatus = "present" | "late" | "absent";
 
+// ---------------------------------------------------------------------------
+// JaaS token hook — fetches a signed RS256 JWT from our own API route
+// ---------------------------------------------------------------------------
+function useJaasToken(roomName: string | undefined, enabled: boolean) {
+  const { user, roles, isAdmin } = useAuth();
+  const isModerator =
+    isAdmin ||
+    roles.some((r) =>
+      ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
+    );
+
+  return useQuery({
+    queryKey: ["jaas-token", roomName, isModerator],
+    enabled: !!roomName && enabled,
+    // Token is valid 60 min — refetch at 50 min to be safe
+    staleTime: 1000 * 60 * 50,
+    queryFn: async () => {
+      const res = await fetch("/api/jaas-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: roomName,
+          displayName: user?.email?.split("@")[0] || "User",
+          email: user?.email ?? "",
+          moderator: isModerator,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error ?? "Failed to fetch JaaS token");
+      }
+      const { token } = await res.json();
+      return token as string;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main room component
+// ---------------------------------------------------------------------------
 function SessionRoom() {
   const { sessionId } = useParams({ from: "/_app/live/$sessionId" });
   const { user, roles, isAdmin } = useAuth();
   const qc = useQueryClient();
   const isStudent = roles.includes("student" as any);
-  const canManage = isAdmin || roles.some((r) =>
-    ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
-  );
+  const canManage =
+    isAdmin ||
+    roles.some((r) =>
+      ["teacher", "class_teacher", "subject_teacher", "hod", "academic_master"].includes(r as string),
+    );
 
   const router = useRouter();
 
@@ -47,7 +89,11 @@ function SessionRoom() {
     queryKey: ["my-student-link", user?.id],
     enabled: !!user?.id && isStudent,
     queryFn: async () => {
-      const { data } = await supabase.from("student_user_links").select("student_id").eq("user_id", user!.id).maybeSingle();
+      const { data } = await supabase
+        .from("student_user_links")
+        .select("student_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
       return data?.student_id ?? null;
     },
   });
@@ -78,15 +124,18 @@ function SessionRoom() {
       const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
       const { data, error } = await supabase
         .from("live_session_attendance")
-        .upsert({
-          session_id: sessionId,
-          student_id: myStudent,
-          user_id: user?.id ?? null,
-          joined_at: new Date(joinedAt).toISOString(),
-          left_at: null,
-          duration_seconds: null,
-          status: autoStatus,
-        } as any, { onConflict: "session_id,student_id" })
+        .upsert(
+          {
+            session_id: sessionId,
+            student_id: myStudent,
+            user_id: user?.id ?? null,
+            joined_at: new Date(joinedAt).toISOString(),
+            left_at: null,
+            duration_seconds: null,
+            status: autoStatus,
+          } as any,
+          { onConflict: "session_id,student_id" },
+        )
         .select("id")
         .maybeSingle();
       if (error) { console.warn("attendance insert", error); return; }
@@ -96,10 +145,11 @@ function SessionRoom() {
       const { id, joinedAt } = attendanceRef.current;
       if (!id || !joinedAt) return;
       const dur = Math.round((Date.now() - joinedAt) / 1000);
-      supabase.from("live_session_attendance").update({
-        left_at: new Date().toISOString(),
-        duration_seconds: dur,
-      }).eq("id", id).then(() => {});
+      supabase
+        .from("live_session_attendance")
+        .update({ left_at: new Date().toISOString(), duration_seconds: dur })
+        .eq("id", id)
+        .then(() => {});
     };
     window.addEventListener("beforeunload", markLeft);
     return () => {
@@ -110,46 +160,79 @@ function SessionRoom() {
   }, [session, isStudent, myStudent, sessionId, user?.id]);
 
   const startSession = async () => {
-    await supabase.from("live_sessions").update({ status: "live", started_at: new Date().toISOString() }).eq("id", sessionId);
+    await supabase
+      .from("live_sessions")
+      .update({ status: "live", started_at: new Date().toISOString() })
+      .eq("id", sessionId);
     qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
     toast.success("Session started");
   };
 
-  if (isLoading) return <div className="p-6 grid place-items-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-  if (!session) return <div className="p-6">Session not found.</div>;
-
-  const displayName = encodeURIComponent(user?.email?.split("@")[0] || "Student");
-  // Suppress moderator login popup, enable media, no prejoin screen
-  const jitsiParams = [
-    "config.prejoinPageEnabled=false",
-    "config.disableDeepLinking=true",
-    "config.startWithAudioMuted=false",
-    "config.startWithVideoMuted=false",
-    "config.requireDisplayName=false",
-    "config.enableWelcomePage=false",
-    "config.disableModeratorIndicator=true",
-    "config.startAudioOnly=false",
-    "interfaceConfig.MOBILE_APP_PROMO=false",
-    "interfaceConfig.SHOW_JITSI_WATERMARK=false",
-    "interfaceConfig.HIDE_INVITE_MORE_HEADER=true",
-  ].join("&");
-  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName="${displayName}"&${jitsiParams}`;
-
   const endSession = async () => {
-    await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
+    await supabase
+      .from("live_sessions")
+      .update({ status: "ended", ended_at: new Date().toISOString() })
+      .eq("id", sessionId);
     toast.success("Session ended");
     qc.invalidateQueries({ queryKey: ["live-session", sessionId] });
     router.navigate({ to: "/live" });
   };
 
+  // JaaS token — only fetch when session is actually live
+  const isLive = session?.status === "live";
+  const {
+    data: jaasToken,
+    isLoading: tokenLoading,
+    error: tokenError,
+  } = useJaasToken(session?.room_name, isLive);
+
+  // JaaS App ID from env (VITE_JAAS_APP_ID in .env / Cloudflare Pages vars)
+  const jaasAppId = import.meta.env.VITE_JAAS_APP_ID as string | undefined;
+
+  if (isLoading)
+    return (
+      <div className="p-6 grid place-items-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  if (!session) return <div className="p-6">Session not found.</div>;
+
+  // Build JaaS iframe URL once token is ready
+  const jitsiIframeSrc =
+    jaasToken && jaasAppId
+      ? [
+          `https://8x8.vc/${jaasAppId}/${session.room_name}`,
+          `#jwt=${jaasToken}`,
+          `&config.prejoinPageEnabled=false`,
+          `&config.disableDeepLinking=true`,
+          `&config.startWithAudioMuted=false`,
+          `&config.startWithVideoMuted=false`,
+          `&config.requireDisplayName=false`,
+          `&config.enableWelcomePage=false`,
+          `&config.disableModeratorIndicator=false`,
+          `&config.startAudioOnly=false`,
+          `&interfaceConfig.MOBILE_APP_PROMO=false`,
+          `&interfaceConfig.SHOW_JITSI_WATERMARK=false`,
+          `&interfaceConfig.HIDE_INVITE_MORE_HEADER=true`,
+        ].join("")
+      : null;
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <Button asChild variant="ghost" size="sm"><Link to="/live"><ArrowLeft className="w-4 h-4 mr-2" />All sessions</Link></Button>
-          <h1 className="text-2xl font-bold mt-2 flex items-center gap-2"><Video className="w-6 h-6 text-primary" />{session.title}</h1>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/live">
+              <ArrowLeft className="w-4 h-4 mr-2" />All sessions
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold mt-2 flex items-center gap-2">
+            <Video className="w-6 h-6 text-primary" />
+            {session.title}
+          </h1>
           <div className="text-sm text-muted-foreground mt-1 flex gap-2 flex-wrap items-center">
-            <Badge variant="outline">{session.classes?.name}</Badge>
+            <Badge variant="outline">{(session as any).classes?.name}</Badge>
             <span>{format(new Date(session.scheduled_start), "PPp")}</span>
             <Badge>{session.status}</Badge>
           </div>
@@ -157,40 +240,82 @@ function SessionRoom() {
         <div className="flex gap-2 flex-wrap">
           {canManage && (
             <Button asChild variant="outline">
-              <Link to="/live/$sessionId/attendance" params={{ sessionId }}>Correct attendance</Link>
+              <Link to="/live/$sessionId/attendance" params={{ sessionId }}>
+                Correct attendance
+              </Link>
             </Button>
           )}
           {canManage && session.status !== "ended" && (
-            <Button variant="destructive" onClick={endSession}>End session</Button>
+            <Button variant="destructive" onClick={endSession}>
+              End session
+            </Button>
           )}
         </div>
       </div>
 
-
+      {/* Student not linked warning */}
       {isStudent && myStudent === null && (
         <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm text-amber-800 dark:text-amber-300">
-          ⚠ Your account is not linked to a student record — your attendance will not be tracked automatically. Contact your administrator.
+          ⚠ Your account is not linked to a student record — your attendance will not be tracked
+          automatically. Contact your administrator.
         </div>
       )}
 
+      {/* Main content area */}
       {session.status === "cancelled" || session.status === "ended" ? (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">This session has {session.status}. You can still adjust attendance below.</CardContent></Card>
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            This session has {session.status}. You can still adjust attendance below.
+          </CardContent>
+        </Card>
       ) : session.status === "scheduled" ? (
-        <Card><CardContent className="py-10 text-center space-y-4">
-          <p className="text-muted-foreground">Session not started yet.</p>
-          <p className="text-sm text-muted-foreground">Scheduled: {format(new Date(session.scheduled_start), "PPp")}</p>
-          {canManage && (
-            <Button onClick={startSession} size="lg">
-              <Video className="w-4 h-4 mr-2" />Start session
+        <Card>
+          <CardContent className="py-10 text-center space-y-4">
+            <p className="text-muted-foreground">Session not started yet.</p>
+            <p className="text-sm text-muted-foreground">
+              Scheduled: {format(new Date(session.scheduled_start), "PPp")}
+            </p>
+            {canManage && (
+              <Button onClick={startSession} size="lg">
+                <Video className="w-4 h-4 mr-2" />Start session
+              </Button>
+            )}
+            {!canManage && (
+              <p className="text-sm text-muted-foreground">
+                Waiting for teacher to start the session.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : /* status === "live" */ tokenLoading ? (
+        <Card>
+          <CardContent className="py-10 text-center space-y-2">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Connecting to live class…</p>
+          </CardContent>
+        </Card>
+      ) : tokenError || !jitsiIframeSrc ? (
+        <Card>
+          <CardContent className="py-10 text-center space-y-3">
+            <p className="text-destructive text-sm">
+              {tokenError
+                ? `Could not get meeting token: ${(tokenError as Error).message}`
+                : "JaaS App ID not configured. Set VITE_JAAS_APP_ID in your environment."}
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => qc.invalidateQueries({ queryKey: ["jaas-token"] })}
+            >
+              Retry
             </Button>
-          )}
-          {!canManage && <p className="text-sm text-muted-foreground">Waiting for teacher to start the session.</p>}
-        </CardContent></Card>
+          </CardContent>
+        </Card>
       ) : (
         <Card className="overflow-hidden">
           <iframe
+            key={jitsiIframeSrc} // remount if token changes
             title={session.title}
-            src={jitsiUrl}
+            src={jitsiIframeSrc}
             allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *; clipboard-write *"
             allowFullScreen
             className="w-full"
@@ -199,18 +324,58 @@ function SessionRoom() {
         </Card>
       )}
 
-      {canManage && <AttendanceRoster sessionId={sessionId} classId={session.class_id} sessionEnded={session.status === "ended"} />}
+      {canManage && (
+        <AttendanceRoster
+          sessionId={sessionId}
+          classId={session.class_id}
+          sessionEnded={session.status === "ended"}
+        />
+      )}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Status badge helper
+// ---------------------------------------------------------------------------
 function statusBadge(s: AttendStatus) {
-  if (s === "present") return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" variant="outline">Present</Badge>;
-  if (s === "late") return <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" variant="outline">Late</Badge>;
-  return <Badge className="bg-destructive/15 text-destructive border-destructive/30" variant="outline">Absent</Badge>;
+  if (s === "present")
+    return (
+      <Badge
+        className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+        variant="outline"
+      >
+        Present
+      </Badge>
+    );
+  if (s === "late")
+    return (
+      <Badge
+        className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        variant="outline"
+      >
+        Late
+      </Badge>
+    );
+  return (
+    <Badge className="bg-destructive/15 text-destructive border-destructive/30" variant="outline">
+      Absent
+    </Badge>
+  );
 }
 
-function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: string; classId: string; sessionEnded: boolean }) {
+// ---------------------------------------------------------------------------
+// Attendance roster (unchanged from original)
+// ---------------------------------------------------------------------------
+function AttendanceRoster({
+  sessionId,
+  classId,
+  sessionEnded,
+}: {
+  sessionId: string;
+  classId: string;
+  sessionEnded: boolean;
+}) {
   const qc = useQueryClient();
   const { user } = useAuth();
 
@@ -266,9 +431,9 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
   };
 
   const markAllUnjoined = async (status: AttendStatus) => {
-    const targets = (roster as any[]).filter(s => !attMap.has(s.id));
+    const targets = (roster as any[]).filter((s) => !attMap.has(s.id));
     if (!targets.length) { toast.info("Everyone is already marked"); return; }
-    const rows = targets.map(s => ({
+    const rows = targets.map((s) => ({
       session_id: sessionId,
       student_id: s.id,
       status,
@@ -276,7 +441,9 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
       marked_at: new Date().toISOString(),
       joined_at: status === "absent" ? null : new Date().toISOString(),
     }));
-    const { error } = await supabase.from("live_session_attendance").upsert(rows as any, { onConflict: "session_id,student_id" });
+    const { error } = await supabase
+      .from("live_session_attendance")
+      .upsert(rows as any, { onConflict: "session_id,student_id" });
     if (error) { toast.error(error.message); return; }
     toast.success(`Marked ${rows.length} as ${status}`);
     qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
@@ -303,7 +470,7 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
           <CardTitle className="text-base">Attendance roster</CardTitle>
           <button
             onClick={() => {
-              const rows = [["Student Name","Unique ID","Status","Joined At","Left At","Duration (min)"]];
+              const rows = [["Student Name", "Unique ID", "Status", "Joined At", "Left At", "Duration (min)"]];
               for (const s of roster as any[]) {
                 const att = attMap.get(s.id);
                 rows.push([
@@ -315,11 +482,13 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
                   att?.duration_seconds ? String(Math.round(att.duration_seconds / 60)) : "",
                 ]);
               }
-              const csv = rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+              const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
               const blob = new Blob([csv], { type: "text/csv" });
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
-              a.href = url; a.download = `attendance-${sessionId}.csv`; a.click();
+              a.href = url;
+              a.download = `attendance-${sessionId}.csv`;
+              a.click();
               URL.revokeObjectURL(url);
             }}
             className="text-xs border rounded px-2 py-1 hover:bg-muted"
@@ -327,12 +496,20 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
             Export CSV
           </button>
           <p className="text-xs text-muted-foreground mt-1">
-            {counts.total} students · <span className="text-emerald-600">{counts.present} present</span> · <span className="text-amber-600">{counts.late} late</span> · <span className="text-destructive">{counts.absent} absent</span> · {counts.unmarked} unmarked
+            {counts.total} students ·{" "}
+            <span className="text-emerald-600">{counts.present} present</span> ·{" "}
+            <span className="text-amber-600">{counts.late} late</span> ·{" "}
+            <span className="text-destructive">{counts.absent} absent</span> · {counts.unmarked}{" "}
+            unmarked
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("absent")}>Mark remaining absent</Button>
-          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("present")}>Mark remaining present</Button>
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("absent")}>
+            Mark remaining absent
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => markAllUnjoined("present")}>
+            Mark remaining present
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -360,13 +537,33 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
                 return (
                   <TableRow key={s.id}>
                     <TableCell>
-                      <div className="font-medium">{s.first_name} {s.last_name}</div>
+                      <div className="font-medium">
+                        {s.first_name} {s.last_name}
+                      </div>
                       <div className="text-xs text-muted-foreground">{s.unique_id}</div>
                     </TableCell>
-                    <TableCell className="text-sm">{a?.joined_at ? format(new Date(a.joined_at), "p") : "—"}</TableCell>
-                    <TableCell className="text-sm">{a?.left_at ? format(new Date(a.left_at), "p") : (hasRecord && status !== "absent" ? <Badge variant="secondary">In room</Badge> : "—")}</TableCell>
-                    <TableCell className="text-sm">{a?.duration_seconds ? Math.round(a.duration_seconds / 60) : "—"}</TableCell>
-                    <TableCell>{hasRecord ? statusBadge(status) : <span className="text-xs text-muted-foreground">Unmarked</span>}</TableCell>
+                    <TableCell className="text-sm">
+                      {a?.joined_at ? format(new Date(a.joined_at), "p") : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {a?.left_at ? (
+                        format(new Date(a.left_at), "p")
+                      ) : hasRecord && status !== "absent" ? (
+                        <Badge variant="secondary">In room</Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {a?.duration_seconds ? Math.round(a.duration_seconds / 60) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {hasRecord ? (
+                        statusBadge(status)
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Unmarked</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex rounded-md border overflow-hidden">
                         <Button
@@ -375,21 +572,27 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
                           className="h-8 rounded-none px-2"
                           onClick={() => setStatus(s.id, "present")}
                           title="Present"
-                        ><Check className="w-4 h-4" /></Button>
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant={status === "late" ? "default" : "ghost"}
                           className="h-8 rounded-none px-2 border-l"
                           onClick={() => setStatus(s.id, "late")}
                           title="Late"
-                        ><Clock className="w-4 h-4" /></Button>
+                        >
+                          <Clock className="w-4 h-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant={status === "absent" ? "destructive" : "ghost"}
                           className="h-8 rounded-none px-2 border-l"
                           onClick={() => setStatus(s.id, "absent")}
                           title="Absent"
-                        ><X className="w-4 h-4" /></Button>
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -399,7 +602,9 @@ function AttendanceRoster({ sessionId, classId, sessionEnded }: { sessionId: str
           </Table>
         )}
         {sessionEnded && (
-          <p className="text-xs text-muted-foreground mt-3">Session has ended — corrections made here are saved immediately.</p>
+          <p className="text-xs text-muted-foreground mt-3">
+            Session has ended — corrections made here are saved immediately.
+          </p>
         )}
       </CardContent>
     </Card>
