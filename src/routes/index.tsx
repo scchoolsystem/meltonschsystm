@@ -13,7 +13,7 @@ import {
   Download, BookOpen, CreditCard, Bell, BarChart3, Calendar, Shield, Utensils,
   Bus, FlaskConical, Dumbbell, FileText, Lock, IdCard, MessageSquare,
   ClipboardList, Settings, Globe, Zap, CheckCircle, ChevronDown, ChevronUp,
-  Target, Heart, Star, ArrowRight, MapPin, ExternalLink, Menu, X,
+  Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
 } from "lucide-react";
 
@@ -263,56 +263,13 @@ const MODULE_CATEGORIES = [
   },
 ];
 
-const PLANS = [
-  {
-    name: "Starter",
-    price: "KES 2,500",
-    period: "/month",
-    desc: "Perfect for small primary schools just getting started.",
-    color: "border-gray-200",
-    badge: "",
-    features: ["Up to 200 students", "Academics & Attendance", "Fee Management", "M-Pesa Payments", "Parent Portal", "SMS Notifications", "Android & Windows App", "Email support"],
-  },
-  {
-    name: "Standard",
-    price: "KES 5,000",
-    period: "/month",
-    desc: "For growing schools that need the full management suite.",
-    color: "border-primary",
-    badge: "Most Popular",
-    features: ["Up to 800 students", "Everything in Starter", "Timetable & Live Classes", "Library & Transport", "Boarding & Clinic", "Discipline & Co-curricular", "ID Card Generation", "Staff Management", "Priority support"],
-  },
-  {
-    name: "Enterprise",
-    price: "KES 9,500",
-    period: "/month",
-    desc: "For large schools and institutions needing everything.",
-    color: "border-gray-200",
-    badge: "",
-    features: ["Unlimited students", "Everything in Standard", "Kitchen & Catering", "Insurance Management", "Advanced Analytics", "Custom Roles & Permissions", "Data Import Tools", "Audit Logs & Security", "Dedicated support"],
-  },
-];
+// NOTE: pricing is now fully live — base plans come from `subscription_plans`
+// and module add-on pricing from `module_addon_pricing`, both editable in
+// Platform Admin → Website Content → Pricing & Modules.
 
-const TEAM = [
-  {
-    name: "On Point Systems",
-    role: "Development & Engineering",
-    photo: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&h=300&fit=crop&crop=face",
-    bio: "Our engineering team builds and maintains the SmartDev platform, with deep experience in cloud infrastructure, mobile apps and school administration workflows.",
-  },
-  {
-    name: "Customer Success",
-    role: "Onboarding & Support",
-    photo: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=300&h=300&fit=crop&crop=face",
-    bio: "Dedicated team ensuring every school gets fully onboarded, staff trained and questions answered — from setup day through the entire school year.",
-  },
-  {
-    name: "Product Team",
-    role: "Research & Design",
-    photo: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&h=300&fit=crop&crop=face",
-    bio: "We visit schools, talk to teachers and administrators, and translate real operational pain points into features that actually solve problems.",
-  },
-];
+// NOTE: generic stock-photo "team" placeholders removed — the Our Story page
+// now shows the real founder (editable via Platform Admin → Website Content)
+// instead of decorative stand-in photos.
 
 const STORY_MILESTONES = [
   { year: "2020", title: "The Problem", desc: "We visited dozens of Kenyan schools still running on paper registers, WhatsApp groups and Excel sheets. We knew there was a better way." },
@@ -789,38 +746,55 @@ function ModulesPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StoryPage() {
+  const site = useSiteMeta();
+  const intro = useLandingContent("story_intro", {
+    badge: "Our Story",
+    heading: "We built the system we wished existed",
+    subheading: "SmartDev started from frustration — watching school administrators drown in paperwork while teachers spent more time on registers than on teaching.",
+    hero_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=450&fit=crop",
+    mission_title: "Our Mission",
+    mission_body: "To give every school in Kenya and East Africa — regardless of size — access to the same quality of administrative technology that was previously only available to large, well-funded institutions. We believe digital tools should reduce the burden on educators, not add to it.",
+    vision_title: "Our Vision",
+    vision_body: "A future where every teacher focuses entirely on teaching, every parent is always informed, and every administrator has the data they need to make decisions. We are working toward a paperless, data-driven school system across East Africa.",
+  });
+  const milestonesData = useLandingContent("story_milestones", { items: STORY_MILESTONES });
+  const milestoneItems: { year: string; title: string; desc: string }[] = milestonesData.items?.length ? milestonesData.items : STORY_MILESTONES;
+  const founder = useLandingContent("founder", {
+    name: "Melton Konchella",
+    role: "Founder & Developer",
+    photo_url: null as string | null,
+    bio: "Melton Konchella founded and personally built SmartDev ERP — designing, developing and maintaining every module of the platform, from the academic and finance systems to the Android and Windows apps.",
+  });
+  const storyHeroPhotos = useGalleryPhotos("story_hero", [{ src: intro.hero_image_url || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=450&fit=crop" }]);
+
   return (
     <div className="py-12">
       <div className="container mx-auto px-6 max-w-5xl">
         {/* Hero */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs font-medium mb-4">
-            <Heart className="w-3.5 h-3.5" /> Our Story
+            <Heart className="w-3.5 h-3.5" /> {intro.badge}
           </div>
-          <h1 className="text-4xl font-bold">We built the system we wished existed</h1>
-          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-lg">SmartDev started from frustration — watching school administrators drown in paperwork while teachers spent more time on registers than on teaching.</p>
+          <h1 className="text-4xl font-bold">{intro.heading}</h1>
+          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-lg">{intro.subheading}</p>
         </div>
 
         {/* Hero image */}
         <div className="rounded-2xl overflow-hidden mb-16 aspect-[16/6]">
-          <img src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=450&fit=crop" alt="School campus" className="w-full h-full object-cover" />
+          <img src={storyHeroPhotos[0]?.src} alt="School campus" className="w-full h-full object-cover" />
         </div>
 
         {/* Mission & Vision */}
         <div className="grid md:grid-cols-2 gap-6 mb-16">
           <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-8">
             <Target className="w-10 h-10 text-primary mb-4" />
-            <h2 className="text-2xl font-bold mb-3">Our Mission</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              To give every school in Kenya and East Africa — regardless of size — access to the same quality of administrative technology that was previously only available to large, well-funded institutions. We believe digital tools should reduce the burden on educators, not add to it.
-            </p>
+            <h2 className="text-2xl font-bold mb-3">{intro.mission_title}</h2>
+            <p className="text-muted-foreground leading-relaxed">{intro.mission_body}</p>
           </div>
           <div className="rounded-2xl border-2 border-blue-200 bg-blue-50 p-8">
             <Star className="w-10 h-10 text-blue-600 mb-4" />
-            <h2 className="text-2xl font-bold mb-3">Our Vision</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              A future where every teacher focuses entirely on teaching, every parent is always informed, and every administrator has the data they need to make decisions. We're working toward a paperless, data-driven school system across East Africa.
-            </p>
+            <h2 className="text-2xl font-bold mb-3">{intro.vision_title}</h2>
+            <p className="text-muted-foreground leading-relaxed">{intro.vision_body}</p>
           </div>
         </div>
 
@@ -851,8 +825,8 @@ function StoryPage() {
           <div className="relative">
             <div className="absolute left-16 md:left-1/2 top-0 bottom-0 w-px bg-border" />
             <div className="space-y-8">
-              {STORY_MILESTONES.map((m, i) => (
-                <div key={m.year} className={`relative flex gap-6 ${i % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"}`}>
+              {milestoneItems.map((m, i) => (
+                <div key={`${m.year}-${i}`} className={`relative flex gap-6 ${i % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"}`}>
                   <div className={`hidden md:block w-1/2 ${i % 2 === 0 ? "text-right pr-8" : "text-left pl-8"}`}>
                     <div className="inline-block rounded-xl border bg-card p-4 text-left">
                       <div className="font-bold text-primary text-lg mb-1">{m.year}</div>
@@ -879,20 +853,22 @@ function StoryPage() {
           </div>
         </div>
 
-        {/* Team */}
+        {/* Founder */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold text-center mb-8">Our team</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {TEAM.map(t => (
-              <div key={t.name} className="rounded-xl border bg-card overflow-hidden">
-                <img src={t.photo} alt={t.name} className="w-full aspect-square object-cover" />
-                <div className="p-5">
-                  <div className="font-bold">{t.name}</div>
-                  <div className="text-sm text-primary mb-2">{t.role}</div>
-                  <p className="text-sm text-muted-foreground">{t.bio}</p>
-                </div>
-              </div>
-            ))}
+          <h2 className="text-2xl font-bold text-center mb-8">Meet the founder</h2>
+          <div className="max-w-md mx-auto rounded-xl border bg-card overflow-hidden">
+            <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
+              {founder.photo_url ? (
+                <img src={founder.photo_url} alt={founder.name} className="w-full h-full object-cover" />
+              ) : (
+                <GraduationCap className="w-16 h-16 text-muted-foreground/40" />
+              )}
+            </div>
+            <div className="p-5 text-center">
+              <div className="font-bold text-lg">{founder.name}</div>
+              <div className="text-sm text-primary mb-2">{founder.role}</div>
+              <p className="text-sm text-muted-foreground">{founder.bio}</p>
+            </div>
           </div>
         </div>
 
@@ -902,11 +878,11 @@ function StoryPage() {
             <MapPin className="w-7 h-7 text-primary" />
           </div>
           <div>
-            <div className="font-bold text-lg">Based in Nairobi, Kenya</div>
+            <div className="font-bold text-lg">Based in {site.location}</div>
             <p className="text-muted-foreground mt-1">We're a Kenyan company, built by Kenyans, for Kenyan schools. We understand the local curriculum, the M-Pesa ecosystem, boarding school culture and what teachers actually need.</p>
             <div className="mt-3 flex flex-wrap gap-4 text-sm">
-              <a href={`mailto:${EMAIL_HELLO}`} className="text-primary hover:underline flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{EMAIL_HELLO}</a>
-              <a href={`tel:${PHONE_PRIMARY.replace(/\s/g,"")}`} className="text-primary hover:underline flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{PHONE_PRIMARY}</a>
+              <a href={`mailto:${site.email_hello}`} className="text-primary hover:underline flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{site.email_hello}</a>
+              <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-primary hover:underline flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{site.phone_primary}</a>
             </div>
           </div>
         </div>
@@ -919,39 +895,161 @@ function StoryPage() {
 // PRICING PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PricingPage({ goTo }: { goTo: (p: Page) => void }) {
+function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
+  const { data: plans, isLoading: plansLoading } = useQuery({
+    queryKey: ["public-plans"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const { data: modules, isLoading: modulesLoading } = useQuery({
+    queryKey: ["public-module-pricing"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("module_addon_pricing")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [extraModules, setExtraModules] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (plans && plans.length && !selectedPlanId) setSelectedPlanId(plans[Math.min(1, plans.length - 1)].id);
+  }, [plans, selectedPlanId]);
+
+  const selectedPlan = plans?.find((p) => p.id === selectedPlanId);
+  const includedKey = selectedPlan ? `included_in_${(selectedPlan.name ?? "").toLowerCase()}` : null;
+
+  const isIncluded = (m: any) => {
+    if (!selectedPlan) return false;
+    const name = (selectedPlan.name ?? "").toLowerCase();
+    if (name.includes("starter")) return Boolean(m.included_in_starter);
+    if (name.includes("standard")) return Boolean(m.included_in_standard);
+    return Boolean(m.included_in_enterprise);
+  };
+
+  const toggleModule = (key: string) => {
+    setExtraModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const addonTotal = (modules ?? [])
+    .filter((m) => extraModules.has(m.feature_key) && !isIncluded(m))
+    .reduce((sum, m) => sum + Number(m.monthly_price ?? 0), 0);
+
+  const baseFee = Number(selectedPlan?.monthly_fee ?? 0);
+  const total = baseFee + addonTotal;
+
   return (
     <div className="py-12">
       <div className="container mx-auto px-6 max-w-5xl">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold">Simple, transparent pricing</h1>
-          <p className="mt-3 text-muted-foreground">All plans include the Android app, Windows desktop software and free setup. No hidden fees.</p>
+          <p className="mt-3 text-muted-foreground">Pick a base plan, then choose exactly the extra modules your school needs. All plans include the Android app, Windows desktop software and free setup.</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-          {PLANS.map(p => (
-            <div key={p.name} className={`rounded-xl border-2 ${p.color} bg-card p-6 flex flex-col relative`}>
-              {p.badge && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">{p.badge}</span>}
-              <div className="mb-4">
-                <div className="font-bold text-xl">{p.name}</div>
-                <div className="mt-1"><span className="text-3xl font-bold">{p.price}</span><span className="text-muted-foreground text-sm">{p.period}</span></div>
-                <p className="text-xs text-muted-foreground mt-2">{p.desc}</p>
+        {/* Base plan cards */}
+        {plansLoading ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            {(plans ?? []).map((p: any, i: number) => {
+              const isSelected = p.id === selectedPlanId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPlanId(p.id)}
+                  className={`text-left rounded-xl border-2 ${isSelected ? "border-primary" : "border-border"} bg-card p-6 flex flex-col relative transition-colors`}
+                >
+                  {p.badge && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">{p.badge}</span>}
+                  <div className="mb-4">
+                    <div className="font-bold text-xl">{p.name}</div>
+                    <div className="mt-1"><span className="text-3xl font-bold">KES {Number(p.monthly_fee ?? 0).toLocaleString()}</span><span className="text-muted-foreground text-sm">/month base</span></div>
+                    <p className="text-xs text-muted-foreground mt-2">{p.description || (p.student_limit ? `Up to ${p.student_limit} students` : "Unlimited students")}</p>
+                  </div>
+                  <div className={`mt-auto text-sm font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                    {isSelected ? "✓ Selected — customize below" : "Tap to select this plan"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Module picker */}
+        {selectedPlan && (
+          <div className="rounded-2xl border bg-card p-6 md:p-8 mb-10">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 mb-2">
+              <h2 className="text-xl font-bold">Choose your modules</h2>
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">Estimated total</div>
+                <div className="text-2xl font-bold text-primary">KES {total.toLocaleString()}<span className="text-sm text-muted-foreground font-normal">/month</span></div>
               </div>
-              <ul className="space-y-2 flex-1 mb-6">
-                {p.features.map(f => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />{f}
-                  </li>
-                ))}
-              </ul>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">Modules already included in the {selectedPlan.name} plan are free. Tick any extra module to add it and see the price update live.</p>
+            {modulesLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(modules ?? []).map((m: any) => {
+                  const included = isIncluded(m);
+                  const checked = included || extraModules.has(m.feature_key);
+                  return (
+                    <label
+                      key={m.feature_key}
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer ${included ? "bg-primary/5 border-primary/30" : "hover:bg-muted/50"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={checked}
+                        disabled={included}
+                        onChange={() => toggleModule(m.feature_key)}
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium flex items-center justify-between gap-2">
+                          {m.display_name}
+                          {included ? (
+                            <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">Included</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">+KES {Number(m.monthly_price ?? 0).toLocaleString()}/mo</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{m.category}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t pt-6">
+              <div className="text-sm text-muted-foreground">
+                Base ({selectedPlan.name}): KES {baseFee.toLocaleString()}/mo &nbsp;+&nbsp; Add-ons: KES {addonTotal.toLocaleString()}/mo
+              </div>
               <button type="button" onClick={() => goTo("contact")}>
-                <Button className="w-full" variant={p.badge ? "default" : "outline"}>Get started</Button>
+                <Button size="lg" className="gap-2">Get started with this plan <ArrowRight className="w-4 h-4" /></Button>
               </button>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <p className="text-center text-sm text-muted-foreground mb-12">All prices in KES. Annual plans available at 2 months free. Contact us for custom pricing for very large institutions.</p>
+        <p className="text-center text-sm text-muted-foreground mb-12">All prices in KES. Annual plans available at 2 months free. Contact us for custom pricing for very large institutions or school networks.</p>
 
         <div className="rounded-2xl border bg-card p-8 mb-8">
           <h2 className="text-xl font-bold mb-6">What's included in every plan</h2>
@@ -969,11 +1067,11 @@ function PricingPage({ goTo }: { goTo: (p: Page) => void }) {
           <h2 className="text-2xl font-bold">Need a custom quote?</h2>
           <p className="text-muted-foreground mt-2 max-w-lg mx-auto">Large institutions, county governments, NGOs and school networks get custom pricing. Talk to us.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <a href={`mailto:${EMAIL_SALES}`}>
+            <a href={`mailto:${site.email_sales}`}>
               <Button className="gap-2"><Mail className="w-4 h-4" /> Email Sales</Button>
             </a>
-            <a href={`tel:${PHONE_PRIMARY.replace(/\s/g,"")}`}>
-              <Button variant="outline" className="gap-2"><Phone className="w-4 h-4" />{PHONE_PRIMARY}</Button>
+            <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`}>
+              <Button variant="outline" className="gap-2"><Phone className="w-4 h-4" />{site.phone_primary}</Button>
             </a>
           </div>
         </div>
@@ -986,13 +1084,21 @@ function PricingPage({ goTo }: { goTo: (p: Page) => void }) {
 // DOWNLOAD PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DownloadPage() {
+function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
+  const windowsDirectUrl = useWindowsDownloadUrl();
+  const windowsHref = windowsDirectUrl ?? WINDOWS_RELEASES_PAGE;
+  const windowsIsDirect = Boolean(windowsDirectUrl);
+  const dl = useLandingContent("download_page", {
+    heading: "Download SmartDev",
+    subheading: "Install on Android or Windows. Log in with your school credentials to get started immediately.",
+  });
+
   return (
     <div className="py-12">
       <div className="container mx-auto px-6 max-w-4xl">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold">Download SmartDev</h1>
-          <p className="mt-3 text-muted-foreground">Install on Android or Windows. Log in with your school credentials to get started immediately.</p>
+          <h1 className="text-4xl font-bold">{dl.heading}</h1>
+          <p className="mt-3 text-muted-foreground">{dl.subheading}</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-12">
@@ -1030,25 +1136,17 @@ function DownloadPage() {
                 <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />{f}</li>
               ))}
             </ul>
-            <a href={WINDOWS_URL} target="_blank" rel="noreferrer" className="w-full">
+            <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"} className="w-full">
               <Button className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white text-base py-6">
                 <Download className="w-5 h-5" /> Download for Windows
               </Button>
             </a>
-            <p className="text-xs text-muted-foreground">Run the .msi or .exe installer and follow the setup wizard.</p>
+            <p className="text-xs text-muted-foreground">{windowsIsDirect ? "Direct download — run the installer and follow the setup wizard." : "Opens the latest release — download the .exe or .msi and run it."}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-card p-6 mb-8">
-          <h2 className="font-bold text-lg mb-4">Also available as a web app</h2>
-          <p className="text-muted-foreground text-sm mb-4">SmartDev runs fully in any modern browser — no installation required. Perfect for school computers and tablets.</p>
-          <a href="https://app.smartdev.co.ke" target="_blank" rel="noreferrer">
-            <Button variant="outline" className="gap-2"><Globe className="w-4 h-4" /> Open Web App <ExternalLink className="w-3.5 h-3.5" /></Button>
-          </a>
-        </div>
-
         <div className="rounded-2xl border bg-muted/30 p-6 text-center">
-          <p className="text-sm text-muted-foreground">Need help with installation? Call <a href={`tel:${PHONE_SUPPORT.replace(/\s/g,"")}`} className="text-primary hover:underline font-medium">{PHONE_SUPPORT}</a> or email <a href={`mailto:${EMAIL_SUPPORT}`} className="text-primary hover:underline">{EMAIL_SUPPORT}</a></p>
+          <p className="text-sm text-muted-foreground">Need help with installation? Call <a href={`tel:${site.phone_support.replace(/\s/g,"")}`} className="text-primary hover:underline font-medium">{site.phone_support}</a> or email <a href={`mailto:${site.email_support}`} className="text-primary hover:underline">{site.email_support}</a></p>
         </div>
       </div>
     </div>
@@ -1059,22 +1157,29 @@ function DownloadPage() {
 // CONTACT PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ContactPage() {
+function ContactPage({ site }: { site: typeof SITE_DEFAULTS }) {
+  const content = useLandingContent("contact_page", {
+    heading: "Get in touch",
+    subheading: "We would love to set up SmartDev for your school. Reach out and we will get back to you same day.",
+    office_image_url: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=300&fit=crop",
+    business_hours: "Monday – Friday: 8:00am – 6:00pm EAT\nSaturday: 9:00am – 2:00pm EAT\nSupport available by email 24/7",
+  });
+  const contactPhotos = useGalleryPhotos("contact", [{ src: content.office_image_url || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=300&fit=crop" }]);
+
   const CONTACTS = [
-    { icon: Mail, label: "General Enquiries", value: EMAIL_HELLO, href: `mailto:${EMAIL_HELLO}`, color: "bg-blue-100 text-blue-700" },
-    { icon: Mail, label: "Sales & Pricing", value: EMAIL_SALES, href: `mailto:${EMAIL_SALES}`, color: "bg-green-100 text-green-700" },
-    { icon: Mail, label: "Technical Support", value: EMAIL_SUPPORT, href: `mailto:${EMAIL_SUPPORT}`, color: "bg-orange-100 text-orange-700" },
-    { icon: Mail, label: "Legal & Compliance", value: EMAIL_LEGAL, href: `mailto:${EMAIL_LEGAL}`, color: "bg-purple-100 text-purple-700" },
-    { icon: Phone, label: "Primary Line", value: PHONE_PRIMARY, href: `tel:${PHONE_PRIMARY.replace(/\s/g,"")}`, color: "bg-teal-100 text-teal-700" },
-    { icon: Phone, label: "Support Line", value: PHONE_SUPPORT, href: `tel:${PHONE_SUPPORT.replace(/\s/g,"")}`, color: "bg-red-100 text-red-700" },
+    { icon: Mail, label: "General Enquiries", value: site.email_hello, href: `mailto:${site.email_hello}`, color: "bg-blue-100 text-blue-700" },
+    { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: `mailto:${site.email_sales}`, color: "bg-green-100 text-green-700" },
+    { icon: Mail, label: "Technical Support", value: site.email_support, href: `mailto:${site.email_support}`, color: "bg-orange-100 text-orange-700" },
+    { icon: Mail, label: "Admin & Legal", value: site.email_admin, href: `mailto:${site.email_admin}`, color: "bg-purple-100 text-purple-700" },
+    { icon: Phone, label: "Call or WhatsApp", value: site.phone_primary, href: `tel:${site.phone_primary.replace(/\s/g,"")}`, color: "bg-teal-100 text-teal-700" },
   ];
 
   return (
     <div className="py-12">
       <div className="container mx-auto px-6 max-w-5xl">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold">Get in touch</h1>
-          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">We'd love to set up SmartDev for your school. Reach out and we'll get back to you same day.</p>
+          <h1 className="text-4xl font-bold">{content.heading}</h1>
+          <p className="mt-3 text-muted-foreground max-w-xl mx-auto">{content.subheading}</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
@@ -1083,7 +1188,7 @@ function ContactPage() {
             <div className="space-y-3">
               {CONTACTS.map(c => (
                 <a
-                  key={c.value}
+                  key={c.label}
                   href={c.href}
                   className="flex items-center gap-4 rounded-xl border bg-card p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors group"
                 >
@@ -1120,18 +1225,18 @@ function ContactPage() {
 
             <div className="mt-8 rounded-xl border bg-card p-5">
               <div className="font-semibold mb-1 flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" /> Our location</div>
-              <p className="text-sm text-muted-foreground">Nairobi, Kenya<br />We also travel to schools across Kenya for onboarding and training.</p>
+              <p className="text-sm text-muted-foreground">{site.location}<br />We also travel to schools across Kenya for onboarding and training.</p>
             </div>
 
             <div className="mt-4 rounded-xl border bg-card p-5">
               <div className="font-semibold mb-1">Business hours</div>
-              <p className="text-sm text-muted-foreground">Monday – Friday: 8:00am – 6:00pm EAT<br />Saturday: 9:00am – 2:00pm EAT<br />Support available by email 24/7</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{content.business_hours}</p>
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl overflow-hidden">
-          <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=300&fit=crop" alt="Office" className="w-full h-56 object-cover" />
+          <img src={contactPhotos[0]?.src} alt="Office" className="w-full h-56 object-cover" />
         </div>
       </div>
     </div>
@@ -1142,7 +1247,7 @@ function ContactPage() {
 // LEGAL PAGE (links to the full legal.html document)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LegalPage() {
+function LegalPage({ site }: { site: typeof SITE_DEFAULTS }) {
   const DOCS = [
     { title: "Terms of Use", desc: "Acceptance, user commitments, prohibited actions, suspension mechanisms and liability limitations.", section: "terms" },
     { title: "Privacy Policy", desc: "What data we collect, how we use it, who we share it with and your rights under Kenyan data protection law.", section: "privacy" },
@@ -1216,8 +1321,8 @@ function LegalPage() {
             <div className="font-bold">Legal enquiries</div>
             <p className="text-sm text-muted-foreground mt-0.5">For DPA requests, compliance questions, data subject access requests or legal notices, contact our legal team directly.</p>
           </div>
-          <a href={`mailto:${EMAIL_LEGAL}`} className="shrink-0">
-            <Button variant="outline" className="gap-2"><Mail className="w-4 h-4" />{EMAIL_LEGAL}</Button>
+          <a href={`mailto:${site.email_admin}`} className="shrink-0">
+            <Button variant="outline" className="gap-2"><Mail className="w-4 h-4" />{site.email_admin}</Button>
           </a>
         </div>
       </div>

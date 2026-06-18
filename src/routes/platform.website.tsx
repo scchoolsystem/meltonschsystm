@@ -256,7 +256,7 @@ function HeroEditor() {
 }
 
 // ---------------------------------------------------------------------------
-// Founder section (replaces generic "On Point Systems" team card)
+// Founder section (replaces the old generic team-card placeholders)
 // ---------------------------------------------------------------------------
 
 function FounderEditor() {
