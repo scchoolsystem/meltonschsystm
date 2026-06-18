@@ -192,7 +192,7 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
       try {
         const domain = "smartdev.co.ke";
         const from = `${schoolName} <noreply@${domain}>`;
-        const htmlBody = `<div>${data.body.replace(/\n/g, "<br/>")}</div>`;
+        const htmlBody = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — important notice for your child</div><div>${data.body.replace(/\n/g, "<br/>")}</div>`;
 
         // Enqueue each recipient through the same queue the transactional emails use
         for (const email of emails) {
