@@ -1,59 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
-<url>
-<loc>https://smartdev.co.ke/</loc>
-<priority>1.0</priority>
-</url>
+  <url><loc>/</loc></url>
+  <url><loc>/__root</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/about</loc>
-<priority>0.9</priority>
-</url>
+  <url><loc>/academics/exams</loc></url>
+  <url><loc>/academics/marks</loc></url>
+  <url><loc>/academics/report-card/$studentId/$examId</loc></url>
+  <url><loc>/academics/report-cards</loc></url>
+  <url><loc>/academics/results</loc></url>
+  <url><loc>/academics/subjects</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/solutions</loc>
-<priority>0.9</priority>
-</url>
+  <url><loc>/admin/activity</loc></url>
+  <url><loc>/admin/billing</loc></url>
+  <url><loc>/admin/brain</loc></url>
+  <url><loc>/admin/communications</loc></url>
+  <url><loc>/admin/departments</loc></url>
+  <url><loc>/admin/features</loc></url>
+  <url><loc>/admin/field-edits</loc></url>
+  <url><loc>/admin/grading</loc></url>
+  <url><loc>/admin/ict</loc></url>
+  <url><loc>/admin/import</loc></url>
+  <url><loc>/admin/insurance</loc></url>
+  <url><loc>/admin/leaving-certificate/$id</loc></url>
+  <url><loc>/admin/leaving-certificates</loc></url>
+  <url><loc>/admin/lifecycle</loc></url>
+  <url><loc>/admin/links</loc></url>
+  <url><loc>/admin/overrides</loc></url>
+  <url><loc>/admin/periods</loc></url>
+  <url><loc>/admin/permissions</loc></url>
+  <url><loc>/admin/roles</loc></url>
+  <url><loc>/admin/rooms</loc></url>
+  <url><loc>/admin/schools</loc></url>
+  <url><loc>/admin/settings</loc></url>
+  <url><loc>/admin/student-documents</loc></url>
+  <url><loc>/admin/support</loc></url>
+  <url><loc>/admin/users</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/features</loc>
-<priority>0.9</priority>
-</url>
+  <url><loc>/analytics</loc></url>
+  <url><loc>/announcements</loc></url>
+  <url><loc>/api/public/mpesa-callback</loc></url>
+  <url><loc>/attendance</loc></url>
+  <url><loc>/boarding</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/pricing</loc>
-<priority>0.9</priority>
-</url>
+  <url><loc>/classes</loc></url>
+  <url><loc>/classroom</loc></url>
+  <url><loc>/clinic</loc></url>
+  <url><loc>/cocurricular</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/demo</loc>
-<priority>0.8</priority>
-</url>
+  <url><loc>/dashboard</loc></url>
+  <url><loc>/department</loc></url>
+  <url><loc>/discipline</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/testimonials</loc>
-<priority>0.8</priority>
-</url>
+  <url><loc>/email/unsubscribe</loc></url>
 
-<url>
-<loc>https://smartdev.co.ke/blog</loc>
-<priority>0.8</priority>
-</url>
-
-<url>
-<loc>https://smartdev.co.ke/contact</loc>
-<priority>0.8</priority>
-</url>
-
-<url>
-<loc>https://smartdev.co.ke/login</loc>
-<priority>0.7</priority>
-</url>
-
-<url>
-<loc>https://smartdev.co.ke/register</loc>
-<priority>0.7</priority>
-</url>
+  <url><loc>/finance/fees</loc></url>
+  <url><loc>/finance/generate</loc></url>
+  <url><loc>/finance/invoices</loc></url>
+  <url><loc>/finance/payments</loc></url>
 
 </urlset>
