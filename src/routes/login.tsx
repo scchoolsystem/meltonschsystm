@@ -102,7 +102,7 @@ function LoginPage() {
       const { error } = await supabase.from("support_tickets").insert({
         subject: `Login help from ${supportName} (${supportEmail})`,
         status: "open",
-        school_id: null,
+        school_id: school?.id ?? null,  // routes to the school's admin; falls back to platform if no school context
       } as any);
       if (error) throw error;
       toast.success("Request sent. We will be in touch shortly.");
