@@ -17,7 +17,19 @@ import {
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
 } from "lucide-react";
 
-export const Route = createFileRoute("/")({ component: IndexPage });
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "SmartDev ERP | School Management System Kenya" },
+      { name: "description", content: "SmartDev ERP is a modern school management system for handling students, exams, attendance, fees, and administration in one platform." },
+      { property: "og:title", content: "SmartDev ERP | School Management System Kenya" },
+      { property: "og:description", content: "All-in-one school ERP for academics, finance, and administration." },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://smartdev.co.ke/" },
+    ],
+  }),
+  component: IndexPage,
+});
 
 const GITHUB_REPO = "scchoolsystem/meltonschsystm";
 const APK_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download/app-release.apk`;
