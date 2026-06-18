@@ -20,8 +20,7 @@
                 "minHeight": 600,
                 "resizable": true,
                 "fullscreen": false,
-                "center": true,
-                "additionalBrowserArguments": "--use-fake-ui-for-media-stream=false --enable-features=WebRTC,WebRtcHideLocalIpsWithMdns --autoplay-policy=no-user-gesture-required"
+                "center": true
             }
         ],
         "security": {
