@@ -39,7 +39,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       # Linux only — system deps Tauri needs
-      # Note: libappindicator3-dev removed — conflicts with libayatana-appindicator3-dev on Ubuntu 22.04
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -58,7 +57,6 @@ jobs:
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
 
-      # Use build:desktop — skips patch-wrangler.py which is server-only
       - name: Build frontend
         run: pnpm build:desktop
         env:
@@ -67,7 +65,17 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
 
-      - name: Build Tauri app
+      # Windows & Linux — no signing secrets needed
+      - name: Build Tauri app (Windows / Linux)
+        if: matrix.os != 'macos-latest'
+        run: pnpm tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      # macOS — only run if Apple signing secrets are present
+      - name: Build Tauri app (macOS)
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE != ''
         run: pnpm tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -78,6 +86,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # macOS unsigned — runs when no Apple signing secrets are configured
+      - name: Build Tauri app (macOS unsigned)
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE == ''
+        run: pnpm tauri build --no-bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
       # ── Windows: rename .exe and .msi ──
       - name: Rename Windows installers
@@ -92,7 +108,7 @@ jobs:
 
       # ── macOS: rename .dmg ──
       - name: Rename macOS installer
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE != ''
         run: |
           VERSION=${{ github.ref_name }}
           DMG=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
@@ -108,7 +124,7 @@ jobs:
           DEB=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
           [ -n "$DEB" ] && mv "$DEB" "src-tauri/target/release/bundle/deb/SmartDev-ERP-${VERSION}-Linux.deb"
 
-      # ── Upload all platform artifacts to the same release ──
+      # ── Upload artifacts ──
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -127,7 +143,7 @@ jobs:
             |------|----------|
             | `SmartDev-ERP-${{ github.ref_name }}-Windows-Setup.exe` | Windows (installer) |
             | `SmartDev-ERP-${{ github.ref_name }}-Windows.msi` | Windows (MSI) |
-            | `SmartDev-ERP-${{ github.ref_name }}-macOS.dmg` | macOS |
+            | `SmartDev-ERP-${{ github.ref_name }}-macOS.dmg` | macOS (signed) |
             | `SmartDev-ERP-${{ github.ref_name }}-Linux.AppImage` | Linux (AppImage) |
             | `SmartDev-ERP-${{ github.ref_name }}-Linux.deb` | Linux (Debian/Ubuntu) |
             | `SmartDev-${{ github.ref_name }}.apk` | Android APK |
