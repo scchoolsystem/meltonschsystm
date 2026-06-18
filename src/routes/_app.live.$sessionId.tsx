@@ -119,7 +119,21 @@ function SessionRoom() {
   if (!session) return <div className="p-6">Session not found.</div>;
 
   const displayName = encodeURIComponent(user?.email?.split("@")[0] || "Student");
-  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName=%22${displayName}%22&config.prejoinPageEnabled=false&config.disableDeepLinking=true`;
+  // Suppress moderator login popup, enable media, no prejoin screen
+  const jitsiParams = [
+    "config.prejoinPageEnabled=false",
+    "config.disableDeepLinking=true",
+    "config.startWithAudioMuted=false",
+    "config.startWithVideoMuted=false",
+    "config.requireDisplayName=false",
+    "config.enableWelcomePage=false",
+    "config.disableModeratorIndicator=true",
+    "config.startAudioOnly=false",
+    "interfaceConfig.MOBILE_APP_PROMO=false",
+    "interfaceConfig.SHOW_JITSI_WATERMARK=false",
+    "interfaceConfig.HIDE_INVITE_MORE_HEADER=true",
+  ].join("&");
+  const jitsiUrl = `https://meet.jit.si/${session.room_name}#userInfo.displayName="${displayName}"&${jitsiParams}`;
 
   const endSession = async () => {
     await supabase.from("live_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
@@ -177,7 +191,8 @@ function SessionRoom() {
           <iframe
             title={session.title}
             src={jitsiUrl}
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *; clipboard-write *"
+            allowFullScreen
             className="w-full"
             style={{ height: "70vh", minHeight: 480, border: 0 }}
           />
