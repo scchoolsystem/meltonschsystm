@@ -68,12 +68,7 @@
             "frameworks": [],
             "providerShortName": null,
             "signingIdentity": null,
-            "infoPlist": {
-                "NSCameraUsageDescription": "SmartDev uses the camera for video conferencing and profile photos.",
-                "NSMicrophoneUsageDescription": "SmartDev uses the microphone for video conferencing.",
-                "NSPhotoLibraryUsageDescription": "SmartDev needs photo library access to upload images.",
-                "NSUserNotificationsUsageDescription": "SmartDev sends notifications for messages and school alerts."
-            }
+            "infoPlist": null
         },
         "publisher": "SmartDev"
     }
