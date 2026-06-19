@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and attach assets to (e.g. v1.0.2)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -22,8 +27,13 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
+    env:
+      VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -62,7 +72,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
 
-      # Windows & Linux only — no signing secrets needed
+      # Windows & Linux only — no signing secrets needed, no macOS in the matrix
       - name: Build Tauri app (Windows / Linux)
         run: pnpm tauri build
         env:
@@ -74,7 +84,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          VERSION=${{ github.ref_name }}
           NSIS=$(find src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
           [ -n "$NSIS" ] && mv "$NSIS" "src-tauri/target/release/bundle/nsis/SmartDev-ERP-${VERSION}-Windows-Setup.exe"
           MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
@@ -83,38 +92,34 @@ jobs:
       - name: Rename Linux installers
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          VERSION=${{ github.ref_name }}
           APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -1)
           [ -n "$APPIMAGE" ] && mv "$APPIMAGE" "src-tauri/target/release/bundle/appimage/SmartDev-ERP-${VERSION}-Linux.AppImage"
           DEB=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
           [ -n "$DEB" ] && mv "$DEB" "src-tauri/target/release/bundle/deb/SmartDev-ERP-${VERSION}-Linux.deb"
-      # ── Upload artifacts ──
+      # ── Upload artifacts onto the existing release for this tag ──
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: SmartDev ERP ${{ github.ref_name }}
+          tag_name: ${{ env.VERSION }}
+          name: SmartDev ERP ${{ env.VERSION }}
           draft: false
           prerelease: false
+          append_body: true
           body: |
-            ## SmartDev ERP ${{ github.ref_name }}
-            School management platform for Kenyan and East African schools.
-            ### Downloads
+            ### Desktop downloads
             | File | Platform |
             |------|----------|
-            | `SmartDev-ERP-${{ github.ref_name }}-Windows-Setup.exe` | Windows (installer) |
-            | `SmartDev-ERP-${{ github.ref_name }}-Windows.msi` | Windows (MSI) |
-            | `SmartDev-ERP-${{ github.ref_name }}-Linux.AppImage` | Linux (AppImage) |
-            | `SmartDev-ERP-${{ github.ref_name }}-Linux.deb` | Linux (Debian/Ubuntu) |
-            | `SmartDev-${{ github.ref_name }}.apk` | Android APK |
+            | `SmartDev-ERP-${{ env.VERSION }}-Windows-Setup.exe` | Windows (installer) |
+            | `SmartDev-ERP-${{ env.VERSION }}-Windows.msi` | Windows (MSI) |
+            | `SmartDev-ERP-${{ env.VERSION }}-Linux.AppImage` | Linux (AppImage) |
+            | `SmartDev-ERP-${{ env.VERSION }}-Linux.deb` | Linux (Debian/Ubuntu) |
             ### Install notes
             **Windows:** Run the `.exe`. If SmartScreen appears click "More info" then "Run anyway".
             **Linux AppImage:** `chmod +x SmartDev-*.AppImage && ./SmartDev-*.AppImage`
-            **Android:** Enable "Install from unknown sources" then open the `.apk`.
           files: |
-            src-tauri/target/release/bundle/nsis/SmartDev-ERP-${{ github.ref_name }}-Windows-Setup.exe
-            src-tauri/target/release/bundle/msi/SmartDev-ERP-${{ github.ref_name }}-Windows.msi
-            src-tauri/target/release/bundle/appimage/SmartDev-ERP-${{ github.ref_name }}-Linux.AppImage
-            src-tauri/target/release/bundle/deb/SmartDev-ERP-${{ github.ref_name }}-Linux.deb
+            src-tauri/target/release/bundle/nsis/SmartDev-ERP-${{ env.VERSION }}-Windows-Setup.exe
+            src-tauri/target/release/bundle/msi/SmartDev-ERP-${{ env.VERSION }}-Windows.msi
+            src-tauri/target/release/bundle/appimage/SmartDev-ERP-${{ env.VERSION }}-Linux.AppImage
+            src-tauri/target/release/bundle/deb/SmartDev-ERP-${{ env.VERSION }}-Linux.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
