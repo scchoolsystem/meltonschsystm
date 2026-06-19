@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to attach desktop assets to (e.g. v1.0.2)'
+        description: 'Release tag to attach desktop assets to (e.g. v1.0.2)'
         required: true
         type: string
 
@@ -46,7 +46,6 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      # Linux only — system deps Tauri needs
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -65,12 +64,6 @@ jobs:
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
 
-      # ── Build the SPA frontend ───────────────────────────────────────────────
-      # Uses vite.config.desktop.ts → outputs plain HTML/JS/CSS to dist-desktop/
-      # (no SSR, no server bundle — just static files Tauri can embed)
-      # tauri.conf.json frontendDist = "../dist-desktop" picks this up.
-      # Supabase keys are baked into the bundle (they're public anon keys — safe).
-      # ─────────────────────────────────────────────────────────────────────────
       - name: Build frontend (SPA for desktop)
         run: pnpm build:desktop
         env:
@@ -79,13 +72,12 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
 
-      - name: Build Tauri app (Windows / Linux)
+      - name: Build Tauri app
         run: pnpm tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-      # ── Windows: rename .exe and .msi ──
       - name: Rename Windows installers
         if: matrix.os == 'windows-latest'
         shell: bash
@@ -95,7 +87,6 @@ jobs:
           MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
           [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-${VERSION}-Windows.msi"
 
-      # ── Linux: rename .AppImage and .deb ──
       - name: Rename Linux installers
         if: matrix.os == 'ubuntu-22.04'
         run: |
@@ -104,8 +95,6 @@ jobs:
           DEB=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
           [ -n "$DEB" ] && mv "$DEB" "src-tauri/target/release/bundle/deb/SmartDev-ERP-${VERSION}-Linux.deb"
 
-      # ── Upload assets onto the EXISTING release for this tag ──
-      # append_body: true adds desktop files without overwriting Android APK/AAB
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -118,13 +107,13 @@ jobs:
             ### Desktop downloads
             | File | Platform |
             |------|----------|
-            | `SmartDev-ERP-${{ env.VERSION }}-Windows-Setup.exe` | Windows (NSIS installer) |
-            | `SmartDev-ERP-${{ env.VERSION }}-Windows.msi` | Windows (MSI) |
-            | `SmartDev-ERP-${{ env.VERSION }}-Linux.AppImage` | Linux (AppImage) |
-            | `SmartDev-ERP-${{ env.VERSION }}-Linux.deb` | Linux (Debian/Ubuntu) |
-            ### Install notes
-            **Windows:** Run the `.exe`. If SmartScreen appears click "More info" → "Run anyway".
-            **Linux AppImage:** `chmod +x SmartDev-*.AppImage && ./SmartDev-*.AppImage`
+            | `SmartDev-ERP-${{ env.VERSION }}-Windows-Setup.exe` | Windows installer |
+            | `SmartDev-ERP-${{ env.VERSION }}-Windows.msi` | Windows MSI |
+            | `SmartDev-ERP-${{ env.VERSION }}-Linux.AppImage` | Linux AppImage |
+            | `SmartDev-ERP-${{ env.VERSION }}-Linux.deb` | Linux Debian/Ubuntu |
+
+            **Windows:** Run the `.exe`. If SmartScreen blocks it click "More info" → "Run anyway".
+            **Linux:** `chmod +x SmartDev-*.AppImage && ./SmartDev-*.AppImage`
           files: |
             src-tauri/target/release/bundle/nsis/SmartDev-ERP-${{ env.VERSION }}-Windows-Setup.exe
             src-tauri/target/release/bundle/msi/SmartDev-ERP-${{ env.VERSION }}-Windows.msi
