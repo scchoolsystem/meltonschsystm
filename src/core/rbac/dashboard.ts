@@ -48,6 +48,8 @@ export type DashboardWidgetKey =
   | "admin.pendingActions"
   | "admin.newStudentsThisWeek"
   | "admin.overdueFees"
+  // Student Success Engine
+  | "admin.studentRisk"
   // ICT admin
   | "ict.featureFlags"
   | "ict.activeUsers"
@@ -62,6 +64,7 @@ export interface DashboardLayout {
 
 const ADMIN_WIDGETS: DashboardWidgetKey[] = [
   "admin.kpis",
+  "admin.studentRisk",
   "admin.studentsPerClass",
   "admin.schoolStructure",
   "admin.attendanceToday",
@@ -97,6 +100,7 @@ export function buildDashboard(userRoles: AppRole[]): DashboardLayout {
           "deputy.attendanceToday",
           "deputy.disciplineToday",
           "deputy.staffOnLeave",
+          "admin.studentRisk",
           "admin.studentsPerClass",
         ],
       };
