@@ -64,13 +64,7 @@ jobs:
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
 
-      - name: Build frontend
-        run: pnpm build:desktop
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
-          VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
+      # No frontend build needed — Tauri wraps the live site (frontendDist = https://app.smartdev.co.ke)
 
       # Windows & Linux only — no signing secrets needed, no macOS in the matrix
       - name: Build Tauri app (Windows / Linux)
