@@ -50,6 +50,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Generate route tree
+        run: pnpm exec tsr generate
+
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
 
