@@ -126,7 +126,7 @@ export function AdminStudentRiskWidget() {
   );
 }
 
-
+export function AdminStudentsPerClassWidget() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-admin-by-class"],
     queryFn: async () => {
