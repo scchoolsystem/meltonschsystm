@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Users, GraduationCap, BookOpen, TrendingUp, CalendarDays,
   ClipboardList, Wallet, Stethoscope, ShieldAlert, Library,
@@ -71,7 +72,61 @@ export function AdminKpisWidget() {
   );
 }
 
-export function AdminStudentsPerClassWidget() {
+export function AdminStudentRiskWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-admin-student-risk"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("v_student_risk")
+        .select("student_id, first_name, last_name, admission_no, risk_score, risk_reason")
+        .gte("risk_score", 45)
+        .order("risk_score", { ascending: false })
+        .limit(8);
+      return data ?? [];
+    },
+  });
+
+  const severity = (score: number) =>
+    score >= 75 ? { label: "Critical", className: "bg-destructive text-destructive-foreground" }
+    : score >= 55 ? { label: "High", className: "bg-orange-500 text-white" }
+    : { label: "Watch", className: "bg-yellow-500 text-black" };
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle className="text-sm font-medium">Students Needing Attention</CardTitle>
+          <CardDescription>Composite risk: attendance, exam trend, discipline, fee arrears</CardDescription>
+        </div>
+        <AlertTriangle className="w-4 h-4 text-chart-1" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? <MiniLoader /> : !data || data.length === 0 ? (
+          <EmptyState>No students currently flagged. 🎉</EmptyState>
+        ) : (
+          <div className="space-y-2">
+            {data.map((s: any) => {
+              const sev = severity(s.risk_score);
+              return (
+                <div key={s.student_id} className="flex items-start justify-between gap-3 border-b last:border-0 pb-2 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {s.first_name} {s.last_name} <span className="text-muted-foreground">· {s.admission_no}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{s.risk_reason || "—"}</p>
+                  </div>
+                  <Badge className={sev.className}>{sev.label} · {Math.round(s.risk_score)}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-admin-by-class"],
     queryFn: async () => {
