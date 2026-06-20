@@ -70,8 +70,9 @@ function LoginPage() {
       if (isEmail) {
         loginEmail = input;
       } else {
+        if (!slug) throw new Error("No school selected. Please sign in from your school's portal.");
         try {
-          const r = await lookup({ data: { uniqueId: input, schoolSlug: slug ?? "school-1" } });
+          const r = await lookup({ data: { uniqueId: input, schoolSlug: slug } });
           loginEmail = r.email;
         } catch (lookupErr: any) {
           const msg = String(lookupErr?.message ?? "");
