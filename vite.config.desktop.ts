@@ -5,11 +5,6 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import path from "path";
 
-// Desktop SPA build — completely separate from the SSR/Cloudflare build.
-// - Entry: desktop/index.html  (NOT the repo root, so pnpm build ignores it)
-// - Output: dist-desktop/      (tauri.conf.json frontendDist points here)
-// - No SSR, no Cloudflare Worker — plain HTML/JS/CSS bundled into the installer.
-
 export default defineConfig({
   plugins: [
     tanstackRouter({
@@ -30,6 +25,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@tanstack/start-server-core": path.resolve(__dirname, "./desktop/empty-stub.ts"),
+      "@tanstack/start-storage-context": path.resolve(__dirname, "./desktop/empty-stub.ts"),
     },
   },
   define: {
