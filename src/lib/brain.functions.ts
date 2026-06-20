@@ -18,12 +18,12 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       supabaseAdmin.from("invoices").select("id, student_id, amount, paid, status, due_date").eq("school_id", schoolId),
       supabaseAdmin.from("attendance_records").select("student_id, status, date").eq("school_id", schoolId).gte("date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
       supabaseAdmin.from("discipline_records").select("student_id, severity, incident_date").eq("school_id", schoolId).gte("incident_date", new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)),
-      supabaseAdmin.from("override_log").select("actor_id, resource, field, reason, created_at").gte("created_at", since7).order("created_at", { ascending: false }),
-      supabaseAdmin.from("field_policies").select("resource, field, classification, required_level"),
-      supabaseAdmin.from("field_edit_audit").select("actor_id, resource, field, override_used, created_at").gte("created_at", since30),
+      supabaseAdmin.from("override_log").select("actor_id, resource, field, reason, created_at").eq("school_id", schoolId).gte("created_at", since7).order("created_at", { ascending: false }),
+      supabaseAdmin.from("field_policies").select("resource, field, classification, required_level").eq("school_id", schoolId),
+      supabaseAdmin.from("field_edit_audit").select("actor_id, resource, field, override_used, created_at").eq("school_id", schoolId).gte("created_at", since30),
       supabaseAdmin.from("smart_alerts").select("id, category, severity, title, body, resolved, created_at").eq("school_id", schoolId).eq("resolved", false).order("created_at", { ascending: false }).limit(20),
-      supabaseAdmin.from("pending_parent_links").select("id, status").eq("status", "pending"),
-      supabaseAdmin.from("lifecycle_events").select("target_type, to_status, created_at").gte("created_at", since30),
+      supabaseAdmin.from("pending_parent_links").select("id, status").eq("school_id", schoolId).eq("status", "pending"),
+      supabaseAdmin.from("lifecycle_events").select("target_type, to_status, created_at").eq("school_id", schoolId).gte("created_at", since30),
       supabaseAdmin.from("exam_results").select("score").eq("school_id", schoolId),
     ]);
 
