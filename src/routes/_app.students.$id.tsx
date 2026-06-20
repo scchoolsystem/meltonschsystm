@@ -626,7 +626,10 @@ function StudentProfilePage() {
                   <div className="font-medium">{transport.transport_routes?.name ?? "Route"}</div>
                   <div className="text-muted-foreground">Pickup: {transport.pickup_point ?? "—"}</div>
                   <div className="text-muted-foreground">Vehicle: {transport.transport_routes?.vehicle_reg ?? "—"}</div>
-                  <div className="text-muted-foreground">Driver: {transport.transport_routes?.driver_name ?? "—"} {transport.transport_routes?.driver_phone ? `· ${transport.transport_routes.driver_phone}` : ""}</div>
+                  <div className="text-muted-foreground">
+                    Driver: {transport.transport_routes?.driver_name ?? "—"}
+                    {transport.transport_routes?.driver_phone ? ` · ${transport.transport_routes.driver_phone}` : ""}
+                  </div>
                 </div>
               )}
             </CardContent>
