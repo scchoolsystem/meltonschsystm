@@ -26,6 +26,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -55,6 +57,7 @@ jobs:
           [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi"
 
       - name: Upload Windows installers to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           # When triggered by a tag push, github.ref_name IS the tag.
