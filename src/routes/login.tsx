@@ -85,8 +85,10 @@ function LoginPage() {
       if (school?.id) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          await supabase.from("school_members").update({ is_default: false }).eq("user_id", user.id);
-          await supabase.from("school_members").update({ is_default: true }).eq("user_id", user.id).eq("school_id", school.id);
+          // Atomically set this school as the default in a single query —
+          // prevents the race condition where my_school_id() returns the
+          // previous school before both UPDATE statements finish.
+          await supabase.rpc("set_default_school", { p_school_id: school.id });
         }
       }
       toast.success("Welcome back");
