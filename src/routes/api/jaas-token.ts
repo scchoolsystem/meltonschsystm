@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // ---------------------------------------------------------------------------
 // Helpers — Web Crypto RS256 JWT signing (Cloudflare Workers compatible)
@@ -16,7 +18,6 @@ function encodeJson(obj: object): string {
 }
 
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  // Strip PEM headers/footers and whitespace
   const b64 = pem
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
@@ -35,30 +36,15 @@ async function importPrivateKey(pem: string): Promise<CryptoKey> {
   );
 }
 
-async function signRS256(payload: object, privateKeyPem: string): Promise<string> {
-  const header = { alg: "RS256", typ: "JWT" };
-  const headerB64 = encodeJson(header);
-  const payloadB64 = encodeJson(payload);
-  const signingInput = `${headerB64}.${payloadB64}`;
-
-  const key = await importPrivateKey(privateKeyPem);
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(signingInput),
-  );
-
-  return `${signingInput}.${base64urlEncode(signature)}`;
-}
-
 // ---------------------------------------------------------------------------
-// Route
+// Route — requires a valid Supabase session
 // ---------------------------------------------------------------------------
 
 export const Route = createFileRoute("/api/jaas-token")({
   server: {
+    middleware: [requireSupabaseAuth],
     handlers: {
-      POST: async ({ request }) => {
+      POST: async ({ request, context }) => {
         const appId = process.env.JAAS_APP_ID;
         const apiKey = process.env.JAAS_API_KEY;
         const privateKey = process.env.JAAS_PRIVATE_KEY;
@@ -70,7 +56,10 @@ export const Route = createFileRoute("/api/jaas-token")({
           );
         }
 
-        let body: { room?: string; displayName?: string; email?: string; moderator?: boolean };
+        // context.userId and context.claims come from requireSupabaseAuth
+        const userId: string = (context as any).userId;
+
+        let body: { room?: string };
         try {
           body = await request.json();
         } catch {
@@ -80,31 +69,65 @@ export const Route = createFileRoute("/api/jaas-token")({
           });
         }
 
-        const { room, displayName = "User", email = "", moderator = false } = body;
-
-        if (!room) {
+        const { room } = body;
+        if (!room || typeof room !== "string" || room.trim() === "") {
           return new Response(JSON.stringify({ error: "room is required" }), {
             status: 400,
             headers: { "content-type": "application/json" },
           });
         }
 
+        // Sanitise room name — only allow UUID-like or slug chars
+        const safeRoom = room.trim().replace(/[^a-zA-Z0-9_\-]/g, "");
+        if (!safeRoom) {
+          return new Response(JSON.stringify({ error: "Invalid room name" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Fetch real user identity and role from DB — never trust client-supplied values
+        const { data: profile, error: profileErr } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name, email")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profileErr || !profile) {
+          return new Response(JSON.stringify({ error: "User profile not found" }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Determine moderator status from DB role — never from request body
+        const { data: roleRow } = await supabaseAdmin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        const isModerator =
+          roleRow?.role === "admin" ||
+          roleRow?.role === "teacher" ||
+          roleRow?.role === "school_admin";
+
         const now = Math.floor(Date.now() / 1000);
 
         const jwtPayload = {
           iss: "chat",
           iat: now,
-          exp: now + 3600,       // 1 hour
+          exp: now + 3600,
           nbf: now - 10,
           aud: "jitsi",
-          sub: appId,            // your JaaS App ID
-          room: "*",             // wildcard — lets the same token work for any room under your app
+          sub: appId,
+          room: safeRoom,          // specific room only — no wildcard
           context: {
             user: {
-              id: email || `user-${Date.now()}`,
-              name: displayName,
-              email: email,
-              moderator: moderator === true,
+              id: userId,
+              name: profile.full_name ?? "User",
+              email: profile.email ?? "",
+              moderator: isModerator,
             },
             features: {
               livestreaming: false,
@@ -115,10 +138,7 @@ export const Route = createFileRoute("/api/jaas-token")({
           },
         };
 
-        // kid header must match the API key ID from the JaaS dashboard
         const headerOverride = { alg: "RS256", typ: "JWT", kid: apiKey };
-
-        // We need to sign with the kid override — rebuild manually
         const headerB64 = encodeJson(headerOverride);
         const payloadB64 = encodeJson(jwtPayload);
         const signingInput = `${headerB64}.${payloadB64}`;
