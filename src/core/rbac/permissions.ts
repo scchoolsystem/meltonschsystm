@@ -7,7 +7,7 @@ export type AppRole =
   | "subject_teacher" | "hod" | "admission_officer" | "bursar"
   | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff"
   | "teacher" | "nurse" | "matron" | "transport_officer"
-  | "school_admin" | "academic_master"
+  | "school_admin" | "academic_master" | "hr_admin" | "hr"
   | "exams_admin" | "exams_user" | "finance_admin" | "finance_user"
   | "boarding_admin" | "boarding_user" | "kitchen_admin" | "kitchen_user"
   | "security_admin" | "security_user" | "library_admin" | "library_user"
@@ -114,6 +114,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.overrides": ["super_admin", "principal"],
   "admin.field-edits": [...ADMIN_ROLES],
   "admin.leaving-certificates": [...ADMIN_ROLES],
+  "admin.leaving-certificate": [...ADMIN_ROLES],
   "admin.leaving-certificate": [...ADMIN_ROLES],
   "admin.insurance": [...ADMIN_ROLES, "bursar", "finance_admin"],
   "admin.student-documents": [...ADMIN_ROLES, "admission_officer"],
