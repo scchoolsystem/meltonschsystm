@@ -23,13 +23,13 @@ export default defineConfig({
     emptyOutDir: true,
   },
 resolve: {
-  alias: {
-    "@": path.resolve(__dirname, "./src"),
-    "@tanstack/start-server-core": path.resolve(__dirname, "./desktop/empty-stub.ts"),
-    "@tanstack/start-storage-context": path.resolve(__dirname, "./desktop/empty-stub.ts"),
-    "node:stream": path.resolve(__dirname, "./desktop/node-stream-stub.ts"),
-    "node:stream/web": path.resolve(__dirname, "./desktop/node-stream-web-stub.ts"),
-  },
+  alias: [
+    { find: "@", replacement: path.resolve(__dirname, "./src") },
+    { find: "@tanstack/start-server-core", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
+    { find: "@tanstack/start-storage-context", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
+    { find: "node:stream/web", replacement: path.resolve(__dirname, "./desktop/node-stream-web-stub.ts") },
+    { find: "node:stream", replacement: path.resolve(__dirname, "./desktop/node-stream-stub.ts") },
+  ],
 },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),

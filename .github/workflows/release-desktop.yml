@@ -11,16 +11,7 @@ permissions:
 
 jobs:
   build-desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            name: windows
-          - os: ubuntu-22.04
-            name: linux
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -35,18 +26,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -77,21 +56,12 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Rename Windows installers
-        if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           NSIS=$(find src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
           [ -n "$NSIS" ] && mv "$NSIS" "src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe"
           MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
           [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi"
-
-      - name: Rename Linux installers
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -1)
-          [ -n "$APPIMAGE" ] && mv "$APPIMAGE" "src-tauri/target/release/bundle/appimage/SmartDev-ERP-Linux.AppImage"
-          DEB=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
-          [ -n "$DEB" ] && mv "$DEB" "src-tauri/target/release/bundle/deb/SmartDev-ERP-Linux.deb"
 
       - name: Upload to latest GitHub Release
         uses: softprops/action-gh-release@v2
@@ -101,8 +71,5 @@ jobs:
           files: |
             src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe
             src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi
-            src-tauri/target/release/bundle/appimage/SmartDev-ERP-Linux.AppImage
-            src-tauri/target/release/bundle/deb/SmartDev-ERP-Linux.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
