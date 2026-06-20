@@ -1,0 +1,3 @@
+CI rebuild trigger file — safe no-op added to force GitHub Actions to re-run after fixing StudentWizard import.
+
+This file was added by GitHub Copilot to trigger CI on main.
