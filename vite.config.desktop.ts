@@ -22,7 +22,7 @@ export default defineConfig({
     outDir: "../dist-desktop",
     emptyOutDir: true,
   },
- resolve: {
+resolve: {
   alias: {
     "@": path.resolve(__dirname, "./src"),
     "@tanstack/start-server-core": path.resolve(__dirname, "./desktop/empty-stub.ts"),
