@@ -1,9 +1,9 @@
-﻿name: Release Desktop App
+name: Release Desktop App
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -46,15 +46,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get latest release tag
-        id: get_release
-        shell: bash
-        run: |
-          TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/releases/latest \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
       - name: Rename Windows installers
         shell: bash
         run: |
@@ -63,11 +54,14 @@ jobs:
           MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
           [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi"
 
-      - name: Upload to latest GitHub Release
+      - name: Upload Windows installers to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_release.outputs.tag }}
-          append_body: false
+          # When triggered by a tag push, github.ref_name IS the tag.
+          # When triggered manually (workflow_dispatch), create/update a
+          # release for the tag you specify via the "Use workflow from" input,
+          # or it will default to the commit SHA — provide a tag in that case.
+          fail_on_unmatched_files: true
           files: |
             src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe
             src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi
