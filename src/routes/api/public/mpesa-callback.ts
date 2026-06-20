@@ -1,9 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Safaricom Daraja STK callback. Requires a shared-secret token in the URL
-// (configured when registering the callback URL with Safaricom) to prevent
-// unauthenticated payment injection.
+// Safaricom Daraja STK push callback.
+//
+// Auth: shared-secret passed as the x-callback-token request header.
+// Register your callback URL WITHOUT a ?token= query param — the token
+// must only travel in a header so it is not logged by Cloudflare, Safaricom
+// retry infrastructure, or any HTTP proxy sitting between Safaricom and us.
+//
+// Example callback URL to register with Daraja:
+//   https://app.smartdev.co.ke/api/public/mpesa-callback
+//
+// Set MPESA_CALLBACK_TOKEN in Cloudflare Worker secrets (wrangler secret put).
+
 export const Route = createFileRoute("/api/public/mpesa-callback")({
   server: {
     handlers: {
@@ -12,11 +21,12 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         if (!expected) {
           return new Response("Callback not configured", { status: 503 });
         }
-        const url = new URL(request.url);
-        const provided =
-          url.searchParams.get("token") ||
-          request.headers.get("x-callback-token") ||
-          "";
+
+        // Accept the token from the header ONLY.
+        // The old ?token= query-string fallback has been removed because
+        // query params are recorded in Cloudflare access logs and Safaricom
+        // retry logs, leaking the shared secret.
+        const provided = request.headers.get("x-callback-token") ?? "";
         if (provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
@@ -29,7 +39,7 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         }
 
         const stk = payload?.Body?.stkCallback;
-        if (!stk) return new Response("ok"); // ignore
+        if (!stk) return new Response("ok"); // ignore non-STK shapes
 
         const resultCode = stk.ResultCode;
         if (resultCode !== 0) {
@@ -55,8 +65,8 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           return new Response("ok");
         }
 
-        // BUG B8-1: deduplicate by receipt before doing any work.
-        // (DB also has a UNIQUE index on split_part(reference,' ',1) WHERE method='mpesa'.)
+        // Deduplicate by receipt (DB also has a UNIQUE index on
+        // split_part(reference,' ',1) WHERE method='mpesa').
         const { data: dup } = await supabaseAdmin
           .from("payments")
           .select("id")
@@ -65,8 +75,8 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           .maybeSingle();
         if (dup) return new Response("ok");
 
-        // BUG B8-2: accountRef is the first 12 chars of an invoice UUID — a
-        // 12-hex prefix can collide. Require an unambiguous single match.
+        // accountRef is the first 12 chars of an invoice UUID — require an
+        // unambiguous single match to prevent collision.
         const { data: matches } = await supabaseAdmin
           .from("invoices")
           .select("id")
