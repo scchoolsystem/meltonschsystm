@@ -3,7 +3,7 @@
 // prefer canAccess(roles, "module") over hand-rolled role.includes(...) checks.
 
 export type AppRole =
-  | "super_admin" | "principal" | "deputy_principal" | "class_teacher"
+  | "super_admin" | "principal" | "deputy_principal" | "class_teacher" | "hr_admin" | "hr"
   | "subject_teacher" | "hod" | "admission_officer" | "bursar"
   | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff"
   | "teacher" | "nurse" | "matron" | "transport_officer"
@@ -44,7 +44,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     "sports", "sports_admin", "sports_user",
     "discipline_admin", "guidance_admin",
   ],
-  staff: [...ADMIN_ROLES, "hod"],
+  staff: [...ADMIN_ROLES, "hod", "hr_admin", "hr"],
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   // exams_admin also gets a Subjects link in their nav group.
   subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "student", "parent"],
@@ -114,6 +114,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.overrides": ["super_admin", "principal"],
   "admin.field-edits": [...ADMIN_ROLES],
   "admin.leaving-certificates": [...ADMIN_ROLES],
+  "admin.leaving-certificate": [...ADMIN_ROLES],
   "admin.insurance": [...ADMIN_ROLES, "bursar", "finance_admin"],
   "admin.student-documents": [...ADMIN_ROLES, "admission_officer"],
   "admin.ict": [...ADMIN_ROLES, "ict_admin"],
