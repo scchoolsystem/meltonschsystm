@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_app/staff/$id")({ component: StaffProfil
 function StaffProfilePage() {
   const { id } = Route.useParams();
   const { isAdmin } = useAuth();
+  const router = useRouter();
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ["staff-profile", id],
@@ -82,9 +83,12 @@ function StaffProfilePage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <Link to="/staff" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <button
+          onClick={() => router.history.length > 1 ? router.history.back() : router.navigate({ to: "/staff" })}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="w-4 h-4" /> Back to staff
-        </Link>
+        </button>
         <div className="flex items-center gap-2">
           <Link to="/ids/staff/$id" params={{ id: staff.id }}>
             <Button size="sm" variant="outline"><Printer className="w-4 h-4 mr-2" />ID Card</Button>
