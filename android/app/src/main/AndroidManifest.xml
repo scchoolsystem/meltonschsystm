@@ -38,10 +38,10 @@
 
     <!-- ── Camera ── -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera"           android:required="false" />
-    <uses-feature android:name="android.hardware.camera.front"     android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.flash"     android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <!-- ── Microphone / Audio ── -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -61,7 +61,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Android ≤ 12 fallback -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"  android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
     <!-- ── Biometrics (fingerprint / face login) ── -->
