@@ -24,11 +24,12 @@ const STORAGE_KEY = "smartdev_school_slug";
 
 /** True when running inside the Tauri desktop shell */
 export function isTauri(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    ((window as any).__TAURI__ !== undefined ||
-      (window as any).__TAURI_INTERNALS__ !== undefined)
-  );
+  if (typeof window === "undefined") return false;
+  if ((window as any).__TAURI__ !== undefined) return true;
+  if ((window as any).__TAURI_INTERNALS__ !== undefined) return true;
+  // Fallback: check if running as a file or tauri protocol
+  const proto = window.location.protocol;
+  return proto === "tauri:" || proto === "https:" && window.location.hostname === "tauri.localhost";
 }
 
 /** True when running inside the Capacitor Android/iOS shell */
