@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
     setLoadingList(true);
     setDebugError(null);
     const { data, error } = await supabase.rpc("list_active_schools");
-    if (error) {
-      setDebugError(JSON.stringify(error));
-    }
+    if (error) setDebugError(JSON.stringify(error));
     const rows = (data ?? []) as SchoolRow[];
     setSchools(rows);
     setFiltered(rows);
@@ -49,7 +47,6 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      {/* Nav */}
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 font-bold text-lg">
           <GraduationCap className="w-6 h-6 text-primary" />
@@ -60,7 +57,6 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
         </Button>
       </header>
 
-      {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center space-y-6">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-primary text-primary-foreground shadow-xl mb-2">
           <GraduationCap className="w-10 h-10" />
@@ -76,12 +72,11 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
           <ArrowRight className="w-4 h-4" />
         </Button>
         <p className="text-xs text-muted-foreground">
-          Already know your school's portal?{" "}
+          Already know your school portal?{" "}
           <span className="font-medium">smartdev.co.ke</span>
         </p>
       </section>
 
-      {/* Feature highlights */}
       <section className="max-w-4xl mx-auto px-6 pb-24 grid sm:grid-cols-3 gap-4">
         {[
           { icon: Shield, title: "Secure & Compliant", desc: "Role-based access, audit logs and data encryption keep your school data safe." },
@@ -100,13 +95,11 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
         ))}
       </section>
 
-      {/* Footer */}
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} SmartDev ERP · Nairobi, Kenya ·{" "}
         <a href="mailto:support@smartdev.co.ke" className="hover:underline">support@smartdev.co.ke</a>
       </footer>
 
-      {/* School-picker modal */}
       {open && (
         <div
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -117,27 +110,16 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
               <div className="flex items-center gap-2 font-semibold">
                 <Building2 className="w-5 h-5 text-primary" /> Select Your School
               </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Close"
-              >
+              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="px-4 py-3 border-b relative">
               <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                autoFocus
-                placeholder="Search schools…"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                className="pl-9"
-              />
+              <Input autoFocus placeholder="Search schools..." value={query} onChange={e => setQuery(e.target.value)} className="pl-9" />
             </div>
 
-            {/* Debug error display */}
             {debugError && (
               <div className="px-4 py-3 bg-red-50 text-red-700 text-xs break-all border-b">
                 Error: {debugError}
