@@ -152,6 +152,16 @@ function IndexPage() {
   const [native, setNative] = useState(() => isNativeApp());
   useEffect(() => { setNative(isNativeApp()); }, []);
 
+  // app.smartdev.co.ke is the APP shell (web build of the Android/desktop app),
+  // not the marketing site — even when opened in a plain browser. Only the
+  // root marketing domains (smartdev.co.ke / www) should ever show Landing.
+  const [isAppHost, setIsAppHost] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase().split(":")[0];
+    setIsAppHost(host === "app.smartdev.co.ke");
+  }, []);
+
   useEffect(() => {
     if (loading) return;
     if (slug && slug !== "__platform__") { navigate({ to: "/login" }); return; }
@@ -160,7 +170,7 @@ function IndexPage() {
   // While we are still resolving the slug OR we haven't confirmed whether this
   // is a native app yet, show a spinner so we never flash the marketing page.
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (native && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
+  if ((native || isAppHost) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
   if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   return <Landing />;
 }
