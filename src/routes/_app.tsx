@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -7,7 +7,6 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { supabase } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
@@ -37,17 +36,8 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
   const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
-  const navigate = useNavigate();
 
-  const appRoles = roles as AppRole[];
-  const isBlocked = rolesLoaded && appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path);
-
-  useEffect(() => {
-    if (isBlocked) {
-      navigate({ to: "/dashboard" });
-    }
-  }, [isBlocked, navigate]);
-
+  // Show spinner while auth is loading
   if (loading || !session || !rolesLoaded) {
     return (
       <div className="min-h-screen grid place-items-center">
@@ -56,10 +46,19 @@ function AppLayout() {
     );
   }
 
-  if (isBlocked) {
+  const appRoles = roles as AppRole[];
+
+  // Only block if roles are loaded AND user has roles AND route is truly unauthorized
+  // Allow through if roles array is empty (still loading) or route is allowed
+  if (appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
+    // Return null — beforeLoad redirect will handle login, dashboard is the fallback
     return (
-      <div className="min-h-screen grid place-items-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">Access denied</h2>
+          <p className="text-sm text-muted-foreground">You do not have permission to view this page.</p>
+          <a href="/dashboard" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground mt-2">Go to Dashboard</a>
+        </div>
       </div>
     );
   }
