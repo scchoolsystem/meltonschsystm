@@ -117,7 +117,7 @@ function Page() {
                   <TableCell className="capitalize">{c.conduct}</TableCell>
                   <TableCell>{c.leaving_date}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => window.open(`/admin/leaving-certificate/${c.id}`, "_blank")}>
+                    <Button size="sm" variant="outline" onClick={() => window.location.href = `/admin/leaving-certificate/${c.id}`}>
                       <Printer className="w-3 h-3 mr-1" />Print
                     </Button>
                   </TableCell>
