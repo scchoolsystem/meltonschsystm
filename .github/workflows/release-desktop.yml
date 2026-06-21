@@ -1,4 +1,4 @@
-name: Release Desktop App
+﻿name: Release Desktop App
 
 on:
   push:
@@ -43,6 +43,10 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
 
+      - name: Check dist-desktop exists
+        run: dir dist-desktop
+        shell: cmd
+
       - name: Build Tauri app
         run: pnpm tauri build
         env:
@@ -63,10 +67,11 @@ jobs:
           # When triggered by a tag push, github.ref_name IS the tag.
           # When triggered manually (workflow_dispatch), create/update a
           # release for the tag you specify via the "Use workflow from" input,
-          # or it will default to the commit SHA — provide a tag in that case.
+          # or it will default to the commit SHA â€” provide a tag in that case.
           fail_on_unmatched_files: true
           files: |
             src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe
             src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
