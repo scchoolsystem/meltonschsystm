@@ -22,8 +22,10 @@ const STORAGE_KEY = "smartdev_school_slug";
 
 // Detect if running inside Capacitor (Android/iOS native shell)
 export function isNativeApp(): boolean {
-  return typeof window !== "undefined" &&
-    (window as any)?.Capacitor?.isNativePlatform?.() === true;
+  return typeof window !== "undefined" && (
+    (window as any)?.Capacitor?.isNativePlatform?.() === true ||
+    (window as any).__TAURI__ !== undefined
+  );
 }
 
 type TenantState = {
