@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -7,17 +7,14 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { supabase } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_app")({
-  // Wave 1, Fix C-3: use getUser() (re-validates with Auth server) instead of
-  // getSession() (reads local storage only). Avoids double-bounce on hard
-  // refresh when local session is stale or absent.
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/login" });
   },
   component: AppLayout,
-  // Wave 3: authenticated-area boundaries (root cascades, these keep chrome).
   errorComponent: ({ error, reset }) => (
     <div className="min-h-screen grid place-items-center p-6">
       <div className="max-w-md text-center space-y-4">
@@ -40,6 +37,16 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
   const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const navigate = useNavigate();
+
+  const appRoles = roles as AppRole[];
+  const isBlocked = rolesLoaded && appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path);
+
+  useEffect(() => {
+    if (isBlocked) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [isBlocked, navigate]);
 
   if (loading || !session || !rolesLoaded) {
     return (
@@ -49,12 +56,12 @@ function AppLayout() {
     );
   }
 
-  // Wave 1, Fix C-3: drop the client-side <Navigate /> fallback. beforeLoad
-  // already guarantees a user; for unauthorized routes throw a router
-  // redirect so the URL bar stays consistent and no second render flashes.
-  const appRoles = roles as AppRole[];
-  if (path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
-    throw redirect({ to: "/dashboard" });
+  if (isBlocked) {
+    return (
+      <div className="min-h-screen grid place-items-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
