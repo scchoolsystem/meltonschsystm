@@ -51,3 +51,7 @@ android-sdk/
 .env.*
 .wrangler/deploy/
 .dev.vars
+
+meltonschsystm/
+meltonschsystm-fresh/
+package-lock.json
