@@ -26,7 +26,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
     setLoadingList(true);
     // Use SECURITY DEFINER RPC so anon (unauthenticated desktop/Android users)
     // can list schools before logging in — the direct table query is blocked by RLS.
-    const { data } = await supabase.rpc("list_active_schools");
+    const openPicker = async () => {   setOpen(true);   if (schools.length) return;   setLoadingList(true);   const { data, error } = await supabase.rpc("list_active_schools");   if (error) {     console.error("list_active_schools error:", error);     alert("Error loading schools: " + JSON.stringify(error)); // temp debug   }   const rows = (data ?? []) as SchoolRow[];   setSchools(rows);   setFiltered(rows);   setLoadingList(false); };
     const rows = (data ?? []) as SchoolRow[];
     setSchools(rows);
     setFiltered(rows);
