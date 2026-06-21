@@ -145,16 +145,22 @@ function getOS() {
 function IndexPage() {
   const { slug, loading } = useTenant();
   const navigate = useNavigate();
-  const native = isNativeApp();
-  const isAppSubdomain = typeof window !== "undefined" && window.location.hostname === "app.smartdev.co.ke";
+  // isNativeApp() reads window.__TAURI__ which Tauri injects after the document
+  // is parsed — calling it synchronously at render time can return false on the
+  // very first paint before the injection completes.  Use a state initialised
+  // after mount so we always read the correct value.
+  const [native, setNative] = useState(() => isNativeApp());
+  useEffect(() => { setNative(isNativeApp()); }, []);
 
   useEffect(() => {
     if (loading) return;
     if (slug && slug !== "__platform__") { navigate({ to: "/login" }); return; }
   }, [loading, slug, navigate]);
 
+  // While we are still resolving the slug OR we haven't confirmed whether this
+  // is a native app yet, show a spinner so we never flash the marketing page.
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if ((native || isAppSubdomain) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
+  if (native && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
   if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   return <Landing />;
 }
