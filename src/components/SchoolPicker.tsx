@@ -21,17 +21,25 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   const [selecting, setSelecting] = useState<string | null>(null);
   const [debugError, setDebugError] = useState<string | null>(null);
 
-  const openPicker = async () => {
+const openPicker = async () => {
     setOpen(true);
     if (schools.length) return;
     setLoadingList(true);
     setDebugError(null);
-    const { data, error } = await supabase.rpc("list_active_schools");
-    if (error) setDebugError(JSON.stringify(error));
-    const rows = (data ?? []) as SchoolRow[];
-    setSchools(rows);
-    setFiltered(rows);
-    setLoadingList(false);
+    try {
+      const { data, error } = await supabase.rpc("list_active_schools");
+      if (error) {
+        setDebugError(JSON.stringify(error));
+      } else {
+        const rows = (data ?? []) as SchoolRow[];
+        setSchools(rows);
+        setFiltered(rows);
+      }
+    } catch (e: any) {
+      setDebugError(e?.message ?? "Network request failed (no response from server).");
+    } finally {
+      setLoadingList(false);
+    }
   };
 
   useEffect(() => {
