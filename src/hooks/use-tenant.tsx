@@ -20,14 +20,66 @@ export type School = {
 export const PLATFORM_SLUG = "__platform__";
 const STORAGE_KEY = "smartdev_school_slug";
 
-// Detect if running inside Capacitor (Android/iOS native shell) or Tauri (desktop)
-export function isNativeApp(): boolean {
-  return typeof window !== "undefined" && (
-    (window as any)?.Capacitor?.isNativePlatform?.() === true ||
-    (window as any).__TAURI__ !== undefined ||
-    (window as any).__TAURI_INTERNALS__ !== undefined
+// ─── Platform detection ───────────────────────────────────────────────────────
+
+/** True when running inside the Tauri desktop shell */
+export function isTauri(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    ((window as any).__TAURI__ !== undefined ||
+      (window as any).__TAURI_INTERNALS__ !== undefined)
   );
 }
+
+/** True when running inside the Capacitor Android/iOS shell */
+export function isCapacitor(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    (window as any)?.Capacitor?.isNativePlatform?.() === true
+  );
+}
+
+/** True for any native shell (Capacitor OR Tauri) */
+export function isNativeApp(): boolean {
+  return isTauri() || isCapacitor();
+}
+
+// ─── Storage helpers ──────────────────────────────────────────────────────────
+// Tauri does NOT have the Capacitor plugin bridge, so use localStorage there.
+// Capacitor (Android) uses @capacitor/preferences for proper native storage.
+
+async function storageGet(key: string): Promise<string | null> {
+  if (isTauri()) {
+    return localStorage.getItem(key);
+  }
+  if (isCapacitor()) {
+    const { value } = await Preferences.get({ key });
+    return value;
+  }
+  return null;
+}
+
+async function storageSet(key: string, value: string): Promise<void> {
+  if (isTauri()) {
+    localStorage.setItem(key, value);
+    return;
+  }
+  if (isCapacitor()) {
+    await Preferences.set({ key, value });
+  }
+}
+
+async function storageRemove(key: string): Promise<void> {
+  if (isTauri()) {
+    localStorage.removeItem(key);
+    return;
+  }
+  if (isCapacitor()) {
+    await Preferences.remove({ key });
+  }
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type TenantState = {
   school: School | null;
@@ -53,9 +105,8 @@ const TenantContext = createContext<TenantState>({
   clearSchoolSlug: async () => {},
 });
 
-/**
- * Extract the school slug from the current hostname (web only).
- */
+// ─── Subdomain helper ─────────────────────────────────────────────────────────
+
 export function getSubdomainSlug(hostname: string): string | null {
   const host = hostname.toLowerCase().split(":")[0];
 
@@ -92,23 +143,19 @@ export function getSubdomainSlug(hostname: string): string | null {
   return null;
 }
 
-/**
- * Resolve the active school slug.
- * Priority:
- *   1. Native app  -> read from @capacitor/preferences
- *   2. Web         -> read from subdomain hostname
- *   3. Dev/unknown -> null (will show school picker or fallback)
- */
+// ─── Slug resolution ──────────────────────────────────────────────────────────
+
 async function resolveSlug(): Promise<string | null> {
   if (isNativeApp()) {
-    const { value } = await Preferences.get({ key: STORAGE_KEY });
-    return value ?? null;
+    return storageGet(STORAGE_KEY);
   }
   if (typeof window !== "undefined") {
     return getSubdomainSlug(window.location.hostname);
   }
   return null;
 }
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [school, setSchool] = useState<School | null>(null);
@@ -119,7 +166,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const isPlatformHost = slug === PLATFORM_SLUG;
 
-  // Redirect school subdomains to app.smartdev.co.ke
+  // Redirect school subdomains to app.smartdev.co.ke (web only)
   useEffect(() => {
     if (isNativeApp()) return;
     if (typeof window === "undefined") return;
@@ -175,16 +222,23 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // On mount: resolve slug from native storage or subdomain
+  // On mount: resolve slug from storage (Tauri/Capacitor) or subdomain (web)
   useEffect(() => {
-    resolveSlug().then((resolved) => {
-      setSlug(resolved);
-      void loadSchool(resolved);
-    });
     // Safety timeout — never hang forever
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 8000);
+    const timer = setTimeout(() => setLoading(false), 5000);
+
+    resolveSlug()
+      .then((resolved) => {
+        setSlug(resolved);
+        return loadSchool(resolved);
+      })
+      .catch(() => {
+        setLoading(false);
+      })
+      .finally(() => {
+        clearTimeout(timer);
+      });
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -202,20 +256,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [school, isPlatformHost]);
 
-  // Called from SchoolPicker screen (mobile/desktop)
   const setSchoolSlug = async (newSlug: string) => {
-    if (isNativeApp()) {
-      await Preferences.set({ key: STORAGE_KEY, value: newSlug });
-    }
+    await storageSet(STORAGE_KEY, newSlug);
     setSlug(newSlug);
     await loadSchool(newSlug);
   };
 
-  // Called on sign-out (mobile/desktop)
   const clearSchoolSlug = async () => {
-    if (isNativeApp()) {
-      await Preferences.remove({ key: STORAGE_KEY });
-    }
+    await storageRemove(STORAGE_KEY);
     setSlug(null);
     setSchool(null);
     setFeatures({});
