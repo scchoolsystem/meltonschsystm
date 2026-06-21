@@ -20,19 +20,29 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   const [loadingList, setLoadingList] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const openPicker = async () => {
     setOpen(true);
     if (schools.length) return;
     setLoadingList(true);
-    const { data } = await supabase
-      .from("schools")
-      .select("id,slug,name,logo_url,status")
-      .eq("status", "active")
-      .order("name");
-    const rows = (data ?? []) as SchoolRow[];
-    setSchools(rows);
-    setFiltered(rows);
-    setLoadingList(false);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("id,slug,name,logo_url,status")
+        .eq("status", "active")
+        .order("name");
+      if (error) throw error;
+      const rows = (data ?? []) as SchoolRow[];
+      setSchools(rows);
+      setFiltered(rows);
+    } catch (err: any) {
+      console.error("[SchoolPicker] failed to load schools:", err);
+      setLoadError(err?.message ?? "Could not load schools. Please try again.");
+    } finally {
+      setLoadingList(false);
+    }
   };
 
   useEffect(() => {
@@ -157,7 +167,18 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                 </li>
               )}
-              {!loadingList && filtered.length === 0 && (
+              {!loadingList && loadError && (
+                <li className="py-8 text-center text-sm text-destructive px-4">
+                  {loadError}
+                  <button
+                    onClick={openPicker}
+                    className="block mx-auto mt-2 text-xs underline text-muted-foreground hover:text-foreground"
+                  >
+                    Retry
+                  </button>
+                </li>
+              )}
+              {!loadingList && !loadError && filtered.length === 0 && (
                 <li className="py-8 text-center text-sm text-muted-foreground">No schools found.</li>
               )}
               {filtered.map(school => (
