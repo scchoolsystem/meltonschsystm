@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +45,7 @@ interface Student {
 
 function StudentsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
   const isAdmissionOfficer = isAdmin || hasRole("admission_officer");
@@ -187,8 +188,8 @@ function StudentsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Button asChild size="sm" variant="outline">
-                            <a href={`/students/${s.id}/documents`}>Upload Documents</a>
+                          <Button size="sm" variant="outline" onClick={() => navigate({ to: "/students/$id", params: { id: s.id } })}>
+                            Upload Documents
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -229,6 +230,7 @@ function StudentsPage() {
 }
 
 function StudentsTableCard({ q, setQ, setPage, isLoading, filtered, canEdit, isAdmin, schoolId, deleteMutation, page, pageCount, totalCount }: any) {
+  const navigate = useNavigate();
   return (
     <Card>
         <CardHeader>
@@ -283,10 +285,8 @@ function StudentsTableCard({ q, setQ, setPage, isLoading, filtered, canEdit, isA
                         </div>
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        <Button size="sm" variant="ghost" className="gap-1" asChild>
-                          <Link to="/students/$id" params={{ id: s.id }}>
-                            <Eye className="w-3.5 h-3.5" /> View
-                          </Link>
+                        <Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate({ to: "/students/$id", params: { id: s.id } })}>
+                          <Eye className="w-3.5 h-3.5" /> View
                         </Button>
                         {canEdit && (
                           <>
@@ -535,4 +535,3 @@ function AdmitStudentDialog({ classes, settings, onDone }: { classes: ClassRow[]
     </DialogContent>
   );
 }
-
