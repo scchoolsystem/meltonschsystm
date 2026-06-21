@@ -19,14 +19,17 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   const [query, setQuery] = useState("");
   const [loadingList, setLoadingList] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   const openPicker = async () => {
     setOpen(true);
     if (schools.length) return;
     setLoadingList(true);
-    // Use SECURITY DEFINER RPC so anon (unauthenticated desktop/Android users)
-    // can list schools before logging in — the direct table query is blocked by RLS.
-    const openPicker = async () => {   setOpen(true);   if (schools.length) return;   setLoadingList(true);   const { data, error } = await supabase.rpc("list_active_schools");   if (error) {     console.error("list_active_schools error:", error);     alert("Error loading schools: " + JSON.stringify(error)); // temp debug   }   const rows = (data ?? []) as SchoolRow[];   setSchools(rows);   setFiltered(rows);   setLoadingList(false); };
+    setDebugError(null);
+    const { data, error } = await supabase.rpc("list_active_schools");
+    if (error) {
+      setDebugError(JSON.stringify(error));
+    }
     const rows = (data ?? []) as SchoolRow[];
     setSchools(rows);
     setFiltered(rows);
@@ -81,21 +84,9 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
       {/* Feature highlights */}
       <section className="max-w-4xl mx-auto px-6 pb-24 grid sm:grid-cols-3 gap-4">
         {[
-          {
-            icon: Shield,
-            title: "Secure & Compliant",
-            desc: "Role-based access, audit logs and data encryption keep your school data safe.",
-          },
-          {
-            icon: BarChart3,
-            title: "Real-time Analytics",
-            desc: "Live attendance, fees collection and academic performance dashboards.",
-          },
-          {
-            icon: Bell,
-            title: "Instant Notifications",
-            desc: "SMS and push alerts to parents and staff the moment something happens.",
-          },
+          { icon: Shield, title: "Secure & Compliant", desc: "Role-based access, audit logs and data encryption keep your school data safe." },
+          { icon: BarChart3, title: "Real-time Analytics", desc: "Live attendance, fees collection and academic performance dashboards." },
+          { icon: Bell, title: "Instant Notifications", desc: "SMS and push alerts to parents and staff the moment something happens." },
         ].map(({ icon: Icon, title, desc }) => (
           <Card key={title} className="hover:shadow-md transition-shadow">
             <CardContent className="pt-6 space-y-2">
@@ -122,7 +113,6 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            {/* header */}
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-2 font-semibold">
                 <Building2 className="w-5 h-5 text-primary" /> Select Your School
@@ -136,7 +126,6 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
               </button>
             </div>
 
-            {/* search */}
             <div className="px-4 py-3 border-b relative">
               <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -148,14 +137,20 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
               />
             </div>
 
-            {/* list */}
+            {/* Debug error display */}
+            {debugError && (
+              <div className="px-4 py-3 bg-red-50 text-red-700 text-xs break-all border-b">
+                Error: {debugError}
+              </div>
+            )}
+
             <ul className="max-h-72 overflow-auto divide-y">
               {loadingList && (
                 <li className="flex justify-center py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                 </li>
               )}
-              {!loadingList && filtered.length === 0 && (
+              {!loadingList && filtered.length === 0 && !debugError && (
                 <li className="py-8 text-center text-sm text-muted-foreground">No schools found.</li>
               )}
               {filtered.map(school => (
