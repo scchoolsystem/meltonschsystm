@@ -1,6 +1,6 @@
 [package]
 name = "smartdev"
-version = "1.0.0"
+version = "1.4.4"
 description = "SmartDev ERP – School Management System"
 authors = ["SmartDev"]
 edition = "2021"

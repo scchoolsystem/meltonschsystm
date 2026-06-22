@@ -27,10 +27,7 @@ const openPicker = async () => {
     setLoadingList(true);
     setDebugError(null);
     try {
-      const test = await fetch("https://api.github.com").then(r => `github OK ${r.status}`).catch(e => `github FAIL ${e}`);
-      setDebugError(test);
-    } catch (e: any) {}
-    try {
+    
       const { data, error } = await supabase.rpc("list_active_schools");
       if (error) {
         setDebugError(JSON.stringify(error));
