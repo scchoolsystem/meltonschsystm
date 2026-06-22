@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,10 @@ const openPicker = async () => {
     if (schools.length) return;
     setLoadingList(true);
     setDebugError(null);
+    try {
+      const test = await fetch("https://api.github.com").then(r => `github OK ${r.status}`).catch(e => `github FAIL ${e}`);
+      setDebugError(test);
+    } catch (e: any) {}
     try {
       const { data, error } = await supabase.rpc("list_active_schools");
       if (error) {
