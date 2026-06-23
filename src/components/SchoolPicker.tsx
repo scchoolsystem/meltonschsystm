@@ -13,7 +13,12 @@ type SchoolRow = { id: string; slug: string; name: string; logo_url: string | nu
 
 export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }) {
   const { setSchoolSlug } = useTenant();
-  const [open, setOpen] = useState(false);
+  // Auto-open on Tauri desktop — user has no subdomain to resolve from
+  const isDesktop = typeof window !== "undefined" && (
+    (window as any).__TAURI__ !== undefined ||
+    (window as any).__TAURI_INTERNALS__ !== undefined
+  );
+  const [open, setOpen] = useState(isDesktop);
   const [schools, setSchools] = useState<SchoolRow[]>([]);
   const [filtered, setFiltered] = useState<SchoolRow[]>([]);
   const [query, setQuery] = useState("");
@@ -21,16 +26,15 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   const [selecting, setSelecting] = useState<string | null>(null);
   const [debugError, setDebugError] = useState<string | null>(null);
 
-const openPicker = async () => {
+  const openPicker = async () => {
     setOpen(true);
     if (schools.length) return;
     setLoadingList(true);
     setDebugError(null);
     try {
-    
       const { data, error } = await supabase.rpc("list_active_schools");
       if (error) {
-        setDebugError(JSON.stringify(error));
+        setDebugError(`RPC error: ${error.message} (code: ${error.code})`);
       } else {
         const rows = (data ?? []) as SchoolRow[];
         setSchools(rows);
@@ -42,6 +46,11 @@ const openPicker = async () => {
       setLoadingList(false);
     }
   };
+
+  // Trigger load when auto-opened on desktop
+  useEffect(() => {
+    if (isDesktop) openPicker();
+  }, []);
 
   useEffect(() => {
     const q = query.toLowerCase();

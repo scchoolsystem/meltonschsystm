@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Preferences } from "@capacitor/preferences";
+
+// Capacitor Preferences is only available inside the Android/iOS native shell.
+// Importing it statically crashes the Tauri desktop build because the
+// Capacitor bridge doesn't exist there. Load it lazily instead.
+async function getCapacitorPreferences() {
+  const { Preferences } = await import("@capacitor/preferences");
+  return Preferences;
+}
 
 export type School = {
   id: string;
@@ -54,6 +61,7 @@ async function storageGet(key: string): Promise<string | null> {
     return localStorage.getItem(key);
   }
   if (isCapacitor()) {
+    const Preferences = await getCapacitorPreferences();
     const { value } = await Preferences.get({ key });
     return value;
   }
@@ -66,6 +74,7 @@ async function storageSet(key: string, value: string): Promise<void> {
     return;
   }
   if (isCapacitor()) {
+    const Preferences = await getCapacitorPreferences();
     await Preferences.set({ key, value });
   }
 }
@@ -76,6 +85,7 @@ async function storageRemove(key: string): Promise<void> {
     return;
   }
   if (isCapacitor()) {
+    const Preferences = await getCapacitorPreferences();
     await Preferences.remove({ key });
   }
 }
