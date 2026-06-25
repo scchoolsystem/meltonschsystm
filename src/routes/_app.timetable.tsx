@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { useTenant } from "@/hooks/use-tenant";
 import { generateTimetable } from "@/lib/timetable.functions";
 
 export const Route = createFileRoute("/_app/timetable")({ component: Page });
@@ -49,11 +48,28 @@ const ROOM_TYPES = [
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, roles } = useAuth();
-  const { school } = useTenant();
   const canGenerate = isAdmin || (roles ?? []).some((r) => r === "academic_master");
 
   const [classId, setClassId] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+
+  // School context comes from the logged-in user's session (my_school_id RPC),
+  // NOT from useTenant()/subdomain — app.smartdev.co.ke is the shared host and
+  // useTenant() always resolves to null there.
+  const { data: schoolId } = useQuery({
+    queryKey: ["my-school-id"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("my_school_id");
+      if (error) throw error;
+      return data as string | null;
+    },
+  });
+  const { data: school } = useQuery({
+    queryKey: ["school-brand", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () =>
+      (await supabase.from("schools").select("id,name,logo_url").eq("id", schoolId!).maybeSingle()).data ?? null,
+  });
 
   const { data: classes = [] } = useQuery({
     queryKey: ["classes-tt"],
@@ -218,12 +234,12 @@ function Page() {
 
         {/* ─── Periods tab ─── */}
         <TabsContent value="periods" className="mt-4">
-          <PeriodsPanel schoolId={school?.id} />
+          <PeriodsPanel schoolId={schoolId ?? undefined} />
         </TabsContent>
 
         {/* ─── Rooms tab ─── */}
         <TabsContent value="rooms" className="mt-4">
-          <RoomsPanel schoolId={school?.id} />
+          <RoomsPanel schoolId={schoolId ?? undefined} />
         </TabsContent>
 
         {/* ─── Generate tab ─── */}
