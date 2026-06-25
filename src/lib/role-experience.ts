@@ -34,6 +34,17 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
     items: [
       dashboard,
       { title: "My Portal", url: "/portal/parent" },
+      { title: "Performance", url: "/portal/parent?tab=results" },
+      { title: "Report Cards", url: "/portal/parent?tab=reportcards" },
+      { title: "Attendance", url: "/portal/parent?tab=attendance" },
+      { title: "Fees", url: "/portal/parent?tab=fees" },
+      { title: "Timetable", url: "/portal/parent?tab=timetable" },
+      { title: "Transport", url: "/portal/parent?tab=transport" },
+      { title: "Clinic", url: "/portal/parent?tab=clinic" },
+      { title: "Boarding", url: "/portal/parent?tab=boarding" },
+      { title: "Live Classes", url: "/portal/parent?tab=live" },
+      { title: "Discipline", url: "/portal/parent?tab=discipline" },
+      { title: "School News", url: "/portal/parent?tab=news" },
     ],
   }],
   teacher: [{
