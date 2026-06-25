@@ -1,14 +1,3 @@
-// src/routes/_app.academics.report-card.$studentId.$examId.tsx
-// UPGRADED — Professional report card with:
-//   • Student photo + full info grid
-//   • Subject breakdown with progress indicators
-//   • Attendance summary
-//   • Class teacher + principal remarks
-//   • Growth analysis (vs previous exam)
-//   • QR verification code
-//   • Print-optimised CSS
-// Security: students can only print their own report card (enforced via RLS on exam_results)
-
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
