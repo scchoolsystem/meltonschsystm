@@ -1,38 +1,35 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Printer, ShieldCheck, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { useTenant } from "@/hooks/use-tenant";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import { useMemo } from "react";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
+import {
+  Loader2, Search, ClipboardList, LayoutDashboard, FileText,
+  GraduationCap, ChevronRight,
+} from "lucide-react";
 
-export const Route = createFileRoute("/_app/academics/report-card/$studentId/$examId")({
+// ─── Route ──────────────────────────────────────────────────────────────────
+export const Route = createFileRoute("/_app/academics/report-cards")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: ReportCardPage,
+  component: ReportCardsPicker,
 });
 
-// ── Grade helpers ────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 function fallbackGrade(s: number): string {
   if (s >= 80) return "A";  if (s >= 75) return "A-"; if (s >= 70) return "B+";
   if (s >= 65) return "B";  if (s >= 60) return "B-"; if (s >= 55) return "C+";
   if (s >= 50) return "C";  if (s >= 45) return "C-"; if (s >= 40) return "D+";
   if (s >= 35) return "D";  if (s >= 30) return "D-"; return "E";
-}
-
-function fallbackRemarks(grade: string): string {
-  const map: Record<string, string> = {
-    "A": "Excellent performance", "A-": "Very good performance",
-    "B+": "Good performance", "B": "Good", "B-": "Above average",
-    "C+": "Average", "C": "Satisfactory", "C-": "Needs improvement",
-    "D+": "Below average", "D": "Poor performance", "D-": "Very poor performance",
-    "E": "Unsatisfactory — requires attention",
-  };
-  return map[grade] ?? "—";
 }
 
 function gradeColor(grade: string): string {
@@ -43,583 +40,239 @@ function gradeColor(grade: string): string {
   return "#dc2626";
 }
 
-function gradeBg(grade: string): string {
-  if (["A", "A-"].includes(grade)) return "#f0fdf4";
-  if (["B+", "B", "B-"].includes(grade)) return "#eff6ff";
-  if (["C+", "C", "C-"].includes(grade)) return "#fffbeb";
-  if (["D+", "D", "D-"].includes(grade)) return "#fff7ed";
-  return "#fef2f2";
+function initials(first?: string, last?: string) {
+  return `${(first ?? "?")[0] ?? ""}${(last ?? "")[0] ?? ""}`.toUpperCase();
 }
 
-function scoreBarWidth(score: number, max: number) {
-  return `${Math.round((score / max) * 100)}%`;
-}
+// ─── Main picker page ───────────────────────────────────────────────────────
+function ReportCardsPicker() {
+  const { isAdmin, hasRole } = useAuth();
+  const { isTeacherScoped, classIds } = useTeacherScope();
+  const canBrowse = isAdmin || hasRole("teacher") || hasRole("class_teacher") ||
+    hasRole("subject_teacher") || hasRole("hod") || hasRole("academic_master") ||
+    hasRole("exams_admin") || hasRole("principal") || hasRole("deputy_principal");
 
-function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
-}
+  const [classId, setClassId] = useState<string>("");
+  const [examId, setExamId] = useState<string>("");
+  const [search, setSearch] = useState("");
 
-// ── Security guard ──────────────────────────────────────────────────────────
-function SecurityCheck({ studentId, children }: { studentId: string; children: React.ReactNode }) {
-  const { user, roles, rolesLoaded } = useAuth();
-
-  const { data: link, isLoading } = useQuery({
-    queryKey: ["rc-security", studentId, user?.id],
-    enabled: !!user && rolesLoaded,
+  // ── Classes (scoped to the teacher's own classes if applicable) ─────────
+  const { data: classes = [], isLoading: classesLoading } = useQuery({
+    queryKey: ["rc-picker-classes", isTeacherScoped, classIds.join(",")],
     queryFn: async () => {
-      // Admins / staff can view any report card in their school
-      const isStaff = roles.some((r: any) =>
-        ["super_admin", "principal", "deputy_principal", "school_admin",
-         "class_teacher", "teacher", "hod", "academic_master", "exams_admin"].includes(r)
-      );
-      if (isStaff) return { allowed: true };
-
-      // Students: must be linked to this exact student record
-      const { data } = await supabase
-        .from("student_user_links")
-        .select("student_id")
-        .eq("user_id", user!.id)
-        .eq("student_id", studentId)
-        .maybeSingle();
-      return { allowed: !!data };
+      let q = supabase.from("classes").select("id,name,stream,year").order("name");
+      if (isTeacherScoped) {
+        if (classIds.length === 0) return [];
+        q = q.in("id", classIds);
+      }
+      const { data } = await q;
+      return data ?? [];
     },
   });
 
-  if (!rolesLoaded || isLoading) return (
-    <div className="h-screen grid place-items-center">
-      <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />
-    </div>
-  );
+  // ── Exams ────────────────────────────────────────────────────────────────
+  const { data: exams = [], isLoading: examsLoading } = useQuery({
+    queryKey: ["rc-picker-exams"],
+    queryFn: async () =>
+      (await supabase.from("exams").select("id,name,term,year").order("start_date", { ascending: false })).data ?? [],
+  });
 
-  if (!link?.allowed) return (
-    <div className="h-screen grid place-items-center p-6">
-      <div className="max-w-sm text-center space-y-3">
-        <ShieldCheck className="w-12 h-12 mx-auto text-destructive opacity-60" />
-        <h2 className="font-semibold text-lg">Access Denied</h2>
-        <p className="text-sm text-muted-foreground">You do not have permission to view this report card.</p>
+  // Default to the most recent exam once loaded
+  useMemo(() => {
+    if (!examId && exams.length > 0) setExamId(exams[0].id);
+  }, [exams, examId]);
+
+  // ── Students in selected class ──────────────────────────────────────────
+  const { data: students = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ["rc-picker-students", classId],
+    enabled: !!classId,
+    queryFn: async () =>
+      (await supabase
+        .from("students")
+        .select("id,first_name,last_name,admission_no,photo_url")
+        .eq("class_id", classId)
+        .order("first_name")).data ?? [],
+  });
+
+  // ── Exam results for selected class + exam (for quick average badge) ────
+  const studentIds = useMemo(() => students.map((s: any) => s.id), [students]);
+  const { data: results = [] } = useQuery({
+    queryKey: ["rc-picker-results", examId, studentIds.join(",")],
+    enabled: !!examId && studentIds.length > 0,
+    queryFn: async () =>
+      (await supabase
+        .from("exam_results")
+        .select("student_id,score")
+        .eq("exam_id", examId)
+        .in("student_id", studentIds)).data ?? [],
+  });
+
+  const averages = useMemo(() => {
+    const map = new Map<string, { total: number; count: number }>();
+    (results as any[]).forEach((r) => {
+      const cur = map.get(r.student_id) ?? { total: 0, count: 0 };
+      cur.total += Number(r.score) || 0;
+      cur.count += 1;
+      map.set(r.student_id, cur);
+    });
+    const out = new Map<string, number>();
+    map.forEach((v, k) => out.set(k, v.count ? v.total / v.count : 0));
+    return out;
+  }, [results]);
+
+  const filteredStudents = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return students;
+    return (students as any[]).filter((s) =>
+      `${s.first_name} ${s.last_name} ${s.admission_no}`.toLowerCase().includes(term)
+    );
+  }, [students, search]);
+
+  if (!canBrowse) {
+    return (
+      <div className="flex items-center justify-center h-64 p-6 animate-in fade-in duration-300">
+        <Card className="max-w-md w-full">
+          <CardContent className="py-12 text-center space-y-3">
+            <ClipboardList className="w-12 h-12 mx-auto text-muted-foreground opacity-50" />
+            <h2 className="font-semibold text-lg">Report Cards</h2>
+            <p className="text-sm text-muted-foreground">
+              You don't have access to view student report cards.
+            </p>
+          </CardContent>
+        </Card>
       </div>
-    </div>
-  );
-
-  return <>{children}</>;
-}
-
-// ── Main component ──────────────────────────────────────────────────────────
-function ReportCardPage() {
-  const { studentId, examId } = Route.useParams();
-  const { school } = useTenant();
+    );
+  }
 
   return (
-    <SecurityCheck studentId={studentId}>
-      <ReportCardContent studentId={studentId} examId={examId} school={school} />
-    </SecurityCheck>
-  );
-}
-
-function ReportCardContent({
-  studentId, examId, school,
-}: { studentId: string; examId: string; school: any }) {
-
-  const { data: exam } = useQuery({
-    queryKey: ["exam-rc", examId],
-    queryFn: async () => (await supabase.from("exams").select("name,term,year,start_date,end_date").eq("id", examId).single()).data,
-  });
-
-  const { data: student } = useQuery({
-    queryKey: ["student-rc", studentId],
-    queryFn: async () => (await supabase
-      .from("students")
-      .select("first_name,last_name,admission_no,unique_id,date_of_birth,gender,photo_url,classes(name,stream,level)")
-      .eq("id", studentId)
-      .single()
-    ).data,
-  });
-
-  const { data: results = [], isLoading: resultsLoading } = useQuery({
-    queryKey: ["rc-results", studentId, examId],
-    queryFn: async () => (await supabase
-      .from("exam_results")
-      .select("score,grade,remarks,verified,subject_id,subjects(code,name,scale_id)")
-      .eq("student_id", studentId)
-      .eq("exam_id", examId)
-    ).data || [],
-  });
-
-  const { data: rcSettings } = useQuery({
-    queryKey: ["rc-settings"],
-    queryFn: async () => {
-      const { data: sid } = await supabase.rpc("current_user_school");
-      const { data } = await supabase
-        .from("report_card_settings")
-        .select("*")
-        .eq("school_id", sid as string)
-        .maybeSingle();
-      return data;
-    },
-  });
-
-  const { data: summary } = useQuery({
-    queryKey: ["rc-summary", studentId, examId],
-    enabled: results.length > 0,
-    queryFn: async () => {
-      const { data: sid } = await supabase.rpc("current_user_school");
-      const { data } = await supabase.rpc("get_student_report_summary", {
-        p_student_id: studentId,
-        p_exam_id: examId,
-        p_school_id: sid as string,
-      });
-      return (data as any)?.[0] ?? null;
-    },
-  });
-
-  // Subject positions
-  const { data: subjectPositions = {} } = useQuery({
-    queryKey: ["rc-subject-positions", examId, studentId],
-    enabled: !!rcSettings?.show_subject_position && results.length > 0,
-    queryFn: async () => {
-      const { data: allResults } = await supabase
-        .from("exam_results")
-        .select("student_id,subject_id,score")
-        .eq("exam_id", examId);
-      if (!allResults) return {};
-
-      const bySubject: Record<string, number[]> = {};
-      for (const r of allResults) {
-        if (!bySubject[r.subject_id]) bySubject[r.subject_id] = [];
-        bySubject[r.subject_id].push(r.score);
-      }
-
-      const myScores: Record<string, number> = {};
-      for (const r of results as any[]) myScores[r.subject_id] = r.score;
-
-      const positions: Record<string, number> = {};
-      for (const [subId, scores] of Object.entries(bySubject)) {
-        const myScore = myScores[subId];
-        if (myScore === undefined) continue;
-        positions[subId] = scores.filter((s) => s > myScore).length + 1;
-      }
-      return positions;
-    },
-  });
-
-  // Attendance for this student (last 90 days)
-  const { data: attendanceRecords = [] } = useQuery({
-    queryKey: ["rc-attendance", studentId],
-    queryFn: async () => (await supabase
-      .from("attendance_records")
-      .select("status")
-      .eq("student_id", studentId)
-      .order("date", { ascending: false })
-      .limit(90)
-    ).data || [],
-  });
-
-  // Previous exam results for growth analysis
-  const { data: previousResults = [] } = useQuery({
-    queryKey: ["rc-prev-results", studentId, examId],
-    enabled: results.length > 0,
-    queryFn: async () => {
-      // Find the exam before this one (by start_date)
-      const currentExamDate = exam?.start_date;
-      if (!currentExamDate) return [];
-      const { data: prevExam } = await supabase
-        .from("exams")
-        .select("id")
-        .lt("start_date", currentExamDate)
-        .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!prevExam) return [];
-      const { data } = await supabase
-        .from("exam_results")
-        .select("score,subject_id")
-        .eq("student_id", studentId)
-        .eq("exam_id", prevExam.id);
-      return data || [];
-    },
-  });
-
-  // ── Calculations ─────────────────────────────────────────────────────────
-  const totalMethod  = rcSettings?.total_method ?? "sum";
-  const maxPerSubject = Number(rcSettings?.max_score_per_subject ?? 100);
-  const totalScore   = (results as any[]).reduce((a, r) => a + Number(r.score), 0);
-  const meanScore    = results.length ? totalScore / results.length : 0;
-  const displayTotal = totalMethod === "sum" ? totalScore : meanScore;
-  const displayMax   = totalMethod === "sum" ? maxPerSubject * results.length : maxPerSubject;
-
-  // Get the grading scale bands for overall grade calculation
-  const { data: gradingBands = [] } = useQuery({
-    queryKey: ["rc-grading-bands", rcSettings?.overall_scale_id],
-    enabled: !!rcSettings?.overall_scale_id || !!rcSettings?.id,
-    queryFn: async () => {
-      let scaleId = rcSettings?.overall_scale_id;
-      // If no scale specified or set to "default", get the default scale
-      if (!scaleId || scaleId === "default") {
-        const { data: defaultScale } = await supabase
-          .from("grading_scales")
-          .select("id")
-          .eq("is_default", true)
-          .maybeSingle();
-        if (!defaultScale) return [];
-        scaleId = defaultScale.id;
-      }
-      const { data } = await supabase
-        .from("grading_bands")
-        .select("grade,min_score,max_score")
-        .eq("scale_id", scaleId)
-        .order("min_score", { ascending: false });
-      return data || [];
-    },
-  });
-
-  // Calculate overall grade from grading bands
-  const getOverallGrade = (mean: number) => {
-    // First try to use the grading bands
-    for (const band of gradingBands) {
-      if (mean >= band.min_score && mean <= band.max_score) {
-        return band.grade;
-      }
-    }
-    // Fallback to the default grade helper
-    return fallbackGrade(mean);
-  };
-
-  // Get remark from grading bands or fallback to settings
-  const getOverallRemark = (grade: string) => {
-    if (summary?.overall_remarks) return summary.overall_remarks;
-    if (rcSettings?.grade_remarks?.[grade]) return rcSettings.grade_remarks[grade];
-    // Try to find remark from grading bands
-    const band = gradingBands.find((b: any) => b.grade === grade);
-    if (band?.remark) return band.remark;
-    return "—";
-  };
-
-  const overallGrade   = getOverallGrade(meanScore);
-  const gradeColour    = gradeColor(overallGrade);
-  const gradeBgColour  = gradeBg(overallGrade);
-  const overallRemarks = getOverallRemark(overallGrade);
-  const position       = summary?.position;
-
-  const principalName  = rcSettings?.principal_name ?? "";
-  const principalTitle = rcSettings?.principal_title ?? "Principal";
-  const footerNote     = rcSettings?.footer_note ?? "";
-
-  // Attendance stats
-  const presentCount = attendanceRecords.filter((a: any) => a.status === "present").length;
-  const attRate      = attendanceRecords.length
-    ? Math.round((presentCount / attendanceRecords.length) * 100)
-    : null;
-
-  // Previous scores map for growth
-  const prevScoreMap: Record<string, number> = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const r of previousResults as any[]) m[r.subject_id] = r.score;
-    return m;
-  }, [previousResults]);
-
-  // QR verification string
-  const qrData = `${school?.name ?? ""} | ${student?.first_name ?? ""} ${student?.last_name ?? ""} | Adm: ${student?.admission_no ?? ""} | ${exam?.name ?? ""} | Grade: ${overallGrade}`;
-  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}`;
-
-  if (resultsLoading) return (
-    <div className="h-screen grid place-items-center">
-      <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-muted/30 py-8 print:bg-white print:py-0">
-
-      {/* Print styles injected inline for portability */}
-      <style>{`
-        @media print {
-          @page { size: A4; margin: 12mm; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-          .print-border { border: 1px solid #d1d5db !important; }
-        }
-        .score-bar { height: 5px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
-        .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
-      `}</style>
-
-      <div className="max-w-[820px] mx-auto px-4 print:px-0">
-
-        {/* ── Actions ─────────────────────────────────────────────────── */}
-        <div className="flex justify-end gap-2 mb-4 no-print">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="w-4 h-4 mr-2" /> Print / Save PDF
-          </Button>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <ClipboardList className="w-5 h-5 text-primary" />
         </div>
-
-        {/* ── Report card body ─────────────────────────────────────────── */}
-        <div className="bg-white text-gray-900 border rounded-xl p-8 print:border-0 print:p-0 print:rounded-none shadow-sm space-y-6">
-
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 pb-4 border-b-2 border-gray-200">
-            <div className="flex items-center gap-4">
-              {school?.logo_url && (
-                <img src={school.logo_url} alt="School logo" className="w-16 h-16 object-contain shrink-0" />
-              )}
-              <div>
-                <h1 className="text-xl font-extrabold uppercase tracking-tight">{school?.name || "School"}</h1>
-                {(school as any)?.address && <p className="text-xs text-gray-500 mt-0.5">{(school as any).address}</p>}
-                {(school as any)?.motto && <p className="text-xs italic text-gray-500 mt-0.5">&ldquo;{(school as any).motto}&rdquo;</p>}
-                <p className="text-sm font-bold mt-1.5 uppercase tracking-wide text-gray-700">Student Report Card</p>
-                <p className="text-xs text-gray-500">{exam?.name} &mdash; {exam?.term} {exam?.year}</p>
-              </div>
-            </div>
-            {/* QR code */}
-            <div className="shrink-0 text-center">
-              <img src={qrUrl} alt="Verification QR" className="w-16 h-16" />
-              <p className="text-[9px] text-gray-400 mt-0.5">Verify</p>
-            </div>
-          </div>
-
-          {/* Student info + photo */}
-          <div className="flex gap-4 items-start">
-            {student?.photo_url && (
-              <img
-                src={student.photo_url}
-                alt="Student"
-                className="w-24 h-28 object-cover rounded border-2 border-gray-200 shrink-0"
-              />
-            )}
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
-              {[
-                ["Full Name",   `${student?.first_name ?? ""} ${student?.last_name ?? ""}`.trim()],
-                ["Adm No",      student?.admission_no ?? "—"],
-                ["Student ID",  (student as any)?.unique_id ?? "—"],
-                ["Class",       (student as any)?.classes?.name ?? "—"],
-                ["Stream",      (student as any)?.classes?.stream ?? "—"],
-                ["Gender",      (student as any)?.gender ? ((student as any).gender[0].toUpperCase() + (student as any).gender.slice(1)) : "—"],
-                ["Date of Birth", (student as any)?.date_of_birth ?? "—"],
-                ["Exam Period",  exam ? `${exam.start_date ?? ""}${exam.end_date ? " → " + exam.end_date : ""}` : "—"],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <span className="text-xs text-gray-500">{label}: </span>
-                  <span className="font-semibold">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Results table ──────────────────────────────────────────── */}
-          <div>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">Academic Results</h2>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-100 text-xs uppercase tracking-wide text-gray-600">
-                  <th className="text-left px-3 py-2">Subject</th>
-                  <th className="text-right px-3 py-2">Score</th>
-                  {rcSettings?.show_subject_position && <th className="text-center px-3 py-2">Pos</th>}
-                  <th className="text-center px-3 py-2">Grade</th>
-                  <th className="text-center px-2 py-2 hidden sm:table-cell">Growth</th>
-                  <th className="text-left px-3 py-2">Progress</th>
-                  <th className="text-left px-3 py-2 hidden sm:table-cell">Remarks</th>
-                  <th className="text-center px-2 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(results as any[]).length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="text-center py-6 text-gray-400 text-xs">
-                      No results recorded for this exam.
-                    </td>
-                  </tr>
-                )}
-                {(results as any[]).map((r, i) => {
-                  const g      = r.grade ?? fallbackGrade(r.score);
-                  const gc     = gradeColor(g);
-                  const prev   = prevScoreMap[r.subject_id];
-                  const growth = prev !== undefined ? r.score - prev : null;
-                  return (
-                    <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
-                      <td className="px-3 py-2 font-medium">
-                        {r.subjects?.name}
-                        {r.subjects?.code && (
-                          <span className="ml-1.5 text-[10px] text-gray-400 font-mono">{r.subjects.code}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-semibold tabular-nums">
-                        {r.score}
-                        <span className="text-[10px] text-gray-400"> /{maxPerSubject}</span>
-                      </td>
-                      {rcSettings?.show_subject_position && (
-                        <td className="px-3 py-2 text-center text-xs text-gray-500">
-                          {subjectPositions[r.subject_id] != null
-                            ? ordinal(subjectPositions[r.subject_id])
-                            : "—"}
-                        </td>
-                      )}
-                      <td className="px-3 py-2 text-center">
-                        <span className="font-extrabold text-base" style={{ color: gc }}>{g}</span>
-                      </td>
-                      <td className="px-2 py-2 text-center hidden sm:table-cell">
-                        {growth === null ? (
-                          <Minus className="w-3 h-3 mx-auto text-gray-300" />
-                        ) : growth > 0 ? (
-                          <span className="text-emerald-600 text-xs font-semibold flex items-center justify-center gap-0.5">
-                            <TrendingUp className="w-3 h-3" />+{growth.toFixed(1)}
-                          </span>
-                        ) : growth < 0 ? (
-                          <span className="text-red-500 text-xs font-semibold flex items-center justify-center gap-0.5">
-                            <TrendingDown className="w-3 h-3" />{growth.toFixed(1)}
-                          </span>
-                        ) : (
-                          <Minus className="w-3 h-3 mx-auto text-gray-400" />
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="score-bar w-20">
-                          <div
-                            className="score-bar-fill"
-                            style={{ width: scoreBarWidth(r.score, maxPerSubject), backgroundColor: gc }}
-                          />
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-gray-500 hidden sm:table-cell max-w-[140px] truncate">
-                        {r.remarks || "—"}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        {r.verified
-                          ? <span className="text-emerald-600 text-[10px] font-semibold">✓</span>
-                          : <span className="text-gray-400 text-[10px]">Pending</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Academic summary ───────────────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="border rounded-lg p-3 text-center bg-gray-50">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500">
-                {totalMethod === "sum" ? "Total Score" : "Mean Score"}
-              </div>
-              <div className="text-2xl font-extrabold mt-1">
-                {displayTotal.toFixed(totalMethod === "sum" ? 0 : 1)}
-                <span className="text-xs font-normal text-gray-400"> /{displayMax.toFixed(0)}</span>
-              </div>
-            </div>
-            <div className="border rounded-lg p-3 text-center bg-gray-50">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500">Mean %</div>
-              <div className="text-2xl font-extrabold mt-1">{meanScore.toFixed(1)}%</div>
-            </div>
-            <div className="border-2 rounded-lg p-3 text-center col-span-2 sm:col-span-1"
-              style={{ borderColor: gradeColour, background: gradeBgColour }}>
-              <div className="text-[10px] uppercase tracking-wider text-gray-500">Overall Grade</div>
-              <div className="text-4xl font-black mt-1 leading-none" style={{ color: gradeColour }}>{overallGrade}</div>
-              {overallGrade !== "—" && (
-                <div className="text-[10px] mt-1.5 font-medium italic" style={{ color: gradeColour }}>
-                  {overallRemarks}
-                </div>
-              )}
-            </div>
-            {rcSettings?.show_position && position != null ? (
-              <div className="border rounded-lg p-3 text-center bg-gray-50">
-                <div className="text-[10px] uppercase tracking-wider text-gray-500">Class Position</div>
-                <div className="text-2xl font-extrabold mt-1">{ordinal(position)}</div>
-              </div>
-            ) : attRate !== null ? (
-              <div className="border rounded-lg p-3 text-center bg-gray-50">
-                <div className="text-[10px] uppercase tracking-wider text-gray-500">Attendance</div>
-                <div className="text-2xl font-extrabold mt-1"
-                  style={{ color: attRate >= 90 ? "#16a34a" : attRate >= 75 ? "#d97706" : "#dc2626" }}>
-                  {attRate}%
-                </div>
-                <div className="text-[10px] text-gray-400">{presentCount}/{attendanceRecords.length} days</div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Attendance summary row */}
-          {attRate !== null && (
-            <div className="border rounded-lg p-4 bg-gray-50 text-sm flex flex-wrap gap-6 items-center">
-              <div>
-                <span className="text-xs text-gray-500 uppercase tracking-wide">Attendance Summary</span>
-                <div className="font-bold text-lg mt-0.5">{attRate}% present</div>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Days present:</span>
-                <span className="font-semibold ml-1">{presentCount}</span>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500">Days absent:</span>
-                <span className="font-semibold ml-1">
-                  {attendanceRecords.filter((a: any) => a.status === "absent").length}
-                </span>
-              </div>
-              <div className="flex-1 min-w-[120px]">
-                <div className="score-bar">
-                  <div
-                    className="score-bar-fill"
-                    style={{
-                      width: `${attRate}%`,
-                      backgroundColor: attRate >= 90 ? "#16a34a" : attRate >= 75 ? "#d97706" : "#dc2626",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Remarks */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border rounded-lg p-4 text-sm space-y-1 bg-gray-50">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Class Teacher's Remarks</div>
-              <div className="italic text-gray-700 mt-1.5">{overallRemarks}</div>
-            </div>
-            {rcSettings?.principal_remarks && (
-              <div className="border rounded-lg p-4 text-sm space-y-1 bg-gray-50">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{principalTitle}'s Remarks</div>
-                <div className="italic text-gray-700 mt-1.5">{rcSettings.principal_remarks}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Signatures */}
-          <div className="grid grid-cols-2 gap-12 pt-4 text-xs text-gray-500 border-t">
-            <div className="space-y-6">
-              <div className="h-8" />
-              <div className="border-t pt-2">
-                <p className="font-semibold text-gray-700">Class Teacher's Signature</p>
-                <p>Name: ________________________________</p>
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="h-8" />
-              <div className="border-t pt-2">
-                <p className="font-semibold text-gray-700">{principalTitle}'s Signature</p>
-                {principalName && <p className="font-medium text-gray-800">{principalName}</p>}
-                <p>Name: ________________________________</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Parent acknowledgement */}
-          <div className="border rounded-lg p-4 text-xs text-gray-500 space-y-2 bg-gray-50">
-            <p className="font-semibold text-gray-700 uppercase tracking-wide text-[10px]">Parent / Guardian Acknowledgement</p>
-            <p>I have seen and acknowledged this report card.</p>
-            <div className="grid grid-cols-2 gap-6 mt-2">
-              <div>Signature: _______________________</div>
-              <div>Date: ____________________________</div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          {footerNote && (
-            <p className="text-[10px] text-center text-gray-400 border-t pt-3">{footerNote}</p>
-          )}
-
-          <p className="text-[9px] text-center text-gray-300">
-            Powered by SmartDev ERP &mdash; smartdev.co.ke
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Report Cards</h1>
+          <p className="text-sm text-muted-foreground">
+            Pick a class and exam, then choose a student to view their report card or full dashboard.
           </p>
         </div>
       </div>
+
+      {/* Filters */}
+      <Card className="animate-in fade-in slide-in-from-bottom-1 duration-300 delay-75">
+        <CardContent className="pt-6 flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Class</label>
+            <Select value={classId} onValueChange={setClassId}>
+              <SelectTrigger><SelectValue placeholder={classesLoading ? "Loading…" : "Select a class"} /></SelectTrigger>
+              <SelectContent>
+                {(classes as any[]).map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}{c.stream ? ` — ${c.stream}` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Exam</label>
+            <Select value={examId} onValueChange={setExamId}>
+              <SelectTrigger><SelectValue placeholder={examsLoading ? "Loading…" : "Select an exam"} /></SelectTrigger>
+              <SelectContent>
+                {(exams as any[]).map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.name} — {e.term} {e.year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Search student</label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Name or admission no."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+                disabled={!classId}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Student list */}
+      {!classId ? (
+        <Card className="animate-in fade-in duration-300">
+          <CardContent className="py-16 text-center text-muted-foreground">
+            <GraduationCap className="w-10 h-10 mx-auto mb-3 opacity-40" />
+            Select a class above to see its students.
+          </CardContent>
+        </Card>
+      ) : studentsLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : filteredStudents.length === 0 ? (
+        <Card className="animate-in fade-in duration-300">
+          <CardContent className="py-16 text-center text-muted-foreground">
+            No students match your search.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {filteredStudents.map((s: any, i: number) => {
+            const avg = averages.get(s.id);
+            const grade = avg !== undefined ? fallbackGrade(avg) : null;
+            return (
+              <Card
+                key={s.id}
+                className="group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2"
+                style={{ animationDelay: `${Math.min(i * 40, 400)}ms`, animationDuration: "300ms" }}
+              >
+                <CardContent className="pt-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-11 w-11">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {initials(s.first_name, s.last_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{s.first_name} {s.last_name}</p>
+                      <p className="text-xs text-muted-foreground">Adm. {s.admission_no}</p>
+                    </div>
+                    {grade && (
+                      <Badge
+                        className="font-bold"
+                        style={{ backgroundColor: `${gradeColor(grade)}1a`, color: gradeColor(grade), borderColor: "transparent" }}
+                      >
+                        {grade}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    {examId ? (
+                      <Button asChild size="sm" variant="outline" className="flex-1 gap-1.5 text-xs">
+                        <Link to="/academics/report-card/$studentId/$examId" params={{ studentId: s.id, examId }}>
+                          <FileText className="w-3.5 h-3.5" /> Report Card
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline" className="flex-1 gap-1.5 text-xs" disabled>
+                        <FileText className="w-3.5 h-3.5" /> Report Card
+                      </Button>
+                    )}
+                    <Button asChild size="sm" className="flex-1 gap-1.5 text-xs">
+                      <Link to="/portal/student" search={{ studentId: s.id }}>
+                        <LayoutDashboard className="w-3.5 h-3.5" /> Dashboard
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
