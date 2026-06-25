@@ -860,8 +860,7 @@ function StudentPortal() {
                 )}
               </CardContent>
             </Card>
-          </div>
-
+      
           {/* Term Comparison */}
           {examTrend.length > 0 && (
             <Card>
