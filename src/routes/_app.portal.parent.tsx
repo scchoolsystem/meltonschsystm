@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "framer-motion";
@@ -24,6 +24,9 @@ import { StudentPerformanceCenter } from "@/components/students/StudentPerforman
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export const Route = createFileRoute("/_app/portal/parent")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) ?? "results",
+  }),
   component: ParentPortal,
 });
 
@@ -50,7 +53,11 @@ function ParentPortal() {
   const [data, setData] = useState<any>({ attendance: [], results: [], invoices: [] });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("results");
+  const { tab } = useSearch({ from: "/_app/portal/parent" });
+  const navigate = useNavigate();
+  const activeTab = tab;
+  const setActiveTab = (t: string) =>
+    navigate({ to: "/portal/parent", search: (prev: any) => ({ ...prev, tab: t }), replace: true });
 
   useEffect(() => {
     if (!user) return;
