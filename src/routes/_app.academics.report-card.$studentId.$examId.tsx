@@ -19,7 +19,7 @@ function Page() {
 
   const { data: student } = useQuery({
     queryKey: ["student-rc", studentId],
-    queryFn: async () => (await supabase.from("students").select("first_name,last_name,admission_no,unique_id,date_of_birth,gender,classes(name)").eq("id", studentId).single()).data,
+    queryFn: async () => (await supabase.from("students").select("first_name,last_name,admission_no,unique_id,date_of_birth,gender,photo_url,classes(name)").eq("id", studentId).single()).data,
   });
 
   const { data: results = [], isLoading: resultsLoading } = useQuery({
@@ -136,7 +136,11 @@ function Page() {
           </div>
 
           {/* Student info */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+          <div className="flex gap-4 items-start mb-4">
+            {(student as any)?.photo_url && (
+              <img src={(student as any).photo_url} alt="Student photo" className="w-20 h-24 object-cover rounded border shrink-0" />
+            )}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm flex-1">
             <div><span className="text-muted-foreground">Name: </span><span className="font-semibold">{student?.first_name} {student?.last_name}</span></div>
             <div><span className="text-muted-foreground">Class: </span><span className="font-semibold">{(student as any)?.classes?.name ?? "—"}</span></div>
             <div><span className="text-muted-foreground">Adm No: </span><span className="font-mono">{student?.admission_no}</span></div>
@@ -147,6 +151,7 @@ function Page() {
             {(student as any)?.gender && (
               <div><span className="text-muted-foreground">Gender: </span><span className="capitalize">{(student as any).gender}</span></div>
             )}
+            </div>
           </div>
 
           {/* Results table */}
