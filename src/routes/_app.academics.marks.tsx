@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveStudents } from "@/lib/students.functions";
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,16 +122,9 @@ function AddDialog({ onDone }: { onDone: () => void }) {
 
   const { data: exams = [] } = useQuery({ queryKey: ["exams-min"], queryFn: async () => (await supabase.from("exams").select("id,name").order("created_at", { ascending: false })).data ?? [] });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students-min", isTeacherScoped, classIds.join(",")],
-    queryFn: async () => {
-      let q = supabase.from("students").select("id,admission_no,first_name,last_name,class_id").order("admission_no", { ascending: false }).limit(500);
-      if (isTeacherScoped) {
-        if (classIds.length === 0) return [];
-        q = q.in("class_id", classIds);
-      }
-      return (await q).data ?? [];
-    },
+  const { data: students = [] } = useActiveStudents({
+    classIds: isTeacherScoped ? classIds : undefined,
+    enabled: !isTeacherScoped || classIds.length > 0,
   });
 
   // Subjects scoped to teacher's allowed list, narrowed by student's class when known
@@ -238,12 +232,7 @@ function MarksGrid() {
     },
   });
 
-  const { data: roster = [], isLoading: rosterLoading } = useQuery({
-    queryKey: ["markbook-roster", classId],
-    enabled: !!classId,
-    queryFn: async () =>
-      (await supabase.from("students").select("id,admission_no,first_name,last_name").eq("class_id", classId).order("first_name")).data ?? [],
-  });
+  const { data: roster = [], isLoading: rosterLoading } = useActiveStudents({ classId, enabled: !!classId });
 
   // Existing scores for this exam+class+subject, to prefill the grid
   const { data: existing = [], isLoading: existingLoading } = useQuery({

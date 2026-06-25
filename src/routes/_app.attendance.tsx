@@ -12,6 +12,7 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
+import { useActiveStudents } from "@/lib/students.functions";
 
 export const Route = createFileRoute("/_app/attendance")({ component: Page });
 
@@ -40,11 +41,7 @@ function Page() {
     if (!classId && (classes as any[]).length > 0) setClassId((classes as any[])[0].id);
   }, [classes, classId]);
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students-att", classId],
-    enabled: !!classId,
-    queryFn: async () => (await supabase.from("students").select("id, admission_no, first_name, last_name").eq("class_id", classId).order("admission_no")).data ?? [],
-  });
+  const { data: students = [] } = useActiveStudents({ classId, enabled: !!classId });
   const { data: existing = [] } = useQuery({
     queryKey: ["att", classId, date],
     enabled: !!classId,

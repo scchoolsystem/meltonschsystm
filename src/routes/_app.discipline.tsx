@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveStudents } from "@/lib/students.functions";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_app/discipline")({ component: () => (<FeatureGate feature="discipline"><Page /></FeatureGate>) });
@@ -162,7 +163,7 @@ function Page() {
 
 function IncidentDialog({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", incident_date: format(new Date(), "yyyy-MM-dd"), description: "", severity: "low", action_taken: "" });
-  const { data: students = [] } = useQuery({ queryKey: ["students-min-disc"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const { data: students = [] } = useActiveStudents();
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -195,7 +196,7 @@ function IncidentDialog({ onDone }: { onDone: () => void }) {
 
 function CounsellingDialog({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ student_id: "", counsellor_id: "", session_date: format(new Date(), "yyyy-MM-dd"), notes: "", follow_up_date: "" });
-  const { data: students = [] } = useQuery({ queryKey: ["students-min-counsel"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const { data: students = [] } = useActiveStudents();
   const { data: staff = [] } = useQuery({ queryKey: ["staff-min"], queryFn: async () => (await supabase.from("staff").select("id,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {

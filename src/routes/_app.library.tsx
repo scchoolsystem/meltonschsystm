@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveStudents } from "@/lib/students.functions";
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -241,7 +242,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
 function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
   const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
   const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
-  const { data: students = [] } = useQuery({ queryKey: ["students-min-library"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const { data: students = [] } = useActiveStudents();
   const { data: staffList = [] } = useQuery({ queryKey: ["staff-min-library"], queryFn: async () => (await supabase.from("staff").select("id,employee_no,first_name,last_name,position_title").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {

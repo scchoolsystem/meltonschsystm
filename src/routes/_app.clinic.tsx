@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveStudents } from "@/lib/students.functions";
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -557,11 +558,7 @@ function VisitDialog({ existing, onDone }: { existing?: any; onDone: () => void 
     parent_notified:   existing?.parent_notified   ?? false,
   });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students-clinic-search"],
-    queryFn: async () =>
-      (await supabase.from("students").select("id,admission_no,first_name,last_name,classes(name)").order("first_name")).data ?? [],
-  });
+  const { data: students = [] } = useActiveStudents();
 
   const [stuSearch, setStuSearch] = useState(
     existing ? `${existing.students?.first_name ?? ""} ${existing.students?.last_name ?? ""}`.trim() : ""
@@ -875,11 +872,7 @@ function HealthRecordsTab({ can }: { can: boolean }) {
       ).data ?? [],
   });
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students-clinic-search"],
-    queryFn: async () =>
-      (await supabase.from("students").select("id,admission_no,first_name,last_name,classes(name)").order("first_name")).data ?? [],
-  });
+  const { data: students = [] } = useActiveStudents();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return records as any[];
