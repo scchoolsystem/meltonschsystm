@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room: roomName,
-          displayName: user?.email?.split("@")[0] || "User",
+          displayName: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User",
           email: user?.email ?? "",
           moderator: isModerator,
         }),
@@ -71,6 +72,7 @@ function SessionRoom() {
     );
 
   const router = useRouter();
+  const { school } = useTenant();
 
   const { data: session, isLoading } = useQuery({
     queryKey: ["live-session", sessionId],
@@ -384,7 +386,7 @@ function AttendanceRoster({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, first_name, last_name, unique_id")
+        .select("id, first_name, last_name, unique_id, photo_url")
         .eq("class_id", classId)
         .order("last_name");
       if (error) throw error;
@@ -537,10 +539,19 @@ function AttendanceRoster({
                 return (
                   <TableRow key={s.id}>
                     <TableCell>
-                      <div className="font-medium">
-                        {s.first_name} {s.last_name}
+                      <div className="flex items-center gap-2">
+                        {s.photo_url ? (
+                          <img src={s.photo_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                            {s.first_name?.[0]}{s.last_name?.[0]}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium">{s.first_name} {s.last_name}</div>
+                          <div className="text-xs text-muted-foreground">{s.unique_id}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">{s.unique_id}</div>
                     </TableCell>
                     <TableCell className="text-sm">
                       {a?.joined_at ? format(new Date(a.joined_at), "p") : "—"}
