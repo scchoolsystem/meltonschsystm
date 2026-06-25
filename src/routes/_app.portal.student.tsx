@@ -16,6 +16,7 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, Star, Target,
   BarChart3, BookOpen, Zap, Shield, ChevronUp, ChevronDown, Activity,
   CheckCircle, XCircle, AlertCircle, Lightbulb, Trophy, ArrowUp, ArrowDown,
+  CreditCard, Sun, Library, Megaphone, Scale,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
@@ -636,32 +637,32 @@ function StudentPortal() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto pb-1">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto flex-nowrap gap-0.5 p-1">
-            <TabsTrigger value="dashboard" className="whitespace-nowrap text-xs sm:text-sm">📊 Dashboard</TabsTrigger>
-            <TabsTrigger value="analytics" className="whitespace-nowrap text-xs sm:text-sm">📈 Analytics</TabsTrigger>
-            <TabsTrigger value="subjects" className="whitespace-nowrap text-xs sm:text-sm">📚 Subjects</TabsTrigger>
-            <TabsTrigger value="results" className="whitespace-nowrap text-xs sm:text-sm">🏆 Results</TabsTrigger>
-            <TabsTrigger value="reportcards" className="whitespace-nowrap text-xs sm:text-sm">📋 Reports</TabsTrigger>
-            <TabsTrigger value="timetable" className="whitespace-nowrap text-xs sm:text-sm">🗓 Timetable</TabsTrigger>
-            <TabsTrigger value="attendance" className="whitespace-nowrap text-xs sm:text-sm">✅ Attendance</TabsTrigger>
-            <TabsTrigger value="fees" className="whitespace-nowrap text-xs sm:text-sm">💳 Fees</TabsTrigger>
-            <TabsTrigger value="today" className="whitespace-nowrap text-xs sm:text-sm">☀️ My Day</TabsTrigger>
-            <TabsTrigger value="meals" className="whitespace-nowrap text-xs sm:text-sm">🍽 Meals</TabsTrigger>
-            <TabsTrigger value="cocurricular" className="whitespace-nowrap text-xs sm:text-sm">🏅 Activities</TabsTrigger>
-            <TabsTrigger value="library" className="whitespace-nowrap text-xs sm:text-sm">📖 Library</TabsTrigger>
-            <TabsTrigger value="live" className="whitespace-nowrap text-xs sm:text-sm">🎥 Live</TabsTrigger>
-            <TabsTrigger value="discipline" className="whitespace-nowrap text-xs sm:text-sm">⚖️ Discipline</TabsTrigger>
-            <TabsTrigger value="clinic" className="whitespace-nowrap text-xs sm:text-sm">🏥 Clinic</TabsTrigger>
-            <TabsTrigger value="gate" className="whitespace-nowrap text-xs sm:text-sm">🚪 Gate</TabsTrigger>
-            <TabsTrigger value="transport" className="whitespace-nowrap text-xs sm:text-sm">🚌 Transport</TabsTrigger>
-            <TabsTrigger value="news" className="whitespace-nowrap text-xs sm:text-sm">📣 News</TabsTrigger>
-            <TabsTrigger value="documents" className="whitespace-nowrap text-xs sm:text-sm">📁 Docs</TabsTrigger>
+            <TabsTrigger value="dashboard" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><BarChart3 className="w-3.5 h-3.5" /> Dashboard</TabsTrigger>
+            <TabsTrigger value="analytics" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Analytics</TabsTrigger>
+            <TabsTrigger value="subjects" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Subjects</TabsTrigger>
+            <TabsTrigger value="results" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Trophy className="w-3.5 h-3.5" /> Results</TabsTrigger>
+            <TabsTrigger value="reportcards" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Reports</TabsTrigger>
+            <TabsTrigger value="timetable" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Calendar className="w-3.5 h-3.5" /> Timetable</TabsTrigger>
+            <TabsTrigger value="attendance" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Attendance</TabsTrigger>
+            <TabsTrigger value="fees" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><CreditCard className="w-3.5 h-3.5" /> Fees</TabsTrigger>
+            <TabsTrigger value="today" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Sun className="w-3.5 h-3.5" /> My Day</TabsTrigger>
+            <TabsTrigger value="meals" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Utensils className="w-3.5 h-3.5" /> Meals</TabsTrigger>
+            <TabsTrigger value="cocurricular" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Award className="w-3.5 h-3.5" /> Activities</TabsTrigger>
+            <TabsTrigger value="library" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Library className="w-3.5 h-3.5" /> Library</TabsTrigger>
+            <TabsTrigger value="live" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Video className="w-3.5 h-3.5" /> Live</TabsTrigger>
+            <TabsTrigger value="discipline" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Scale className="w-3.5 h-3.5" /> Discipline</TabsTrigger>
+            <TabsTrigger value="clinic" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Heart className="w-3.5 h-3.5" /> Clinic</TabsTrigger>
+            <TabsTrigger value="gate" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><DoorOpen className="w-3.5 h-3.5" /> Gate</TabsTrigger>
+            <TabsTrigger value="transport" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Bus className="w-3.5 h-3.5" /> Transport</TabsTrigger>
+            <TabsTrigger value="news" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Megaphone className="w-3.5 h-3.5" /> News</TabsTrigger>
+            <TabsTrigger value="documents" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><FileText className="w-3.5 h-3.5" /> Docs</TabsTrigger>
           </TabsList>
         </div>
 
         {/* ── DASHBOARD TAB ──────────────────────────────────────────── */}
         <TabsContent value="dashboard" className="mt-4 space-y-6">
-          {/* Academic Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Academic Summary Cards — 8 KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SummaryCard
               icon={<BarChart3 className="w-5 h-5" />}
               label="Current Average"
@@ -678,6 +679,20 @@ function StudentPortal() {
               color="violet"
             />
             <SummaryCard
+              icon={<Trophy className="w-5 h-5" />}
+              label="Class Position"
+              value={examTrend.length > 0 ? "—" : "—"}
+              sub="In your class"
+              color="amber"
+            />
+            <SummaryCard
+              icon={<Target className="w-5 h-5" />}
+              label="Stream Position"
+              value="—"
+              sub="In your stream"
+              color="blue"
+            />
+            <SummaryCard
               icon={<Activity className="w-5 h-5" />}
               label="Attendance Rate"
               value={`${attRate}%`}
@@ -685,11 +700,37 @@ function StudentPortal() {
               color={attRate >= 90 ? "emerald" : attRate >= 75 ? "amber" : "red"}
             />
             <SummaryCard
+              icon={<CreditCard className="w-5 h-5" />}
+              label="Fee Status"
+              value={totalDue > 0 ? `KES ${(totalDue / 1000).toFixed(0)}k due` : "Clear"}
+              sub={totalDue > 0 ? "Outstanding balance" : "All fees paid"}
+              color={totalDue > 0 ? "red" : "emerald"}
+            />
+            <SummaryCard
+              icon={<ClipboardList className="w-5 h-5" />}
+              label="Upcoming Exam"
+              value={nextExam?.name ?? "None"}
+              sub={
+                daysToExam !== null
+                  ? daysToExam === 0 ? "Today!" : daysToExam === 1 ? "Tomorrow" : `In ${daysToExam} days`
+                  : "No exams scheduled"
+              }
+              color={daysToExam !== null && daysToExam <= 7 ? "amber" : "indigo"}
+            />
+            <SummaryCard
               icon={<Zap className="w-5 h-5" />}
-              label="Exam Readiness"
-              value={readiness !== null ? `${readiness}/100` : "—"}
-              sub="Combined score"
-              color="blue"
+              label="Next Lesson"
+              value={
+                currentSlot?.subjects?.name ?? nextSlot?.subjects?.name ?? "—"
+              }
+              sub={
+                currentSlot
+                  ? `Now · ${currentSlot.start_time?.slice(0, 5)}–${currentSlot.end_time?.slice(0, 5)}`
+                  : nextSlot
+                  ? `${nextSlot.start_time?.slice(0, 5)}–${nextSlot.end_time?.slice(0, 5)}`
+                  : "No more lessons today"
+              }
+              color={currentSlot ? "emerald" : "blue"}
             />
           </div>
 
@@ -812,6 +853,118 @@ function StudentPortal() {
             results={results}
             attendance={attendance}
           />
+          {/* Grade Distribution */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Grade Distribution</CardTitle>
+              <CardDescription>Across all exams and subjects</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {gradeDistribution.length === 0 ? (
+                <EmptyChart message="No results to analyse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={gradeDistribution} dataKey="value" nameKey="name"
+                      cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`}>
+                      {gradeDistribution.map((entry, i) => {
+                        const colors = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444", "#dc2626"];
+                        return <Cell key={i} fill={colors[i % colors.length]} />;
+                      })}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Subject Radar */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Subject Performance Radar</CardTitle>
+              <CardDescription>Current scores by subject</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {subjectAnalytics.length < 3 ? (
+                <EmptyChart message="Need 3+ subjects for radar chart" />
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <RadarChart data={subjectAnalytics.slice(0, 8).map(s => ({ subject: s.name.split(" ")[0], score: s.current }))}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Term Comparison */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Exam Performance History</CardTitle>
+              <CardDescription>Average score per exam</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={examTrend} barSize={40}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: any) => [`${v}%`, "Avg Score"]} />
+                  <Bar dataKey="avg" radius={[6, 6, 0, 0]}>
+                    {examTrend.map((entry, i) => (
+                      <Cell key={i} fill={entry.avg >= 70 ? "#6366f1" : entry.avg >= 50 ? "#f97316" : "#ef4444"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Performance Forecast */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" /> AI Insights & Recommendations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {avgScore !== null && (
+                <RecommendationItem
+                  icon={<BarChart3 className="w-4 h-4" />}
+                  text={
+                    avgScore >= 80
+                      ? `Excellent performance at ${avgScore}%! Keep up your study routine and aim for the A grade threshold.`
+                      : avgScore >= 60
+                      ? `Good standing at ${avgScore}%. Focus on ${weakestSubject?.name ?? "weaker subjects"} to push your average higher.`
+                      : `Your average of ${avgScore}% needs improvement. Consider extra tuition and regular revision.`
+                  }
+                />
+              )}
+              {attRate < 90 && (
+                <RecommendationItem
+                  icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
+                  text={`Attendance at ${attRate}% is ${attRate < 75 ? "critically low" : "slightly below target"}. Missing classes directly impacts performance — aim for 90%+.`}
+                />
+              )}
+              {mostImproved && mostImproved.diff > 5 && (
+                <RecommendationItem
+                  icon={<TrendingUp className="w-4 h-4 text-emerald-500" />}
+                  text={`${mostImproved.name} shows the most improvement (+${mostImproved.diff.toFixed(1)} points). Whatever you're doing there — keep doing it.`}
+                />
+              )}
+              {weakestSubject && weakestSubject.current < 50 && (
+                <RecommendationItem
+                  icon={<BookOpen className="w-4 h-4 text-red-500" />}
+                  text={`${weakestSubject.name} at ${weakestSubject.current}% is below passing. Seek help from your teacher and dedicate extra study time.`}
+                />
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── SUBJECTS TAB ──────────────────────────────────────────── */}
