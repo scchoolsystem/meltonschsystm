@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { generateTimetable } from "@/lib/timetable.functions";
 
 export const Route = createFileRoute("/_app/timetable")({ component: Page });
@@ -36,6 +37,7 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, roles } = useAuth();
+  const { school } = useTenant();
   const canGenerate = isAdmin || (roles ?? []).some((r) => r === "academic_master");
 
   const [classId, setClassId] = useState("");
@@ -56,7 +58,7 @@ function Page() {
     queryFn: async () =>
       (await supabase.from("staff").select("id,first_name,last_name").order("first_name")).data ?? [],
   });
-  const { data: slots = [] } = useQuery({
+  const { data: slots = [], refetch: refetchSlots } = useQuery({
     queryKey: ["tt", classId],
     enabled: !!classId,
     queryFn: async () =>
@@ -75,7 +77,25 @@ function Page() {
     return g;
   }, [slots]);
 
-  const refreshGrid = () => qc.invalidateQueries({ queryKey: ["tt"], exact: false, refetchType: "active" });
+  // Hard refetch (not just invalidate) so deleted slots disappear immediately
+  const refreshGrid = () => {
+    qc.removeQueries({ queryKey: ["tt", classId] });
+    refetchSlots();
+  };
+
+  const printTimetable = () => {
+    const cls = (classes as any[]).find((c) => c.id === classId);
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const rows = DAYS.map((d, i) => {
+      const daySlots = grid[i + 1] ?? [];
+      if (!daySlots.length) return "";
+      return `<tr><td style="font-weight:600;padding:6px 8px;border:1px solid #ddd;white-space:nowrap">${d}</td>${daySlots.map((s: any) => `<td style="padding:6px 8px;border:1px solid #ddd"><b>${s.subjects?.code ?? ""}</b><br/><span style="font-size:11px;color:#555">${s.start_time?.slice(0,5)}–${s.end_time?.slice(0,5)}</span><br/><span style="font-size:11px">${s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : ""}${s.room ? ` · ${s.room}` : ""}</span></td>`).join("")}</tr>`;
+    }).filter(Boolean).join("");
+    w.document.write(`<!DOCTYPE html><html><head><title>Timetable – ${cls?.name ?? ""}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}@media print{body{padding:0}}</style></head><body><div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">${school?.logo_url ? `<img src="${school.logo_url}" style="height:56px;object-fit:contain" alt="logo"/>` : ""}<div><h2 style="margin:0">${school?.name ?? "School"}</h2><p style="margin:2px 0;font-size:13px;color:#555">Timetable – ${cls?.name ?? ""}${cls?.level ? ` (${cls.level})` : ""}</p></div></div><table>${rows}</table></body></html>`);
+    w.document.close();
+    w.print();
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -88,7 +108,7 @@ function Page() {
             View, edit, and auto-generate weekly class schedules.
           </p>
         </div>
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-end flex-wrap">
           <div className="min-w-[220px]">
             <Label>Class</Label>
             <Select value={classId} onValueChange={setClassId}>
@@ -102,6 +122,11 @@ function Page() {
               </SelectContent>
             </Select>
           </div>
+          {classId && (slots as any[]).length > 0 && (
+            <Button variant="outline" onClick={printTimetable}>
+              🖨 Print timetable
+            </Button>
+          )}
           {isAdmin && classId && (
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
@@ -197,15 +222,23 @@ function SlotCard({
   slot: any; subjects: any[]; staff: any[]; canEdit: boolean; onChanged: () => void;
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  // Local visibility — optimistically hide on delete
+  const [deleted, setDeleted] = useState(false);
 
   const deleteMut = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("timetable_slots").delete().eq("id", slot.id);
       if (error) throw error;
     },
+    onMutate: () => setDeleted(true), // hide immediately
     onSuccess: () => { toast.success("Slot deleted"); onChanged(); },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => {
+      setDeleted(false); // restore if failed
+      toast.error(e.message);
+    },
   });
+
+  if (deleted) return null;
 
   return (
     <div className="border rounded p-2 group relative">
@@ -257,6 +290,7 @@ function SlotCard({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => deleteMut.mutate()}
+                  disabled={deleteMut.isPending}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
@@ -293,7 +327,6 @@ function SlotDialog({
       if (!payload.teacher_id || payload.teacher_id === "__none__") delete payload.teacher_id;
       if (!payload.room) delete payload.room;
 
-      // Conflict check (exclude self when editing)
       const classQ = supabase
         .from("timetable_slots")
         .select("id, subjects(name)")
@@ -451,7 +484,7 @@ function GeneratePanel({
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Auto-builds a clash-free weekly schedule. After generating you can edit or delete any slot individually from the <strong>View</strong> tab.
+            Auto-builds a clash-free weekly schedule based on your school's configured periods and rooms. Each school's timetable is fully independent — you can customise periods, rooms, and teacher assignments under <strong>Admin → Periods</strong> and <strong>Admin → Rooms</strong>. After generating, edit or delete any slot individually from the <strong>View</strong> tab.
           </p>
 
           <div className="grid grid-cols-2 gap-4 max-w-md">
