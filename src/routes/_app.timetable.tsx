@@ -75,7 +75,7 @@ function Page() {
     return g;
   }, [slots]);
 
-  const refreshGrid = () => qc.invalidateQueries({ queryKey: ["tt", classId] });
+  const refreshGrid = () => qc.invalidateQueries({ queryKey: ["tt"], exact: false, refetchType: "active" });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -280,7 +280,7 @@ function SlotDialog({
   const isEdit = !!existing;
   const [f, setF] = useState({
     subject_id: existing?.subject_id ?? "",
-    teacher_id: existing?.teacher_id ?? "",
+    teacher_id: existing?.teacher_id ?? "__none__",
     day_of_week: existing?.day_of_week ?? 1,
     start_time: existing?.start_time?.slice(0, 5) ?? "07:30",
     end_time: existing?.end_time?.slice(0, 5) ?? "08:10",
@@ -290,7 +290,7 @@ function SlotDialog({
   const m = useMutation({
     mutationFn: async () => {
       const payload: any = { ...f, class_id: classId };
-      if (!payload.teacher_id) delete payload.teacher_id;
+      if (!payload.teacher_id || payload.teacher_id === "__none__") delete payload.teacher_id;
       if (!payload.room) delete payload.room;
 
       // Conflict check (exclude self when editing)
@@ -383,7 +383,7 @@ function SlotDialog({
           <Select value={f.teacher_id} onValueChange={(v) => setF({ ...f, teacher_id: v })}>
             <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">— None —</SelectItem>
+              <SelectItem value="__none__">— None —</SelectItem>
               {staff.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
               ))}
