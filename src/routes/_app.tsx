@@ -9,13 +9,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: async () => {
-    // Use getSession() — reads from local storage, no network round-trip.
-    // getUser() hits Supabase's auth server on EVERY navigation, and any
-    // transient network hiccup or mid-refresh token would wrongly redirect
-    // a still-logged-in user to /login.
+  beforeLoad: async ({ location }) => {
     const { data, error } = await supabase.auth.getSession();
-    if (error || !data.session) throw redirect({ to: "/login" });
+    if (error || !data.session) {
+      // Save the current path so login can redirect back after auth
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.pathname },
+      });
+    }
   },
   component: AppLayout,
   errorComponent: ({ error, reset }) => (
@@ -41,7 +43,6 @@ function AppLayout() {
   const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
 
-  // Show spinner while auth is loading
   if (loading || !session || !rolesLoaded) {
     return (
       <div className="min-h-screen grid place-items-center">
@@ -52,10 +53,7 @@ function AppLayout() {
 
   const appRoles = roles as AppRole[];
 
-  // Only block if roles are loaded AND user has roles AND route is truly unauthorized
-  // Allow through if roles array is empty (still loading) or route is allowed
   if (appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
-    // Return null — beforeLoad redirect will handle login, dashboard is the fallback
     return (
       <div className="min-h-screen grid place-items-center p-6">
         <div className="max-w-md text-center space-y-2">
