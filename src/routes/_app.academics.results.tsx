@@ -584,12 +584,3 @@ function Page() {
     </div>
   );
 }
-
-// ── GRADE_COLORS for Bar chart cells ────────────────────────────────────────
-const GRADE_COLORS: Record<string, string> = {
-  "A": "#16a34a", "A-": "#22c55e",
-  "B+": "#2563eb", "B": "#3b82f6", "B-": "#60a5fa",
-  "C+": "#d97706", "C": "#f59e0b", "C-": "#fbbf24",
-  "D+": "#dc2626", "D": "#ef4444", "D-": "#f87171",
-  "E": "#7c3aed",
-};
