@@ -1,12 +1,3 @@
-// src/components/dashboard/AcademicAnalyticsPanel.tsx
-// Admin-facing advanced academic analytics — drop this into _app.analytics.tsx
-// inside the admin section. Displays:
-//   • Subject performance averages
-//   • Class rankings (top / bottom performers)
-//   • Academic health score
-//   • Student risk indicators
-//   • Improvement tracking across terms
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo } from "react";
