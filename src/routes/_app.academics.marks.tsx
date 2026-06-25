@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
 
-export const Route = createFileRoute("/_app/academics/results")({ component: RootPage });
+export const Route = createFileRoute("/_app/academics/marks")({ component: RootPage });
 
 function gradeFor(s: number) {
   if (s >= 80) return "A"; if (s >= 70) return "B"; if (s >= 60) return "C"; if (s >= 50) return "D"; return "E";
