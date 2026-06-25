@@ -1,15 +1,37 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { tabContentVariants, fadeUp } from "./motion-variants";
+import { tabContentVariants, fadeUp, stagger } from "./motion-variants";
 
-export { fadeUp };
+export { fadeUp, stagger };
 
 export interface PortalTabConfig {
   value: string;
   icon: ReactNode;
   label: string;
   pulse?: boolean;
+}
+
+export function GlassCard({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export function AnimatedNumber({ value, className = "" }: { value: number; className?: string }) {
+  return (
+    <motion.span
+      key={value}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={className}
+    >
+      {value}
+    </motion.span>
+  );
 }
 
 export function PortalTabBar({
