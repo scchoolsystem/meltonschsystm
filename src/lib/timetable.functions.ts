@@ -218,38 +218,49 @@ export const generateTimetable = createServerFn({ method: "POST" })
         };
       });
 
-      // Expand demand into individual lesson "units" — doubles become one
-      // unit worth 2 periods, singles worth 1 — then deterministically shuffle
-      // per class so subject order varies but is reproducible.
+      const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
+      const numDays = days.length || 1;
+
+      // Distribute each subject's weekly lesson count evenly across the days
+      // it actually has (round-robin, not a shuffled pool). e.g. Maths=6 over
+      // 5 days → 1/day with one day getting a 2nd. Which day gets the "extra"
+      // rotates per subject so it isn't always Monday/Math piling up together.
       type Unit = { subject_id: string; periodsNeeded: 1 | 2 };
-      const units: Unit[] = [];
-      demand.forEach((d) => {
-        let remaining = d.lessons;
-        if (d.allow_double && remaining >= 2) {
-          while (remaining >= 2) { units.push({ subject_id: d.subject_id, periodsNeeded: 2 }); remaining -= 2; }
-        }
-        while (remaining >= 1) { units.push({ subject_id: d.subject_id, periodsNeeded: 1 }); remaining -= 1; }
+      const dayUnits = new Map<number, Unit[]>();
+      days.forEach((d) => dayUnits.set(d, []));
+
+      demand.forEach((d, subjectIdx) => {
+        const base = Math.floor(d.lessons / numDays);
+        const extra = d.lessons % numDays;
+        const rotation = subjectIdx % numDays; // stagger which day(s) get the extra lesson
+        days.forEach((day, i) => {
+          const pos = (i - rotation + numDays) % numDays;
+          let count = base + (pos < extra ? 1 : 0);
+          if (d.allow_double) {
+            while (count >= 2) { dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 2 }); count -= 2; }
+          }
+          while (count >= 1) { dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 1 }); count -= 1; }
+        });
       });
 
-      let seed = classId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-      const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-      units.sort(() => rng() - 0.5);
-
       // Track subjects already scheduled today for THIS class (distribution rule:
-      // don't repeat a subject same day unless it's the second half of a double)
+      // don't repeat a subject same day unless it's the second half of a double,
+      // or it's genuinely that day's designated "extra" lesson for that subject)
       const scheduledTodayForClass = new Map<number, Set<string>>(); // day -> subject_ids
       const stickyTeacher = new Map<string, string>(); // subject_id -> staff_id (same teacher all week)
 
-      const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
-
-      for (const day of days) {
-        if (!units.length) break;
+      for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+        const day = days[dayIdx];
+        const units = dayUnits.get(day)!;
+        if (!units.length) continue;
         const dayPeriods = periodsByDay.get(day)!;
         const todaySet = scheduledTodayForClass.get(day) ?? new Set<string>();
         scheduledTodayForClass.set(day, todaySet);
+        let scheduledToday = 0;
 
         for (let pi = 0; pi < dayPeriods.length; pi++) {
           if (!units.length) break;
+
           const period = dayPeriods[pi];
           const k = slotKey(period.day_of_week, period.start_time);
           const u = ensureUsage(k);
@@ -325,6 +336,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
           if (room.id) u.rooms.add(room.id);
           bumpLoad(teacherId!, day);
           todaySet.add(unit.subject_id);
+          scheduledToday++;
 
           inserts.push({
             class_id: classId, subject_id: unit.subject_id, teacher_id: teacherId,
@@ -347,6 +359,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
               room: room2.name, room_id: room2.id, period_template_id: nextPeriod.id, school_id: schoolId,
             });
             pi++; // consume the next period too
+            scheduledToday++;
           }
 
           // remove the consumed unit from the array
@@ -354,8 +367,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
         }
       }
 
-      if (units.length) {
-        conflicts.push(`${classNames.get(classId)}: ${units.length} lesson(s) unscheduled — not enough period slots for this class's subject load.`);
+      const leftover = Array.from(dayUnits.values()).reduce((sum, arr) => sum + arr.length, 0);
+      if (leftover) {
+        conflicts.push(`${classNames.get(classId)}: ${leftover} lesson(s) unscheduled — not enough period slots on the relevant day(s).`);
       }
     }
 
