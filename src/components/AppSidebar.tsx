@@ -35,7 +35,12 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 px-2 py-3">
           <div className="w-8 h-8 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shrink-0 overflow-hidden">
             {settings?.logo_url ? (
-              <img src={settings.logo_url} alt="Logo" className="w-full h-full object-cover" />
+              <img
+                src={settings.logo_url}
+                alt="Logo"
+                className="w-full h-full object-contain p-0.5"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
             ) : (
               <GraduationCap className="w-4 h-4" />
             )}
