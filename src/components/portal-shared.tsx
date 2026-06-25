@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { tabContentVariants } from "./motion-variants";
+import { tabContentVariants, fadeUp } from "./motion-variants";
+
+export { fadeUp };
 
 export interface PortalTabConfig {
   value: string;
