@@ -1,3 +1,4 @@
+import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -806,8 +807,12 @@ function StudentPortal() {
         </TabsContent>
 
         {/* ── ANALYTICS TAB ──────────────────────────────────────────── */}
-        <TabsContent value="analytics" className="mt-4 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TabsContent value="analytics" className="mt-4 space-y-4">
+  <StudentPerformanceCenter
+    results={results}
+    attendance={attendance}
+  />
+</TabsContent>
             {/* Grade Distribution */}
             <Card>
               <CardHeader className="pb-2">
