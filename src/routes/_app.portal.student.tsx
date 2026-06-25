@@ -854,79 +854,76 @@ function StudentPortal() {
             attendance={attendance}
           />
           {/* Grade Distribution */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Grade Distribution</CardTitle>
-                <CardDescription>Across all exams and subjects</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {gradeDistribution.length === 0 ? (
-                  <EmptyChart message="No results to analyse" />
-                ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie data={gradeDistribution} dataKey="value" nameKey="name"
-                        cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) =>
-                          `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {gradeDistribution.map((entry, i) => {
-                          const colors = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444", "#dc2626"];
-                          return <Cell key={i} fill={colors[i % colors.length]} />;
-                        })}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Grade Distribution</CardTitle>
+              <CardDescription>Across all exams and subjects</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {gradeDistribution.length === 0 ? (
+                <EmptyChart message="No results to analyse" />
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={gradeDistribution} dataKey="value" nameKey="name"
+                      cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`}>
+                      {gradeDistribution.map((entry, i) => {
+                        const colors = ["#22c55e", "#84cc16", "#eab308", "#f97316", "#ef4444", "#dc2626"];
+                        return <Cell key={i} fill={colors[i % colors.length]} />;
+                      })}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* Subject Radar */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Subject Performance Radar</CardTitle>
-                <CardDescription>Current scores by subject</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {subjectAnalytics.length < 3 ? (
-                  <EmptyChart message="Need 3+ subjects for radar chart" />
-                ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <RadarChart data={subjectAnalytics.slice(0, 8).map(s => ({ subject: s.name.split(" ")[0], score: s.current }))}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-                      <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Subject Radar */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Subject Performance Radar</CardTitle>
+              <CardDescription>Current scores by subject</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {subjectAnalytics.length < 3 ? (
+                <EmptyChart message="Need 3+ subjects for radar chart" />
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <RadarChart data={subjectAnalytics.slice(0, 8).map(s => ({ subject: s.name.split(" ")[0], score: s.current }))}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Term Comparison */}
-          {examTrend.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Exam Performance History</CardTitle>
-                <CardDescription>Average score per exam</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={examTrend} barSize={40}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: any) => [`${v}%`, "Avg Score"]} />
-                    <Bar dataKey="avg" radius={[6, 6, 0, 0]}>
-                      {examTrend.map((entry, i) => (
-                        <Cell key={i} fill={entry.avg >= 70 ? "#6366f1" : entry.avg >= 50 ? "#f97316" : "#ef4444"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Exam Performance History</CardTitle>
+              <CardDescription>Average score per exam</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={examTrend} barSize={40}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v: any) => [`${v}%`, "Avg Score"]} />
+                  <Bar dataKey="avg" radius={[6, 6, 0, 0]}>
+                    {examTrend.map((entry, i) => (
+                      <Cell key={i} fill={entry.avg >= 70 ? "#6366f1" : entry.avg >= 50 ? "#f97316" : "#ef4444"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           {/* Performance Forecast */}
           <Card>
