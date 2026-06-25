@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
@@ -14,10 +15,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, Star, Pencil, CheckCircle2, UserSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
 
-export const Route = createFileRoute("/_app/academics/results")({ component: Page });
+export const Route = createFileRoute("/_app/academics/results")({
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw redirect({ to: "/login" });
+  },
+  component: ResultsGuard,
+});
+
+function ResultsGuard() {
+  const { roles, rolesLoaded } = useAuth();
+  if (!rolesLoaded) return null;
+  const pureStudent = roles.length === 1 && roles[0] === "student";
+  if (pureStudent) {
+    return (
+      <div className="flex items-center justify-center h-64 p-6">
+        <div className="max-w-md text-center space-y-3">
+          <p className="text-sm text-muted-foreground">Your results are in <strong>My Portal</strong> — Results tab.</p>
+          <a href="/portal/student" className="text-primary underline text-sm">Go to My Portal</a>
+        </div>
+      </div>
+    );
+  }
+  return <Page />;
+}
 
 // ── Resolve grade from DB scale for a given subject + score ─────────────────
 async function resolveGrade(score: number, subjectId: string): Promise<string> {

@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
@@ -9,7 +10,30 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, FileText, Printer } from "lucide-react";
 
-export const Route = createFileRoute("/_app/academics/report-cards")({ component: Page });
+export const Route = createFileRoute("/_app/academics/report-cards")({
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) throw redirect({ to: "/login" });
+  },
+  component: ReportCardsGuard,
+});
+
+function ReportCardsGuard() {
+  const { roles, rolesLoaded } = useAuth();
+  if (!rolesLoaded) return null;
+  const pureStudent = roles.length === 1 && roles[0] === "student";
+  if (pureStudent) {
+    return (
+      <div className="flex items-center justify-center h-64 p-6">
+        <div className="max-w-md text-center space-y-3">
+          <p className="text-sm text-muted-foreground">Your report cards are in <strong>My Portal</strong> — Reports tab.</p>
+          <a href="/portal/student" className="text-primary underline text-sm">Go to My Portal</a>
+        </div>
+      </div>
+    );
+  }
+  return <Page />;
+}
 
 function Page() {
   const [examId, setExamId] = useState("");
