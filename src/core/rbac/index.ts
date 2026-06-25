@@ -71,7 +71,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { module: "exams", label: "Exams", to: "/academics/exams", group: "Academics" },
   { module: "marks", label: "Marks", to: "/academics/marks", group: "Academics" },
   { module: "results", label: "Results", to: "/academics/results", group: "Academics" },
-  { module: "report-cards", label: "Report Cards", to: "/academics/report-cards", group: "Academics" },
+  { module: "report-cards-admin", label: "Report Cards", to: "/academics/report-cards", group: "Academics" },
   { module: "attendance", label: "Attendance", to: "/attendance", group: "Academics" },
   { module: "timetable", label: "Timetable", to: "/timetable", group: "Academics" },
   { module: "finance", label: "Fees & Finance", to: "/finance/fees", group: "Operations" },
