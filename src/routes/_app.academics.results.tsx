@@ -84,14 +84,54 @@ function Page() {
     },
   });
 
+  // Track which IDs are being verified optimistically
+  const [optimisticVerified, setOptimisticVerified] = useState<Set<string>>(new Set());
+
   const verifyMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("exam_results").update({ verified: true, verified_by: u.user?.id, verified_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase
+        .from("exam_results")
+        .update({ verified: true, verified_by: u.user?.id, verified_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["exam_results"] }); toast.success("Result verified"); },
-    onError: (e: any) => toast.error(e.message),
+    onMutate: (id: string) => {
+      setOptimisticVerified(prev => new Set([...prev, id]));
+    },
+    onSuccess: (id: string) => {
+      qc.invalidateQueries({ queryKey: ["exam_results"] });
+      toast.success("Result verified");
+    },
+    onError: (e: any, id: string) => {
+      setOptimisticVerified(prev => { const s = new Set(prev); s.delete(id); return s; });
+      toast.error("Verify failed: " + e.message);
+    },
+  });
+
+  const verifyAllMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data: u } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("exam_results")
+        .update({ verified: true, verified_by: u.user?.id, verified_at: now })
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onMutate: (ids: string[]) => {
+      setOptimisticVerified(prev => new Set([...prev, ...ids]));
+    },
+    onSuccess: (count: number) => {
+      qc.invalidateQueries({ queryKey: ["exam_results"] });
+      toast.success(`${count} result${count === 1 ? "" : "s"} verified`);
+    },
+    onError: (e: any, ids: string[]) => {
+      setOptimisticVerified(prev => { const s = new Set(prev); ids.forEach(id => s.delete(id)); return s; });
+      toast.error("Bulk verify failed: " + e.message);
+    },
   });
 
   return (
@@ -105,10 +145,27 @@ function Page() {
           </p>
         </div>
         {can && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Record Result</Button></DialogTrigger>
-            <AddDialog onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["exam_results"] }); }} />
-          </Dialog>
+          <div className="flex gap-2 flex-wrap">
+            {data.filter(r => !r.verified && !optimisticVerified.has(r.id)).length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const ids = data.filter(r => !r.verified && !optimisticVerified.has(r.id)).map(r => r.id);
+                  verifyAllMutation.mutate(ids);
+                }}
+                disabled={verifyAllMutation.isPending}
+              >
+                {verifyAllMutation.isPending
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                Verify All ({data.filter(r => !r.verified && !optimisticVerified.has(r.id)).length})
+              </Button>
+            )}
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Record Result</Button></DialogTrigger>
+              <AddDialog onDone={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["exam_results"] }); }} />
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -152,15 +209,22 @@ function Page() {
                         <TableCell>{r.score}</TableCell>
                         <TableCell className="font-bold text-base">{r.grade}</TableCell>
                         <TableCell>
-                          {r.verified
+                          {(r.verified || optimisticVerified.has(r.id))
                             ? <Badge className="bg-green-600">Verified</Badge>
                             : <Badge variant="outline">Pending</Badge>}
                         </TableCell>
                         {can && (
                           <TableCell className="text-right space-x-1">
-                            {!r.verified && (
-                              <Button size="sm" variant="ghost" className="h-8" onClick={() => verifyMutation.mutate(r.id)}>
-                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Verify
+                            {!r.verified && !optimisticVerified.has(r.id) && (
+                              <Button
+                                size="sm" variant="ghost" className="h-8"
+                                onClick={() => verifyMutation.mutate(r.id)}
+                                disabled={verifyMutation.isPending}
+                              >
+                                {verifyMutation.isPending && verifyMutation.variables === r.id
+                                  ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                  : <CheckCircle2 className="w-3.5 h-3.5 mr-1" />}
+                                Verify
                               </Button>
                             )}
                             <Button size="sm" variant="outline" className="h-8" onClick={() => setEditing(r)}>
