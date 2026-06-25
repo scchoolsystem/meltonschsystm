@@ -53,7 +53,9 @@ function AppLayout() {
 
   const appRoles = roles as AppRole[];
 
-  if (appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
+  // Only block access once roles are loaded AND user has roles assigned.
+  // Never block while still loading (empty appRoles during load would deny everything).
+  if (rolesLoaded && appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
     return (
       <div className="min-h-screen grid place-items-center p-6">
         <div className="max-w-md text-center space-y-2">
