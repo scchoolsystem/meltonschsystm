@@ -249,10 +249,56 @@ function ReportCardContent({
   const displayTotal = totalMethod === "sum" ? totalScore : meanScore;
   const displayMax   = totalMethod === "sum" ? maxPerSubject * results.length : maxPerSubject;
 
-  const overallGrade   = summary?.overall_grade ?? (results.length > 0 ? fallbackGrade(meanScore) : "—");
-  const gradeColour    = overallGrade !== "—" ? gradeColor(overallGrade) : "#6b7280";
-  const gradeBgColour  = overallGrade !== "—" ? gradeBg(overallGrade) : "#f9fafb";
-  const overallRemarks = summary?.overall_remarks ?? rcSettings?.grade_remarks?.[overallGrade] ?? (overallGrade !== "—" ? fallbackRemarks(overallGrade) : "—");
+  // Get the grading scale bands for overall grade calculation
+  const { data: gradingBands = [] } = useQuery({
+    queryKey: ["rc-grading-bands", rcSettings?.overall_scale_id],
+    enabled: !!rcSettings?.overall_scale_id || !!rcSettings?.id,
+    queryFn: async () => {
+      let scaleId = rcSettings?.overall_scale_id;
+      // If no scale specified or set to "default", get the default scale
+      if (!scaleId || scaleId === "default") {
+        const { data: defaultScale } = await supabase
+          .from("grading_scales")
+          .select("id")
+          .eq("is_default", true)
+          .maybeSingle();
+        if (!defaultScale) return [];
+        scaleId = defaultScale.id;
+      }
+      const { data } = await supabase
+        .from("grading_bands")
+        .select("grade,min_score,max_score")
+        .eq("scale_id", scaleId)
+        .order("min_score", { ascending: false });
+      return data || [];
+    },
+  });
+
+  // Calculate overall grade from grading bands
+  const getOverallGrade = (mean: number) => {
+    // First try to use the grading bands
+    for (const band of gradingBands) {
+      if (mean >= band.min_score && mean <= band.max_score) {
+        return band.grade;
+      }
+    }
+    // Fallback to the default grade helper
+    return fallbackGrade(mean);
+  };
+
+  // Get remark from grading bands or fallback to settings
+  const getOverallRemark = (grade: string) => {
+    if (summary?.overall_remarks) return summary.overall_remarks;
+    if (rcSettings?.grade_remarks?.[grade]) return rcSettings.grade_remarks[grade];
+    // Try to find remark from grading bands
+    const band = gradingBands.find((b: any) => b.grade === grade);
+    if (band?.remark) return band.remark;
+    return "—";
+  };
+
+  const overallGrade   = getOverallGrade(meanScore);
+  const gradeColour    = gradeColor(overallGrade);
+  const overallRemarks = getOverallRemark(overallGrade);
   const position       = summary?.position;
 
   const principalName  = rcSettings?.principal_name ?? "";
