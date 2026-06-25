@@ -809,12 +809,11 @@ function StudentPortal() {
 
         {/* ── ANALYTICS TAB ──────────────────────────────────────────── */}
         <TabsContent value="analytics" className="mt-4 space-y-4">
-  <StudentPerformanceCenter
-    results={results}
-    attendance={attendance}
-  />
-</TabsContent>
-            {/* Grade Distribution */}
+          <StudentPerformanceCenter
+            results={results}
+            attendance={attendance}
+          />
+          {/* Grade Distribution */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold">Grade Distribution</CardTitle>
