@@ -76,8 +76,8 @@ function ParentPortal() {
       const since = new Date(Date.now() - 7 * 864e5).toISOString();
       const until = new Date(Date.now() + 14 * 864e5).toISOString();
       const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt] = await Promise.all([
-        supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(30),
-        supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(50),
+        supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(180),
+        supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year, start_date)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(200),
         supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }),
         classId
           ? (supabase as any).from("live_sessions").select("id, title, scheduled_start, status").eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until).order("scheduled_start")
