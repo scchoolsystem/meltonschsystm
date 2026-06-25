@@ -17,6 +17,7 @@ import {
   BarChart3, BookOpen, Zap, Shield, ChevronUp, ChevronDown, Activity,
   CheckCircle, XCircle, AlertCircle, Lightbulb, Trophy, ArrowUp, ArrowDown,
 } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { format, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
 import { AttendanceHeatmap } from "@/components/AttendanceHeatmap";
