@@ -1,23 +1,46 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { redeemParentCode, autoLinkParent } from "@/lib/parent-link.functions";
 import { toast } from "sonner";
-import { Bus, Heart, Bed, DoorOpen, ClipboardList, Award } from "lucide-react";
+import {
+  Bus, Heart, Bed, DoorOpen, ClipboardList, Award, Trophy,
+  CheckCircle, CreditCard, Calendar, Video, Scale, Megaphone, GraduationCap,
+} from "lucide-react";
+import {
+  GlassCard, AnimatedNumber, fadeUp, stagger,
+  PortalTabBar, PortalTabContent, type PortalTabConfig,
+} from "@/components/portal-shared";
 
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export const Route = createFileRoute("/_app/portal/parent")({
   component: ParentPortal,
 });
+
+const PARENT_TABS: PortalTabConfig[] = [
+  { value: "results", icon: <Trophy className="w-3.5 h-3.5" />, label: "Results" },
+  { value: "reportcards", icon: <ClipboardList className="w-3.5 h-3.5" />, label: "Report Cards" },
+  { value: "attendance", icon: <CheckCircle className="w-3.5 h-3.5" />, label: "Attendance" },
+  { value: "fees", icon: <CreditCard className="w-3.5 h-3.5" />, label: "Fees" },
+  { value: "timetable", icon: <Calendar className="w-3.5 h-3.5" />, label: "Timetable" },
+  { value: "transport", icon: <Bus className="w-3.5 h-3.5" />, label: "Transport" },
+  { value: "clinic", icon: <Heart className="w-3.5 h-3.5" />, label: "Clinic" },
+  { value: "boarding", icon: <Bed className="w-3.5 h-3.5" />, label: "Boarding" },
+  { value: "gate", icon: <DoorOpen className="w-3.5 h-3.5" />, label: "Gate Passes" },
+  { value: "cocurricular", icon: <Award className="w-3.5 h-3.5" />, label: "Co-curricular" },
+  { value: "live", icon: <Video className="w-3.5 h-3.5" />, label: "Live Classes" },
+  { value: "discipline", icon: <Scale className="w-3.5 h-3.5" />, label: "Discipline" },
+  { value: "news", icon: <Megaphone className="w-3.5 h-3.5" />, label: "School News" },
+];
 
 function ParentPortal() {
   const { user, fullName } = useAuth();
@@ -26,6 +49,7 @@ function ParentPortal() {
   const [data, setData] = useState<any>({ attendance: [], results: [], invoices: [] });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("results");
 
   useEffect(() => {
     if (!user) return;
@@ -93,7 +117,10 @@ function ParentPortal() {
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <motion.div
+        initial="hidden" animate="show" variants={fadeUp}
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
         <div>
           <h1 className="text-3xl font-bold">Hello, {fullName || "Parent"}</h1>
           <p className="text-sm text-muted-foreground">Viewing: {active?.first_name} {active?.last_name} · {active?.admission_no}</p>
@@ -108,35 +135,22 @@ function ParentPortal() {
             </SelectContent>
           </Select>
         )}
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Class" value={active?.classes?.name ?? "—"} />
-        <StatCard label="Attendance" value={`${attRate}%`} hint={`${present}/${data.attendance.length} days`} />
-        <StatCard label="Outstanding Fees" value={`KES ${totalDue.toLocaleString()}`} hint={`${data.invoices.length} invoice(s)`} />
-        {data.dorm?.dormitories?.name && <StatCard label="Dorm" value={data.dorm.dormitories.name} hint={data.dorm.bed_no ? `Bed ${data.dorm.bed_no}` : undefined} />}
-        {data.transport?.transport_routes?.name && <StatCard label="Transport Route" value={data.transport.transport_routes.name} />}
-      </div>
+      <motion.div
+        initial="hidden" animate="show" variants={stagger}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        <StatCard icon={<GraduationCap className="w-4 h-4" />} label="Class" rawValue={active?.classes?.name ?? "—"} />
+        <StatCard icon={<CheckCircle className="w-4 h-4" />} label="Attendance" value={attRate} suffix="%" hint={`${present}/${data.attendance.length} days`} />
+        <StatCard icon={<CreditCard className="w-4 h-4" />} label="Outstanding Fees" rawValue={`KES ${totalDue.toLocaleString()}`} hint={`${data.invoices.length} invoice(s)`} />
+        {data.dorm?.dormitories?.name && <StatCard icon={<Bed className="w-4 h-4" />} label="Dorm" rawValue={data.dorm.dormitories.name} hint={data.dorm.bed_no ? `Bed ${data.dorm.bed_no}` : undefined} />}
+        {data.transport?.transport_routes?.name && <StatCard icon={<Bus className="w-4 h-4" />} label="Transport Route" rawValue={data.transport.transport_routes.name} />}
+      </motion.div>
 
-      <Tabs defaultValue="results">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="results">Results</TabsTrigger>
-          <TabsTrigger value="reportcards">Report Cards</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="fees">Fees</TabsTrigger>
-          <TabsTrigger value="timetable">Timetable</TabsTrigger>
-          <TabsTrigger value="transport">Transport</TabsTrigger>
-          <TabsTrigger value="clinic">Clinic</TabsTrigger>
-          <TabsTrigger value="boarding">Boarding</TabsTrigger>
-          <TabsTrigger value="gate">Gate Passes</TabsTrigger>
-          <TabsTrigger value="cocurricular">Co-curricular</TabsTrigger>
-          <TabsTrigger value="live">Live Classes</TabsTrigger>
-          <TabsTrigger value="discipline">Discipline</TabsTrigger>
-          <TabsTrigger value="news">School News</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="results">
-          <Card><CardContent className="pt-6 space-y-2">
+      <PortalTabBar tabs={PARENT_TABS} activeTab={activeTab} onTabChange={setActiveTab}>
+        <PortalTabContent value="results">
+          <GlassCard className="p-6 space-y-2">
             {data.results.length === 0 && <p className="text-sm text-muted-foreground">No results yet.</p>}
             {data.results.map((r: any) => (
               <div key={r.id} className="flex justify-between border-b py-2">
@@ -150,11 +164,11 @@ function ParentPortal() {
                 </div>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="reportcards">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="reportcards">
+          <GlassCard className="p-6 space-y-2">
             {reportCardExams.length === 0 && <p className="text-sm text-muted-foreground">No report cards available yet.</p>}
             {reportCardExams.map((e: any) => (
               <div key={e.id} className="flex items-center justify-between border-b py-2">
@@ -169,11 +183,11 @@ function ParentPortal() {
                 </Button>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="attendance">
-          <Card><CardContent className="pt-6 space-y-1">
+        <PortalTabContent value="attendance">
+          <GlassCard className="p-6 space-y-1">
             {data.attendance.length === 0 && <p className="text-sm text-muted-foreground">No records.</p>}
             {data.attendance.map((a: any) => (
               <div key={a.id} className="flex justify-between py-1 border-b text-sm">
@@ -181,11 +195,11 @@ function ParentPortal() {
                 <Badge variant={a.status === "present" ? "default" : a.status === "absent" ? "destructive" : "secondary"}>{a.status}</Badge>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="fees">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="fees">
+          <GlassCard className="p-6 space-y-2">
             {data.invoices.length === 0 && <p className="text-sm text-muted-foreground">No invoices.</p>}
             {data.invoices.map((i: any) => (
               <div key={i.id} className="flex justify-between border-b py-2">
@@ -199,11 +213,11 @@ function ParentPortal() {
                 </div>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="timetable">
-          <Card><CardContent className="pt-6">
+        <PortalTabContent value="timetable">
+          <GlassCard className="p-6">
             {(data.timetable ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">No timetable published for this class yet.</p>
             ) : (
@@ -228,11 +242,11 @@ function ParentPortal() {
                 })}
               </div>
             )}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="transport">
-          <Card><CardContent className="pt-6">
+        <PortalTabContent value="transport">
+          <GlassCard className="p-6">
             {!data.transport ? (
               <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Bus className="w-4 h-4" /> No transport route assigned.</p>
             ) : (
@@ -243,11 +257,11 @@ function ParentPortal() {
                 <div><span className="text-muted-foreground">Monthly fee:</span> KES {Number(data.transport.transport_routes?.monthly_fee ?? 0).toLocaleString()}</div>
               </div>
             )}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="clinic">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="clinic">
+          <GlassCard className="p-6 space-y-2">
             {(data.clinic ?? []).length === 0 && <p className="text-sm text-muted-foreground">No clinic visits.</p>}
             {(data.clinic ?? []).map((c: any) => (
               <div key={c.id} className="border-b py-2">
@@ -260,11 +274,11 @@ function ParentPortal() {
                 {c.treatment && <div className="text-sm"><span className="text-muted-foreground">Treatment:</span> {c.treatment}</div>}
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="boarding">
-          <Card><CardContent className="pt-6">
+        <PortalTabContent value="boarding">
+          <GlassCard className="p-6">
             {!data.dorm ? (
               <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><Bed className="w-4 h-4" /> Not assigned to a dormitory.</p>
             ) : (
@@ -274,11 +288,11 @@ function ParentPortal() {
                 <div><span className="text-muted-foreground">Assigned on:</span> {data.dorm.assigned_on ?? "—"}</div>
               </div>
             )}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="gate">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="gate">
+          <GlassCard className="p-6 space-y-2">
             {(data.gatePasses ?? []).length === 0 && <p className="text-sm text-muted-foreground">No gate passes on record.</p>}
             {(data.gatePasses ?? []).map((g: any) => (
               <div key={g.id} className="border-b py-2">
@@ -292,11 +306,11 @@ function ParentPortal() {
                 </div>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="cocurricular">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="cocurricular">
+          <GlassCard className="p-6 space-y-2">
             {(data.coCurricular ?? []).length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any co-curricular activities.</p>}
             {(data.coCurricular ?? []).map((c: any) => {
               const a = c.co_curricular_activities;
@@ -312,11 +326,11 @@ function ParentPortal() {
                 </div>
               );
             })}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="live">
-          <Card>
+        <PortalTabContent value="live">
+          <GlassCard className="p-0">
             <CardHeader><CardTitle className="text-base">Upcoming live classes</CardTitle><CardDescription>Online sessions scheduled for {active?.first_name}'s class.</CardDescription></CardHeader>
             <CardContent className="space-y-2">
               {(data.liveUpcoming ?? []).length === 0 && <p className="text-sm text-muted-foreground">No live classes scheduled.</p>}
@@ -330,8 +344,8 @@ function ParentPortal() {
                 </div>
               ))}
             </CardContent>
-          </Card>
-          <Card className="mt-4">
+          </GlassCard>
+          <GlassCard className="p-0 mt-4">
             <CardHeader><CardTitle className="text-base">Live class attendance</CardTitle></CardHeader>
             <CardContent className="space-y-1">
               {(data.liveAttendance ?? []).length === 0 && <p className="text-sm text-muted-foreground">No live attendance records.</p>}
@@ -348,11 +362,11 @@ function ParentPortal() {
                 </div>
               ))}
             </CardContent>
-          </Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="discipline">
-          <Card><CardContent className="pt-6 space-y-2">
+        <PortalTabContent value="discipline">
+          <GlassCard className="p-6 space-y-2">
             {(data.discipline ?? []).length === 0 && <p className="text-sm text-muted-foreground">No discipline records.</p>}
             {(data.discipline ?? []).map((d: any) => (
               <div key={d.id} className="border-b py-2">
@@ -365,11 +379,11 @@ function ParentPortal() {
                 {d.action_taken && <div className="text-xs text-muted-foreground mt-1">Action: {d.action_taken}</div>}
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
+          </GlassCard>
+        </PortalTabContent>
 
-        <TabsContent value="news">
-          <Card><CardContent className="pt-6 space-y-3">
+        <PortalTabContent value="news">
+          <GlassCard className="p-6 space-y-3">
             {announcements.length === 0 && <p className="text-sm text-muted-foreground">No announcements.</p>}
             {announcements.map(a => (
               <div key={a.id} className="border-b pb-3">
@@ -380,9 +394,9 @@ function ParentPortal() {
                 <div className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{a.body}</div>
               </div>
             ))}
-          </CardContent></Card>
-        </TabsContent>
-      </Tabs>
+          </GlassCard>
+        </PortalTabContent>
+      </PortalTabBar>
     </div>
   );
 }
@@ -439,11 +453,18 @@ function LinkChildPanel({ onLinked }: { onLinked: () => void }) {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatCard({
+  icon, label, value, suffix = "", rawValue, hint,
+}: {
+  icon: React.ReactNode; label: string; value?: number; suffix?: string; rawValue?: string; hint?: string;
+}) {
   return (
-    <Card>
-      <CardHeader className="pb-2"><CardDescription>{label}</CardDescription><CardTitle className="text-2xl">{value}</CardTitle></CardHeader>
-      {hint && <CardContent className="text-xs text-muted-foreground">{hint}</CardContent>}
-    </Card>
+    <GlassCard className="p-4">
+      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">{icon} {label}</div>
+      <div className="text-2xl font-bold">
+        {value !== undefined ? <AnimatedNumber value={value} suffix={suffix} /> : rawValue}
+      </div>
+      {hint && <div className="text-xs text-muted-foreground mt-1">{hint}</div>}
+    </GlassCard>
   );
 }
