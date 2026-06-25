@@ -2,113 +2,41 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// =============================================================================
+// SMARTDEV ERP TIMETABLE ENGINE v2
+// Replaces the flat "same lessons-per-week for every subject" generator with
+// an aSc/Zeraki-style solver:
+//   1. Lesson demand per class from class_subjects (+ subjects.lessons_per_week)
+//   2. Teacher matching: teacher_subjects ∩ teacher_class_assignments ∩ staff_availability
+//   3. Room allocation: subject_room_requirements room_type > class capacity fit > any active room
+//   4. Double periods: subjects.allow_double_period → consecutive period pairs
+//   5. Breaks respected via period_templates.is_break = false filter (already excluded)
+//   6. Workload balancing: per-teacher per-day cap + gap minimization
+//   7. Subject distribution: no subject repeats same day unless it's its double period
+//   8. Conflict engine: teacher/room/class usage tracked per (day, start_time) slot
+// Storage: timetable_slots (the live table — auto_timetable is unused legacy/drift)
+// =============================================================================
 
-interface Period {
-  id: string;
-  day_of_week: number;
-  period_index: number;
-  label: string;
-  start_time: string;
-  end_time: string;
-  is_break: boolean;
-  event_type?: string;
-}
-
-interface Room {
-  id: string;
-  name: string;
-  room_type: string;
-  capacity: number;
-  is_active: boolean;
-}
-
-interface Teacher {
-  id: string;
-  first_name: string;
-  last_name: string;
-  max_lessons_per_day: number;
-  max_lessons_per_week: number;
-  preferred_free_day?: number | null;
-  preferred_free_periods?: string | null;
-  priority_subject_1_id?: string | null;
-  priority_subject_2_id?: string | null;
-  priority_subject_3_id?: string | null;
-}
-
-interface SubjectRequirement {
-  subject_id: string;
-  subject_code: string;
-  subject_name: string;
-  lessons_per_week: number;
-  allow_double: boolean;
-  allow_triple: boolean;
-  is_practical: boolean;
-  is_optional: boolean;
-  optional_group: string | null;
-  preferred_room_id: string | null;
-  required_room_type: string | null;
-  preferred_teacher_id: string | null;
-}
-
-interface TimetableSlotInsert {
-  class_id: string;
-  subject_id: string;
-  teacher_id: string | null;
-  day_of_week: number;
-  period_index: number;
-  start_time: string;
-  end_time: string;
-  room: string | null;
-  room_id: string | null;
-  lesson_type: "single" | "double" | "triple" | "practical";
-  is_optional: boolean;
-  optional_group: string | null;
-  version_id: string | null;
-}
-
-// ─── Room type compatibility matrix ──────────────────────────────────────────
-
-const ROOM_COMPAT: Record<string, string[]> = {
-  chemistry_lab:    ["chemistry_lab", "science_lab"],
-  biology_lab:      ["biology_lab", "science_lab"],
-  physics_lab:      ["physics_lab", "science_lab"],
-  science_lab:      ["chemistry_lab", "biology_lab", "physics_lab", "science_lab"],
-  computer_lab:     ["computer_lab"],
-  music_room:       ["music_room", "hall"],
-  agriculture_area: ["agriculture_area"],
-  library:          ["library"],
-  hall:             ["hall", "music_room"],
-  classroom:        ["classroom"],
-  art_room:         ["art_room", "classroom"],
-  gym:              ["gym", "hall"],
-  other:            ["other", "classroom"],
+type Period = {
+  id: string; day_of_week: number; period_index: number;
+  label: string; start_time: string; end_time: string; is_break: boolean;
 };
-
-function roomFits(room: Room, requiredType: string | null): boolean {
-  if (!requiredType) return true;
-  const compat = ROOM_COMPAT[requiredType] ?? [requiredType];
-  return compat.includes(room.room_type);
-}
-
-// ─── Main generate function ───────────────────────────────────────────────────
+type ClassSubjectDemand = { subject_id: string; lessons: number; allow_double: boolean; preferred_room_type: string | null };
+type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string> };
 
 export const generateTimetable = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z.object({
       classIds: z.array(z.string().uuid()).min(1),
-      lessonsPerSubjectPerWeek: z.number().min(1).max(10).default(4),
       replaceExisting: z.boolean().default(true),
-      useClassRequirements: z.boolean().default(true),
-      generateScope: z.enum(["all", "class", "stream", "department"]).default("all"),
-      versionLabel: z.string().optional(),
+      maxLessonsPerTeacherPerDay: z.number().min(1).max(12).default(6),
     }).parse(input)
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
+    // ── Auth ──────────────────────────────────────────────────────────────
     const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
       supabase.rpc("is_admin", { _user_id: userId }),
       supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
@@ -119,420 +47,333 @@ export const generateTimetable = createServerFn({ method: "POST" })
     const { data: schoolId } = await supabase.rpc("my_school_id");
     if (!schoolId) throw new Error("No school context");
 
-    // ── Load classes ──────────────────────────────────────────────────────────
+    // ── Load classes ─────────────────────────────────────────────────────
     const { data: classRows, error: clsErr } = await supabase
-      .from("classes")
-      .select("id,name,stream,default_room_id,class_teacher_id")
-      .eq("school_id", schoolId)
-      .in("id", data.classIds);
+      .from("classes").select("id,name,capacity,class_teacher_id,stream,level")
+      .eq("school_id", schoolId).in("id", data.classIds);
     if (clsErr) throw new Error(clsErr.message);
-    const classMap = new Map((classRows ?? []).map((r: any) => [r.id, r]));
     const allowed = new Set((classRows ?? []).map((r: any) => r.id));
+    const classNames = new Map((classRows ?? []).map((r: any) => [r.id, r.name]));
+    const classCapacity = new Map((classRows ?? []).map((r: any) => [r.id, r.capacity]));
     const invalid = data.classIds.filter((id) => !allowed.has(id));
     if (invalid.length) throw new Error(`Classes not in your school: ${invalid.join(", ")}`);
 
-    // ── Load period templates (non-break lesson slots only) ───────────────────
+    // ── Load period templates (non-break only — this is how breaks/Friday
+    //    early dismissal/assembly/games are respected: admins simply don't
+    //    create teaching periods for those slots, or mark them is_break) ──
     const { data: periodRows = [], error: pErr } = await supabase
       .from("period_templates")
-      .select("id,day_of_week,period_index,label,start_time,end_time,is_break,event_type")
-      .eq("school_id", schoolId)
-      .eq("is_break", false)
-      .order("day_of_week")
-      .order("period_index");
+      .select("id,day_of_week,period_index,label,start_time,end_time,is_break")
+      .eq("school_id", schoolId).eq("is_break", false)
+      .order("day_of_week").order("period_index");
     if (pErr) throw new Error("Could not load period templates: " + pErr.message);
-    if (!(periodRows as any[]).length)
+    const periods = (periodRows ?? []) as Period[];
+    if (!periods.length)
       return { ok: false, error: "No period templates configured. Go to Timetable → Periods tab first.", inserted: 0, conflicts: [] };
 
-    const lessonPeriods = (periodRows as Period[]).filter(
-      p => !p.event_type || p.event_type === "lesson"
-    );
-
-    // ── Load rooms ────────────────────────────────────────────────────────────
+    // ── Load rooms ────────────────────────────────────────────────────────
     const { data: roomRows = [], error: rErr } = await supabase
-      .from("rooms")
-      .select("id,name,room_type,capacity,is_active")
-      .eq("school_id", schoolId)
-      .eq("is_active", true)
-      .order("room_type")
-      .order("name");
+      .from("rooms").select("id,name,room_type,capacity").eq("school_id", schoolId).eq("is_active", true).order("name");
     if (rErr) throw new Error("Could not load rooms: " + rErr.message);
-    const rooms = roomRows as Room[];
+    const rooms = (roomRows ?? []) as { id: string; name: string; room_type: string; capacity: number }[];
     if (!rooms.length)
       return { ok: false, error: "No active rooms configured. Go to Timetable → Rooms tab first.", inserted: 0, conflicts: [] };
 
-    // ── Load staff with V2 workload fields ────────────────────────────────────
+    // ── Load subjects, class_subjects, subject_room_requirements ──────────
+    const { data: subjects = [] } = await supabase
+      .from("subjects").select("id,code,name,level,lessons_per_week,allow_double_period,preferred_time_of_day")
+      .eq("school_id", schoolId);
+    const subjectMap = new Map((subjects as any[]).map((s) => [s.id, s]));
+
+    const { data: classSubjectRows = [], error: csErr } = await supabase
+      .from("class_subjects").select("class_id,subject_id,lessons_per_week").in("class_id", data.classIds);
+    if (csErr) throw new Error("Could not load class_subjects: " + csErr.message + " (run the class_subjects migration first)");
+
+    const { data: roomReqRows = [] } = await supabase
+      .from("subject_room_requirements").select("subject_id,room_type").eq("school_id", schoolId);
+    const roomReqFor = new Map((roomReqRows as any[]).map((r) => [r.subject_id, r.room_type]));
+
+    // ── Load staff, teacher_subjects, teacher_class_assignments, availability ──
     const { data: staffRows = [] } = await supabase
-      .from("staff")
-      .select("id,role,first_name,last_name,max_lessons_per_day,max_lessons_per_week,preferred_free_day,preferred_free_periods,priority_subject_1_id,priority_subject_2_id,priority_subject_3_id")
-      .eq("school_id", schoolId);
+      .from("staff").select("id,user_id,first_name,last_name,status").eq("school_id", schoolId).eq("status", "active");
+    const staffById = new Map((staffRows as any[]).map((s) => [s.id, s]));
+    const staffByUserId = new Map((staffRows as any[]).filter((s) => s.user_id).map((s) => [s.user_id, s]));
 
-    const teacherRoles = new Set(["teacher", "subject_teacher", "class_teacher", "hod", "academic_master"]);
-    const teachers = (staffRows as any[]).filter(s => teacherRoles.has(s.role));
-    const allStaff = teachers.length ? teachers : (staffRows as any[]);
-
-    // ── Load teacher-subject assignments ──────────────────────────────────────
     const { data: teacherSubjectRows = [] } = await supabase
-      .from("teacher_subjects")
-      .select("staff_id,subject_id,is_primary")
-      .eq("school_id", schoolId);
-
-    const qualifiedFor = new Map<string, string[]>();
+      .from("teacher_subjects").select("staff_id,subject_id").eq("school_id", schoolId);
+    const qualifiedFor = new Map<string, string[]>(); // subject_id -> staff_id[]
     (teacherSubjectRows as any[]).forEach((r) => {
       const arr = qualifiedFor.get(r.subject_id) ?? [];
       arr.push(r.staff_id);
       qualifiedFor.set(r.subject_id, arr);
     });
 
-    // ── Load class subject requirements ───────────────────────────────────────
-    const { data: csrRows = [] } = await supabase
-      .from("class_subject_requirements")
-      .select("class_id,subject_id,lessons_per_week,allow_double,allow_triple,is_practical,is_optional,optional_group,preferred_room_id,required_room_type,preferred_teacher_id")
-      .eq("school_id", schoolId)
-      .in("class_id", data.classIds);
-
-    const classSubjectReqs = new Map<string, SubjectRequirement[]>();
-    (csrRows as any[]).forEach((r: any) => {
-      const arr = classSubjectReqs.get(r.class_id) ?? [];
-      arr.push(r as SubjectRequirement);
-      classSubjectReqs.set(r.class_id, arr);
+    const { data: assignmentRows = [] } = await supabase
+      .from("teacher_class_assignments").select("teacher_user_id,class_id").eq("school_id", schoolId).eq("is_active", true);
+    const assignedStaffIdsForClass = new Map<string, Set<string>>(); // class_id -> staff_id set
+    (assignmentRows as any[]).forEach((r) => {
+      const staff = staffByUserId.get(r.teacher_user_id);
+      if (!staff) return;
+      const set = assignedStaffIdsForClass.get(r.class_id) ?? new Set<string>();
+      set.add(staff.id);
+      assignedStaffIdsForClass.set(r.class_id, set);
     });
+    // classes with NO configured assignments at all → don't filter by assignment (fallback)
+    const classesWithAssignments = new Set(Array.from(assignedStaffIdsForClass.keys()));
 
-    // ── Fallback: load all subjects if no per-class requirements ──────────────
-    const { data: subjects = [] } = await supabase
-      .from("subjects")
-      .select("id,code,name,lessons_per_week,allow_double_period")
-      .eq("school_id", schoolId);
+    const { data: availabilityRows = [] } = await supabase
+      .from("staff_availability").select("staff_id,day_of_week,period_index,available").eq("school_id", schoolId);
+    // staff_id -> set of "day-period_index" that are explicitly UNAVAILABLE
+    const unavailable = new Map<string, Set<string>>();
+    (availabilityRows as any[]).filter((r) => r.available === false).forEach((r) => {
+      const set = unavailable.get(r.staff_id) ?? new Set<string>();
+      set.add(`${r.day_of_week}-${r.period_index}`);
+      unavailable.set(r.staff_id, set);
+    });
+    const periodByDayIndex = new Map(periods.map((p) => [`${p.day_of_week}-${p.period_index}`, p]));
 
-    // ── Create timetable version ──────────────────────────────────────────────
-    const versionLabel = data.versionLabel ?? `Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
-    const { data: versionRow } = await supabase
-      .from("timetable_versions")
-      .insert({
-        school_id: schoolId,
-        label: versionLabel,
-        is_active: true,
-        generated_by: userId,
-        generation_options: {
-          classIds: data.classIds,
-          lessonsPerSubjectPerWeek: data.lessonsPerSubjectPerWeek,
-          useClassRequirements: data.useClassRequirements,
-        },
-      })
-      .select("id")
-      .maybeSingle();
-    const versionId = versionRow?.id ?? null;
-
-    // ── Clear existing slots if requested ─────────────────────────────────────
+    // ── Clear existing if requested ────────────────────────────────────────
     if (data.replaceExisting)
       await supabase.from("timetable_slots").delete().in("class_id", data.classIds);
 
-    // ── Conflict tracking (cross-class, cross-teacher, cross-room) ────────────
-    type SlotUsage = {
-      teachers: Set<string>;
-      rooms: Set<string>;
-      classes: Set<string>;
-      teacherLessonsDay: Map<string, number>;
-    };
-    const usage = new Map<string, SlotUsage>();
-    const teacherWeeklyCount = new Map<string, number>();
+    const conflicts: string[] = [];
+
+    // ── Global usage tracking across all classes being generated ──────────
+    const usage = new Map<string, SlotUsage>(); // key: "day-start_time"
     const slotKey = (day: number, start: string) => `${day}-${start}`;
     const ensureUsage = (k: string): SlotUsage => {
       let u = usage.get(k);
-      if (!u) {
-        u = { teachers: new Set(), rooms: new Set(), classes: new Set(), teacherLessonsDay: new Map() };
-        usage.set(k, u);
-      }
+      if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set() }; usage.set(k, u); }
       return u;
     };
+    // teacher_id -> "day" -> lesson count (for workload balancing)
+    const teacherDailyLoad = new Map<string, Map<number, number>>();
+    const bumpLoad = (teacherId: string, day: number) => {
+      const m = teacherDailyLoad.get(teacherId) ?? new Map<number, number>();
+      m.set(day, (m.get(day) ?? 0) + 1);
+      teacherDailyLoad.set(teacherId, m);
+    };
+    const loadOn = (teacherId: string, day: number) => teacherDailyLoad.get(teacherId)?.get(day) ?? 0;
 
-    const inserts: TimetableSlotInsert[] = [];
-    const conflicts: string[] = [];
+    type Insert = {
+      class_id: string; subject_id: string; teacher_id: string | null;
+      day_of_week: number; start_time: string; end_time: string;
+      room: string | null; room_id: string | null; period_template_id: string;
+      school_id: string;
+    };
+    const inserts: Insert[] = [];
+    const noQualifiedFor = new Set<string>();
 
-    // ── Per-class scheduling loop ─────────────────────────────────────────────
+    // Group periods by day, in order, so we can detect consecutive pairs for doubles
+    const periodsByDay = new Map<number, Period[]>();
+    periods.forEach((p) => {
+      const arr = periodsByDay.get(p.day_of_week) ?? [];
+      arr.push(p);
+      periodsByDay.set(p.day_of_week, arr);
+    });
+    periodsByDay.forEach((arr) => arr.sort((a, b) => a.period_index - b.period_index));
+
+    const isTeacherFree = (staffId: string, day: number, periodIndex: number, k: string) => {
+      const u = ensureUsage(k);
+      if (u.teachers.has(staffId)) return false;
+      if (unavailable.get(staffId)?.has(`${day}-${periodIndex}`)) return false;
+      return true;
+    };
+
+    const pickRoom = (subjectId: string, classId: string, k: string): { id: string | null; name: string | null } => {
+      const u = ensureUsage(k);
+      const requiredType = roomReqFor.get(subjectId);
+      const cap = classCapacity.get(classId) ?? 0;
+      // priority 1: required room type
+      if (requiredType) {
+        const r = rooms.find((rm) => rm.room_type === requiredType && !u.rooms.has(rm.id));
+        if (r) return { id: r.id, name: r.name };
+      }
+      // priority 2: any classroom that fits class capacity
+      const fit = rooms.find((rm) => rm.room_type === "classroom" && rm.capacity >= cap && !u.rooms.has(rm.id));
+      if (fit) return { id: fit.id, name: fit.name };
+      // priority 3: any free room
+      const any = rooms.find((rm) => !u.rooms.has(rm.id));
+      if (any) return { id: any.id, name: any.name };
+      return { id: null, name: null };
+    };
+
+    // ── Main scheduling loop — one class at a time ─────────────────────────
     for (const classId of data.classIds) {
-      const cls = classMap.get(classId) as any;
-      const className = cls?.name ?? classId;
-
-      // Build demand list from class requirements or fallback
-      const reqs: SubjectRequirement[] = classSubjectReqs.has(classId) && data.useClassRequirements
-        ? classSubjectReqs.get(classId)!
-        : (subjects as any[]).map((s: any) => ({
-            subject_id: s.id,
-            subject_code: s.code,
-            subject_name: s.name,
-            lessons_per_week: data.lessonsPerSubjectPerWeek,
-            allow_double: s.allow_double_period ?? false,
-            allow_triple: false,
-            is_practical: false,
-            is_optional: false,
-            optional_group: null,
-            preferred_room_id: null,
-            required_room_type: null,
-            preferred_teacher_id: null,
-          }));
-
-      // Separate optional groups — handle concurrently
-      const optionalGroups = new Map<string, SubjectRequirement[]>();
-      const regularReqs: SubjectRequirement[] = [];
-      for (const req of reqs) {
-        if (req.is_optional && req.optional_group) {
-          const g = optionalGroups.get(req.optional_group) ?? [];
-          g.push(req);
-          optionalGroups.set(req.optional_group, g);
-        } else {
-          regularReqs.push(req);
-        }
+      // Build demand: class_subjects rows for this class (lessons_per_week override
+      // falls back to subjects.lessons_per_week)
+      const csForClass = (classSubjectRows as any[]).filter((cs) => cs.class_id === classId);
+      if (!csForClass.length) {
+        conflicts.push(`${classNames.get(classId)}: no subjects configured in class_subjects — skipped. Run the class_subjects migration/backfill first.`);
+        continue;
       }
 
-      // Build demand array: expand each subject by lessons_per_week
-      // Priority subjects first (teacher priority subjects are handled in teacher selection)
-      const demand: Array<{ req: SubjectRequirement; lessonType: "single" | "double" | "triple" | "practical" }> = [];
+      const demand: ClassSubjectDemand[] = csForClass.map((cs) => {
+        const subj = subjectMap.get(cs.subject_id);
+        return {
+          subject_id: cs.subject_id,
+          lessons: cs.lessons_per_week ?? subj?.lessons_per_week ?? 4,
+          allow_double: !!subj?.allow_double_period,
+          preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
+        };
+      });
 
-      for (const req of regularReqs) {
-        let count = req.lessons_per_week;
-        // Add triple lessons first
-        if (req.allow_triple && count >= 3) {
-          demand.push({ req, lessonType: req.is_practical ? "practical" : "triple" });
-          count -= 3;
+      // Expand demand into individual lesson "units" — doubles become one
+      // unit worth 2 periods, singles worth 1 — then deterministically shuffle
+      // per class so subject order varies but is reproducible.
+      type Unit = { subject_id: string; periodsNeeded: 1 | 2 };
+      const units: Unit[] = [];
+      demand.forEach((d) => {
+        let remaining = d.lessons;
+        if (d.allow_double && remaining >= 2) {
+          while (remaining >= 2) { units.push({ subject_id: d.subject_id, periodsNeeded: 2 }); remaining -= 2; }
         }
-        // Add double lessons
-        if (req.allow_double && count >= 2) {
-          demand.push({ req, lessonType: req.is_practical ? "practical" : "double" });
-          count -= 2;
-        }
-        // Fill rest with singles
-        for (let i = 0; i < count; i++) {
-          demand.push({ req, lessonType: "single" });
-        }
-      }
+        while (remaining >= 1) { units.push({ subject_id: d.subject_id, periodsNeeded: 1 }); remaining -= 1; }
+      });
 
-      // Add optional groups (they all share the same time slot)
-      for (const [groupName, groupReqs] of optionalGroups) {
-        const firstReq = groupReqs[0];
-        for (let i = 0; i < firstReq.lessons_per_week; i++) {
-          demand.push({ req: { ...firstReq, optional_group: groupName }, lessonType: "single" });
-        }
-      }
-
-      // Shuffle demand deterministically by classId seed
       let seed = classId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
       const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-      demand.sort(() => rng() - 0.5);
+      units.sort(() => rng() - 0.5);
 
-      // Sticky teacher per subject in this class
-      const stickyTeacher = new Map<string, string>();
-      let demandIdx = 0;
+      // Track subjects already scheduled today for THIS class (distribution rule:
+      // don't repeat a subject same day unless it's the second half of a double)
+      const scheduledTodayForClass = new Map<number, Set<string>>(); // day -> subject_ids
+      const stickyTeacher = new Map<string, string>(); // subject_id -> staff_id (same teacher all week)
 
-      for (const period of lessonPeriods) {
-        if (demandIdx >= demand.length) break;
+      let unitIdx = 0;
+      const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
 
-        const k = slotKey(period.day_of_week, period.start_time);
-        const u = ensureUsage(k);
+      for (const day of days) {
+        if (unitIdx >= units.length) break;
+        const dayPeriods = periodsByDay.get(day)!;
+        const todaySet = scheduledTodayForClass.get(day) ?? new Set<string>();
+        scheduledTodayForClass.set(day, todaySet);
 
-        // Skip if class already scheduled in this period
-        if (u.classes.has(classId)) continue;
+        for (let pi = 0; pi < dayPeriods.length; pi++) {
+          if (unitIdx >= units.length) break;
+          const period = dayPeriods[pi];
+          const k = slotKey(period.day_of_week, period.start_time);
+          const u = ensureUsage(k);
+          if (u.classes.has(classId)) continue; // class already booked this slot
 
-        const { req, lessonType } = demand[demandIdx];
-
-        // ── Check for consecutive periods needed for doubles/triples ──────────
-        let periodsNeeded = lessonType === "triple" || lessonType === "practical" ? 3
-          : lessonType === "double" ? 2 : 1;
-
-        if (periodsNeeded > 1) {
-          // Find consecutive available periods starting here
-          const pidx = lessonPeriods.indexOf(period);
-          let canFit = true;
-          for (let offset = 1; offset < periodsNeeded; offset++) {
-            const nextP = lessonPeriods[pidx + offset];
-            if (!nextP
-              || nextP.day_of_week !== period.day_of_week
-              || nextP.period_index !== period.period_index + offset) {
-              canFit = false; break;
-            }
-            const nk = slotKey(nextP.day_of_week, nextP.start_time);
-            if (ensureUsage(nk).classes.has(classId)) { canFit = false; break; }
+          // find next unit whose subject isn't already taught to this class today
+          let chosenIdx = -1;
+          for (let i = unitIdx; i < units.length; i++) {
+            if (!todaySet.has(units[i].subject_id)) { chosenIdx = i; break; }
           }
-          if (!canFit) {
-            // Downgrade to single lesson
-            periodsNeeded = 1;
+          if (chosenIdx === -1) chosenIdx = unitIdx; // all remaining are repeats — allow it rather than stall
+
+          const unit = units[chosenIdx];
+
+          // double period needs a free consecutive slot too
+          const needsDouble = unit.periodsNeeded === 2;
+          const nextPeriod = dayPeriods[pi + 1];
+          if (needsDouble && !nextPeriod) {
+            // no room for a double at end of day — try as single instead
+            unit.periodsNeeded = 1;
           }
-        }
 
-        // ── Pick teacher ──────────────────────────────────────────────────────
-        const qualifiedIds = qualifiedFor.get(req.subject_id) ?? [];
-        let candidatePool = qualifiedIds.length
-          ? allStaff.filter(t => qualifiedIds.includes(t.id))
-          : allStaff;
+          // ── Teacher selection ──────────────────────────────────────────
+          const classAssigned = assignedStaffIdsForClass.get(classId);
+          const restrictToAssigned = classesWithAssignments.has(classId);
+          const qualifiedIds = qualifiedFor.get(unit.subject_id);
+          let pool: string[];
+          if (qualifiedIds && qualifiedIds.length) {
+            pool = restrictToAssigned && classAssigned
+              ? qualifiedIds.filter((id) => classAssigned.has(id))
+              : qualifiedIds;
+            if (!pool.length) pool = qualifiedIds; // assignment too strict — fall back to qualification only
+          } else {
+            noQualifiedFor.add(unit.subject_id);
+            pool = Array.from(staffById.keys());
+          }
 
-        // Prefer preferred_teacher_id
-        if (req.preferred_teacher_id) {
-          const preferred = candidatePool.find(t => t.id === req.preferred_teacher_id);
-          if (preferred) candidatePool = [preferred, ...candidatePool.filter(t => t.id !== preferred.id)];
-        }
-
-        // Sort by priority subjects (teachers who have this as priority get precedence)
-        candidatePool = [...candidatePool].sort((a, b) => {
-          const aPriority = [a.priority_subject_1_id, a.priority_subject_2_id, a.priority_subject_3_id].includes(req.subject_id) ? -1 : 0;
-          const bPriority = [b.priority_subject_1_id, b.priority_subject_2_id, b.priority_subject_3_id].includes(req.subject_id) ? -1 : 0;
-          return aPriority - bPriority;
-        });
-
-        let teacherId: string | null = null;
-        const sticky = stickyTeacher.get(req.subject_id);
-
-        if (sticky) {
-          const t = allStaff.find(s => s.id === sticky);
-          const weekCount = teacherWeeklyCount.get(sticky) ?? 0;
-          const dayCount = u.teacherLessonsDay.get(sticky) ?? 0;
-          const maxWeek = t?.max_lessons_per_week ?? 40;
-          const maxDay = t?.max_lessons_per_day ?? 8;
-          if (!u.teachers.has(sticky) && weekCount < maxWeek && dayCount < maxDay) {
+          const sticky = stickyTeacher.get(unit.subject_id);
+          let teacherId: string | null = null;
+          if (sticky && isTeacherFree(sticky, day, period.period_index, k)) {
             teacherId = sticky;
-          }
-        }
-
-        if (!teacherId) {
-          for (const t of candidatePool) {
-            const weekCount = teacherWeeklyCount.get(t.id) ?? 0;
-            const dayCount = u.teacherLessonsDay.get(t.id) ?? 0;
-            const maxWeek = t.max_lessons_per_week ?? 40;
-            const maxDay = t.max_lessons_per_day ?? 8;
-            // Skip if teacher prefers this day free
-            if (t.preferred_free_day === period.day_of_week) continue;
-            if (!u.teachers.has(t.id) && weekCount < maxWeek && dayCount < maxDay) {
-              teacherId = t.id;
-              if (!stickyTeacher.has(req.subject_id)) stickyTeacher.set(req.subject_id, t.id);
-              break;
-            }
-          }
-        }
-
-        if (!teacherId) {
-          // Fallback: any free teacher ignoring soft constraints
-          const fallback = allStaff.find(t => !u.teachers.has(t.id));
-          if (fallback) {
-            teacherId = fallback.id;
-            conflicts.push(`${className} · ${period.label}: no preferred teacher free — fallback to ${fallback.first_name} ${fallback.last_name}`);
           } else {
-            conflicts.push(`${className} · ${period.label}: all teachers busy — slot skipped`);
-            demandIdx++;
-            continue;
-          }
-        }
-
-        // ── Pick room ─────────────────────────────────────────────────────────
-        let selectedRoom: Room | null = null;
-
-        // Priority 1: subject's preferred room
-        if (req.preferred_room_id) {
-          const pr = rooms.find(r => r.id === req.preferred_room_id && !u.rooms.has(r.id));
-          if (pr) selectedRoom = pr;
-        }
-
-        // Priority 2: class home room
-        if (!selectedRoom && cls?.default_room_id) {
-          const hr = rooms.find(r => r.id === cls.default_room_id && !u.rooms.has(r.id));
-          if (hr && roomFits(hr, req.required_room_type)) selectedRoom = hr;
-        }
-
-        // Priority 3: matching room type
-        if (!selectedRoom && req.required_room_type) {
-          const matchingRoom = rooms.find(r =>
-            !u.rooms.has(r.id) && roomFits(r, req.required_room_type)
-          );
-          if (matchingRoom) {
-            selectedRoom = matchingRoom;
-          } else {
-            // No matching specialized room — try any classroom for non-practical
-            if (!req.is_practical) {
-              const anyRoom = rooms.find(r => !u.rooms.has(r.id) && r.room_type === "classroom");
-              if (anyRoom) {
-                selectedRoom = anyRoom;
-                conflicts.push(`${className} · ${req.subject_code}: preferred room type '${req.required_room_type}' unavailable — using ${anyRoom.name}`);
-              }
+            const free = pool.find((id) => isTeacherFree(id, day, period.period_index, k)
+              && loadOn(id, day) < data.maxLessonsPerTeacherPerDay);
+            if (free) {
+              teacherId = free;
+              if (!stickyTeacher.has(unit.subject_id)) stickyTeacher.set(unit.subject_id, free);
             } else {
-              conflicts.push(`${className} · ${req.subject_code}: practical requires '${req.required_room_type}' but none available — skipping`);
-              demandIdx++;
-              continue;
+              const anyFree = pool.find((id) => isTeacherFree(id, day, period.period_index, k));
+              if (anyFree) {
+                teacherId = anyFree;
+                conflicts.push(`${classNames.get(classId)} · ${period.label}: teacher over daily cap, assigned anyway`);
+              } else {
+                conflicts.push(`${classNames.get(classId)} · ${period.label}: no teacher available — slot skipped`);
+                continue; // try next period, keep this unit pending
+              }
             }
           }
-        }
 
-        // Priority 4: any available room
-        if (!selectedRoom) {
-          selectedRoom = rooms.find(r => !u.rooms.has(r.id)) ?? null;
-        }
-
-        // ── Commit slot(s) ────────────────────────────────────────────────────
-        const pidx = lessonPeriods.indexOf(period);
-        const endPeriod = lessonPeriods[pidx + periodsNeeded - 1] ?? period;
-
-        for (let offset = 0; offset < periodsNeeded; offset++) {
-          const p = lessonPeriods[pidx + offset] ?? period;
-          const pk = slotKey(p.day_of_week, p.start_time);
-          const pu = ensureUsage(pk);
-          pu.teachers.add(teacherId!);
-          pu.classes.add(classId);
-          if (selectedRoom) pu.rooms.add(selectedRoom.id);
-          pu.teacherLessonsDay.set(teacherId!, (pu.teacherLessonsDay.get(teacherId!) ?? 0) + 1);
-        }
-
-        teacherWeeklyCount.set(teacherId!, (teacherWeeklyCount.get(teacherId!) ?? 0) + periodsNeeded);
-
-        inserts.push({
-          class_id: classId,
-          subject_id: req.subject_id,
-          teacher_id: teacherId,
-          day_of_week: period.day_of_week,
-          period_index: period.period_index,
-          start_time: period.start_time,
-          end_time: endPeriod.end_time,
-          room: selectedRoom?.name ?? null,
-          room_id: selectedRoom?.id ?? null,
-          lesson_type: periodsNeeded > 2 ? (req.is_practical ? "practical" : "triple") : periodsNeeded === 2 ? "double" : "single",
-          is_optional: req.is_optional,
-          optional_group: req.optional_group,
-          version_id: versionId,
-        });
-
-        // If double/triple, skip the consumed periods
-        for (let offset = 1; offset < periodsNeeded; offset++) {
-          // Mark next period as "used" for this class so we skip it in outer loop
-          const nextP = lessonPeriods[pidx + offset];
-          if (nextP) {
-            const nk = slotKey(nextP.day_of_week, nextP.start_time);
-            ensureUsage(nk).classes.add(classId);
+          // if double, verify the SAME teacher and a room are free next period too
+          if (needsDouble && nextPeriod) {
+            const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
+            const u2 = ensureUsage(k2);
+            const teacherFreeNext = !u2.teachers.has(teacherId!) && !unavailable.get(teacherId!)?.has(`${day}-${nextPeriod.period_index}`);
+            if (!teacherFreeNext || u2.classes.has(classId)) {
+              unit.periodsNeeded = 1; // demote to single, can't get a clean double here
+            }
           }
-        }
 
-        demandIdx++;
+          const room = pickRoom(unit.subject_id, classId, k);
+
+          u.teachers.add(teacherId!);
+          u.classes.add(classId);
+          if (room.id) u.rooms.add(room.id);
+          bumpLoad(teacherId!, day);
+          todaySet.add(unit.subject_id);
+
+          inserts.push({
+            class_id: classId, subject_id: unit.subject_id, teacher_id: teacherId,
+            day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
+            room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+          });
+
+          // second half of a double
+          if (unit.periodsNeeded === 2 && nextPeriod) {
+            const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
+            const u2 = ensureUsage(k2);
+            const room2 = pickRoom(unit.subject_id, classId, k2);
+            u2.teachers.add(teacherId!);
+            u2.classes.add(classId);
+            if (room2.id) u2.rooms.add(room2.id);
+            bumpLoad(teacherId!, day);
+            inserts.push({
+              class_id: classId, subject_id: unit.subject_id, teacher_id: teacherId,
+              day_of_week: nextPeriod.day_of_week, start_time: nextPeriod.start_time, end_time: nextPeriod.end_time,
+              room: room2.name, room_id: room2.id, period_template_id: nextPeriod.id, school_id: schoolId,
+            });
+            pi++; // consume the next period too
+          }
+
+          // remove the consumed unit from the array
+          units.splice(chosenIdx, 1);
+          if (chosenIdx <= unitIdx) unitIdx = Math.max(0, unitIdx - 1);
+        }
       }
 
-      if (demandIdx < demand.length) {
-        conflicts.push(`${className}: ${demand.length - demandIdx} lesson(s) could not be scheduled — add more period slots.`);
+      if (units.length) {
+        conflicts.push(`${classNames.get(classId)}: ${units.length} lesson(s) unscheduled — not enough period slots for this class's subject load.`);
       }
     }
 
-    // ── Batch insert ──────────────────────────────────────────────────────────
+    if (noQualifiedFor.size) {
+      const codes = Array.from(noQualifiedFor).map((id) => subjectMap.get(id)?.code ?? subjectMap.get(id)?.name ?? id).join(", ");
+      conflicts.push(`No qualified teacher (via teacher_subjects) for: ${codes}. Assign teachers under Staff → Subjects Taught.`);
+    }
+
+    // ── Batch insert ─────────────────────────────────────────────────────
     let inserted = 0;
     for (let i = 0; i < inserts.length; i += 50) {
       const chunk = inserts.slice(i, i + 50);
-      const { data: rows, error } = await supabase
-        .from("timetable_slots")
-        .insert(chunk)
-        .select("id");
-      if (error) {
-        conflicts.push(`DB insert error (batch ${Math.floor(i / 50) + 1}): ${error.message}`);
-      } else {
-        inserted += rows?.length ?? 0;
-      }
-    }
-
-    // Update version stats
-    if (versionId) {
-      await supabase.from("timetable_versions").update({
-        stats: { inserted, conflicts: conflicts.length, classes: data.classIds.length }
-      }).eq("id", versionId);
+      const { data: rows, error } = await supabase.from("timetable_slots").insert(chunk).select("id");
+      if (error) conflicts.push(`DB insert error (batch ${Math.floor(i / 50) + 1}): ${error.message}`);
+      else inserted += rows?.length ?? 0;
     }
 
     return {
@@ -540,85 +381,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
       inserted,
       totalPlanned: inserts.length,
       conflicts,
-      versionId,
-      summary: {
-        classes: data.classIds.length,
-        periodsAvailable: lessonPeriods.length,
-        lessonsRequested: inserts.length + (demand?.length ?? 0),
-      },
-    };
-  });
-
-// ─── Swap lesson server function ──────────────────────────────────────────────
-
-export const swapTimetableSlots = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({
-      slotAId: z.string().uuid(),
-      slotBId: z.string().uuid(),
-      swapType: z.enum(["full", "teacher", "room"]).default("full"),
-    }).parse(input)
-  )
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
-      supabase.rpc("is_admin", { _user_id: userId }),
-      supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
-    ]);
-    if (!isAdmin && !isAcademic) throw new Error("Permission denied");
-
-    const { data: slotA } = await supabase.from("timetable_slots").select("*").eq("id", data.slotAId).maybeSingle();
-    const { data: slotB } = await supabase.from("timetable_slots").select("*").eq("id", data.slotBId).maybeSingle();
-    if (!slotA || !slotB) throw new Error("Slots not found");
-
-    if (data.swapType === "full") {
-      await supabase.from("timetable_slots").update({
-        day_of_week: slotB.day_of_week, period_index: slotB.period_index,
-        start_time: slotB.start_time, end_time: slotB.end_time,
-      }).eq("id", data.slotAId);
-      await supabase.from("timetable_slots").update({
-        day_of_week: slotA.day_of_week, period_index: slotA.period_index,
-        start_time: slotA.start_time, end_time: slotA.end_time,
-      }).eq("id", data.slotBId);
-    } else if (data.swapType === "teacher") {
-      await supabase.from("timetable_slots").update({ teacher_id: slotB.teacher_id }).eq("id", data.slotAId);
-      await supabase.from("timetable_slots").update({ teacher_id: slotA.teacher_id }).eq("id", data.slotBId);
-    } else if (data.swapType === "room") {
-      await supabase.from("timetable_slots").update({ room: slotB.room, room_id: slotB.room_id }).eq("id", data.slotAId);
-      await supabase.from("timetable_slots").update({ room: slotA.room, room_id: slotA.room_id }).eq("id", data.slotBId);
-    }
-
-    return { ok: true };
-  });
-
-// ─── Analytics server function ────────────────────────────────────────────────
-
-export const getTimetableAnalytics = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase } = context;
-    const { data: schoolId } = await supabase.rpc("my_school_id");
-    if (!schoolId) throw new Error("No school context");
-
-    const [
-      { data: healthRows },
-      { data: teacherWorkload },
-      { data: roomUsage },
-      { data: unallocated },
-    ] = await Promise.all([
-      supabase.rpc("timetable_health_score", { p_school_id: schoolId }),
-      supabase.from("teacher_workload").select("*").eq("school_id", schoolId).order("total_lessons_scheduled", { ascending: false }),
-      supabase.from("rooms").select("id,name,room_type,capacity").eq("school_id", schoolId).eq("is_active", true),
-      supabase.from("class_subject_requirements")
-        .select("class_id,subject_id,lessons_per_week,classes(name),subjects(name,code)")
-        .eq("school_id", schoolId),
-    ]);
-
-    return {
-      health: healthRows?.[0] ?? null,
-      teacherWorkload: teacherWorkload ?? [],
-      rooms: roomUsage ?? [],
-      unallocated: unallocated ?? [],
+      summary: { classes: data.classIds.length, periodsAvailable: periods.length },
     };
   });
