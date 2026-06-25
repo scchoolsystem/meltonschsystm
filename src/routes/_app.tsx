@@ -10,8 +10,12 @@ import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/login" });
+    // Use getSession() — reads from local storage, no network round-trip.
+    // getUser() hits Supabase's auth server on EVERY navigation, and any
+    // transient network hiccup or mid-refresh token would wrongly redirect
+    // a still-logged-in user to /login.
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) throw redirect({ to: "/login" });
   },
   component: AppLayout,
   errorComponent: ({ error, reset }) => (
