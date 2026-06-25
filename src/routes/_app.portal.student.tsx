@@ -16,7 +16,6 @@ import {
   TrendingUp, TrendingDown, Minus, AlertTriangle, Star, Target,
   BarChart3, BookOpen, Zap, Shield, ChevronUp, ChevronDown, Activity,
   CheckCircle, XCircle, AlertCircle, Lightbulb, Trophy, ArrowUp, ArrowDown,
-  CreditCard, Sun, Library, Megaphone, Scale,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
@@ -637,25 +636,25 @@ function StudentPortal() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto pb-1">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto flex-nowrap gap-0.5 p-1">
-            <TabsTrigger value="dashboard" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><BarChart3 className="w-3.5 h-3.5" /> Dashboard</TabsTrigger>
-            <TabsTrigger value="analytics" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Analytics</TabsTrigger>
-            <TabsTrigger value="subjects" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Subjects</TabsTrigger>
-            <TabsTrigger value="results" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Trophy className="w-3.5 h-3.5" /> Results</TabsTrigger>
-            <TabsTrigger value="reportcards" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> Reports</TabsTrigger>
-            <TabsTrigger value="timetable" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Calendar className="w-3.5 h-3.5" /> Timetable</TabsTrigger>
-            <TabsTrigger value="attendance" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Attendance</TabsTrigger>
-            <TabsTrigger value="fees" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><CreditCard className="w-3.5 h-3.5" /> Fees</TabsTrigger>
-            <TabsTrigger value="today" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Sun className="w-3.5 h-3.5" /> My Day</TabsTrigger>
-            <TabsTrigger value="meals" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Utensils className="w-3.5 h-3.5" /> Meals</TabsTrigger>
-            <TabsTrigger value="cocurricular" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Award className="w-3.5 h-3.5" /> Activities</TabsTrigger>
-            <TabsTrigger value="library" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Library className="w-3.5 h-3.5" /> Library</TabsTrigger>
-            <TabsTrigger value="live" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Video className="w-3.5 h-3.5" /> Live</TabsTrigger>
-            <TabsTrigger value="discipline" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Scale className="w-3.5 h-3.5" /> Discipline</TabsTrigger>
-            <TabsTrigger value="clinic" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Heart className="w-3.5 h-3.5" /> Clinic</TabsTrigger>
-            <TabsTrigger value="gate" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><DoorOpen className="w-3.5 h-3.5" /> Gate</TabsTrigger>
-            <TabsTrigger value="transport" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Bus className="w-3.5 h-3.5" /> Transport</TabsTrigger>
-            <TabsTrigger value="news" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><Megaphone className="w-3.5 h-3.5" /> News</TabsTrigger>
-            <TabsTrigger value="documents" className="whitespace-nowrap text-xs sm:text-sm gap-1.5"><FileText className="w-3.5 h-3.5" /> Docs</TabsTrigger>
+            <TabsTrigger value="dashboard" className="whitespace-nowrap text-xs sm:text-sm">📊 Dashboard</TabsTrigger>
+            <TabsTrigger value="analytics" className="whitespace-nowrap text-xs sm:text-sm">📈 Analytics</TabsTrigger>
+            <TabsTrigger value="subjects" className="whitespace-nowrap text-xs sm:text-sm">📚 Subjects</TabsTrigger>
+            <TabsTrigger value="results" className="whitespace-nowrap text-xs sm:text-sm">🏆 Results</TabsTrigger>
+            <TabsTrigger value="reportcards" className="whitespace-nowrap text-xs sm:text-sm">📋 Reports</TabsTrigger>
+            <TabsTrigger value="timetable" className="whitespace-nowrap text-xs sm:text-sm">🗓 Timetable</TabsTrigger>
+            <TabsTrigger value="attendance" className="whitespace-nowrap text-xs sm:text-sm">✅ Attendance</TabsTrigger>
+            <TabsTrigger value="fees" className="whitespace-nowrap text-xs sm:text-sm">💳 Fees</TabsTrigger>
+            <TabsTrigger value="today" className="whitespace-nowrap text-xs sm:text-sm">☀️ My Day</TabsTrigger>
+            <TabsTrigger value="meals" className="whitespace-nowrap text-xs sm:text-sm">🍽 Meals</TabsTrigger>
+            <TabsTrigger value="cocurricular" className="whitespace-nowrap text-xs sm:text-sm">🏅 Activities</TabsTrigger>
+            <TabsTrigger value="library" className="whitespace-nowrap text-xs sm:text-sm">📖 Library</TabsTrigger>
+            <TabsTrigger value="live" className="whitespace-nowrap text-xs sm:text-sm">🎥 Live</TabsTrigger>
+            <TabsTrigger value="discipline" className="whitespace-nowrap text-xs sm:text-sm">⚖️ Discipline</TabsTrigger>
+            <TabsTrigger value="clinic" className="whitespace-nowrap text-xs sm:text-sm">🏥 Clinic</TabsTrigger>
+            <TabsTrigger value="gate" className="whitespace-nowrap text-xs sm:text-sm">🚪 Gate</TabsTrigger>
+            <TabsTrigger value="transport" className="whitespace-nowrap text-xs sm:text-sm">🚌 Transport</TabsTrigger>
+            <TabsTrigger value="news" className="whitespace-nowrap text-xs sm:text-sm">📣 News</TabsTrigger>
+            <TabsTrigger value="documents" className="whitespace-nowrap text-xs sm:text-sm">📁 Docs</TabsTrigger>
           </TabsList>
         </div>
 
