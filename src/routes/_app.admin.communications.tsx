@@ -149,7 +149,7 @@ function CommunicationsPage() {
         },
       }),
     onSuccess: (res) => {
-      toast.success(`Email ${res.status} — ${res.sent} recipients`);
+      toast.success(`Email queued — ${res.sent} recipient${res.sent !== 1 ? "s" : ""}`);
       setEmSub(""); setEmBody("");
       qc.invalidateQueries({ queryKey: ["notif_log"] });
       qc.invalidateQueries({ queryKey: ["notif_log_emails"] });

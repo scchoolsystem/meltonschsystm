@@ -30,14 +30,28 @@ export function MpesaSettingsCard() {
     consumer_key:    "",
     consumer_secret: "",
     passkey:         "",
-    callback_token:  crypto.randomUUID().replace(/-/g, "").slice(0, 24),
+    callback_token:  "",
     env:             "sandbox" as "sandbox" | "production",
     enabled:         false,
+  });
+  const [savedFlags, setSavedFlags] = useState({
+    consumer_key_set: false,
+    consumer_secret_set: false,
+    passkey_set: false,
+    callback_token_set: false,
   });
 
   useEffect(() => {
     load({}).then((cfg) => {
-      if (cfg) setForm(f => ({ ...f, ...cfg }));
+      if (cfg) {
+        setForm(f => ({ ...f, shortcode: cfg.shortcode ?? "", env: cfg.env ?? "sandbox", enabled: cfg.enabled ?? false }));
+        setSavedFlags({
+          consumer_key_set: !!cfg.consumer_key_set,
+          consumer_secret_set: !!cfg.consumer_secret_set,
+          passkey_set: !!cfg.passkey_set,
+          callback_token_set: !!cfg.callback_token_set,
+        });
+      }
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -124,7 +138,7 @@ export function MpesaSettingsCard() {
                 type={showSecrets ? "text" : "password"}
                 value={form.consumer_key}
                 onChange={e => set("consumer_key", e.target.value)}
-                placeholder="From Daraja portal"
+                placeholder={savedFlags.consumer_key_set ? "•••••••• (saved — leave blank to keep)" : "From Daraja portal"}
                 className="pr-10"
               />
             </div>
@@ -137,7 +151,7 @@ export function MpesaSettingsCard() {
               type={showSecrets ? "text" : "password"}
               value={form.consumer_secret}
               onChange={e => set("consumer_secret", e.target.value)}
-              placeholder="From Daraja portal"
+              placeholder={savedFlags.consumer_secret_set ? "•••••••• (saved — leave blank to keep)" : "From Daraja portal"}
             />
           </div>
 
@@ -148,19 +162,24 @@ export function MpesaSettingsCard() {
               type={showSecrets ? "text" : "password"}
               value={form.passkey}
               onChange={e => set("passkey", e.target.value)}
-              placeholder="From Daraja portal → Lipa na M-Pesa"
+              placeholder={savedFlags.passkey_set ? "•••••••• (saved — leave blank to keep)" : "From Daraja portal → Lipa na M-Pesa"}
             />
           </div>
 
           {/* Callback token */}
           <div className="md:col-span-2">
             <Label>Callback Secret Token</Label>
-            <Input
-              type={showSecrets ? "text" : "password"}
-              value={form.callback_token}
-              onChange={e => set("callback_token", e.target.value)}
-              placeholder="Auto-generated secure token"
-            />
+            <div className="flex gap-2">
+              <Input
+                type={showSecrets ? "text" : "password"}
+                value={form.callback_token}
+                onChange={e => set("callback_token", e.target.value)}
+                placeholder={savedFlags.callback_token_set ? "•••••••• (saved — leave blank to keep)" : "Click Generate, or leave blank"}
+              />
+              <Button type="button" variant="outline" onClick={() => set("callback_token", crypto.randomUUID().replace(/-/g, "").slice(0, 24))}>
+                Generate
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               A random secret that protects your callback URL from spoofing.
             </p>

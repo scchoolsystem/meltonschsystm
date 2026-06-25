@@ -20,9 +20,9 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
       { title: "My Portal", url: "/portal/student" },
       { title: "My Subjects", url: "/academics/subjects" },
       { title: "Exams", url: "/academics/exams" },
-      { title: "Results", url: "/academics/results" },
+      // Results, Report Cards, admin/* and settings/* are accessed via the
+      // student portal only — direct routes are blocked by route guards.
       { title: "Attendance", url: "/attendance" },
-      { title: "Timetable", url: "/timetable" },
       { title: "Classroom", url: "/classroom" },
       { title: "Live Classes", url: "/live" },
       { title: "Announcements", url: "/announcements" },

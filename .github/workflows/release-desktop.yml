@@ -1,4 +1,4 @@
-name: Release Desktop App
+﻿name: Release Desktop App
 
 on:
   push:
@@ -10,8 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
+  build-desktop:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,24 +26,52 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
 
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build frontend
-        run: pnpm build
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+
+      - name: Build frontend (SPA)
+        run: pnpm build:desktop
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+          VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
+
+      - name: Check dist-desktop exists
+        run: dir dist-desktop
+        shell: cmd
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        run: pnpm tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      - name: Rename Windows installers
+        shell: bash
+        run: |
+          NSIS=$(find src-tauri/target/release/bundle/nsis -name "*.exe" | head -1)
+          [ -n "$NSIS" ] && mv "$NSIS" "src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe"
+          MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
+          [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi"
+
+      - name: Upload Windows installers to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: SmartDev ERP ${{ github.ref_name }}
-          releaseDraft: false
-          prerelease: false
+          # When triggered by a tag push, github.ref_name IS the tag.
+          # When triggered manually (workflow_dispatch), create/update a
+          # release for the tag you specify via the "Use workflow from" input,
+          # or it will default to the commit SHA â€” provide a tag in that case.
+          fail_on_unmatched_files: true
+          files: |
+            src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe
+            src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

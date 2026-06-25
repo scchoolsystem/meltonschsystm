@@ -4,6 +4,7 @@ import { buildDashboard, type DashboardWidgetKey } from "@/core/rbac/dashboard";
 import type { AppRole } from "@/core/rbac";
 import {
   AdminKpisWidget,
+  AdminStudentRiskWidget,
   AdminStudentsPerClassWidget,
   AdminSchoolStructureWidget,
   TeacherMyClassesWidget,
@@ -49,6 +50,7 @@ const GREETINGS: Record<string, string> = {
 
 const WIDGETS: Record<DashboardWidgetKey, React.ComponentType> = {
   "admin.kpis": AdminKpisWidget,
+  "admin.studentRisk": AdminStudentRiskWidget,
   "admin.studentsPerClass": AdminStudentsPerClassWidget,
   "admin.schoolStructure": AdminSchoolStructureWidget,
   "teacher.myClasses": TeacherMyClassesWidget,
@@ -90,6 +92,9 @@ function Dashboard() {
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         <Header greeting={greeting} fullName={fullName} roles={roles} />
         <AdminKpisWidget />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <AdminStudentRiskWidget />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <AdminAttendanceTodayWidget />
           <AdminPendingActionsWidget />

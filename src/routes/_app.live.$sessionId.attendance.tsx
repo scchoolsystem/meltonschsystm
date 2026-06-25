@@ -56,7 +56,7 @@ function AttendanceCorrection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, first_name, last_name, unique_id")
+        .select("id, first_name, last_name, unique_id, photo_url")
         .eq("class_id", session!.class_id)
         .order("last_name");
       if (error) throw error;
@@ -212,8 +212,19 @@ function AttendanceCorrection() {
                 {rows.map(({ student: s, att: a, status, changed }) => (
                   <TableRow key={s.id}>
                     <TableCell>
-                      <div className="font-medium">{s.first_name} {s.last_name}</div>
-                      <div className="text-xs text-muted-foreground">{s.unique_id}</div>
+                      <div className="flex items-center gap-2">
+                        {s.photo_url ? (
+                          <img src={s.photo_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                            {s.first_name?.[0]}{s.last_name?.[0]}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-medium">{s.first_name} {s.last_name}</div>
+                          <div className="text-xs text-muted-foreground">{s.unique_id}</div>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">{a?.joined_at ? format(new Date(a.joined_at), "PPp") : <span className="text-muted-foreground">Never joined</span>}</TableCell>
                     <TableCell className="text-sm">{a?.left_at ? format(new Date(a.left_at), "PPp") : "—"}</TableCell>

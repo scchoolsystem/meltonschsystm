@@ -164,10 +164,10 @@ export const saveMpesaConfig = createServerFn({ method: "POST" })
   .validator((input) =>
     z.object({
       shortcode:       z.string().min(4, "Shortcode required"),
-      consumer_key:    z.string().min(10, "Consumer key required"),
-      consumer_secret: z.string().min(10, "Consumer secret required"),
-      passkey:         z.string().min(10, "Passkey required"),
-      callback_token:  z.string().min(8, "Callback token required"),
+      consumer_key:    z.string().optional().default(""),
+      consumer_secret: z.string().optional().default(""),
+      passkey:         z.string().optional().default(""),
+      callback_token:  z.string().optional().default(""),
       env:             z.enum(["sandbox", "production"]),
       enabled:         z.boolean(),
     }).parse(input),
@@ -180,15 +180,33 @@ export const saveMpesaConfig = createServerFn({ method: "POST" })
     const schoolId = schoolIdRaw as unknown as string | null;
     if (!schoolId) throw new Error("No school found for your account");
 
+    // Secret fields arrive blank when the admin didn't change them (the
+    // client never receives the real secret values back). In that case,
+    // keep whatever is already stored instead of overwriting with "".
+    const { data: existing } = await supabase
+      .from("school_mpesa_config")
+      .select("consumer_key, consumer_secret, passkey, callback_token")
+      .eq("school_id", schoolId)
+      .maybeSingle();
+
+    const consumer_key    = data.consumer_key    || existing?.consumer_key    || "";
+    const consumer_secret = data.consumer_secret || existing?.consumer_secret || "";
+    const passkey         = data.passkey         || existing?.passkey        || "";
+    const callback_token  = data.callback_token  || existing?.callback_token || "";
+
+    if (data.enabled && (!consumer_key || !consumer_secret || !passkey || !callback_token)) {
+      throw new Error("All Daraja credentials are required to enable M-Pesa.");
+    }
+
     const { error } = await supabase
       .from("school_mpesa_config")
       .upsert({
         school_id:       schoolId,
         shortcode:       data.shortcode,
-        consumer_key:    data.consumer_key,
-        consumer_secret: data.consumer_secret,
-        passkey:         data.passkey,
-        callback_token:  data.callback_token,
+        consumer_key,
+        consumer_secret,
+        passkey,
+        callback_token,
         env:             data.env,
         enabled:         data.enabled,
       }, { onConflict: "school_id" });
@@ -214,5 +232,17 @@ export const loadMpesaConfig = createServerFn({ method: "GET" })
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return data;
+    if (!data) return null;
+
+    // Never send raw secrets to the browser. The settings UI only needs to
+    // know whether each credential is already set, plus the non-secret fields.
+    return {
+      shortcode: data.shortcode,
+      env: data.env,
+      enabled: data.enabled,
+      consumer_key_set: !!data.consumer_key,
+      consumer_secret_set: !!data.consumer_secret,
+      passkey_set: !!data.passkey,
+      callback_token_set: !!data.callback_token,
+    };
   });

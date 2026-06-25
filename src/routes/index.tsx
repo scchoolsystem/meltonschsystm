@@ -17,7 +17,19 @@ import {
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
 } from "lucide-react";
 
-export const Route = createFileRoute("/")({ component: IndexPage });
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "SmartDev ERP | School Management System Kenya" },
+      { name: "description", content: "SmartDev ERP is a modern school management system for handling students, exams, attendance, fees, and administration in one platform." },
+      { property: "og:title", content: "SmartDev ERP | School Management System Kenya" },
+      { property: "og:description", content: "All-in-one school ERP for academics, finance, and administration." },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://smartdev.co.ke/" },
+    ],
+  }),
+  component: IndexPage,
+});
 
 const GITHUB_REPO = "scchoolsystem/meltonschsystm";
 const APK_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download/app-release.apk`;
@@ -133,16 +145,32 @@ function getOS() {
 function IndexPage() {
   const { slug, loading } = useTenant();
   const navigate = useNavigate();
-  const native = isNativeApp();
-  const isAppSubdomain = typeof window !== "undefined" && window.location.hostname === "app.smartdev.co.ke";
+  // isNativeApp() reads window.__TAURI__ which Tauri injects after the document
+  // is parsed — calling it synchronously at render time can return false on the
+  // very first paint before the injection completes.  Use a state initialised
+  // after mount so we always read the correct value.
+  const [native, setNative] = useState(() => isNativeApp());
+  useEffect(() => { setNative(isNativeApp()); }, []);
+
+  // app.smartdev.co.ke is the APP shell (web build of the Android/desktop app),
+  // not the marketing site — even when opened in a plain browser. Only the
+  // root marketing domains (smartdev.co.ke / www) should ever show Landing.
+  const [isAppHost, setIsAppHost] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase().split(":")[0];
+    setIsAppHost(host === "app.smartdev.co.ke");
+  }, []);
 
   useEffect(() => {
     if (loading) return;
     if (slug && slug !== "__platform__") { navigate({ to: "/login" }); return; }
   }, [loading, slug, navigate]);
 
+  // While we are still resolving the slug OR we haven't confirmed whether this
+  // is a native app yet, show a spinner so we never flash the marketing page.
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if ((native || isAppSubdomain) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
+  if ((native || isAppHost) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
   if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   return <Landing />;
 }

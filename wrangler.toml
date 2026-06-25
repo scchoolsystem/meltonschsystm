@@ -1,2 +1,0 @@
-[build]
-command = "corepack enable && pnpm install --frozen-lockfile && pnpm build"

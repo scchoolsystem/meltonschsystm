@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
@@ -10,12 +10,36 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Wallet, Building2 } from "lucide-react";
+import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
 
 export const Route = createFileRoute("/_app/admin/billing")({ component: BillingPage });
 
 function BillingPage() {
   const { school } = useTenant();
-  const schoolId = school?.id;
+
+  // useTenant().school can be null if the slug/subdomain hasn't resolved yet
+  // (e.g. direct dashboard navigation rather than via subdomain or SchoolPicker).
+  // Fall back to the logged-in user's own school_members row so billing data
+  // still loads even when tenant context is unset.
+  const { data: memberSchoolId } = useQuery({
+    queryKey: ["my-school-id"],
+    enabled: !school?.id,
+    queryFn: async () => {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (!uid) return null;
+      const { data } = await (supabase as any)
+        .from("school_members")
+        .select("school_id")
+        .eq("user_id", uid)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.school_id ?? null;
+    },
+  });
+
+  const schoolId = school?.id ?? memberSchoolId;
 
   const { data: sub } = useQuery({
     queryKey: ["school-subscription", schoolId],
@@ -110,7 +134,7 @@ function BillingPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {needsPayment && <PayNowButton invoice={inv} />}
+                      {needsPayment && <PayNowButton invoice={inv} schoolId={schoolId!} />}
                     </TableCell>
                   </TableRow>
                 );
@@ -123,50 +147,66 @@ function BillingPage() {
   );
 }
 
-function PayNowButton({ invoice }: { invoice: any }) {
+function PayNowButton({ invoice, schoolId }: { invoice: any; schoolId: string }) {
   const [open, setOpen] = useState(false);
+  const [mpesaOpen, setMpesaOpen] = useState(false);
+  const qc = useQueryClient();
   const balance = Number(invoice.amount) - Number(invoice.paid);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm">Pay now</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Pay invoice {invoice.invoice_no}</DialogTitle></DialogHeader>
-        <div className="text-sm text-muted-foreground mb-2">
-          Outstanding balance: <strong className="text-foreground">KES {balance.toLocaleString()}</strong>
-        </div>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild><Button size="sm">Pay now</Button></DialogTrigger>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Pay invoice {invoice.invoice_no}</DialogTitle></DialogHeader>
+          <div className="text-sm text-muted-foreground mb-2">
+            Outstanding balance: <strong className="text-foreground">KES {balance.toLocaleString()}</strong>
+          </div>
 
-        <Tabs defaultValue="bank">
-          <TabsList className="grid grid-cols-2">
-            <TabsTrigger value="bank"><Building2 className="w-4 h-4 mr-1" /> Bank transfer</TabsTrigger>
-            <TabsTrigger value="mpesa"><Wallet className="w-4 h-4 mr-1" /> M-Pesa</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="mpesa">
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="mpesa"><Wallet className="w-4 h-4 mr-1" /> M-Pesa</TabsTrigger>
+              <TabsTrigger value="bank"><Building2 className="w-4 h-4 mr-1" /> Bank transfer</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="bank" className="space-y-2 mt-4 text-sm">
-            <p className="text-muted-foreground">Transfer to the platform account:</p>
-            <div className="border rounded p-3 bg-muted/30 space-y-1 text-xs">
-              <div><strong>Contact platform owner for current bank details.</strong></div>
-              <div className="text-muted-foreground mt-2">Reference: {invoice.invoice_no}</div>
-              <div className="text-muted-foreground">Amount: KES {balance.toLocaleString()}</div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              After transferring, email the receipt to your account manager — payment is recorded within 24 hours.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="mpesa" className="space-y-2 mt-4 text-sm">
-            <div className="border rounded p-3 bg-muted/30 text-xs">
-              <div className="font-medium mb-1">M-Pesa payment</div>
-              <div className="text-muted-foreground">
-                M-Pesa STK push for platform invoices is being configured. In the meantime, please use bank transfer
-                or contact your platform account manager.
+            <TabsContent value="bank" className="space-y-2 mt-4 text-sm">
+              <p className="text-muted-foreground">Transfer to the platform account:</p>
+              <div className="border rounded p-3 bg-muted/30 space-y-1 text-xs">
+                <div><strong>Contact platform owner for current bank details.</strong></div>
+                <div className="text-muted-foreground mt-2">Reference: {invoice.invoice_no}</div>
+                <div className="text-muted-foreground">Amount: KES {balance.toLocaleString()}</div>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+              <p className="text-xs text-muted-foreground mt-2">
+                After transferring, email the receipt to your account manager — payment is recorded within 24 hours.
+              </p>
+            </TabsContent>
 
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Close</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <TabsContent value="mpesa" className="space-y-2 mt-4 text-sm">
+              <p className="text-muted-foreground text-xs">
+                You'll get an M-Pesa prompt on your phone to enter your PIN and complete the payment.
+              </p>
+              <Button className="w-full" onClick={() => setMpesaOpen(true)}>
+                <Wallet className="w-4 h-4 mr-1" /> Pay KES {balance.toLocaleString()} with M-Pesa
+              </Button>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PlatformMpesaPayDialog
+        open={mpesaOpen}
+        onOpenChange={setMpesaOpen}
+        invoiceId={invoice.id}
+        schoolId={schoolId}
+        amountDue={balance}
+        onPaid={() => {
+          qc.invalidateQueries({ queryKey: ["school-platform-invoices"] });
+          setMpesaOpen(false);
+          setOpen(false);
+        }}
+      />
+    </>
   );
 }

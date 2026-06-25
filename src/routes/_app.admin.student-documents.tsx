@@ -13,8 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Upload, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 
-export const Route = createFileRoute("/_app/admin/student-documents")({ component: DocsPage });
+export const Route = createFileRoute("/_app/admin/student-documents")({
+  validateSearch: z.object({ student: z.string().optional() }),
+  component: DocsPage,
+});
 
 const DOC_TYPES = [
   { value: "birth_certificate", label: "Birth Certificate" },
@@ -27,12 +31,35 @@ const DOC_TYPES = [
   { value: "other", label: "Other" },
 ];
 
+interface Document {
+  id: string;
+  doc_type: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+  students: {
+    first_name: string;
+    last_name: string;
+    admission_no: string;
+  };
+}
+
+interface Student {
+  id: string;
+  first_name: string;
+  last_name: string;
+  admission_no: string;
+}
+
 function DocsPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [studentId, setStudentId] = useState("");
+  const { student: preselect } = Route.useSearch() as { student?: string };
+  const [studentId, setStudentId] = useState(preselect ?? "");
+  const [open, setOpen] = useState(!!preselect);
   const [docType, setDocType] = useState("birth_certificate");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +83,7 @@ function DocsPage() {
     },
   });
 
-  const filtered = docs.filter((d: any) => {
+  const filtered = docs.filter((d: Document) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (d.students?.first_name ?? "").toLowerCase().includes(q)
@@ -122,7 +149,7 @@ function DocsPage() {
                 <Select value={studentId} onValueChange={setStudentId}>
                   <SelectTrigger><SelectValue placeholder="Pick a student" /></SelectTrigger>
                   <SelectContent>
-                    {students.map((s: any) => (
+                    {students.map((s: Student) => (
                       <SelectItem key={s.id} value={s.id}>{s.admission_no} — {s.first_name} {s.last_name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -162,7 +189,7 @@ function DocsPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No documents</TableCell></TableRow>
-              ) : filtered.map((d: any) => (
+              ) : filtered.map((d: Document) => (
                 <TableRow key={d.id}>
                   <TableCell>{d.students?.first_name} {d.students?.last_name}</TableCell>
                   <TableCell>{d.students?.admission_no}</TableCell>

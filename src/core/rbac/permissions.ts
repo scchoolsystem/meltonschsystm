@@ -3,11 +3,11 @@
 // prefer canAccess(roles, "module") over hand-rolled role.includes(...) checks.
 
 export type AppRole =
-  | "super_admin" | "principal" | "deputy_principal" | "class_teacher"
+  | "super_admin" | "principal" | "deputy_principal" | "class_teacher" | "hr_admin" | "hr"
   | "subject_teacher" | "hod" | "admission_officer" | "bursar"
   | "librarian" | "sports" | "boarding" | "parent" | "student" | "staff"
   | "teacher" | "nurse" | "matron" | "transport_officer"
-  | "school_admin" | "academic_master"
+  | "school_admin" | "academic_master" | "hr_admin" | "hr"
   | "exams_admin" | "exams_user" | "finance_admin" | "finance_user"
   | "boarding_admin" | "boarding_user" | "kitchen_admin" | "kitchen_user"
   | "security_admin" | "security_user" | "library_admin" | "library_user"
@@ -44,14 +44,28 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     "sports", "sports_admin", "sports_user",
     "discipline_admin", "guidance_admin",
   ],
-  staff: [...ADMIN_ROLES, "hod"],
+  staff: [...ADMIN_ROLES, "hod", "hr_admin", "hr"],
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   // exams_admin also gets a Subjects link in their nav group.
   subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "student", "parent"],
-  exams: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
+  // SECURITY: exam ADMINISTRATION (create/edit exam windows). Students and
+  // parents must never reach this — they see their own exams inside
+  // portal.student / portal.parent, never this CRUD screen.
+  exams: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master"],
   marks: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user"],
-  results: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master", "student", "parent"],
-  "report-cards": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master", "student", "parent"],
+  // SECURITY: whole-school/whole-class results ADMINISTRATION (marks entry,
+  // verification, cross-student tables). Students/parents must never reach
+  // this — their own results render inside portal.student / portal.parent.
+  results: [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master"],
+  // SECURITY: the class-wide report-card PICKER/ranking admin screen
+  // (/academics/report-cards, plural). Never expose to student/parent —
+  // it lets you pick any class and open ANY student's report card.
+  "report-cards-admin": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master"],
+  // A single student's own report card detail page
+  // (/academics/report-card/$studentId/$examId, singular). Ownership of
+  // $studentId must still be enforced by the route loader / RLS — this
+  // module key only controls whether the role may reach the page at all.
+  "report-card-view": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master", "student", "parent"],
   attendance: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
   // Widened to match every role role-experience.ts gives an Analytics/Reports
@@ -114,6 +128,8 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.overrides": ["super_admin", "principal"],
   "admin.field-edits": [...ADMIN_ROLES],
   "admin.leaving-certificates": [...ADMIN_ROLES],
+  "admin.leaving-certificate": [...ADMIN_ROLES],
+  "admin.leaving-certificate": [...ADMIN_ROLES],
   "admin.insurance": [...ADMIN_ROLES, "bursar", "finance_admin"],
   "admin.student-documents": [...ADMIN_ROLES, "admission_officer"],
   "admin.ict": [...ADMIN_ROLES, "ict_admin"],
@@ -140,7 +156,11 @@ export function moduleForPath(pathname: string): string | null {
   if (seg[0] === "academics" && seg[1]) {
     if (seg[1] === "exams") return "exams";
     if (seg[1] === "marks") return "marks";
-    if (seg[1] === "results" || seg[1] === "report-card" || seg[1] === "report-cards") return "results";
+    if (seg[1] === "results") return "results";
+    // /academics/report-card/$studentId/$examId — own report card detail.
+    if (seg[1] === "report-card") return "report-card-view";
+    // /academics/report-cards — admin class-wide picker/ranking.
+    if (seg[1] === "report-cards") return "report-cards-admin";
     if (seg[1] === "subjects") return "subjects";
   }
   if (seg[0] === "finance") return "finance";

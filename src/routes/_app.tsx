@@ -9,15 +9,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
-  // Wave 1, Fix C-3: use getUser() (re-validates with Auth server) instead of
-  // getSession() (reads local storage only). Avoids double-bounce on hard
-  // refresh when local session is stale or absent.
-  beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/login" });
+  beforeLoad: async ({ location }) => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session) {
+      // Save the current path so login can redirect back after auth
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.pathname },
+      });
+    }
   },
   component: AppLayout,
-  // Wave 3: authenticated-area boundaries (root cascades, these keep chrome).
   errorComponent: ({ error, reset }) => (
     <div className="min-h-screen grid place-items-center p-6">
       <div className="max-w-md text-center space-y-4">
@@ -49,12 +51,20 @@ function AppLayout() {
     );
   }
 
-  // Wave 1, Fix C-3: drop the client-side <Navigate /> fallback. beforeLoad
-  // already guarantees a user; for unauthorized routes throw a router
-  // redirect so the URL bar stays consistent and no second render flashes.
   const appRoles = roles as AppRole[];
-  if (path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
-    throw redirect({ to: "/dashboard" });
+
+  // Only block access once roles are loaded AND user has roles assigned.
+  // Never block while still loading (empty appRoles during load would deny everything).
+  if (rolesLoaded && appRoles.length > 0 && path !== "/dashboard" && !canAccessRoute(appRoles, path)) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">Access denied</h2>
+          <p className="text-sm text-muted-foreground">You do not have permission to view this page.</p>
+          <a href="/dashboard" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground mt-2">Go to Dashboard</a>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -47,7 +47,7 @@ function Page() {
         await supabase
           .from("leaving_certificates")
           .select(
-            "*, students(first_name, last_name, admission_no, unique_id, date_of_birth, gender, admitted_on, classes(name, level))"
+            "*, students(first_name, last_name, admission_no, unique_id, date_of_birth, gender, admitted_on, photo_url, classes(name, level))"
           )
           .eq("id", id)
           .maybeSingle()
@@ -142,6 +142,13 @@ function Page() {
               Serial No: <span className="font-mono">{data.serial_no}</span>
             </div>
           </div>
+
+          {/* Student photo */}
+          {s.photo_url && (
+            <div className="flex justify-end mb-4">
+              <img src={s.photo_url} alt="Student photo" className="w-24 h-28 object-cover rounded border" />
+            </div>
+          )}
 
           {/* Certificate body text */}
           <p className="text-sm leading-relaxed mb-6">

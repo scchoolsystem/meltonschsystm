@@ -9,6 +9,13 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles, Activity } from "lucide-react";
+import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalyticsPanel";
+
+// ...inside the admin section:
+<section className="space-y-4">
+  <h2 className="text-base font-semibold">Academic Analytics</h2>
+  <AcademicAnalyticsPanel />
+</section>
 
 export const Route = createFileRoute("/_app/analytics")({ component: Analytics });
 

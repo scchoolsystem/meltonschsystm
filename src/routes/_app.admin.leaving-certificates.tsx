@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -117,8 +117,10 @@ function Page() {
                   <TableCell className="capitalize">{c.conduct}</TableCell>
                   <TableCell>{c.leaving_date}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => window.open(`/admin/leaving-certificate/${c.id}`, "_blank")}>
-                      <Printer className="w-3 h-3 mr-1" />Print
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to="/admin/leaving-certificate/$id" params={{ id: c.id }}>
+                        <Printer className="w-3 h-3 mr-1" />Print
+                      </Link>
                     </Button>
                   </TableCell>
                 </TableRow>

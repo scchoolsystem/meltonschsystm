@@ -464,3 +464,80 @@ export const updateStaff = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// ---------- UPDATE STUDENT ----------
+async function syncStudentActivities(studentId: string, schoolId: string, activityIds?: string[]) {
+  if (!Array.isArray(activityIds)) return;
+  try {
+    await (supabaseAdmin as any).from("student_co_curricular").delete().eq("student_id", studentId);
+    if (activityIds.length) {
+      const rows = activityIds.map((activity_id) => ({ student_id: studentId, activity_id, school_id: schoolId }));
+      const { error } = await (supabaseAdmin as any).from("student_co_curricular").insert(rows);
+      if (error && error.code !== "42P01") throw new Error(error.message);
+    }
+  } catch (e: any) {
+    if (e?.code !== "42P01") throw e;
+  }
+}
+
+export const updateStudent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      id: z.string().uuid(),
+      first_name: z.string().trim().min(1).max(80).optional(),
+      last_name: z.string().trim().min(1).max(80).optional(),
+      gender: z.enum(["male", "female", "other"]).optional(),
+      date_of_birth: z.string().optional().or(z.literal("")),
+      class_id: z.string().uuid().optional().or(z.literal("")),
+      national_id: z.string().trim().max(40).optional().or(z.literal("")),
+      desk_no: z.number().int().nonnegative().optional(),
+      parent_name: z.string().trim().max(120).optional().or(z.literal("")),
+      parent_phone: z.string().trim().max(40).optional().or(z.literal("")),
+      parent_email: z.string().email().max(255).optional().or(z.literal("")),
+      address: z.string().trim().max(500).optional().or(z.literal("")),
+      medical_notes: z.string().trim().max(1000).optional().or(z.literal("")),
+      photo_url: z.string().url().optional().or(z.literal("")),
+      activity_ids: z.array(z.string().uuid()).max(40).optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const isAdmin = await assertAdmin(context);
+    if (!isAdmin) {
+      const { data: ok1 } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admission_officer" as never });
+      const { data: ok2 } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "deputy_principal" as never });
+      if (!ok1 && !ok2) throw new Error("Not authorized to update students");
+    }
+    const { data: callerSchool } = await context.supabase.rpc("my_school_id");
+    if (!callerSchool) throw new Error("No school context for current user");
+
+    const { data: existingStudent } = await supabaseAdmin
+      .from("students").select("id, school_id")
+      .eq("id", data.id).eq("school_id", callerSchool).maybeSingle();
+    if (!existingStudent) throw new Error("Student not found in your school");
+
+    const patch: any = {};
+    if (data.first_name !== undefined) patch.first_name = data.first_name;
+    if (data.last_name !== undefined) patch.last_name = data.last_name;
+    if (data.gender !== undefined) patch.gender = data.gender;
+    if (data.date_of_birth !== undefined) patch.date_of_birth = data.date_of_birth || null;
+    if (data.class_id !== undefined) patch.class_id = data.class_id || null;
+    if (data.national_id !== undefined) patch.national_id = data.national_id || null;
+    if (data.desk_no !== undefined) patch.desk_no = data.desk_no;
+    if (data.parent_name !== undefined) patch.parent_name = data.parent_name || null;
+    if (data.parent_phone !== undefined) patch.parent_phone = data.parent_phone || null;
+    if (data.parent_email !== undefined) patch.parent_email = data.parent_email || null;
+    if (data.address !== undefined) patch.address = data.address || null;
+    if (data.medical_notes !== undefined) patch.medical_notes = data.medical_notes || null;
+    if (data.photo_url) patch.photo_url = data.photo_url;
+
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabaseAdmin.from("students").update(patch)
+        .eq("id", data.id).eq("school_id", callerSchool);
+      if (error) throw new Error(error.message);
+    }
+
+    await syncStudentActivities(data.id, callerSchool as string, data.activity_ids);
+
+    return { ok: true };
+  });

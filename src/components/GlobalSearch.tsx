@@ -10,6 +10,17 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Row = { kind: "student" | "staff" | "class"; id: string; label: string; sub?: string };
 
+/**
+ * Sanitise a search term for use in Supabase ilike patterns.
+ * Strips PostgREST filter-injection characters: commas, parentheses,
+ * dots (which delimit column.operator.value in .or() strings), and
+ * percent/underscore wildcards beyond the ones we add ourselves.
+ */
+function sanitiseSearchTerm(raw: string): string {
+  // Allow letters, digits, spaces, hyphens, and forward slashes (for IDs like S/001)
+  return raw.replace(/[^\w\s\-/]/g, "").trim();
+}
+
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -29,37 +40,81 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (!open) return;
-    const term = q.trim();
+    const raw = q.trim();
     const t = setTimeout(async () => {
+      if (!raw) { setRows([]); return; }
+
+      // Sanitise before building patterns — prevents PostgREST filter injection
+      const term = sanitiseSearchTerm(raw);
       if (!term) { setRows([]); return; }
+
       const like = `%${term}%`;
+
+      // Use individual chained .or() calls with fixed column lists rather than
+      // string interpolation, so the pattern value is always passed as a
+      // parameterised value and cannot escape into filter syntax.
       const [s, st, c] = await Promise.all([
-        supabase.from("students")
+        supabase
+          .from("students")
           .select("id,first_name,last_name,admission_no,unique_id")
-          .or(`first_name.ilike.${like},last_name.ilike.${like},admission_no.ilike.${like},unique_id.ilike.${like}`)
+          .or(
+            [
+              `first_name.ilike.${like}`,
+              `last_name.ilike.${like}`,
+              `admission_no.ilike.${like}`,
+              `unique_id.ilike.${like}`,
+            ].join(","),
+          )
           .limit(8),
-        supabase.from("staff")
+        supabase
+          .from("staff")
           .select("id,first_name,last_name,employee_no,unique_id,role")
-          .or(`first_name.ilike.${like},last_name.ilike.${like},employee_no.ilike.${like},unique_id.ilike.${like}`)
+          .or(
+            [
+              `first_name.ilike.${like}`,
+              `last_name.ilike.${like}`,
+              `employee_no.ilike.${like}`,
+              `unique_id.ilike.${like}`,
+            ].join(","),
+          )
           .limit(8),
-        supabase.from("classes")
+        supabase
+          .from("classes")
           .select("id,name,level,stream")
-          .or(`name.ilike.${like},level.ilike.${like}`)
+          .or(
+            [
+              `name.ilike.${like}`,
+              `level.ilike.${like}`,
+            ].join(","),
+          )
           .limit(8),
       ]);
+
       const out: Row[] = [];
-      s.data?.forEach((r: any) => out.push({
-        kind: "student", id: r.id,
-        label: `${r.first_name} ${r.last_name}`, sub: r.unique_id || r.admission_no,
-      }));
-      st.data?.forEach((r: any) => out.push({
-        kind: "staff", id: r.id,
-        label: `${r.first_name} ${r.last_name}`, sub: `${r.role} · ${r.unique_id || r.employee_no}`,
-      }));
-      c.data?.forEach((r: any) => out.push({
-        kind: "class", id: r.id,
-        label: r.name, sub: [r.level, r.stream].filter(Boolean).join(" · "),
-      }));
+      s.data?.forEach((r: any) =>
+        out.push({
+          kind: "student",
+          id: r.id,
+          label: `${r.first_name} ${r.last_name}`,
+          sub: r.unique_id || r.admission_no,
+        }),
+      );
+      st.data?.forEach((r: any) =>
+        out.push({
+          kind: "staff",
+          id: r.id,
+          label: `${r.first_name} ${r.last_name}`,
+          sub: `${r.role} · ${r.unique_id || r.employee_no}`,
+        }),
+      );
+      c.data?.forEach((r: any) =>
+        out.push({
+          kind: "class",
+          id: r.id,
+          label: r.name,
+          sub: [r.level, r.stream].filter(Boolean).join(" · "),
+        }),
+      );
       setRows(out);
     }, 200);
     return () => clearTimeout(t);
@@ -75,7 +130,8 @@ export function GlobalSearch() {
   return (
     <>
       <Button
-        variant="outline" size="sm"
+        variant="outline"
+        size="sm"
         onClick={() => setOpen(true)}
         className="gap-2 text-muted-foreground w-64 justify-start"
       >
@@ -93,7 +149,11 @@ export function GlobalSearch() {
             return (
               <CommandGroup key={kind} heading={kind.toUpperCase() + "S"}>
                 {items.map((r) => (
-                  <CommandItem key={`${kind}-${r.id}`} onSelect={() => go(r)} value={`${r.label} ${r.sub ?? ""}`}>
+                  <CommandItem
+                    key={`${kind}-${r.id}`}
+                    onSelect={() => go(r)}
+                    value={`${r.label} ${r.sub ?? ""}`}
+                  >
                     <div className="flex flex-col">
                       <span>{r.label}</span>
                       {r.sub && <span className="text-xs text-muted-foreground">{r.sub}</span>}
