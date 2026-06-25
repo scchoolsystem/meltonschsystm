@@ -19,6 +19,7 @@ import {
   GlassCard, AnimatedNumber, fadeUp, stagger,
   PortalTabBar, PortalTabContent, type PortalTabConfig,
 } from "@/components/portal-shared";
+import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
 
 const DAYS = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/_app/portal/parent")({
 });
 
 const PARENT_TABS: PortalTabConfig[] = [
-  { value: "results", icon: <Trophy className="w-3.5 h-3.5" />, label: "Results" },
+  { value: "results", icon: <Trophy className="w-3.5 h-3.5" />, label: "Performance" },
   { value: "reportcards", icon: <ClipboardList className="w-3.5 h-3.5" />, label: "Report Cards" },
   { value: "attendance", icon: <CheckCircle className="w-3.5 h-3.5" />, label: "Attendance" },
   { value: "fees", icon: <CreditCard className="w-3.5 h-3.5" />, label: "Fees" },
@@ -150,21 +151,10 @@ function ParentPortal() {
 
       <PortalTabBar tabs={PARENT_TABS} activeTab={activeTab} onTabChange={setActiveTab}>
         <PortalTabContent value="results">
-          <GlassCard className="p-6 space-y-2">
-            {data.results.length === 0 && <p className="text-sm text-muted-foreground">No results yet.</p>}
-            {data.results.map((r: any) => (
-              <div key={r.id} className="flex justify-between border-b py-2">
-                <div>
-                  <div className="font-medium">{r.subjects?.name}</div>
-                  <div className="text-xs text-muted-foreground">{r.exams?.name} · {r.exams?.term} {r.exams?.year}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold">{r.score}</div>
-                  {r.grade && <Badge variant="secondary">{r.grade}</Badge>}
-                </div>
-              </div>
-            ))}
-          </GlassCard>
+          <StudentPerformanceCenter
+            results={data.results}
+            attendance={data.attendance}
+          />
         </PortalTabContent>
 
         <PortalTabContent value="reportcards">
