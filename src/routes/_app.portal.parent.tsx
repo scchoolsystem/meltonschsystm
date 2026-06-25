@@ -99,8 +99,6 @@ function ParentPortal() {
     })();
   }, [activeId, children]);
 
-  if (loading) return <div className="p-6 text-muted-foreground">Loading…</div>;
-  if (children.length === 0) return <LinkChildPanel onLinked={() => window.location.reload()} />;
 
   const active = children.find(c => c.id === activeId);
   const totalDue = data.invoices.reduce((s: number, i: any) => s + Number(i.amount) - Number(i.paid), 0);
@@ -114,6 +112,8 @@ function ParentPortal() {
     }
     return Array.from(map.entries()).map(([id, exam]) => ({ id, ...exam }));
   }, [data.results]);
+  if (loading) return <div className="p-6 text-muted-foreground">Loading…</div>;
+  if (children.length === 0) return <LinkChildPanel onLinked={() => window.location.reload()} />;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
