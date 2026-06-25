@@ -1,11 +1,3 @@
-// src/routes/_app.academics.results.tsx
-// UPGRADED — Results page:
-//   • Pure students → redirect to /portal/student#results tab
-//   • Staff/admin   → full analytics dashboard with filters + mark entry
-//   • Added: per-exam averages card, grade distribution chart,
-//     student risk indicators, subject performance table
-
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
