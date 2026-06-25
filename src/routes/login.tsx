@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,10 +14,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { GraduationCap, Loader2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/login")({ component: LoginPage });
+export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
+  component: LoginPage,
+});
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = useSearch({ from: "/login" });
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
   const { school, slug, isPlatformHost, error: tenantError, loading: tenantLoading } = useTenant();
@@ -32,18 +38,20 @@ function LoginPage() {
   const [supportBusy, setSupportBusy] = useState(false);
   const settings = school ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url } : null;
 
-  // Only treat as root host AFTER tenant has finished loading
   const isRootHost = !tenantLoading && !isPlatformHost && !slug && !isNativeApp();
 
   useEffect(() => {
-    if (tenantLoading) return; // wait for tenant before any redirect
+    if (tenantLoading) return;
     if (isPlatformHost) { navigate({ to: session ? "/platform/dashboard" : "/platform/login" }); return; }
     if (isRootHost) { navigate({ to: "/" }); return; }
     if (isNativeApp() && !isPlatformHost && !slug) { navigate({ to: "/" }); return; }
-    if (!loading && session) navigate({ to: "/dashboard" });
-  }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading, slug]);
+    if (!loading && session) {
+      // Restore the page the user was on before being redirected to login
+      const destination = redirectTo && redirectTo !== "/login" ? redirectTo : "/dashboard";
+      navigate({ to: destination });
+    }
+  }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading, slug, redirectTo]);
 
-  // Still loading tenant — show spinner, don't flash anything
   if (tenantLoading) {
     return (
       <div className="min-h-screen grid place-items-center">
@@ -85,17 +93,15 @@ function LoginPage() {
       if (school?.id) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Atomically set this school as the default in a single query —
-          // prevents the race condition where my_school_id() returns the
-          // previous school before both UPDATE statements finish.
           await supabase.rpc("set_default_school", { p_school_id: school.id });
         }
       }
       toast.success("Welcome back");
-      navigate({ to: "/dashboard" });
+      // Go back to where they were, or dashboard if no redirect saved
+      const destination = redirectTo && redirectTo !== "/login" ? redirectTo : "/dashboard";
+      navigate({ to: destination });
     } catch (err: any) { toast.error(err.message ?? "Login failed"); } finally { setBusy(false); }
   }
-
 
   async function handleSupportSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -105,7 +111,7 @@ function LoginPage() {
       const { error } = await supabase.from("support_tickets").insert({
         subject: `Login help from ${supportName} (${supportEmail})`,
         status: "open",
-        school_id: school?.id ?? null,  // routes to the school's admin; falls back to platform if no school context
+        school_id: school?.id ?? null,
       } as any);
       if (error) throw error;
       toast.success("Request sent. We will be in touch shortly.");
