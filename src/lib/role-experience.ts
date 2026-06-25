@@ -34,7 +34,7 @@ const ROLE_GROUPS: Record<string, NavGroup[]> = {
     items: [
       dashboard,
       { title: "My Portal", url: "/portal/parent" },
-      { title: "Child Performance", url: "/academics/results" },
+      { title: "Child Performance", url: "/portal/parent" },
       { title: "Attendance", url: "/attendance" },
       { title: "Fees", url: "/finance/invoices" },
       { title: "Discipline", url: "/discipline" },
