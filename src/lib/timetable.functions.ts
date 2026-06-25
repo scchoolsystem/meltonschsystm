@@ -20,9 +20,10 @@ export const generateTimetable = createServerFn({ method: "POST" })
     if (!isAdmin && !isAcademic) throw new Error("Only admins or academic master can generate timetables");
     const { data: schoolId } = await supabase.rpc("my_school_id");
     if (!schoolId) throw new Error("No school context");
-    const { data: classRows, error: clsErr } = await supabase.from("classes").select("id").eq("school_id", schoolId).in("id", data.classIds);
+    const { data: classRows, error: clsErr } = await supabase.from("classes").select("id,name").eq("school_id", schoolId).in("id", data.classIds);
     if (clsErr) throw new Error(clsErr.message);
     const allowed = new Set((classRows ?? []).map((r: any) => r.id));
+    const classNames = new Map((classRows ?? []).map((r: any) => [r.id, r.name]));
     const invalid = data.classIds.filter((id) => !allowed.has(id));
     if (invalid.length) throw new Error(`Classes not in your school: ${invalid.join(", ")}`);
     const { data: periodRows = [], error: pErr } = await supabase
@@ -117,7 +118,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
       );
     }
     droppedByClass.forEach((count, classId) => {
-      conflicts.push(`Class ${classId}: ${count} lesson(s) could not be scheduled — not enough period slots in the week for the requested lessons-per-subject.`);
+      conflicts.push(`${classNames.get(classId) ?? classId}: ${count} lesson(s) could not be scheduled — not enough period slots in the week for the requested lessons-per-subject.`);
     });
     let inserted = 0;
     for (let i = 0; i < inserts.length; i += 50) {
