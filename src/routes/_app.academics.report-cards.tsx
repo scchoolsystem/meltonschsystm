@@ -298,6 +298,7 @@ function ReportCardContent({
 
   const overallGrade   = getOverallGrade(meanScore);
   const gradeColour    = gradeColor(overallGrade);
+  const gradeBgColour  = gradeBg(overallGrade);
   const overallRemarks = getOverallRemark(overallGrade);
   const position       = summary?.position;
 
