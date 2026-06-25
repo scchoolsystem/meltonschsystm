@@ -1227,5 +1227,3 @@ function InventoryTab({ inventory, can }: { inventory: any[]; can: boolean }) {
     </div>
   );
 }
-
-Claude is AI and can make mistakes. Plea
