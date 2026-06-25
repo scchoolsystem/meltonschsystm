@@ -13,7 +13,10 @@
     "build:android": "bash scripts/build-android.sh",
     "deploy": "pnpm build && npx wrangler deploy --config dist/server/wrangler.json",
     "release": "pnpm deploy && bash scripts/build-android.sh",
-    "build:desktop": "vite build --config vite.config.desktop.ts"
+    "build:desktop": "vite build --config vite.config.desktop.ts",
+    "desktop:frontend": "vite build --config vite.config.desktop.ts",
+    "desktop:dev": "pnpm desktop:frontend && tauri dev",
+    "desktop:build": "pnpm desktop:frontend && tauri build"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

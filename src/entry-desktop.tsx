@@ -2,16 +2,17 @@
 // No SSR, no hydration — plain client-side React render.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { RouterProvider } from "@tanstack/react-router";
+import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
-import { createRouter } from "@tanstack/react-router";
 import "./styles.css";
 
 const queryClient = new QueryClient();
+const history = createHashHistory();
 
 const router = createRouter({
   routeTree,
+  history,
   context: { queryClient },
   scrollRestoration: true,
   defaultPreloadStaleTime: 0,

@@ -14,7 +14,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/hooks/use-auth";
 import { StaffWizard } from "@/components/staff/StaffWizard";
 
-export const Route = createFileRoute("/_app/staff/$id")({ component: StaffProfilePage });
+export const Route = createFileRoute("/_app/staff_/$id")({ component: StaffProfilePage });
 
 function PayslipsTab({ staffId }: { staffId?: string }) {
   const { data: slips = [], isLoading, isError } = useQuery({

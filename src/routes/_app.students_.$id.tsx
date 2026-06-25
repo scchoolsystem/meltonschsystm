@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/hooks/use-auth";
 import { StudentWizard } from "@/components/students/StudentWizard";
 
-export const Route = createFileRoute("/_app/students/$id")({ component: StudentProfilePage });
+export const Route = createFileRoute("/_app/students_/$id")({ component: StudentProfilePage });
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

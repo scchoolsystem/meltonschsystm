@@ -77,7 +77,9 @@ export function PlatformMpesaPayDialog({ open, onOpenChange, invoiceId, schoolId
     setStatus("sending");
     setMessage(null);
     try {
-      const res = await fetch("/api/platform-mpesa-stk", {
+      const defaultApiBase = window.location.protocol === "file:" ? "https://app.smartdev.co.ke" : "";
+      const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? defaultApiBase;
+      const res = await fetch(`${apiBase}/api/public/platform-mpesa-stk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ invoice_id: invoiceId, school_id: schoolId, phone, amount: amt }),

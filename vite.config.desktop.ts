@@ -6,6 +6,9 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import path from "path";
 
 export default defineConfig({
+  root: "desktop",
+  base: "./",
+  publicDir: path.resolve(__dirname, "public"),
   plugins: [
     tanstackRouter({
       target: "react",
@@ -17,20 +20,19 @@ export default defineConfig({
     tsconfigPaths(),
     tailwindcss(),
   ],
-  root: "desktop",
   build: {
     outDir: "../dist-desktop",
     emptyOutDir: true,
   },
-resolve: {
-  alias: [
-    { find: "@", replacement: path.resolve(__dirname, "./src") },
-    { find: "@tanstack/start-server-core", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
-    { find: "@tanstack/start-storage-context", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
-    { find: "node:stream/web", replacement: path.resolve(__dirname, "./desktop/node-stream-web-stub.ts") },
-    { find: "node:stream", replacement: path.resolve(__dirname, "./desktop/node-stream-stub.ts") },
-  ],
-},
+  resolve: {
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+      { find: "@tanstack/start-server-core", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
+      { find: "@tanstack/start-storage-context", replacement: path.resolve(__dirname, "./desktop/empty-stub.ts") },
+      { find: "node:stream/web", replacement: path.resolve(__dirname, "./desktop/node-stream-web-stub.ts") },
+      { find: "node:stream", replacement: path.resolve(__dirname, "./desktop/node-stream-stub.ts") },
+    ],
+  },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
   },

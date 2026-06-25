@@ -31,8 +31,12 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
     if (schools.length) return;
     setLoadingList(true);
     setDebugError(null);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
     try {
-      const { data, error } = await supabase.rpc("list_active_schools");
+      const { data, error } = await supabase
+        .rpc("list_active_schools")
+        .abortSignal(controller.signal);
       if (error) {
         setDebugError(`RPC error: ${error.message} (code: ${error.code})`);
       } else {
@@ -41,8 +45,11 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
         setFiltered(rows);
       }
     } catch (e: any) {
-      setDebugError(e?.message ?? "Network request failed (no response from server).");
+      setDebugError(e?.name === "AbortError"
+        ? "The school list request timed out. Check your internet connection and try again."
+        : e?.message ?? "Network request failed (no response from server).");
     } finally {
+      window.clearTimeout(timeoutId);
       setLoadingList(false);
     }
   };

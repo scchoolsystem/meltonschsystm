@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist-desktop",
     "devUrl": "http://localhost:8080",
-    "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "beforeDevCommand": "pnpm desktop:frontend",
+    "beforeBuildCommand": "pnpm desktop:frontend"
   },
   "app": {
     "withGlobalTauri": true,
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' https://vpikrrytxeyybfhnozyt.supabase.co wss://vpikrrytxeyybfhnozyt.supabase.co https://*.supabase.co wss://*.supabase.co; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://app.smartdev.co.ke https://*.smartdev.co.ke; connect-src 'self' https://app.smartdev.co.ke https://*.smartdev.co.ke https://vpikrrytxeyybfhnozyt.supabase.co wss://vpikrrytxeyybfhnozyt.supabase.co https://*.supabase.co wss://*.supabase.co https://api.safaricom.co.ke https://sandbox.safaricom.co.ke; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'"
     }
   },
   "bundle": {
