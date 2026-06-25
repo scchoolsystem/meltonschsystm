@@ -240,28 +240,26 @@ export const generateTimetable = createServerFn({ method: "POST" })
       const scheduledTodayForClass = new Map<number, Set<string>>(); // day -> subject_ids
       const stickyTeacher = new Map<string, string>(); // subject_id -> staff_id (same teacher all week)
 
-      let unitIdx = 0;
       const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
 
       for (const day of days) {
-        if (unitIdx >= units.length) break;
+        if (!units.length) break;
         const dayPeriods = periodsByDay.get(day)!;
         const todaySet = scheduledTodayForClass.get(day) ?? new Set<string>();
         scheduledTodayForClass.set(day, todaySet);
 
         for (let pi = 0; pi < dayPeriods.length; pi++) {
-          if (unitIdx >= units.length) break;
+          if (!units.length) break;
           const period = dayPeriods[pi];
           const k = slotKey(period.day_of_week, period.start_time);
           const u = ensureUsage(k);
           if (u.classes.has(classId)) continue; // class already booked this slot
 
-          // find next unit whose subject isn't already taught to this class today
-          let chosenIdx = -1;
-          for (let i = unitIdx; i < units.length; i++) {
-            if (!todaySet.has(units[i].subject_id)) { chosenIdx = i; break; }
-          }
-          if (chosenIdx === -1) chosenIdx = unitIdx; // all remaining are repeats — allow it rather than stall
+          // find next unit whose subject isn't already taught to this class today —
+          // always search the LIVE array fresh (units shrinks via splice below,
+          // so no separate index pointer needs to stay in sync with it)
+          let chosenIdx = units.findIndex((un) => !todaySet.has(un.subject_id));
+          if (chosenIdx === -1) chosenIdx = 0; // all remaining are repeats — allow it rather than stall
 
           const unit = units[chosenIdx];
 
@@ -353,7 +351,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
           // remove the consumed unit from the array
           units.splice(chosenIdx, 1);
-          if (chosenIdx <= unitIdx) unitIdx = Math.max(0, unitIdx - 1);
         }
       }
 
