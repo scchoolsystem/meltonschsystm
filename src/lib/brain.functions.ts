@@ -41,7 +41,7 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       // discipline – last 60 days
       supabaseAdmin.from("discipline_records").select("student_id,severity,incident_date,category").eq("school_id", schoolId).gte("incident_date", agoDate(60)),
       // academics
-      supabaseAdmin.from("exam_results").select("score,student_id,class_id,exam_id").eq("school_id", schoolId),
+      supabaseAdmin.from("exam_results").select("score,student_id,exam_id").eq("school_id", schoolId),
       supabaseAdmin.from("exams").select("id,name,date").eq("school_id", schoolId).order("date", { ascending: false }).limit(6),
       supabaseAdmin.from("classes").select("id,name").eq("school_id", schoolId),
       // governance
@@ -52,7 +52,7 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       supabaseAdmin.from("pending_parent_links").select("id,status").eq("school_id", schoolId).eq("status", "pending"),
       supabaseAdmin.from("lifecycle_events").select("target_type,to_status,created_at").eq("school_id", schoolId).gte("created_at", ago(30)),
       // boarding
-      supabaseAdmin.from("boarding_roll_call").select("student_id,status,date").eq("school_id", schoolId).gte("date", agoDate(7)),
+      supabaseAdmin.from("boarding_roll_call").select("student_id,status,roll_date").eq("school_id", schoolId).gte("roll_date", agoDate(7)),
       supabaseAdmin.from("dorm_assignments").select("student_id,dormitory_id").eq("school_id", schoolId),
       supabaseAdmin.from("dormitories").select("id,name,capacity").eq("school_id", schoolId),
       // clinic
@@ -62,11 +62,11 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       supabaseAdmin.from("meal_plans").select("student_id,plan_type").eq("school_id", schoolId),
       supabaseAdmin.from("kitchen_stock").select("id,item_name,quantity,reorder_level").eq("school_id", schoolId),
       // library
-      supabaseAdmin.from("book_loans").select("id,student_id,due_date,returned_at,loan_date").eq("school_id", schoolId).gte("loan_date", agoDate(30)),
+      supabaseAdmin.from("book_loans").select("id,student_id,due_date,returned_at,created_at").eq("school_id", schoolId).gte("created_at", ago(30)),
       supabaseAdmin.from("books").select("id,available_copies,total_copies").eq("school_id", schoolId),
       // transport
       supabaseAdmin.from("transport_routes").select("id,name,capacity").eq("school_id", schoolId),
-      supabaseAdmin.from("transport_daily_log").select("route_id,date,students_count").eq("school_id", schoolId).gte("date", agoDate(7)),
+      supabaseAdmin.from("transport_daily_log").select("route_id,log_date,boarded_count").eq("school_id", schoolId).gte("log_date", agoDate(7)),
       supabaseAdmin.from("transport_assignments").select("student_id,route_id").eq("school_id", schoolId),
       // security
       supabaseAdmin.from("gate_passes").select("id,student_id,status,created_at").eq("school_id", schoolId).gte("created_at", ago(7)),
@@ -194,7 +194,7 @@ export const computeSchoolBrain = createServerFn({ method: "POST" })
       : [];
     const classMeanMap = new Map<string, number[]>();
     for (const r of latestExamScores) {
-      const cid = r.class_id ?? studentClassMap.get(r.student_id) ?? "unknown";
+      const cid = studentClassMap.get(r.student_id) ?? "unknown";
       if (!classMeanMap.has(cid)) classMeanMap.set(cid, []);
       classMeanMap.get(cid)!.push(Number(r.score || 0));
     }
