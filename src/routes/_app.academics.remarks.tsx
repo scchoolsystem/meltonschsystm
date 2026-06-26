@@ -166,14 +166,12 @@ async function upsertRemark(params: {
   // deterministic.
   row.subject_id = params.remarkType === "subject_teacher" ? params.subjectId ?? null : null;
 
-  // Two separate partial unique indexes back these two conflict targets —
-  // see migration fix_exam_remarks_unique_constraint.sql. A single 4-column
-  // UNIQUE constraint can't be targeted here because subject_id is NULL for
-  // class_teacher/principal rows, and Postgres never treats NULL = NULL.
-  const conflictCols =
-    params.remarkType === "subject_teacher"
-      ? "exam_id,student_id,remark_type,subject_id"
-      : "exam_id,student_id,remark_type";
+  // exam_remarks.subject_key is a generated column (COALESCE(subject_id,
+  // sentinel)) backed by ONE plain unique constraint — see
+  // fix_exam_remarks_generated_column.sql. Same conflict target works for
+  // every remark_type now; no more branching needed, and unlike a partial
+  // index this one IS usable as an ON CONFLICT arbiter via Supabase upsert.
+  const conflictCols = "exam_id,student_id,remark_type,subject_key";
 
   const { error } = await (supabase as any)
     .from("exam_remarks")
