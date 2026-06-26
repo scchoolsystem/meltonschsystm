@@ -3,6 +3,15 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Base URL for all email links. Used to build absolute URLs so links work in
+// email clients (relative paths render as http:///path with no host).
+const APP_BASE_URL = "https://app.smartdev.co.ke";
+
+// Placeholder domain used for student auth accounts that have no real email.
+// Addresses ending with this domain must never be emailed — Resend bounces them
+// and repeated bounces damage the sender reputation of smartdev.co.ke.
+const FAKE_EMAIL_DOMAIN = "@school.erp";
+
 async function resolveSchoolId(ctx: { supabase: any }) {
   const { data: schoolId, error } = await ctx.supabase.rpc("my_school_id");
   if (error) throw new Error(error.message);
@@ -100,10 +109,12 @@ export const notifyFeeDue = createServerFn({ method: "POST" })
       const bal = Number(inv.amount) - Number(inv.paid ?? 0);
       if (bal <= 0) continue;
       const subject = `Fee Reminder — ${s.first_name} ${s.last_name}`;
+      const portalUrl = `${APP_BASE_URL}/portal/parent`;
       const html = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — important notice for your child</div><p>Dear Parent/Guardian,</p>
         <p>This is a friendly reminder that an amount of <strong>${fmtKes(bal)}</strong> is due on <strong>${inv.due_date}</strong> for ${s.first_name} ${s.last_name}.</p>
+        <p>Log in to your parent portal to view the invoice: <a href="${portalUrl}">View Invoice</a></p>
         <p>Thank you.</p>`;
-      const text = `Dear Parent/Guardian,\n\nAn amount of ${fmtKes(bal)} is due on ${inv.due_date} for ${s.first_name} ${s.last_name}.\n\nThank you.`;
+      const text = `Dear Parent/Guardian,\n\nAn amount of ${fmtKes(bal)} is due on ${inv.due_date} for ${s.first_name} ${s.last_name}.\n\nView the invoice: ${portalUrl}\n\nThank you.`;
       const ok = await enqueueOne(s.parent_email, subject, html, text, schoolId, schoolName, "fee-reminder");
       if (ok) count++;
     }
@@ -164,10 +175,11 @@ export const notifyAttendanceAlert = createServerFn({ method: "POST" })
     for (const s of (students ?? []) as any[]) {
       if (!s.parent_email) continue;
       const subject = `Attendance Alert — ${s.first_name} ${s.last_name}`;
+      const portalUrl = `${APP_BASE_URL}/portal/parent`;
       const html = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — important notice for your child</div><p>Dear Parent/Guardian,</p>
         <p>${s.first_name} ${s.last_name} has been marked absent for 3 or more consecutive days.</p>
-        <p>Please contact the school office.</p>`;
-      const text = `Dear Parent/Guardian,\n\n${s.first_name} ${s.last_name} has been marked absent for 3 or more consecutive days.\nPlease contact the school office.`;
+        <p>Please contact the school office or log in to your portal: <a href="${portalUrl}">Parent Portal</a></p>`;
+      const text = `Dear Parent/Guardian,\n\n${s.first_name} ${s.last_name} has been marked absent for 3 or more consecutive days.\nPlease contact the school office or log in: ${portalUrl}`;
       const ok = await enqueueOne(s.parent_email, subject, html, text, schoolId, schoolName, "attendance-alert");
       if (ok) count++;
     }
@@ -203,7 +215,10 @@ export const notifyResultsPublished = createServerFn({ method: "POST" })
       .select("id, first_name, last_name, parent_email")
       .in("id", studentIds);
 
-    // Student account emails (via link table)
+    // Resolve real student account emails via the link table.
+    // Skip any address ending with FAKE_EMAIL_DOMAIN — these are placeholder
+    // auth accounts (e.g. stu-2026-000004@school.erp) with no real inbox.
+    // Sending to them causes hard bounces which damage sender reputation.
     const { data: links } = await supabaseAdmin
       .from("student_user_links")
       .select("student_id, user_id")
@@ -213,24 +228,36 @@ export const notifyResultsPublished = createServerFn({ method: "POST" })
     for (const link of (links ?? []) as any[]) {
       try {
         const { data: u } = await supabaseAdmin.auth.admin.getUserById(link.user_id);
-        if (u?.user?.email) studentEmailById.set(link.student_id, u.user.email);
+        const email = u?.user?.email;
+        if (email && !email.endsWith(FAKE_EMAIL_DOMAIN)) {
+          studentEmailById.set(link.student_id, email);
+        }
       } catch { /* ignore */ }
     }
 
     let count = 0;
     const subject = `Results Published — ${exam.name}`;
-    const html = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — exam results are now available</div><p>The results for <strong>${exam.name}</strong> are now available.</p>
-                  <p>Log in to your portal to view them: <a href="/portal/student">View Results</a></p>`;
-    const text = `The results for ${exam.name} are now available.\nLog in to your portal to view them.`;
+    const studentPortalUrl = `${APP_BASE_URL}/portal/student`;
+    const parentPortalUrl = `${APP_BASE_URL}/portal/parent`;
+    const studentHtml = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — exam results are now available</div>
+      <p>The results for <strong>${exam.name}</strong> are now available.</p>
+      <p>Log in to your student portal to view them: <a href="${studentPortalUrl}">View Results</a></p>`;
+    const studentText = `The results for ${exam.name} are now available.\nLog in to view them: ${studentPortalUrl}`;
+    const parentHtml = `<div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">${schoolName} — exam results are now available</div>
+      <p>The results for <strong>${exam.name}</strong> are now available for your child.</p>
+      <p>Log in to your parent portal to view them: <a href="${parentPortalUrl}">View Results</a></p>`;
+    const parentText = `The results for ${exam.name} are now available.\nLog in to view them: ${parentPortalUrl}`;
 
     for (const s of (students ?? []) as any[]) {
+      // Email the parent
       if (s.parent_email) {
-        const ok = await enqueueOne(s.parent_email, subject, html, text, schoolId, schoolName, "results-published");
+        const ok = await enqueueOne(s.parent_email, subject, parentHtml, parentText, schoolId, schoolName, "results-published");
         if (ok) count++;
       }
+      // Email the student's real account (skip fake @school.erp addresses)
       const semail = studentEmailById.get(s.id);
       if (semail) {
-        const ok = await enqueueOne(semail, subject, html, text, schoolId, schoolName, "results-published");
+        const ok = await enqueueOne(semail, subject, studentHtml, studentText, schoolId, schoolName, "results-published");
         if (ok) count++;
       }
     }
