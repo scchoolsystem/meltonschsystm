@@ -241,20 +241,20 @@ function BudgetDialog({ year, onDone }: { year: number; onDone: () => void }) {
       <div className="space-y-3">
         <div><Label>Budget Name *</Label><Input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Salaries Term 1" required /></div>
         <div><Label>Category</Label>
-          <Select value={f.category_id} onValueChange={(v) => set("category_id", v)}>
+          <Select value={f.category_id || "__none__"} onValueChange={(v) => set("category_id", v === "__none__" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="Link to category" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No category</SelectItem>
+              <SelectItem value="__none__">No category</SelectItem>
               {(cats as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><Label>Term</Label>
-            <Select value={f.term} onValueChange={(v) => set("term", v)}>
+            <Select value={f.term || "__none__"} onValueChange={(v) => set("term", v === "__none__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="All terms" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All terms</SelectItem>
+                <SelectItem value="__none__">All terms</SelectItem>
                 {["Term 1", "Term 2", "Term 3"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
             </Select>
