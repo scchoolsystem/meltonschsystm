@@ -207,39 +207,88 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
       topName: nameOf(top), topScore: Number(top.score),
       bottomName: nameOf(bottom), bottomScore: Number(bottom.score),
     };
-  }, [selectedSubjectId, results, subjectAverages]);
+  }, [selectedSubjectId, filtered, subjectAverages]);
 
   // ── Class rankings ────────────────────────────────────────────────────
   const classRankings = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; count: number }>();
-    for (const r of results as any[]) {
+    const map = new Map<string, { id: string; name: string; total: number; count: number }>();
+    for (const r of filtered as any[]) {
       const cid  = (r.students as any)?.class_id ?? "unknown";
       const name = (r.students as any)?.classes?.name
         ? `${(r.students as any).classes.name}${(r.students as any).classes.stream ? " " + (r.students as any).classes.stream : ""}`
         : "Unknown";
-      if (!map.has(cid)) map.set(cid, { name, total: 0, count: 0 });
+      if (!map.has(cid)) map.set(cid, { id: cid, name, total: 0, count: 0 });
       const e = map.get(cid)!;
       e.total += Number(r.score);
       e.count++;
     }
     return Array.from(map.values())
-      .map((c) => ({ name: c.name, avg: Math.round(c.total / c.count) }))
+      .map((c) => ({ id: c.id, name: c.name, avg: Math.round(c.total / c.count), count: c.count }))
       .sort((a, b) => b.avg - a.avg);
-  }, [results]);
+  }, [filtered]);
+
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+
+  // ── Selected class drill-down ──────────────────────────────────────────
+  const classDetail = useMemo(() => {
+    if (!selectedClassId) return null;
+    const rows = (filtered as any[]).filter((r) => ((r.students as any)?.class_id ?? "unknown") === selectedClassId);
+    if (!rows.length) return null;
+
+    const meta = classRankings.find((c) => c.id === selectedClassId);
+
+    const subjMap = new Map<string, { name: string; total: number; count: number }>();
+    for (const r of rows) {
+      const sid = r.subject_id;
+      const name = r.subjects?.name ?? sid;
+      if (!subjMap.has(sid)) subjMap.set(sid, { name, total: 0, count: 0 });
+      const e = subjMap.get(sid)!;
+      e.total += Number(r.score);
+      e.count++;
+    }
+    const subjectBreakdown = Array.from(subjMap.values())
+      .map((s) => ({ name: s.name, avg: Math.round(s.total / s.count) }))
+      .sort((a, b) => b.avg - a.avg);
+
+    const studentMap = new Map<string, { name: string; total: number; count: number }>();
+    for (const r of rows) {
+      const sid = r.student_id;
+      const name = `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim() || "—";
+      if (!studentMap.has(sid)) studentMap.set(sid, { name, total: 0, count: 0 });
+      const e = studentMap.get(sid)!;
+      e.total += Number(r.score);
+      e.count++;
+    }
+    const studentAverages = Array.from(studentMap.values())
+      .map((s) => ({ name: s.name, avg: Math.round(s.total / s.count) }))
+      .sort((a, b) => b.avg - a.avg);
+
+    const avg = meta?.avg ?? 0;
+    const passRate = Math.round(rows.filter((r) => Number(r.score) >= 40).length / rows.length * 100);
+    const atRisk = studentAverages.filter((s) => s.avg < 40).length;
+
+    return {
+      name: meta?.name ?? "Class",
+      avg, passRate, atRisk,
+      topStudents: studentAverages.slice(0, 5),
+      bottomStudents: studentAverages.slice(-5).reverse(),
+      subjectBreakdown,
+    };
+  }, [selectedClassId, filtered, classRankings]);
 
   // ── Academic health score (school-wide) ──────────────────────────────
   const healthScore = useMemo(() => {
-    if (!results.length) return null;
-    const overall = results.reduce((a, r) => a + Number((r as any).score), 0) / results.length;
-    const passRate = results.filter((r) => Number((r as any).score) >= 40).length / results.length;
-    const aRate    = results.filter((r) => Number((r as any).score) >= 70).length / results.length;
+    if (!filtered.length) return null;
+    const overall = filtered.reduce((a, r) => a + Number((r as any).score), 0) / filtered.length;
+    const passRate = filtered.filter((r) => Number((r as any).score) >= 40).length / filtered.length;
+    const aRate    = filtered.filter((r) => Number((r as any).score) >= 70).length / filtered.length;
     return Math.round(overall * 0.5 + passRate * 100 * 0.3 + aRate * 100 * 0.2);
-  }, [results]);
+  }, [filtered]);
 
   // ── At-risk students ──────────────────────────────────────────────────
   const atRiskStudents = useMemo(() => {
     const map = new Map<string, { name: string; total: number; count: number }>();
-    for (const r of results as any[]) {
+    for (const r of filtered as any[]) {
       const id   = r.student_id;
       const name = `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim();
       if (!map.has(id)) map.set(id, { name, total: 0, count: 0 });
@@ -252,12 +301,12 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
       .filter((s) => s.avg < 40)
       .sort((a, b) => a.avg - b.avg)
       .slice(0, 12);
-  }, [results]);
+  }, [filtered]);
 
   // ── Term trend (school-wide avg by term) ─────────────────────────────
   const termTrend = useMemo(() => {
     const map = new Map<string, { total: number; count: number }>();
-    for (const r of results as any[]) {
+    for (const r of filtered as any[]) {
       const key = `${r.exams?.year ?? ""} ${r.exams?.term ?? ""}`.trim();
       if (!key || key === " ") continue;
       if (!map.has(key)) map.set(key, { total: 0, count: 0 });
@@ -268,15 +317,34 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([term, v]) => ({ term, avg: Math.round(v.total / v.count) }));
-  }, [results]);
+  }, [filtered]);
+
+  // ── Predicted next-term mean (simple linear regression over term trend) ─
+  const predictedNextMean = useMemo(() => {
+    if (termTrend.length < 2) return null;
+    const n = termTrend.length;
+    const xs = termTrend.map((_, i) => i);
+    const ys = termTrend.map((t) => t.avg);
+    const xMean = xs.reduce((a, b) => a + b, 0) / n;
+    const yMean = ys.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (xs[i] - xMean) * (ys[i] - yMean);
+      den += (xs[i] - xMean) ** 2;
+    }
+    const slope = den === 0 ? 0 : num / den;
+    const intercept = yMean - slope * xMean;
+    const predicted = slope * n + intercept;
+    return Math.max(0, Math.min(100, Math.round(predicted)));
+  }, [termTrend]);
 
   const overallAvg = useMemo(() =>
-    results.length ? Math.round(results.reduce((a, r) => a + Number((r as any).score), 0) / results.length) : null,
-    [results]
+    filtered.length ? Math.round(filtered.reduce((a, r) => a + Number((r as any).score), 0) / filtered.length) : null,
+    [filtered]
   );
   const passRate = useMemo(() =>
-    results.length ? Math.round(results.filter((r) => Number((r as any).score) >= 40).length / results.length * 100) : null,
-    [results]
+    filtered.length ? Math.round(filtered.filter((r) => Number((r as any).score) >= 40).length / filtered.length * 100) : null,
+    [filtered]
   );
 
   if (isLoading) return <div className="h-48 grid place-items-center text-sm text-muted-foreground">Loading analytics...</div>;
@@ -285,9 +353,58 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
   return (
     <div className="space-y-6">
 
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={filterExam} onValueChange={setFilterExam}>
+          <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue placeholder="Exam" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Exams</SelectItem>
+            {examOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterClass} onValueChange={setFilterClass}>
+          <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue placeholder="Class" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            {classOptions.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterSubject} onValueChange={setFilterSubject}>
+          <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Subject" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Subjects</SelectItem>
+            {subjectOptions.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterGender} onValueChange={setFilterGender}>
+          <SelectTrigger className="h-8 w-[110px] text-xs"><SelectValue placeholder="Gender" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Genders</SelectItem>
+            <SelectItem value="male">Male</SelectItem>
+            <SelectItem value="female">Female</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <button
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+            onClick={() => { setFilterExam("all"); setFilterClass("all"); setFilterSubject("all"); setFilterGender("all"); }}
+          >
+            Clear filters
+          </button>
+        )}
+        <Button size="sm" variant="outline" className="h-8 ml-auto gap-1.5 text-xs" onClick={exportCsv}>
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </Button>
+      </div>
+
+      {!filtered.length ? (
+        <div className="h-32 grid place-items-center text-sm text-muted-foreground">No results match these filters.</div>
+      ) : (
+      <>
+
       {/* KPI row */}
       <motion.div
-        className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+        className="grid grid-cols-2 sm:grid-cols-5 gap-3"
         variants={stagger}
         initial="hidden"
         animate="show"
@@ -297,6 +414,7 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
           { label: "School Health",     num: healthScore,            suffix: "/100",  icon: "fa-heart-pulse",           color: "text-emerald-600" },
           { label: "Pass Rate",         num: passRate,                suffix: "%",     icon: "fa-circle-check",          color: passRate !== null && passRate >= 70 ? "text-emerald-600" : "text-amber-600" },
           { label: "At-Risk Students",  num: atRiskStudents.length,  suffix: "",      icon: "fa-triangle-exclamation",  color: "text-red-500" },
+          { label: "Predicted Next",    num: predictedNextMean,      suffix: "%",     icon: "fa-wand-magic-sparkles",   color: "text-purple-600" },
         ].map(({ label, num, suffix, icon, color }) => (
           <motion.div key={label} variants={fadeUp} whileHover={{ y: -2 }}>
             <Card>
@@ -355,11 +473,15 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
             {classRankings.slice(0, 8).map((c, i) => (
-              <div key={c.name} className="flex items-center gap-3 text-sm">
+              <div
+                key={c.id}
+                className="flex items-center gap-3 text-sm cursor-pointer rounded px-1 -mx-1 hover:bg-muted/50"
+                onClick={() => setSelectedClassId(c.id === selectedClassId ? null : c.id)}
+              >
                 <span className={`text-xs font-bold w-5 text-center ${i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}>
                   {i + 1}
                 </span>
-                <span className="flex-1 text-xs truncate">{c.name}</span>
+                <span className={`flex-1 text-xs truncate ${c.id === selectedClassId ? "font-bold text-primary" : ""}`}>{c.name}</span>
                 <Progress value={c.avg} max={100} className="w-24 h-2" />
                 <span className="w-10 text-right text-xs font-semibold">{c.avg}%</span>
                 <span className={`text-xs font-bold w-6 ${c.avg >= 70 ? "text-emerald-600" : c.avg >= 50 ? "text-amber-600" : "text-red-500"}`}>
@@ -367,6 +489,7 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
                 </span>
               </div>
             ))}
+            <p className="text-[10px] text-muted-foreground pt-1">Click a class to drill in</p>
           </CardContent>
         </Card>
       </div>
