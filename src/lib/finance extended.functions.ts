@@ -32,12 +32,12 @@ async function getSchoolId(context: { supabase: any }) {
 }
 
 // ── 1. Bulk invoice generation (already exists, keep) ────────
-export { bulkGenerateInvoices, mpesaStkPush } from "./finance.functions";
+
 
 // ── 2. Finance KPIs ──────────────────────────────────────────
 export const getFinanceKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ year: z.number().int().optional() }).parse(input))
+  .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinance(context);
     const schoolId = await getSchoolId(context);
@@ -52,7 +52,7 @@ export const getFinanceKpis = createServerFn({ method: "GET" })
 // ── 3. Monthly collections ───────────────────────────────────
 export const getMonthlyCollections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ year: z.number().int().optional() }).parse(input))
+  .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinance(context);
     const schoolId = await getSchoolId(context);
@@ -86,7 +86,7 @@ export const getClassCollectionRates = createServerFn({ method: "GET" })
 // ── 5. Term financial summary ────────────────────────────────
 export const getTermSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ year: z.number().int().optional() }).parse(input))
+  .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinance(context);
     const schoolId = await getSchoolId(context);
@@ -120,7 +120,7 @@ export const getFeeDefaulters = createServerFn({ method: "GET" })
 // ── 7. Budget vs actual ──────────────────────────────────────
 export const getBudgetVsActual = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ year: z.number().int().optional() }).parse(input))
+  .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinance(context);
     const schoolId = await getSchoolId(context);
@@ -138,7 +138,7 @@ export const getBudgetVsActual = createServerFn({ method: "GET" })
 // ── 8. Payment method breakdown ──────────────────────────────
 export const getPaymentMethodBreakdown = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ year: z.number().int().optional() }).parse(input))
+  .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinance(context);
     const schoolId = await getSchoolId(context);
@@ -156,7 +156,7 @@ export const getPaymentMethodBreakdown = createServerFn({ method: "GET" })
 // ── 9. List expenses ─────────────────────────────────────────
 export const listExpenses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       year: z.number().int().optional(),
       term: z.string().optional(),
@@ -185,7 +185,7 @@ export const listExpenses = createServerFn({ method: "GET" })
 // ── 10. Record expense ───────────────────────────────────────
 export const recordExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       category_id: z.string().uuid().optional(),
       title: z.string().min(1),
@@ -214,7 +214,7 @@ export const recordExpense = createServerFn({ method: "POST" })
 // ── 11. Approve expense ──────────────────────────────────────
 export const approveExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ expense_id: z.string().uuid() }).parse(input))
+  .validator((input) => z.object({ expense_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinanceWrite(context);
     const { error } = await context.supabase.rpc("approve_expense", { p_expense_id: data.expense_id });
@@ -224,7 +224,7 @@ export const approveExpense = createServerFn({ method: "POST" })
 // ── 12. Upsert budget ────────────────────────────────────────
 export const upsertBudget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       id: z.string().uuid().optional(),
       category_id: z.string().uuid().optional(),
@@ -251,7 +251,7 @@ export const upsertBudget = createServerFn({ method: "POST" })
 // ── 13. Record payment (manual) ──────────────────────────────
 export const recordPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       invoice_id: z.string().uuid(),
       amount: z.number().positive(),
@@ -297,7 +297,7 @@ export const recordPayment = createServerFn({ method: "POST" })
 // ── 14. Write-off invoice balance ────────────────────────────
 export const writeOffInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({ invoice_id: z.string().uuid(), amount: z.number().positive(), reason: z.string().min(1) }).parse(input)
   )
   .handler(async ({ data, context }) => {
@@ -313,7 +313,7 @@ export const writeOffInvoice = createServerFn({ method: "POST" })
 // ── 15. Petty cash ───────────────────────────────────────────
 export const recordPettyCash = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z.object({
       type: z.enum(["top_up", "disbursement"]),
       amount: z.number().positive(),
