@@ -21,7 +21,12 @@ export const Route = createFileRoute("/_app/live/$sessionId")({
 type AttendStatus = "present" | "late" | "absent";
 
 // ---------------------------------------------------------------------------
-// JaaS token hook — fetches a signed RS256 JWT from our own API route
+// JaaS token hook — fetches a signed RS256 JWT from our own API route.
+// FIX: attaches Supabase Bearer token manually because this is a plain fetch(),
+// not a TanStack serverFn — so the global attachSupabaseAuth middleware does NOT
+// run automatically. Without the Authorization header the server middleware throws
+// "Unauthorized: No authorization header provided", which surfaces as
+// "Could not get meeting token".
 // ---------------------------------------------------------------------------
 function useJaasToken(roomName: string | undefined, enabled: boolean) {
   const { user, roles, isAdmin } = useAuth();
@@ -36,22 +41,38 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
     enabled: !!roomName && enabled,
     // Token is valid 60 min — refetch at 50 min to be safe
     staleTime: 1000 * 60 * 50,
+    retry: 2,
     queryFn: async () => {
+      // Always get a fresh session token before calling the API
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Not authenticated — please log in again");
+      }
+      const accessToken = sessionData.session.access_token;
+
       const res = await fetch("/api/jaas-token", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room: roomName,
-          displayName: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User",
-          email: user?.email ?? "",
-          moderator: isModerator,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          // Required: the server-side requireSupabaseAuth middleware validates this
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ room: roomName }),
       });
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error ?? "Failed to fetch JaaS token");
+        let errMsg = res.statusText;
+        try {
+          const body = await res.json();
+          errMsg = body.error ?? errMsg;
+        } catch {
+          // ignore parse errors — keep statusText
+        }
+        throw new Error(errMsg);
       }
+
       const { token } = await res.json();
+      if (!token) throw new Error("Server returned empty token");
       return token as string;
     },
   });
@@ -299,11 +320,16 @@ function SessionRoom() {
       ) : tokenError || !jitsiIframeSrc ? (
         <Card>
           <CardContent className="py-10 text-center space-y-3">
-            <p className="text-destructive text-sm">
+            <p className="text-destructive text-sm font-medium">
               {tokenError
                 ? `Could not get meeting token: ${(tokenError as Error).message}`
                 : "JaaS App ID not configured. Set VITE_JAAS_APP_ID in your environment."}
             </p>
+            {!jaasAppId && (
+              <p className="text-xs text-muted-foreground">
+                Add <code className="bg-muted px-1 rounded">VITE_JAAS_APP_ID</code> to your Cloudflare environment variables.
+              </p>
+            )}
             <Button
               variant="outline"
               onClick={() => qc.invalidateQueries({ queryKey: ["jaas-token"] })}
@@ -367,7 +393,7 @@ function statusBadge(s: AttendStatus) {
 }
 
 // ---------------------------------------------------------------------------
-// Attendance roster (unchanged from original)
+// Attendance roster
 // ---------------------------------------------------------------------------
 function AttendanceRoster({
   sessionId,
