@@ -58,9 +58,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
     const invalid = data.classIds.filter((id) => !allowed.has(id));
     if (invalid.length) throw new Error(`Classes not in your school: ${invalid.join(", ")}`);
 
-    // ── Load period templates (non-break only — this is how breaks/Friday
-    //    early dismissal/assembly/games are respected: admins simply don't
-    //    create teaching periods for those slots, or mark them is_break) ──
+    // ── Load period templates (non-break only) ──
     const { data: periodRows = [], error: pErr } = await supabase
       .from("period_templates")
       .select("id,day_of_week,period_index,label,start_time,end_time,is_break")
@@ -118,19 +116,16 @@ export const generateTimetable = createServerFn({ method: "POST" })
       set.add(staff.id);
       assignedStaffIdsForClass.set(r.class_id, set);
     });
-    // classes with NO configured assignments at all → don't filter by assignment (fallback)
     const classesWithAssignments = new Set(Array.from(assignedStaffIdsForClass.keys()));
 
     const { data: availabilityRows = [] } = await supabase
       .from("staff_availability").select("staff_id,day_of_week,period_index,available").eq("school_id", schoolId);
-    // staff_id -> set of "day-period_index" that are explicitly UNAVAILABLE
     const unavailable = new Map<string, Set<string>>();
     (availabilityRows as any[]).filter((r) => r.available === false).forEach((r) => {
       const set = unavailable.get(r.staff_id) ?? new Set<string>();
       set.add(`${r.day_of_week}-${r.period_index}`);
       unavailable.set(r.staff_id, set);
     });
-    const periodByDayIndex = new Map(periods.map((p) => [`${p.day_of_week}-${p.period_index}`, p]));
 
     // ── Clear existing if requested ────────────────────────────────────────
     if (data.replaceExisting)
@@ -138,15 +133,14 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
     const conflicts: string[] = [];
 
-    // ── Global usage tracking across all classes being generated ──────────
-    const usage = new Map<string, SlotUsage>(); // key: "day-start_time"
+    // ── Global usage tracking ──────────────────────────────────────────────
+    const usage = new Map<string, SlotUsage>();
     const slotKey = (day: number, start: string) => `${day}-${start}`;
     const ensureUsage = (k: string): SlotUsage => {
       let u = usage.get(k);
       if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set() }; usage.set(k, u); }
       return u;
     };
-    // teacher_id -> "day" -> lesson count (for workload balancing)
     const teacherDailyLoad = new Map<string, Map<number, number>>();
     const bumpLoad = (teacherId: string, day: number) => {
       const m = teacherDailyLoad.get(teacherId) ?? new Map<number, number>();
@@ -164,7 +158,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
     const inserts: Insert[] = [];
     const noQualifiedFor = new Set<string>();
 
-    // Group periods by day, in order, so we can detect consecutive pairs for doubles
+    // Group periods by day
     const periodsByDay = new Map<number, Period[]>();
     periods.forEach((p) => {
       const arr = periodsByDay.get(p.day_of_week) ?? [];
@@ -184,27 +178,22 @@ export const generateTimetable = createServerFn({ method: "POST" })
       const u = ensureUsage(k);
       const requiredType = roomReqFor.get(subjectId);
       const cap = classCapacity.get(classId) ?? 0;
-      // priority 1: required room type
       if (requiredType) {
         const r = rooms.find((rm) => rm.room_type === requiredType && !u.rooms.has(rm.id));
         if (r) return { id: r.id, name: r.name };
       }
-      // priority 2: any classroom that fits class capacity
       const fit = rooms.find((rm) => rm.room_type === "classroom" && rm.capacity >= cap && !u.rooms.has(rm.id));
       if (fit) return { id: fit.id, name: fit.name };
-      // priority 3: any free room
       const any = rooms.find((rm) => !u.rooms.has(rm.id));
       if (any) return { id: any.id, name: any.name };
       return { id: null, name: null };
     };
 
-    // ── Main scheduling loop — one class at a time ─────────────────────────
+    // ── Main scheduling loop ──────────────────────────────────────────────
     for (const classId of data.classIds) {
-      // Build demand: class_subjects rows for this class (lessons_per_week override
-      // falls back to subjects.lessons_per_week)
       const csForClass = (classSubjectRows as any[]).filter((cs) => cs.class_id === classId);
       if (!csForClass.length) {
-        conflicts.push(`${classNames.get(classId)}: no subjects configured in class_subjects — skipped. Run the class_subjects migration/backfill first.`);
+        conflicts.push(`${classNames.get(classId)}: no subjects configured in class_subjects — skipped.`);
         continue;
       }
 
@@ -221,10 +210,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
       const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
       const numDays = days.length || 1;
 
-      // Distribute each subject's weekly lesson count evenly across the days
-      // it actually has (round-robin, not a shuffled pool). e.g. Maths=6 over
-      // 5 days → 1/day with one day getting a 2nd. Which day gets the "extra"
-      // rotates per subject so it isn't always Monday/Math piling up together.
       type Unit = { subject_id: string; periodsNeeded: 1 | 2 };
       const dayUnits = new Map<number, Unit[]>();
       days.forEach((d) => dayUnits.set(d, []));
@@ -232,7 +217,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
       demand.forEach((d, subjectIdx) => {
         const base = Math.floor(d.lessons / numDays);
         const extra = d.lessons % numDays;
-        const rotation = subjectIdx % numDays; // stagger which day(s) get the extra lesson
+        const rotation = subjectIdx % numDays;
         days.forEach((day, i) => {
           const pos = (i - rotation + numDays) % numDays;
           let count = base + (pos < extra ? 1 : 0);
@@ -243,11 +228,8 @@ export const generateTimetable = createServerFn({ method: "POST" })
         });
       });
 
-      // Track subjects already scheduled today for THIS class (distribution rule:
-      // don't repeat a subject same day unless it's the second half of a double,
-      // or it's genuinely that day's designated "extra" lesson for that subject)
-      const scheduledTodayForClass = new Map<number, Set<string>>(); // day -> subject_ids
-      const stickyTeacher = new Map<string, string>(); // subject_id -> staff_id (same teacher all week)
+      const scheduledTodayForClass = new Map<number, Set<string>>();
+      const stickyTeacher = new Map<string, string>();
 
       for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
         const day = days[dayIdx];
@@ -256,7 +238,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
         const dayPeriods = periodsByDay.get(day)!;
         const todaySet = scheduledTodayForClass.get(day) ?? new Set<string>();
         scheduledTodayForClass.set(day, todaySet);
-        let scheduledToday = 0;
 
         for (let pi = 0; pi < dayPeriods.length; pi++) {
           if (!units.length) break;
@@ -264,25 +245,18 @@ export const generateTimetable = createServerFn({ method: "POST" })
           const period = dayPeriods[pi];
           const k = slotKey(period.day_of_week, period.start_time);
           const u = ensureUsage(k);
-          if (u.classes.has(classId)) continue; // class already booked this slot
+          if (u.classes.has(classId)) continue;
 
-          // find next unit whose subject isn't already taught to this class today —
-          // always search the LIVE array fresh (units shrinks via splice below,
-          // so no separate index pointer needs to stay in sync with it)
           let chosenIdx = units.findIndex((un) => !todaySet.has(un.subject_id));
-          if (chosenIdx === -1) chosenIdx = 0; // all remaining are repeats — allow it rather than stall
+          if (chosenIdx === -1) chosenIdx = 0;
 
           const unit = units[chosenIdx];
-
-          // double period needs a free consecutive slot too
           const needsDouble = unit.periodsNeeded === 2;
           const nextPeriod = dayPeriods[pi + 1];
           if (needsDouble && !nextPeriod) {
-            // no room for a double at end of day — try as single instead
             unit.periodsNeeded = 1;
           }
 
-          // ── Teacher selection ──────────────────────────────────────────
           const classAssigned = assignedStaffIdsForClass.get(classId);
           const restrictToAssigned = classesWithAssignments.has(classId);
           const qualifiedIds = qualifiedFor.get(unit.subject_id);
@@ -291,7 +265,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
             pool = restrictToAssigned && classAssigned
               ? qualifiedIds.filter((id) => classAssigned.has(id))
               : qualifiedIds;
-            if (!pool.length) pool = qualifiedIds; // assignment too strict — fall back to qualification only
+            if (!pool.length) pool = qualifiedIds;
           } else {
             noQualifiedFor.add(unit.subject_id);
             pool = Array.from(staffById.keys());
@@ -314,18 +288,17 @@ export const generateTimetable = createServerFn({ method: "POST" })
                 conflicts.push(`${classNames.get(classId)} · ${period.label}: teacher over daily cap, assigned anyway`);
               } else {
                 conflicts.push(`${classNames.get(classId)} · ${period.label}: no teacher available — slot skipped`);
-                continue; // try next period, keep this unit pending
+                continue;
               }
             }
           }
 
-          // if double, verify the SAME teacher and a room are free next period too
           if (needsDouble && nextPeriod) {
             const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
             const u2 = ensureUsage(k2);
             const teacherFreeNext = !u2.teachers.has(teacherId!) && !unavailable.get(teacherId!)?.has(`${day}-${nextPeriod.period_index}`);
             if (!teacherFreeNext || u2.classes.has(classId)) {
-              unit.periodsNeeded = 1; // demote to single, can't get a clean double here
+              unit.periodsNeeded = 1;
             }
           }
 
@@ -336,7 +309,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
           if (room.id) u.rooms.add(room.id);
           bumpLoad(teacherId!, day);
           todaySet.add(unit.subject_id);
-          scheduledToday++;
 
           inserts.push({
             class_id: classId, subject_id: unit.subject_id, teacher_id: teacherId,
@@ -344,7 +316,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
             room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
           });
 
-          // second half of a double
           if (unit.periodsNeeded === 2 && nextPeriod) {
             const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
             const u2 = ensureUsage(k2);
@@ -358,11 +329,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
               day_of_week: nextPeriod.day_of_week, start_time: nextPeriod.start_time, end_time: nextPeriod.end_time,
               room: room2.name, room_id: room2.id, period_template_id: nextPeriod.id, school_id: schoolId,
             });
-            pi++; // consume the next period too
-            scheduledToday++;
+            pi++;
           }
 
-          // remove the consumed unit from the array
           units.splice(chosenIdx, 1);
         }
       }
@@ -379,39 +348,19 @@ export const generateTimetable = createServerFn({ method: "POST" })
     }
 
     // ── Batch insert ─────────────────────────────────────────────────────
-// Disable the DB clash trigger during bulk insert — the solver already
-// does in-memory clash detection above. The trigger fires per-row and
-// sees earlier rows in the same batch as "booked", causing false errors.
-await supabase.rpc("set_config", {
-  setting: "app.skip_timetable_clash_check",
-  value: "on",
-  is_local: true,
-});
-
-let inserted = 0;
-
-try {
-  for (let i = 0; i < inserts.length; i += 50) {
-    const chunk = inserts.slice(i, i + 50);
-
-    const { data: rows, error } = await supabase
-      .from("timetable_slots")
-      .insert(chunk)
-      .select("id");
-
-    if (error) {
-      conflicts.push(
-        `DB insert error (batch ${Math.floor(i / 50) + 1}): ${error.message}`
-      );
-    } else {
-      inserted += rows?.length ?? 0;
+    let inserted = 0;
+    for (let i = 0; i < inserts.length; i += 50) {
+      const chunk = inserts.slice(i, i + 50);
+      const { data: rows, error } = await supabase.from("timetable_slots").insert(chunk).select("id");
+      if (error) conflicts.push(`DB insert error (batch ${Math.floor(i / 50) + 1}): ${error.message}`);
+      else inserted += rows?.length ?? 0;
     }
-  }
-} finally {
-  // Always restore the setting, even if an insert fails
-  await supabase.rpc("set_config", {
-    setting: "app.skip_timetable_clash_check",
-    value: "off",
-    is_local: true,
+
+    return {
+      ok: true,
+      inserted,
+      totalPlanned: inserts.length,
+      conflicts,
+      summary: { classes: data.classIds.length, periodsAvailable: periods.length },
+    };
   });
-}
