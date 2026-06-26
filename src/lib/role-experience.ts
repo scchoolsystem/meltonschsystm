@@ -51,6 +51,9 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Invoices", url: "/finance/invoices" },
     { title: "Bulk Generate", url: "/finance/generate" },
     { title: "Payments", url: "/finance/payments" },
+    { title: "Expenses", url: "/finance/expenses" },
+    { title: "Budget", url: "/finance/budget" },
+    { title: "Analytics", url: "/finance/analytics" },
   ]},
   { label: "Digital IDs", items: [
     { title: "Bulk Print Cards", url: "/ids/bulk" },
@@ -174,7 +177,9 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Invoices", url: "/finance/invoices" },
       { title: "Bulk Generate", url: "/finance/generate" },
       { title: "Payments", url: "/finance/payments" },
-      { title: "Analytics", url: "/analytics" },
+      { title: "Expenses", url: "/finance/expenses" },
+      { title: "Budget", url: "/finance/budget" },
+      { title: "Analytics", url: "/finance/analytics" },
     ]},
   ],
   nurse: [
