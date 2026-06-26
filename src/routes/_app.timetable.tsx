@@ -834,19 +834,39 @@ function ClassSubjectsPanel({
       (await supabase.from("rooms").select("id,name").eq("school_id", schoolId!).eq("is_active", true).order("name")).data ?? [],
   });
 
+  // teacher_subjects: subject_id -> staff[] (qualified teachers per subject)
+  const { data: teacherSubjectRows = [] } = useQuery({
+    queryKey: ["teacher-subjects", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () =>
+      (await supabase.from("teacher_subjects").select("staff_id,subject_id").eq("school_id", schoolId!)).data ?? [],
+  });
+
+  // Build map: subject_id -> staff names
+  const qualifiedTeacherMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const ts of teacherSubjectRows as any[]) {
+      const s = (staff as any[]).find((st) => st.id === ts.staff_id);
+      if (!s) continue;
+      const arr = map.get(ts.subject_id) ?? [];
+      arr.push(`${s.first_name} ${s.last_name}`);
+      map.set(ts.subject_id, arr);
+    }
+    return map;
+  }, [teacherSubjectRows, staff]);
+
   const { data: classSubjects = [], isLoading } = useQuery({
     queryKey: ["class-subjects", classId],
     enabled: !!classId,
     queryFn: async () =>
       (await supabase
         .from("class_subjects")
-        .select("*, subjects(id,code,name), staff(id,first_name,last_name), rooms:preferred_room_id(id,name)")
+        .select("*, subjects(id,code,name), rooms:preferred_room_id(id,name)")
         .eq("class_id", classId)
         .order("created_at")
       ).data ?? [],
   });
 
-  // Which subject ids are already assigned to this class
   const assignedIds = new Set((classSubjects as any[]).map((cs: any) => cs.subject_id));
 
   const upsert = useMutation({
@@ -860,10 +880,8 @@ function ClassSubjectsPanel({
         requires_triple_lesson: row.requires_triple_lesson,
         priority: row.priority ?? 1,
       };
-      if (row.teacher_id && row.teacher_id !== "__none__") payload.teacher_id = row.teacher_id;
       if (row.preferred_room_id && row.preferred_room_id !== "__none__") payload.preferred_room_id = row.preferred_room_id;
-      if (row.elective_group) payload.elective_group = row.elective_group;
-
+      if (row.elective_group?.trim()) payload.elective_group = row.elective_group.trim();
       if (row.id) {
         const { error } = await supabase.from("class_subjects").update(payload).eq("id", row.id);
         if (error) throw error;
@@ -895,9 +913,9 @@ function ClassSubjectsPanel({
 
   const openAdd = () => {
     setEditRow({
-      subject_id: "", teacher_id: "__none__", preferred_room_id: "__none__",
-      lessons_per_week: 4, requires_double_lesson: false, requires_triple_lesson: false,
-      elective_group: "", priority: 1,
+      subject_id: "", preferred_room_id: "__none__",
+      lessons_per_week: 4, requires_double_lesson: false,
+      requires_triple_lesson: false, elective_group: "", priority: 1,
     });
     setDialogOpen(true);
   };
@@ -906,7 +924,6 @@ function ClassSubjectsPanel({
     setEditRow({
       id: cs.id,
       subject_id: cs.subject_id,
-      teacher_id: cs.teacher_id ?? "__none__",
       preferred_room_id: cs.preferred_room_id ?? "__none__",
       lessons_per_week: cs.lessons_per_week ?? 4,
       requires_double_lesson: cs.requires_double_lesson ?? false,
@@ -927,8 +944,8 @@ function ClassSubjectsPanel({
             <BookOpen className="w-5 h-5 text-primary" /> Class Subjects
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Assign subjects, teachers, and weekly lesson counts to each class.
-            The timetable generator uses this to build schedules.
+            Assign subjects and weekly lesson counts per class. Teachers are linked
+            via <strong>Staff → Subjects Taught</strong> and auto-assigned by the generator.
           </p>
         </div>
         {classId && (
@@ -985,7 +1002,7 @@ function ClassSubjectsPanel({
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="text-left px-4 py-3 font-medium">Subject</th>
-                  <th className="text-left px-4 py-3 font-medium">Teacher</th>
+                  <th className="text-left px-4 py-3 font-medium">Qualified teachers</th>
                   <th className="text-center px-3 py-3 font-medium">Lessons/wk</th>
                   <th className="text-left px-3 py-3 font-medium hidden md:table-cell">Options</th>
                   <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Preferred room</th>
@@ -993,62 +1010,75 @@ function ClassSubjectsPanel({
                 </tr>
               </thead>
               <tbody>
-                {(classSubjects as any[]).map((cs: any) => (
-                  <tr key={cs.id} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{cs.subjects?.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{cs.subjects?.code}</div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {cs.staff ? `${cs.staff.first_name} ${cs.staff.last_name}` : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <Badge variant="secondary">{cs.lessons_per_week ?? "—"}</Badge>
-                    </td>
-                    <td className="px-3 py-3 hidden md:table-cell">
-                      <div className="flex gap-1 flex-wrap">
-                        {cs.requires_double_lesson && <Badge variant="outline" className="text-xs">Double</Badge>}
-                        {cs.requires_triple_lesson && <Badge variant="outline" className="text-xs">Triple</Badge>}
-                        {cs.elective_group && <Badge variant="outline" className="text-xs">Elective: {cs.elective_group}</Badge>}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-muted-foreground hidden lg:table-cell">
-                      {cs.rooms?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cs)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove subject?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Remove <strong>{cs.subjects?.name}</strong> from <strong>{currentClass?.name}</strong>?
-                                This won't delete any timetable slots already generated.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => remove.mutate(cs.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Remove
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {(classSubjects as any[]).map((cs: any) => {
+                  const teachers = qualifiedTeacherMap.get(cs.subject_id) ?? [];
+                  return (
+                    <tr key={cs.id} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{cs.subjects?.name}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{cs.subjects?.code}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {teachers.length === 0 ? (
+                          <span className="text-xs text-amber-500 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> None assigned in Staff
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {teachers.map((t) => (
+                              <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <Badge variant="secondary">{cs.lessons_per_week ?? "—"}</Badge>
+                      </td>
+                      <td className="px-3 py-3 hidden md:table-cell">
+                        <div className="flex gap-1 flex-wrap">
+                          {cs.requires_double_lesson && <Badge variant="outline" className="text-xs">Double</Badge>}
+                          {cs.requires_triple_lesson && <Badge variant="outline" className="text-xs">Triple</Badge>}
+                          {cs.elective_group && <Badge variant="outline" className="text-xs">Elective: {cs.elective_group}</Badge>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground hidden lg:table-cell">
+                        {cs.rooms?.name ?? "—"}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex gap-1 justify-end">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cs)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove subject?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Remove <strong>{cs.subjects?.name}</strong> from <strong>{currentClass?.name}</strong>?
+                                  This won't delete any timetable slots already generated.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => remove.mutate(cs.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </CardContent>
@@ -1075,28 +1105,28 @@ function ClassSubjectsPanel({
                   <SelectContent>
                     {subjects
                       .filter((s: any) => editRow.id ? true : !assignedIds.has(s.id))
-                      .map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>{s.code} – {s.name}</SelectItem>
-                      ))}
+                      .map((s: any) => {
+                        const teachers = qualifiedTeacherMap.get(s.id) ?? [];
+                        return (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.code} – {s.name}
+                            {teachers.length === 0 && " ⚠ no teacher"}
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
-                {!editRow.id && assignedIds.size === subjects.length && (
-                  <p className="text-xs text-muted-foreground">All subjects already assigned to this class.</p>
+                {editRow.subject_id && (qualifiedTeacherMap.get(editRow.subject_id) ?? []).length === 0 && (
+                  <p className="text-xs text-amber-500 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    No teachers assigned to this subject yet. Go to Staff → edit a staff member → Subjects Taught.
+                  </p>
                 )}
-              </div>
-
-              {/* Teacher */}
-              <div className="space-y-1">
-                <Label>Teacher (optional)</Label>
-                <Select value={editRow.teacher_id} onValueChange={(v) => setEditRow({ ...editRow, teacher_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Assign teacher" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— None —</SelectItem>
-                    {staff.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {editRow.subject_id && (qualifiedTeacherMap.get(editRow.subject_id) ?? []).length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Qualified: {(qualifiedTeacherMap.get(editRow.subject_id) ?? []).join(", ")}
+                  </p>
+                )}
               </div>
 
               {/* Lessons per week + priority */}
