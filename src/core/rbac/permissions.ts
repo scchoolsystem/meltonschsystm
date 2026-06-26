@@ -172,6 +172,8 @@ export function moduleForPath(pathname: string): string | null {
     // /academics/report-cards — admin class-wide picker/ranking.
     if (seg[1] === "report-cards") return "report-cards-admin";
     if (seg[1] === "subjects") return "subjects";
+    if (seg[1] === "oversight") return "exam-oversight";
+    if (seg[1] === "remarks") return "remarks";
   }
   if (seg[0] === "finance") return "finance";
   if (seg[0] === "timetable") return "timetable";
