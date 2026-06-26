@@ -162,8 +162,14 @@ async function upsertRemark(params: {
     written_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  if (params.subjectId) row.subject_id = params.subjectId;
+  // subject_id must always be set explicitly (even to null) so behaviour is
+  // deterministic.
+  row.subject_id = params.remarkType === "subject_teacher" ? params.subjectId ?? null : null;
 
+  // Two separate partial unique indexes back these two conflict targets —
+  // see migration fix_exam_remarks_unique_constraint.sql. A single 4-column
+  // UNIQUE constraint can't be targeted here because subject_id is NULL for
+  // class_teacher/principal rows, and Postgres never treats NULL = NULL.
   const conflictCols =
     params.remarkType === "subject_teacher"
       ? "exam_id,student_id,remark_type,subject_id"
