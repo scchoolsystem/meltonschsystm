@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Loader2, Sparkles, CheckCircle2, AlertTriangle, CalendarDays,
-  Pencil, Trash2, Clock, Copy, DoorOpen,
+  Pencil, Trash2, Clock, Copy, DoorOpen, BookOpen, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -146,6 +146,9 @@ function Page() {
           <TabsTrigger value="rooms">
             <DoorOpen className="w-3.5 h-3.5 mr-1.5" /> Rooms
           </TabsTrigger>
+          <TabsTrigger value="class-subjects">
+            <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Class Subjects
+          </TabsTrigger>
           {canGenerate && (
             <TabsTrigger value="generate">
               <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Generate
@@ -240,6 +243,16 @@ function Page() {
         {/* ─── Rooms tab ─── */}
         <TabsContent value="rooms" className="mt-4">
           <RoomsPanel schoolId={schoolId ?? undefined} />
+        </TabsContent>
+
+        {/* ─── Class Subjects tab ─── */}
+        <TabsContent value="class-subjects" className="mt-4">
+          <ClassSubjectsPanel
+            classes={classes as any[]}
+            subjects={subjects as any[]}
+            staff={staff as any[]}
+            schoolId={schoolId ?? undefined}
+          />
         </TabsContent>
 
         {/* ─── Generate tab ─── */}
@@ -798,6 +811,372 @@ function GeneratePanel({ classes, activeClassId, onGenerated }: {
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────── Class Subjects Panel ──────────────────── */
+
+function ClassSubjectsPanel({
+  classes, subjects, staff, schoolId,
+}: {
+  classes: any[]; subjects: any[]; staff: any[]; schoolId?: string;
+}) {
+  const qc = useQueryClient();
+  const [classId, setClassId] = useState(classes[0]?.id ?? "");
+  const [editRow, setEditRow] = useState<any | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["rooms", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () =>
+      (await supabase.from("rooms").select("id,name").eq("school_id", schoolId!).eq("is_active", true).order("name")).data ?? [],
+  });
+
+  const { data: classSubjects = [], isLoading } = useQuery({
+    queryKey: ["class-subjects", classId],
+    enabled: !!classId,
+    queryFn: async () =>
+      (await supabase
+        .from("class_subjects")
+        .select("*, subjects(id,code,name), staff(id,first_name,last_name), rooms:preferred_room_id(id,name)")
+        .eq("class_id", classId)
+        .order("created_at")
+      ).data ?? [],
+  });
+
+  // Which subject ids are already assigned to this class
+  const assignedIds = new Set((classSubjects as any[]).map((cs: any) => cs.subject_id));
+
+  const upsert = useMutation({
+    mutationFn: async (row: any) => {
+      const payload: any = {
+        class_id: classId,
+        school_id: schoolId,
+        subject_id: row.subject_id,
+        lessons_per_week: row.lessons_per_week,
+        requires_double_lesson: row.requires_double_lesson,
+        requires_triple_lesson: row.requires_triple_lesson,
+        priority: row.priority ?? 1,
+      };
+      if (row.teacher_id && row.teacher_id !== "__none__") payload.teacher_id = row.teacher_id;
+      if (row.preferred_room_id && row.preferred_room_id !== "__none__") payload.preferred_room_id = row.preferred_room_id;
+      if (row.elective_group) payload.elective_group = row.elective_group;
+
+      if (row.id) {
+        const { error } = await supabase.from("class_subjects").update(payload).eq("id", row.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("class_subjects").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-subjects", classId] });
+      setDialogOpen(false);
+      setEditRow(null);
+      toast.success("Saved");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("class_subjects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-subjects", classId] });
+      toast.success("Removed");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const openAdd = () => {
+    setEditRow({
+      subject_id: "", teacher_id: "__none__", preferred_room_id: "__none__",
+      lessons_per_week: 4, requires_double_lesson: false, requires_triple_lesson: false,
+      elective_group: "", priority: 1,
+    });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (cs: any) => {
+    setEditRow({
+      id: cs.id,
+      subject_id: cs.subject_id,
+      teacher_id: cs.teacher_id ?? "__none__",
+      preferred_room_id: cs.preferred_room_id ?? "__none__",
+      lessons_per_week: cs.lessons_per_week ?? 4,
+      requires_double_lesson: cs.requires_double_lesson ?? false,
+      requires_triple_lesson: cs.requires_triple_lesson ?? false,
+      elective_group: cs.elective_group ?? "",
+      priority: cs.priority ?? 1,
+    });
+    setDialogOpen(true);
+  };
+
+  const currentClass = classes.find((c) => c.id === classId);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" /> Class Subjects
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Assign subjects, teachers, and weekly lesson counts to each class.
+            The timetable generator uses this to build schedules.
+          </p>
+        </div>
+        {classId && (
+          <Button size="sm" onClick={openAdd}>
+            <Plus className="w-4 h-4 mr-2" /> Add Subject
+          </Button>
+        )}
+      </div>
+
+      {/* Class picker */}
+      <div className="flex gap-2 flex-wrap">
+        {classes.map((c) => {
+          const count = classId === c.id ? (classSubjects as any[]).length : null;
+          return (
+            <button
+              key={c.id}
+              onClick={() => setClassId(c.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                classId === c.id ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
+              }`}
+            >
+              {c.name}
+              {c.level ? <span className="ml-1 opacity-60 text-xs">{c.level}</span> : null}
+              {count !== null && <span className="ml-2 opacity-70">({count})</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {!classId ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Select a class above to manage its subjects.
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+          </CardContent>
+        </Card>
+      ) : (classSubjects as any[]).length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+            <BookOpen className="w-8 h-8 mx-auto opacity-30" />
+            <p>No subjects assigned to <strong>{currentClass?.name}</strong> yet.</p>
+            <p className="text-xs">Click "Add Subject" to configure which subjects are taught in this class.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="text-left px-4 py-3 font-medium">Subject</th>
+                  <th className="text-left px-4 py-3 font-medium">Teacher</th>
+                  <th className="text-center px-3 py-3 font-medium">Lessons/wk</th>
+                  <th className="text-left px-3 py-3 font-medium hidden md:table-cell">Options</th>
+                  <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Preferred room</th>
+                  <th className="px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {(classSubjects as any[]).map((cs: any) => (
+                  <tr key={cs.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{cs.subjects?.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{cs.subjects?.code}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {cs.staff ? `${cs.staff.first_name} ${cs.staff.last_name}` : "—"}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <Badge variant="secondary">{cs.lessons_per_week ?? "—"}</Badge>
+                    </td>
+                    <td className="px-3 py-3 hidden md:table-cell">
+                      <div className="flex gap-1 flex-wrap">
+                        {cs.requires_double_lesson && <Badge variant="outline" className="text-xs">Double</Badge>}
+                        {cs.requires_triple_lesson && <Badge variant="outline" className="text-xs">Triple</Badge>}
+                        {cs.elective_group && <Badge variant="outline" className="text-xs">Elective: {cs.elective_group}</Badge>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground hidden lg:table-cell">
+                      {cs.rooms?.name ?? "—"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex gap-1 justify-end">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cs)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remove subject?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Remove <strong>{cs.subjects?.name}</strong> from <strong>{currentClass?.name}</strong>?
+                                This won't delete any timetable slots already generated.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => remove.mutate(cs.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Remove
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add / Edit dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditRow(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editRow?.id ? "Edit subject assignment" : "Add subject to class"}</DialogTitle>
+          </DialogHeader>
+          {editRow && (
+            <div className="space-y-4 py-1">
+              {/* Subject */}
+              <div className="space-y-1">
+                <Label>Subject</Label>
+                <Select
+                  value={editRow.subject_id}
+                  onValueChange={(v) => setEditRow({ ...editRow, subject_id: v })}
+                  disabled={!!editRow.id}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choose subject" /></SelectTrigger>
+                  <SelectContent>
+                    {subjects
+                      .filter((s: any) => editRow.id ? true : !assignedIds.has(s.id))
+                      .map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>{s.code} – {s.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {!editRow.id && assignedIds.size === subjects.length && (
+                  <p className="text-xs text-muted-foreground">All subjects already assigned to this class.</p>
+                )}
+              </div>
+
+              {/* Teacher */}
+              <div className="space-y-1">
+                <Label>Teacher (optional)</Label>
+                <Select value={editRow.teacher_id} onValueChange={(v) => setEditRow({ ...editRow, teacher_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Assign teacher" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {staff.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Lessons per week + priority */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Lessons per week</Label>
+                  <Input
+                    type="number" min={1} max={20}
+                    value={editRow.lessons_per_week}
+                    onChange={(e) => setEditRow({ ...editRow, lessons_per_week: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Priority</Label>
+                  <Input
+                    type="number" min={1} max={10}
+                    value={editRow.priority}
+                    onChange={(e) => setEditRow({ ...editRow, priority: parseInt(e.target.value) || 1 })}
+                  />
+                  <p className="text-xs text-muted-foreground">1 = highest</p>
+                </div>
+              </div>
+
+              {/* Preferred room */}
+              <div className="space-y-1">
+                <Label>Preferred room (optional)</Label>
+                <Select value={editRow.preferred_room_id} onValueChange={(v) => setEditRow({ ...editRow, preferred_room_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Any available room" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Any room —</SelectItem>
+                    {(rooms as any[]).map((r: any) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Elective group */}
+              <div className="space-y-1">
+                <Label>Elective group (optional)</Label>
+                <Input
+                  placeholder="e.g. Science, Arts — leave blank if compulsory"
+                  value={editRow.elective_group}
+                  onChange={(e) => setEditRow({ ...editRow, elective_group: e.target.value })}
+                />
+              </div>
+
+              {/* Double / triple lesson toggles */}
+              <div className="flex gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="double"
+                    checked={editRow.requires_double_lesson}
+                    onCheckedChange={(v) => setEditRow({ ...editRow, requires_double_lesson: v, requires_triple_lesson: v ? false : editRow.requires_triple_lesson })}
+                  />
+                  <Label htmlFor="double">Double lesson</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="triple"
+                    checked={editRow.requires_triple_lesson}
+                    onCheckedChange={(v) => setEditRow({ ...editRow, requires_triple_lesson: v, requires_double_lesson: v ? false : editRow.requires_double_lesson })}
+                  />
+                  <Label htmlFor="triple">Triple lesson</Label>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); setEditRow(null); }}>Cancel</Button>
+            <Button
+              onClick={() => { if (!editRow?.subject_id) return toast.error("Select a subject"); upsert.mutate(editRow); }}
+              disabled={upsert.isPending}
+            >
+              {upsert.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
