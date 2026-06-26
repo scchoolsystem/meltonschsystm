@@ -113,7 +113,7 @@ function Page() {
   });
   const { data: classes = [], isLoading: cLoading } = useQuery({
     queryKey: ["finance-classes"],
-    queryFn: () => classFn({ data: {} }),
+    queryFn: () => classFn({}),
   });
   const { data: termRows = [], isLoading: tLoading } = useQuery({
     queryKey: ["finance-term", selectedYear],
@@ -121,7 +121,7 @@ function Page() {
   });
   const { data: defaulters = [], isLoading: dLoading } = useQuery({
     queryKey: ["finance-defaulters"],
-    queryFn: () => defaulterFn({ data: {} }),
+    queryFn: () => defaulterFn({}),
   });
   const { data: methods = [] } = useQuery({
     queryKey: ["finance-methods", selectedYear],
