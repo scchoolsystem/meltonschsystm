@@ -202,20 +202,61 @@ export function AdminSchoolStructureWidget() {
 // ---------- TEACHER ----------
 export function TeacherMyClassesWidget() {
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-teacher-classes"],
+    queryKey: ["dashboard-teacher-classes-v2"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
       if (!uid) return [];
-      const { data: staff } = await supabase.from("staff").select("id").eq("user_id", uid).maybeSingle();
+
+      const { data: staff } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("user_id", uid)
+        .maybeSingle();
       if (!staff) return [];
-      const { data: classes } = await supabase
-        .from("classes")
-        .select("id, name, students(count)")
-        .eq("class_teacher_id", (staff as any).id);
-      return (classes ?? []).map((c: any) => ({ name: c.name, count: c.students?.[0]?.count ?? 0 }));
+      const staffId = (staff as any).id;
+
+      // Parallel: class teacher + subject teacher (timetable)
+      const [a, b] = await Promise.all([
+        supabase
+          .from("classes")
+          .select("id,name,stream,students(count)")
+          .eq("class_teacher_id", staffId),
+        supabase
+          .from("timetable_slots")
+          .select("class_id,classes(id,name,stream,students(count)),subjects(name)")
+          .eq("teacher_id", staffId),
+      ]);
+
+      const map = new Map<string, { name: string; stream: string | null; count: number; subjects: Set<string> }>();
+
+      for (const c of (a.data ?? []) as any[]) {
+        map.set(c.id, {
+          name: c.name,
+          stream: c.stream,
+          count: c.students?.[0]?.count ?? 0,
+          subjects: new Set(),
+        });
+      }
+
+      for (const slot of (b.data ?? []) as any[]) {
+        const cls = slot.classes;
+        if (!cls) continue;
+        if (!map.has(cls.id)) {
+          map.set(cls.id, {
+            name: cls.name,
+            stream: cls.stream,
+            count: cls.students?.[0]?.count ?? 0,
+            subjects: new Set(),
+          });
+        }
+        if (slot.subjects?.name) map.get(cls.id)!.subjects.add(slot.subjects.name);
+      }
+
+      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -223,16 +264,28 @@ export function TeacherMyClassesWidget() {
         <BookOpen className="w-4 h-4 text-chart-1" />
       </CardHeader>
       <CardContent>
-        {isLoading ? <MiniLoader /> : data && data.length ? (
-          <ul className="text-sm space-y-1">
+        {isLoading ? (
+          <MiniLoader />
+        ) : data && data.length ? (
+          <ul className="text-sm space-y-2">
             {data.map((c, i) => (
-              <li key={i} className="flex justify-between">
-                <span>{c.name}</span>
-                <span className="text-muted-foreground">{c.count} students</span>
+              <li key={i}>
+                <div className="flex justify-between">
+                  <span className="font-medium">{c.name}{c.stream ? ` ${c.stream}` : ""}</span>
+                  <span className="text-muted-foreground text-xs">{c.count} students</span>
+                </div>
+                {c.subjects.size > 0 && (
+                  <div className="text-xs text-muted-foreground truncate mt-0.5">
+                    {Array.from(c.subjects).slice(0, 3).join(", ")}
+                    {c.subjects.size > 3 && ` +${c.subjects.size - 3}`}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
-        ) : <EmptyState>No classes assigned</EmptyState>}
+        ) : (
+          <EmptyState>No classes assigned yet</EmptyState>
+        )}
       </CardContent>
     </Card>
   );
@@ -281,6 +334,74 @@ export function TeacherTodayTimetableWidget() {
 }
 
 export function TeacherPendingMarksWidget() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-teacher-pending-marks"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) return { pending: 0, total: 0, exams: [] };
+
+      const { data: staff } = await supabase
+        .from("staff")
+        .select("id")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (!staff) return { pending: 0, total: 0, exams: [] };
+      const staffId = (staff as any).id;
+
+      const { data: slots } = await supabase
+        .from("timetable_slots")
+        .select("class_id,subject_id")
+        .eq("teacher_id", staffId);
+      if (!slots || slots.length === 0) return { pending: 0, total: 0, exams: [] };
+
+      const subjectIds = [...new Set((slots as any[]).map((s: any) => s.subject_id).filter(Boolean))];
+      const classIds = [...new Set((slots as any[]).map((s: any) => s.class_id).filter(Boolean))];
+
+      const { data: students } = await supabase
+        .from("students")
+        .select("id")
+        .in("class_id", classIds)
+        .eq("status", "active");
+      const studentIds = (students ?? []).map((s: any) => s.id);
+      if (studentIds.length === 0) return { pending: 0, total: 0, exams: [] };
+
+      const { data: activeExams } = await supabase
+        .from("exams")
+        .select("id,name")
+        .in("status", ["ongoing", "planned"])
+        .order("start_date", { ascending: false });
+
+      if (!activeExams || activeExams.length === 0) return { pending: 0, total: 0, exams: [] };
+
+      const examIds = (activeExams as any[]).map((e: any) => e.id);
+
+      const { data: results } = await supabase
+        .from("exam_results")
+        .select("verified, exam_id")
+        .in("exam_id", examIds)
+        .in("student_id", studentIds)
+        .in("subject_id", subjectIds);
+
+      const total = (results ?? []).length;
+      const verified = (results ?? []).filter((r: any) => r.verified).length;
+      const pending = total - verified;
+
+      const byExam: Record<string, { name: string; pending: number }> = {};
+      for (const e of activeExams as any[]) {
+        const examResults = (results ?? []).filter((r: any) => r.exam_id === e.id);
+        const examVerified = examResults.filter((r: any) => r.verified).length;
+        byExam[e.id] = { name: e.name, pending: examResults.length - examVerified };
+      }
+
+      return {
+        pending,
+        total,
+        exams: Object.values(byExam).filter((e) => e.pending > 0),
+      };
+    },
+  });
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -288,9 +409,37 @@ export function TeacherPendingMarksWidget() {
         <ClipboardList className="w-4 h-4 text-chart-3" />
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Open <a href="/academics/marks" className="text-primary underline">Marks</a> to enter or update scores.
-        </p>
+        {isLoading ? (
+          <MiniLoader />
+        ) : data && data.pending > 0 ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-medium">{data.pending} results pending verification</span>
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              {data.exams.slice(0, 3).map((e: any, i: number) => (
+                <li key={i} className="flex justify-between">
+                  <span className="truncate">{e.name}</span>
+                  <Badge variant="outline" className="text-amber-600 border-amber-500/30 ml-2 shrink-0">
+                    {e.pending}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+            <a href="/academics/marks" className="text-xs text-primary underline block mt-1">
+              Open Mark Entry →
+            </a>
+          </div>
+        ) : data && data.total > 0 ? (
+          <div className="text-sm text-emerald-600 font-medium">
+            ✓ All marks verified ({data.total} results)
+          </div>
+        ) : (
+          <EmptyState>
+            <a href="/academics/marks" className="text-primary underline">Open Marks</a> to enter scores.
+          </EmptyState>
+        )}
       </CardContent>
     </Card>
   );
