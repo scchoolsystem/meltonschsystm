@@ -121,10 +121,23 @@ function ReportCardContent({
     queryKey: ["rc-results", studentId, examId],
     queryFn: async () => (await supabase
       .from("exam_results")
-      .select("score,grade,remarks,verified,subject_id,subjects(code,name,scale_id)")
+      .select("score,grade,remarks,verified,subject_id,promotion_decision,subjects(code,name,scale_id)")
       .eq("student_id", studentId)
       .eq("exam_id", examId)
     ).data || [],
+  });
+
+  // Exam remarks (subject teacher / class teacher / principal) — NEW V3
+  const { data: examRemarks = [] } = useQuery({
+    queryKey: ["rc-exam-remarks", studentId, examId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_exam_remarks", {
+        p_exam_id: examId,
+        p_student_id: studentId,
+      });
+      if (error) console.warn("remarks rpc:", error);
+      return (data as any[]) ?? [];
+    },
   });
 
   const { data: rcSettings } = useQuery({
@@ -250,6 +263,35 @@ function ReportCardContent({
     for (const r of previousResults as any[]) m[r.subject_id] = r.score;
     return m;
   }, [previousResults]);
+
+  // Build remark lookup maps — NEW V3
+  const subjectRemarkMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const r of examRemarks as any[]) {
+      if (r.remark_type === "subject_teacher" && r.subject_id) {
+        m[r.subject_id] = r.remark_text;
+      }
+    }
+    return m;
+  }, [examRemarks]);
+
+  const classTeacherRemark = useMemo(() => {
+    const r = (examRemarks as any[]).find((r: any) => r.remark_type === "class_teacher");
+    return r?.remark_text ?? null;
+  }, [examRemarks]);
+
+  const principalRemark = useMemo(() => {
+    const r = (examRemarks as any[]).find((r: any) => r.remark_type === "principal");
+    return r?.remark_text ?? null;
+  }, [examRemarks]);
+
+  const promotionDecision = useMemo(() => {
+    const decisions = (results as any[]).map((r) => r.promotion_decision).filter(Boolean);
+    if (decisions.length === 0) return null;
+    const freq: Record<string, number> = {};
+    for (const d of decisions) freq[d] = (freq[d] ?? 0) + 1;
+    return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }, [results]);
 
   // QR verification string
   const qrData = `${school?.name ?? ""} | ${student?.first_name ?? ""} ${student?.last_name ?? ""} | Adm: ${student?.admission_no ?? ""} | ${exam?.name ?? ""} | Grade: ${overallGrade}`;
@@ -412,7 +454,7 @@ function ReportCardContent({
                         </div>
                       </td>
                       <td className="px-3 py-2 text-xs text-gray-500 hidden sm:table-cell max-w-[140px] truncate">
-                        {r.remarks || "—"}
+                        {subjectRemarkMap[r.subject_id] || r.remarks || "—"}
                       </td>
                       <td className="px-2 py-2 text-center">
                         {r.verified
@@ -497,15 +539,38 @@ function ReportCardContent({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="border rounded-lg p-4 text-sm space-y-1 bg-gray-50">
               <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Class Teacher's Remarks</div>
-              <div className="italic text-gray-700 mt-1.5">{overallRemarks}</div>
+              <div className="italic text-gray-700 mt-1.5">{classTeacherRemark || overallRemarks}</div>
             </div>
-            {rcSettings?.principal_remarks && (
+            {(principalRemark || rcSettings?.principal_remarks) && (
               <div className="border rounded-lg p-4 text-sm space-y-1 bg-gray-50">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{principalTitle}'s Remarks</div>
-                <div className="italic text-gray-700 mt-1.5">{rcSettings.principal_remarks}</div>
+                <div className="italic text-gray-700 mt-1.5">{principalRemark || rcSettings?.principal_remarks}</div>
               </div>
             )}
           </div>
+
+          {promotionDecision && (
+            <div className={`border-2 rounded-lg p-4 text-center ${
+              promotionDecision === "promoted"
+                ? "border-emerald-500 bg-emerald-50"
+                : promotionDecision === "retained"
+                ? "border-red-500 bg-red-50"
+                : "border-amber-500 bg-amber-50"
+            }`}>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                Promotion Decision
+              </div>
+              <div className={`text-xl font-extrabold mt-1 capitalize ${
+                promotionDecision === "promoted"
+                  ? "text-emerald-700"
+                  : promotionDecision === "retained"
+                  ? "text-red-700"
+                  : "text-amber-700"
+              }`}>
+                {promotionDecision}
+              </div>
+            </div>
+          )}
 
           {/* Signatures */}
           <div className="grid grid-cols-2 gap-12 pt-4 text-xs text-gray-500 border-t">
