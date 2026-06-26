@@ -609,6 +609,9 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
           </CardContent>
         </Card>
       )}
+
+      </>
+      )}
     </div>
   );
 }
