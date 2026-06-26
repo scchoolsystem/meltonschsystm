@@ -99,7 +99,7 @@ function Page() {
 
   async function handleSeed() {
     try {
-      await seedFn({ data: {} });
+      await seedFn({});
       toast.success("Default categories seeded");
       qc.invalidateQueries({ queryKey: ["expense-categories"] });
     } catch (e: any) {
