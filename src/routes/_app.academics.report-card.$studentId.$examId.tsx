@@ -56,14 +56,23 @@ function SecurityCheck({ studentId, children }: { studentId: string; children: R
       );
       if (isStaff) return { allowed: true };
 
-      // Students: must be linked to this exact student record
-      const { data } = await supabase
+      /// Students: must be linked to this exact student record
+      const { data: studentLink } = await supabase
         .from("student_user_links")
         .select("student_id")
         .eq("user_id", user!.id)
         .eq("student_id", studentId)
         .maybeSingle();
-      return { allowed: !!data };
+      if (studentLink) return { allowed: true };
+
+      // Parents: must be linked via parent_student_links
+      const { data: parentLink } = await supabase
+        .from("parent_student_links")
+        .select("id")
+        .eq("parent_user_id", user!.id)
+        .eq("student_id", studentId)
+        .maybeSingle();
+      return { allowed: !!parentLink };
     },
   });
 
