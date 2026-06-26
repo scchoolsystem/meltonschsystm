@@ -66,6 +66,17 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // $studentId must still be enforced by the route loader / RLS — this
   // module key only controls whether the role may reach the page at all.
   "report-card-view": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master", "student", "parent"],
+  // Exam oversight: moderation, approval, release dashboard
+  "exam-oversight": [
+    ...ADMIN_ROLES,
+    "exams_admin", "academic_master",
+  ],
+  // Remarks entry: subject/class teacher/principal can access (page filters by role)
+  "remarks": [
+    ...ADMIN_ROLES,
+    ...TEACHING_ROLES,
+    "exams_admin", "academic_master",
+  ],
   attendance: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
   // Widened to match every role role-experience.ts gives an Analytics/Reports
