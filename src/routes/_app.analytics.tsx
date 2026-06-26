@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,20 +10,87 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles, Activity } from "lucide-react";
+import {
+  TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles,
+  Activity, Library, Utensils, Package, Bus, Stethoscope, ShieldCheck,
+  Trophy, BookOpen, DollarSign,
+} from "lucide-react";
 import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalyticsPanel";
-
-// ...inside the admin section:
-<section className="space-y-4">
-  <h2 className="text-base font-semibold">Academic Analytics</h2>
-  <AcademicAnalyticsPanel />
-</section>
+import type { AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app/analytics")({ component: Analytics });
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
 
+// ─── Tab definitions ──────────────────────────────────────────────────────────
+const ALL_TABS = [
+  { key: "overview",    label: "Overview",     icon: TrendingUp,    roles: [] },          // all
+  { key: "academics",   label: "Academics",    icon: GraduationCap, roles: ["teacher","class_teacher","subject_teacher","hod","academic_master","exams_admin","exams_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "finance",     label: "Finance",      icon: DollarSign,    roles: ["bursar","finance_admin","finance_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "library",     label: "Library",      icon: Library,       roles: ["librarian","library_admin","library_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "kitchen",     label: "Kitchen",      icon: Utensils,      roles: ["kitchen_admin","kitchen_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "store",       label: "Store",        icon: Package,       roles: ["store_admin","store_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "transport",   label: "Transport",    icon: Bus,           roles: ["transport_admin","transport_officer","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "clinic",      label: "Clinic",       icon: Stethoscope,   roles: ["nurse","clinic_admin","clinic_user","matron","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "security",    label: "Security",     icon: ShieldCheck,   roles: ["security_admin","security_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "sports",      label: "Sports",       icon: Trophy,        roles: ["sports_admin","sports_user","sports","principal","deputy_principal","school_admin","super_admin"] },
+];
+
 function Analytics() {
+  const { roles } = useAuth();
+  const userRoles = (roles ?? []) as AppRole[];
+
+  const visibleTabs = ALL_TABS.filter(
+    (t) => t.roles.length === 0 || t.roles.some((r) => userRoles.includes(r as AppRole))
+  );
+  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.key ?? "overview");
+
+  return (
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <TrendingUp className="w-5 h-5" /> Analytics & Intelligence
+        </h1>
+        <p className="text-sm text-muted-foreground">Real-time insights across all departments</p>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 overflow-x-auto pb-1 border-b">
+        {visibleTabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-t whitespace-nowrap transition-colors ${
+                activeTab === t.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === "overview"  && <OverviewTab />}
+      {activeTab === "academics" && <AcademicsTab />}
+      {activeTab === "finance"   && <FinanceTab />}
+      {activeTab === "library"   && <LibraryTab />}
+      {activeTab === "kitchen"   && <KitchenTab />}
+      {activeTab === "store"     && <StoreTab />}
+      {activeTab === "transport" && <TransportTab />}
+      {activeTab === "clinic"    && <ClinicTab />}
+      {activeTab === "security"  && <SecurityTab />}
+      {activeTab === "sports"    && <SportsTab />}
+    </div>
+  );
+}
+
+// ─── Overview tab ─────────────────────────────────────────────────────────────
+function OverviewTab() {
   const { data: kpis } = useQuery({
     queryKey: ["analytics-kpis"],
     queryFn: async () => {
@@ -34,157 +103,43 @@ function Analytics() {
       ]);
       const f = (finance.data ?? {}) as any;
       return {
-        students: students.count ?? 0,
-        staff: staff.count ?? 0,
-        totalInvoiced: Number(f.total_invoiced ?? 0),
-        totalPaid: Number(f.total_paid ?? 0),
-        collection: Number(f.collection_pct ?? 0),
-        defaulters: Number(f.defaulters ?? 0),
-        attendance: attendance.data ?? [],
-        genders: students.data ?? [],
+        students: students.count ?? 0, staff: staff.count ?? 0,
+        totalInvoiced: Number(f.total_invoiced ?? 0), totalPaid: Number(f.total_paid ?? 0),
+        collection: Number(f.collection_pct ?? 0), defaulters: Number(f.defaulters ?? 0),
+        attendance: attendance.data ?? [], genders: students.data ?? [],
       };
     },
   });
 
-  const { data: subjectAvg = [] } = useQuery({
-    queryKey: ["analytics-subject-means"],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("v_subject_means")
-        .select("subject_code,mean_score").order("mean_score", { ascending: false });
-      return (data ?? []).map((r: any) => ({ code: r.subject_code ?? "—", mean: Number(r.mean_score) }));
-    },
-  });
-
-  const { data: weakStudents = [] } = useQuery({
-    queryKey: ["analytics-weak"],
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("v_weak_students")
-        .select("student_id,admission_no,first_name,last_name,mean_score")
-        .order("mean_score", { ascending: true }).limit(10);
-      return (data ?? []).map((r: any) => ({
-        id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
-        admno: r.admission_no ?? "", mean: Number(r.mean_score),
-      }));
-    },
-  });
-
-  // 4 weeks attendance heatmap data
-  const { data: heatmap = [] } = useQuery({
-    queryKey: ["analytics-att-heatmap"],
-    queryFn: async () => {
-      const since = new Date(Date.now() - 28 * 864e5).toISOString().slice(0, 10);
-      const { data } = await (supabase as any).from("v_attendance_daily")
-        .select("date,present,total").gte("date", since).order("date");
-      return data ?? [];
-    },
-  });
-
-  // Finance trend - last 6 months payments
-  const { data: financeTrend = [] } = useQuery({
-    queryKey: ["analytics-finance-trend"],
-    queryFn: async () => {
-      const since = new Date();
-      since.setMonth(since.getMonth() - 6);
-      const sinceStr = since.toISOString().slice(0, 10);
-      const [pays, invs] = await Promise.all([
-        (supabase as any).from("payments").select("amount, created_at").gte("created_at", sinceStr),
-        supabase.from("invoices").select("amount, created_at").gte("created_at", sinceStr),
-      ]);
-      const buckets = new Map<string, { month: string; collected: number; invoiced: number }>();
-      const ensureBucket = (k: string) => {
-        if (!buckets.has(k)) buckets.set(k, { month: k, collected: 0, invoiced: 0 });
-        return buckets.get(k)!;
-      };
-      (pays.data ?? []).forEach((p: any) => {
-        const m = p.created_at?.slice(0, 7); if (!m) return;
-        ensureBucket(m).collected += Number(p.amount ?? 0);
-      });
-      (invs.data ?? []).forEach((i: any) => {
-        const m = i.created_at?.slice(0, 7); if (!m) return;
-        ensureBucket(m).invoiced += Number(i.amount ?? 0);
-      });
-      return Array.from(buckets.values()).sort((a, b) => a.month.localeCompare(b.month));
-    },
-  });
-
-  // Class performance comparison
-  const { data: classPerf = [] } = useQuery({
-    queryKey: ["analytics-class-perf"],
-    queryFn: async () => {
-      const { data: results } = await (supabase as any).from("exam_results")
-        .select("score, students(class_id, classes(name))");
-      const map = new Map<string, { className: string; sum: number; count: number }>();
-      (results ?? []).forEach((r: any) => {
-        const cls = r.students?.classes?.name ?? "—";
-        const cur = map.get(cls) ?? { className: cls, sum: 0, count: 0 };
-        cur.sum += Number(r.score ?? 0); cur.count++;
-        map.set(cls, cur);
-      });
-      return Array.from(map.values()).map((c) => ({
-        className: c.className, mean: c.count ? Math.round((c.sum / c.count) * 10) / 10 : 0,
-      })).sort((a, b) => b.mean - a.mean);
-    },
-  });
-
-  // At-risk students (low attendance OR low mean)
   const { data: atRisk = [] } = useQuery({
     queryKey: ["analytics-at-risk"],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
       const [att, weak] = await Promise.all([
-        (supabase as any).from("attendance_records")
-          .select("student_id, status, students(first_name, last_name, admission_no, classes(name))")
-          .gte("date", since),
+        (supabase as any).from("attendance_records").select("student_id, status, students(first_name, last_name, admission_no, classes(name))").gte("date", since),
         (supabase as any).from("v_weak_students").select("student_id, admission_no, first_name, last_name, mean_score"),
       ]);
-      const attMap = new Map<string, { name: string; admno: string; className: string; total: number; present: number; mean?: number }>();
+      const attMap = new Map<string, any>();
       (att.data ?? []).forEach((r: any) => {
         const s = r.students; if (!s) return;
-        const cur = attMap.get(r.student_id) ?? {
-          name: `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim(),
-          admno: s.admission_no ?? "", className: s.classes?.name ?? "—",
-          total: 0, present: 0,
-        };
+        const cur = attMap.get(r.student_id) ?? { name: `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim(), admno: s.admission_no ?? "", className: s.classes?.name ?? "—", total: 0, present: 0 };
         cur.total++; if (r.status === "present") cur.present++;
         attMap.set(r.student_id, cur);
       });
       const weakMap = new Map<string, number>();
       (weak.data ?? []).forEach((w: any) => weakMap.set(w.student_id, Number(w.mean_score)));
-
       const results: any[] = [];
       attMap.forEach((v, id) => {
         const attPct = v.total ? Math.round((v.present / v.total) * 100) : 100;
         const mean = weakMap.get(id);
-        const lowAtt = attPct < 75;
-        const lowMean = mean !== undefined && mean < 40;
-        if (lowAtt || lowMean) {
-          results.push({
-            id, name: v.name, admno: v.admno, className: v.className,
-            attendance: attPct, mean: mean ?? null,
-            risk: lowAtt && lowMean ? "Both" : lowAtt ? "Attendance" : "Academic",
-          });
-        }
-      });
-      // Also include weak students not in attMap
-      weakMap.forEach((mean, id) => {
-        if (attMap.has(id)) return;
-        if (mean < 40) {
-          const w = (weak.data ?? []).find((x: any) => x.student_id === id);
-          results.push({
-            id, name: `${w?.first_name ?? ""} ${w?.last_name ?? ""}`.trim(),
-            admno: w?.admission_no ?? "", className: "—",
-            attendance: null, mean, risk: "Academic",
-          });
-        }
+        const lowAtt = attPct < 75, lowMean = mean !== undefined && mean < 40;
+        if (lowAtt || lowMean) results.push({ id, ...v, attendance: attPct, mean: mean ?? null, risk: lowAtt && lowMean ? "Both" : lowAtt ? "Attendance" : "Academic" });
       });
       return results.sort((a, b) => (a.attendance ?? 100) - (b.attendance ?? 100)).slice(0, 20);
     },
   });
 
-  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({
-    date: r.date, present: Number(r.present ?? 0), absent: Number(r.absent ?? 0),
-  }));
-
+  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({ date: r.date, present: Number(r.present ?? 0), absent: Number(r.absent ?? 0) }));
   const genderMix = (() => {
     const m = new Map<string, number>();
     (kpis?.genders ?? []).forEach((s: any) => { const g = s.gender || "Unknown"; m.set(g, (m.get(g) ?? 0) + 1); });
@@ -192,172 +147,55 @@ function Analytics() {
   })();
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Analytics & Intelligence</h1>
-          <p className="text-sm text-muted-foreground">Real-time insights across the school</p>
-        </div>
-      </div>
-
-      {/* KPIs */}
+    <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi icon={<GraduationCap className="w-4 h-4" />} label="Students" value={kpis?.students ?? 0} />
         <Kpi icon={<Users className="w-4 h-4" />} label="Staff" value={kpis?.staff ?? 0} />
-        <Kpi icon={<Wallet className="w-4 h-4" />} label="Fee Collection"
-          value={`${(kpis?.collection ?? 0).toFixed(0)}%`}
-          sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`} />
+        <Kpi icon={<Wallet className="w-4 h-4" />} label="Fee Collection" value={`${(kpis?.collection ?? 0).toFixed(0)}%`} sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`} />
         <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Defaulters" value={kpis?.defaulters ?? 0} />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">Subject performance (avg score)</CardTitle></CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={subjectAvg.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="code" />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Bar dataKey="mean" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
           <CardHeader><CardTitle className="text-base">Attendance trend (30 days)</CardTitle></CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="h-64">
             <ResponsiveContainer>
               <LineChart data={attTrend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis /><Tooltip /><Legend />
                 <Line type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} />
                 <Line type="monotone" dataKey="absent" stroke="#ef4444" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader><CardTitle className="text-base">Student gender mix</CardTitle></CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="h-64">
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={genderMix} dataKey="value" nameKey="name" outerRadius={90} label>
                   {genderMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip /><Legend />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> AI insights — students at risk
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {weakStudents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No struggling students detected — great work!</p>
-            ) : (
-              <ul className="text-sm space-y-1.5">
-                {weakStudents.map((s: any) => (
-                  <li key={s.id} className="flex items-center justify-between border-b pb-1.5">
-                    <div>
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-xs text-muted-foreground">{s.admno}</div>
-                    </div>
-                    <Badge variant="destructive">{s.mean.toFixed(1)} avg</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
-      {/* === NEW: Finance trend === */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Finance trend (last 6 months)</CardTitle></CardHeader>
-        <CardContent className="h-72">
-          <ResponsiveContainer>
-            <LineChart data={financeTrend}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="invoiced" stroke="hsl(var(--primary))" strokeWidth={2} />
-              <Line type="monotone" dataKey="collected" stroke="#10b981" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* === NEW: Class performance === */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Class performance comparison</CardTitle></CardHeader>
-        <CardContent className="h-72">
-          <ResponsiveContainer>
-            <BarChart data={classPerf}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="className" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
-              <Bar dataKey="mean" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* === NEW: Attendance heatmap === */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Attendance heatmap (last 4 weeks)</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-destructive" /> At-risk students</CardTitle></CardHeader>
         <CardContent>
-          <Heatmap data={heatmap} />
-        </CardContent>
-      </Card>
-
-      {/* === NEW: At-risk panel === */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="w-4 h-4 text-destructive" /> At-risk students
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {atRisk.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No at-risk students right now.</p>
-          ) : (
+          {atRisk.length === 0 ? <p className="text-sm text-muted-foreground">No at-risk students right now.</p> : (
             <Table>
-              <TableHeader><TableRow>
-                <TableHead>Name</TableHead><TableHead>Adm No</TableHead><TableHead>Class</TableHead>
-                <TableHead>Attendance</TableHead><TableHead>Mean</TableHead><TableHead>Risk</TableHead>
-              </TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Adm No</TableHead><TableHead>Class</TableHead><TableHead>Attendance</TableHead><TableHead>Mean</TableHead><TableHead>Risk</TableHead></TableRow></TableHeader>
               <TableBody>
                 {atRisk.map((s: any) => (
                   <TableRow key={s.id}>
-                    <TableCell>{s.name}</TableCell>
-                    <TableCell>{s.admno}</TableCell>
-                    <TableCell>{s.className}</TableCell>
-                    <TableCell className={s.attendance !== null && s.attendance < 75 ? "text-destructive" : ""}>
-                      {s.attendance !== null ? `${s.attendance}%` : "—"}
-                    </TableCell>
-                    <TableCell className={s.mean !== null && s.mean < 40 ? "text-destructive" : ""}>
-                      {s.mean !== null ? s.mean : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={s.risk === "Both" ? "destructive" : "secondary"}>{s.risk}</Badge>
-                    </TableCell>
+                    <TableCell>{s.name}</TableCell><TableCell>{s.admno}</TableCell><TableCell>{s.className}</TableCell>
+                    <TableCell className={s.attendance !== null && s.attendance < 75 ? "text-destructive" : ""}>{s.attendance !== null ? `${s.attendance}%` : "—"}</TableCell>
+                    <TableCell className={s.mean !== null && s.mean < 40 ? "text-destructive" : ""}>{s.mean !== null ? s.mean : "—"}</TableCell>
+                    <TableCell><Badge variant={s.risk === "Both" ? "destructive" : "secondary"}>{s.risk}</Badge></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -369,61 +207,448 @@ function Analytics() {
   );
 }
 
-function Heatmap({ data }: { data: any[] }) {
-  // Build 4×7 grid (4 weeks × Mon-Sun)
-  const byDate = new Map<string, { present: number; total: number }>();
-  data.forEach((r) => byDate.set(r.date, { present: Number(r.present ?? 0), total: Number(r.total ?? 0) }));
+// ─── Academics tab ────────────────────────────────────────────────────────────
+function AcademicsTab() {
+  const { data: subjectAvg = [] } = useQuery({
+    queryKey: ["analytics-subject-means"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("v_subject_means").select("subject_code,mean_score").order("mean_score", { ascending: false });
+      return (data ?? []).map((r: any) => ({ code: r.subject_code ?? "—", mean: Number(r.mean_score) }));
+    },
+  });
 
-  const today = new Date();
-  const cells: Array<{ date: string; pct: number | null; day: string }> = [];
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const { data: classPerf = [] } = useQuery({
+    queryKey: ["analytics-class-perf"],
+    queryFn: async () => {
+      const { data: results } = await (supabase as any).from("exam_results").select("score, students(class_id, classes(name))");
+      const map = new Map<string, { className: string; sum: number; count: number }>();
+      (results ?? []).forEach((r: any) => {
+        const cls = r.students?.classes?.name ?? "—";
+        const cur = map.get(cls) ?? { className: cls, sum: 0, count: 0 };
+        cur.sum += Number(r.score ?? 0); cur.count++;
+        map.set(cls, cur);
+      });
+      return Array.from(map.values()).map((c) => ({ className: c.className, mean: c.count ? Math.round((c.sum / c.count) * 10) / 10 : 0 })).sort((a, b) => b.mean - a.mean);
+    },
+  });
 
-  for (let w = 3; w >= 0; w--) {
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (w * 7 + (6 - d)));
-      const key = date.toISOString().slice(0, 10);
-      const rec = byDate.get(key);
-      const pct = rec && rec.total > 0 ? Math.round((rec.present / rec.total) * 100) : null;
-      cells.push({ date: key, pct, day: days[d] });
-    }
-  }
-
-  const color = (pct: number | null) => {
-    if (pct === null) return "bg-muted/30";
-    if (pct >= 95) return "bg-emerald-600";
-    if (pct >= 85) return "bg-emerald-500";
-    if (pct >= 75) return "bg-yellow-500";
-    if (pct >= 60) return "bg-orange-500";
-    return "bg-destructive";
-  };
+  const { data: weakStudents = [] } = useQuery({
+    queryKey: ["analytics-weak"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("v_weak_students").select("student_id,admission_no,first_name,last_name,mean_score").order("mean_score", { ascending: true }).limit(10);
+      return (data ?? []).map((r: any) => ({ id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(), admno: r.admission_no ?? "", mean: Number(r.mean_score) }));
+    },
+  });
 
   return (
-    <div className="space-y-1">
-      <div className="grid grid-cols-8 gap-1 text-xs text-muted-foreground mb-1">
-        <div></div>{days.map((d) => <div key={d} className="text-center">{d}</div>)}
+    <div className="space-y-6">
+      <AcademicAnalyticsPanel />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Subject performance (avg score)</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer>
+              <BarChart data={subjectAvg.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="code" /><YAxis domain={[0, 100]} /><Tooltip />
+                <Bar dataKey="mean" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Class performance comparison</CardTitle></CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer>
+              <BarChart data={classPerf}>
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="className" /><YAxis domain={[0, 100]} /><Tooltip />
+                <Bar dataKey="mean" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
-      {[0, 1, 2, 3].map((week) => (
-        <div key={week} className="grid grid-cols-8 gap-1">
-          <div className="text-xs text-muted-foreground self-center">W{week + 1}</div>
-          {cells.slice(week * 7, week * 7 + 7).map((c, i) => (
-            <div key={i}
-              title={`${c.date}: ${c.pct !== null ? c.pct + "%" : "no data"}`}
-              className={`h-10 rounded ${color(c.pct)} text-white text-xs flex items-center justify-center`}>
-              {c.pct !== null ? `${c.pct}%` : "—"}
-            </div>
-          ))}
-        </div>
-      ))}
-      <div className="flex gap-3 text-xs text-muted-foreground mt-2">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-600 inline-block" /> ≥95%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-500 inline-block" /> 75–84%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-destructive inline-block" /> &lt;60%</span>
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> AI insights — students at risk (academic)</CardTitle></CardHeader>
+        <CardContent>
+          {weakStudents.length === 0 ? <p className="text-sm text-muted-foreground">No struggling students detected — great work!</p> : (
+            <ul className="text-sm space-y-1.5">
+              {weakStudents.map((s: any) => (
+                <li key={s.id} className="flex items-center justify-between border-b pb-1.5">
+                  <div><div className="font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.admno}</div></div>
+                  <Badge variant="destructive">{s.mean.toFixed(1)} avg</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Finance tab ──────────────────────────────────────────────────────────────
+function FinanceTab() {
+  const { data: financeTrend = [] } = useQuery({
+    queryKey: ["analytics-finance-trend"],
+    queryFn: async () => {
+      const since = new Date(); since.setMonth(since.getMonth() - 6);
+      const sinceStr = since.toISOString().slice(0, 10);
+      const [pays, invs] = await Promise.all([
+        (supabase as any).from("payments").select("amount, created_at").gte("created_at", sinceStr),
+        supabase.from("invoices").select("amount, created_at").gte("created_at", sinceStr),
+      ]);
+      const buckets = new Map<string, { month: string; collected: number; invoiced: number }>();
+      const ensure = (k: string) => { if (!buckets.has(k)) buckets.set(k, { month: k, collected: 0, invoiced: 0 }); return buckets.get(k)!; };
+      (pays.data ?? []).forEach((p: any) => { const m = p.created_at?.slice(0, 7); if (m) ensure(m).collected += Number(p.amount ?? 0); });
+      (invs.data ?? []).forEach((i: any) => { const m = i.created_at?.slice(0, 7); if (m) ensure(m).invoiced += Number(i.amount ?? 0); });
+      return Array.from(buckets.values()).sort((a, b) => a.month.localeCompare(b.month));
+    },
+  });
+
+  const { data: summary } = useQuery({
+    queryKey: ["analytics-finance-summary"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("v_finance_summary").select("*").maybeSingle();
+      return data ?? {};
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<Wallet className="w-4 h-4" />} label="Total Invoiced" value={`KES ${Number(summary?.total_invoiced ?? 0).toLocaleString()}`} />
+        <Kpi icon={<TrendingUp className="w-4 h-4 text-green-500" />} label="Total Collected" value={`KES ${Number(summary?.total_paid ?? 0).toLocaleString()}`} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Collection Rate" value={`${Number(summary?.collection_pct ?? 0).toFixed(1)}%`} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Defaulters" value={summary?.defaulters ?? 0} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Revenue trend (last 6 months)</CardTitle></CardHeader>
+        <CardContent className="h-72">
+          <ResponsiveContainer>
+            <LineChart data={financeTrend}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip /><Legend />
+              <Line type="monotone" dataKey="invoiced" stroke="hsl(var(--primary))" strokeWidth={2} />
+              <Line type="monotone" dataKey="collected" stroke="#10b981" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Library tab ──────────────────────────────────────────────────────────────
+function LibraryTab() {
+  const { data: loans = [] } = useQuery({
+    queryKey: ["analytics-library-loans"],
+    queryFn: async () => {
+      const { data } = await supabase.from("library_loans").select("id, returned, due_date, created_at, book_id, student_id");
+      return data ?? [];
+    },
+  });
+
+  const active = loans.filter((l: any) => !l.returned).length;
+  const overdue = loans.filter((l: any) => !l.returned && l.due_date && new Date(l.due_date) < new Date()).length;
+  const returned = loans.filter((l: any) => l.returned).length;
+
+  const monthly = (() => {
+    const m = new Map<string, number>();
+    loans.forEach((l: any) => { const k = (l.created_at ?? "").slice(0, 7); if (k) m.set(k, (m.get(k) ?? 0) + 1); });
+    return Array.from(m.entries()).sort().map(([month, count]) => ({ month, count }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi icon={<BookOpen className="w-4 h-4" />} label="Active Loans" value={active} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Overdue" value={overdue} />
+        <Kpi icon={<TrendingUp className="w-4 h-4 text-green-500" />} label="Returned" value={returned} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Monthly loan activity</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <BarChart data={monthly}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip />
+              <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Kitchen tab ──────────────────────────────────────────────────────────────
+function KitchenTab() {
+  const { data: meals = [] } = useQuery({
+    queryKey: ["analytics-kitchen-meals"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const { data } = await (supabase as any).from("kitchen_meals").select("id, meal_type, date, servings").gte("date", since).order("date");
+      return data ?? [];
+    },
+  });
+
+  const totalServings = meals.reduce((s: number, m: any) => s + Number(m.servings ?? 0), 0);
+  const byType = (() => {
+    const m = new Map<string, number>();
+    meals.forEach((meal: any) => { const t = meal.meal_type ?? "Other"; m.set(t, (m.get(t) ?? 0) + Number(meal.servings ?? 1)); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+  const daily = (() => {
+    const m = new Map<string, number>();
+    meals.forEach((meal: any) => { const d = meal.date ?? ""; if (d) m.set(d, (m.get(d) ?? 0) + Number(meal.servings ?? 1)); });
+    return Array.from(m.entries()).sort().map(([date, servings]) => ({ date, servings }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3">
+        <Kpi icon={<Utensils className="w-4 h-4" />} label="Meals (30 days)" value={meals.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Total Servings" value={totalServings} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Servings by meal type</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={byType} dataKey="value" nameKey="name" outerRadius={80} label>
+                  {byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip /><Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Daily servings trend</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <LineChart data={daily}>
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis /><Tooltip />
+                <Line type="monotone" dataKey="servings" stroke="hsl(var(--primary))" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
+// ─── Store / Inventory tab ────────────────────────────────────────────────────
+function StoreTab() {
+  const { data: items = [] } = useQuery({
+    queryKey: ["analytics-inventory"],
+    queryFn: async () => {
+      const { data } = await supabase.from("inventory_items").select("id, name, quantity, unit, category, reorder_level");
+      return data ?? [];
+    },
+  });
+
+  const lowStock = items.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0));
+  const byCategory = (() => {
+    const m = new Map<string, number>();
+    items.forEach((i: any) => { const c = i.category ?? "General"; m.set(c, (m.get(c) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <Kpi icon={<Package className="w-4 h-4" />} label="Total Items" value={items.length} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Low Stock" value={lowStock.length} />
+        <Kpi icon={<TrendingUp className="w-4 h-4" />} label="Categories" value={byCategory.length} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Items by category</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byCategory}>
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" /> Low stock items</CardTitle></CardHeader>
+          <CardContent>
+            {lowStock.length === 0 ? <p className="text-sm text-muted-foreground">All items are sufficiently stocked.</p> : (
+              <ul className="text-sm space-y-1.5">
+                {lowStock.map((i: any) => (
+                  <li key={i.id} className="flex items-center justify-between border-b pb-1.5">
+                    <div><div className="font-medium">{i.name}</div><div className="text-xs text-muted-foreground">{i.category}</div></div>
+                    <Badge variant="destructive">{i.quantity} {i.unit}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Transport tab ────────────────────────────────────────────────────────────
+function TransportTab() {
+  const { data: routes = [] } = useQuery({
+    queryKey: ["analytics-transport-routes"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("transport_routes").select("id, name, capacity, assigned_students");
+      return data ?? [];
+    },
+  });
+
+  const totalCapacity = routes.reduce((s: number, r: any) => s + Number(r.capacity ?? 0), 0);
+  const totalAssigned = routes.reduce((s: number, r: any) => s + Number(r.assigned_students ?? 0), 0);
+  const utilisation = totalCapacity > 0 ? Math.round((totalAssigned / totalCapacity) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi icon={<Bus className="w-4 h-4" />} label="Routes" value={routes.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Students Assigned" value={totalAssigned} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Utilisation" value={`${utilisation}%`} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Route capacity vs assigned</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <BarChart data={routes.map((r: any) => ({ name: r.name, capacity: Number(r.capacity ?? 0), assigned: Number(r.assigned_students ?? 0) }))}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Legend />
+              <Bar dataKey="capacity" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="assigned" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Clinic tab ───────────────────────────────────────────────────────────────
+function ClinicTab() {
+  const { data: visits = [] } = useQuery({
+    queryKey: ["analytics-clinic-visits"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const { data } = await supabase.from("clinic_visits").select("id, visit_date, complaint, student_id").gte("visit_date", since);
+      return data ?? [];
+    },
+  });
+
+  const byComplaint = (() => {
+    const m = new Map<string, number>();
+    visits.forEach((v: any) => { const c = v.complaint ?? "General"; m.set(c, (m.get(c) ?? 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3">
+        <Kpi icon={<Stethoscope className="w-4 h-4" />} label="Visits (30 days)" value={visits.length} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Unique Complaints" value={byComplaint.length} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Top complaints (30 days)</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <BarChart data={byComplaint} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} /><Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Security tab ─────────────────────────────────────────────────────────────
+function SecurityTab() {
+  const { data: logs = [] } = useQuery({
+    queryKey: ["analytics-security-logs"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      const { data } = await supabase.from("security_logs").select("id, event_type, created_at").gte("created_at", since);
+      return data ?? [];
+    },
+  });
+
+  const byType = (() => {
+    const m = new Map<string, number>();
+    logs.forEach((l: any) => { const t = l.event_type ?? "Unknown"; m.set(t, (m.get(t) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3">
+        <Kpi icon={<ShieldCheck className="w-4 h-4" />} label="Events (7 days)" value={logs.length} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Event Types" value={byType.length} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Events by type (7 days)</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={byType} dataKey="value" nameKey="name" outerRadius={80} label>
+                {byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip /><Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Sports tab ───────────────────────────────────────────────────────────────
+function SportsTab() {
+  const { data: activities = [] } = useQuery({
+    queryKey: ["analytics-cocurricular"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("cocurricular_activities").select("id, name, category, enrolled_count");
+      return data ?? [];
+    },
+  });
+
+  const totalEnrolled = activities.reduce((s: number, a: any) => s + Number(a.enrolled_count ?? 0), 0);
+  const byCategory = (() => {
+    const m = new Map<string, number>();
+    activities.forEach((a: any) => { const c = a.category ?? "General"; m.set(c, (m.get(c) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi icon={<Trophy className="w-4 h-4" />} label="Activities" value={activities.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Total Enrolled" value={totalEnrolled} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Categories" value={byCategory.length} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Activities by category</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <BarChart data={byCategory}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: any; sub?: string }) {
   return (
     <Card>

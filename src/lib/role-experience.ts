@@ -1,6 +1,7 @@
-// Role-scoped navigation builder. Returns the nav groups a user can see
-// based on their roles. Admin roles get everything; every other role gets
-// a focused, task-specific menu. Unknown roles fall back to Dashboard only.
+// Role-scoped navigation builder. Returns a SINGLE unified nav for the user
+// regardless of how many roles they hold. No repeated Dashboard links, no
+// repeated group headers. Multi-role users get the union of their accessible
+// pages, de-duplicated by URL and grouped logically.
 
 export type NavItem = { title: string; url: string; icon?: any; feature?: string };
 export type NavGroup = { label: string; items: NavItem[] };
@@ -11,248 +12,7 @@ const ADMIN_ROLES = new Set([
 
 const dashboard: NavItem = { title: "Dashboard", url: "/dashboard" };
 
-// Per-role group templates. A user gets the union of every group their roles unlock.
-const ROLE_GROUPS: Record<string, NavGroup[]> = {
-  student: [{
-    label: "My School",
-    items: [
-      dashboard,
-      { title: "My Portal", url: "/portal/student" },
-      { title: "Performance", url: "/portal/student?tab=analytics" },
-      { title: "Results", url: "/portal/student?tab=results" },
-      { title: "Report Cards", url: "/portal/student?tab=reportcards" },
-      { title: "Timetable", url: "/portal/student?tab=timetable" },
-      { title: "Attendance", url: "/portal/student?tab=attendance" },
-      { title: "Fees", url: "/portal/student?tab=fees" },
-      { title: "Classroom", url: "/classroom" },
-      { title: "Live Classes", url: "/live" },
-      { title: "Announcements", url: "/announcements" },
-      { title: "Library", url: "/library" },
-    ],
-  }],
-  parent: [{
-    label: "Parent Portal",
-    items: [
-      dashboard,
-      { title: "My Portal", url: "/portal/parent" },
-      { title: "Child Performance", url: "/portal/parent" },
-      { title: "Attendance", url: "/attendance" },
-      { title: "Fees", url: "/finance/invoices" },
-      { title: "Discipline", url: "/discipline" },
-      { title: "Timetable", url: "/timetable" },
-      { title: "Live Classes", url: "/live" },
-      { title: "Announcements", url: "/announcements" },
-    ],
-  }],
-  teacher: [{
-    label: "Teaching",
-    items: [
-      dashboard,
-      { title: "My Subjects", url: "/academics/subjects" },
-      { title: "Attendance", url: "/attendance" },
-      { title: "Mark Entry", url: "/academics/marks" },
-      { title: "Exams", url: "/academics/exams" },
-      { title: "Students", url: "/students" },
-      { title: "Timetable", url: "/timetable" },
-      { title: "Classroom", url: "/classroom" },
-      { title: "Live Classes", url: "/live" },
-      { title: "Results", url: "/academics/results" },
-    ],
-  }],
-  class_teacher: [{
-    label: "My Class",
-    items: [
-      dashboard,
-      { title: "My Class", url: "/classes" },
-      { title: "Attendance", url: "/attendance" },
-      { title: "Discipline", url: "/discipline" },
-      { title: "Performance", url: "/academics/results" },
-      { title: "Report Cards", url: "/academics/report-cards" },
-      { title: "Timetable", url: "/timetable" },
-      { title: "Classroom", url: "/classroom" },
-      { title: "Live Classes", url: "/live" },
-    ],
-  }],
-  bursar: [{
-    label: "Finance",
-    items: [
-      dashboard,
-      { title: "Fee Structures", url: "/finance/fees" },
-      { title: "Invoices", url: "/finance/invoices" },
-      { title: "Bulk Generate", url: "/finance/generate" },
-      { title: "Payments", url: "/finance/payments" },
-      { title: "Reports", url: "/analytics" },
-    ],
-  }],
-  nurse: [{
-    label: "Clinic",
-    items: [
-      dashboard,
-      { title: "Medical Records", url: "/clinic" },
-      { title: "Announcements", url: "/announcements" },
-    ],
-  }],
-  // Wave 1, Fix C-5: matron previously aliased to nurse and saw only the
-  // Clinic group. Give matrons the boarding-house surface they actually run.
-  matron: [{
-    label: "Boarding",
-    items: [
-      dashboard,
-      { title: "Boarding", url: "/boarding" },
-      { title: "Dormitories", url: "/boarding/dormitories" },
-      { title: "Night Attendance", url: "/boarding/attendance" },
-      { title: "Students", url: "/students" },
-      { title: "Clinic", url: "/clinic" },
-      { title: "Announcements", url: "/announcements" },
-    ],
-  }],
-  discipline_admin: [{
-    label: "Discipline",
-    items: [
-      dashboard,
-      { title: "Incidents", url: "/discipline" },
-      { title: "Students", url: "/students" },
-      { title: "Reports", url: "/analytics" },
-    ],
-  }],
-  security_admin: [{
-    label: "Security",
-    items: [
-      dashboard,
-      { title: "Gate Records", url: "/security" },
-      { title: "Verify Student IDs", url: "/ids/verify" },
-      { title: "Bulk IDs", url: "/ids/bulk" },
-    ],
-  }],
-  sports_admin: [{
-    label: "Sports & activities",
-    items: [
-      dashboard,
-      { title: "Co-curricular", url: "/cocurricular" },
-      { title: "Students", url: "/students" },
-    ],
-  }],
-  librarian: [{
-    label: "Library",
-    items: [
-      dashboard,
-      { title: "Library", url: "/library" },
-      { title: "Students", url: "/students" },
-    ],
-  }],
-  boarding_admin: [{
-    label: "Boarding",
-    items: [
-      dashboard,
-      { title: "Boarding", url: "/boarding" },
-      { title: "Students", url: "/students" },
-    ],
-  }],
-  kitchen_admin: [{
-    label: "Kitchen",
-    items: [dashboard, { title: "Kitchen", url: "/kitchen" }],
-  }],
-  transport_admin: [{
-    label: "Transport",
-    items: [
-      dashboard,
-      { title: "Transport", url: "/transport" },
-      { title: "Students", url: "/students" },
-    ],
-  }],
-  admission_officer: [{
-    label: "Admissions",
-    items: [
-      dashboard,
-      { title: "Students", url: "/students" },
-      { title: "CSV Import", url: "/admin/import" },
-      { title: "Documents", url: "/admin/student-documents" },
-    ],
-  }],
-  // Wave 2: dedicated nav groups for previously-blank sidebars.
-  hod: [{
-    label: "Department",
-    items: [
-      dashboard,
-      { title: "My Department", url: "/admin/departments" },
-      { title: "Subjects", url: "/academics/subjects" },
-      { title: "Staff", url: "/staff" },
-      { title: "Mark Entry", url: "/academics/marks" },
-      { title: "Results", url: "/academics/results" },
-      { title: "Report Cards", url: "/academics/report-cards" },
-      { title: "Analytics", url: "/analytics" },
-      { title: "Announcements", url: "/announcements" },
-    ],
-  }],
-  ict_admin: [{
-    label: "ICT",
-    items: [
-      dashboard,
-      { title: "ICT Overview", url: "/admin/ict" },
-      { title: "Users & Credentials", url: "/admin/users" },
-      { title: "User Roles", url: "/admin/roles" },
-      { title: "Field Permissions", url: "/admin/permissions" },
-      { title: "Portal Links", url: "/admin/links" },
-      { title: "Activity Log", url: "/admin/activity" },
-      { title: "CSV Import", url: "/admin/import" },
-      { title: "Feature Modules", url: "/admin/features" },
-      { title: "Support Tickets", url: "/admin/support" },
-      { title: "Settings", url: "/admin/settings" },
-    ],
-  }],
-  exams_admin: [{
-    label: "Examinations",
-    items: [
-      dashboard,
-      { title: "Exams", url: "/academics/exams" },
-      { title: "Mark Entry", url: "/academics/marks" },
-      { title: "Results", url: "/academics/results" },
-      { title: "Report Cards", url: "/academics/report-cards" },
-      { title: "Grading Scale", url: "/admin/grading" },
-      { title: "Subjects", url: "/academics/subjects" },
-      { title: "Analytics", url: "/analytics" },
-    ],
-  }],
-  store_admin: [{
-    label: "Store / Inventory",
-    items: [
-      dashboard,
-      { title: "Inventory", url: "/inventory" },
-      { title: "Announcements", url: "/announcements" },
-    ],
-  }],
-  guidance_admin: [{
-    label: "Guidance & Counselling",
-    items: [
-      dashboard,
-      { title: "Discipline", url: "/discipline" },
-      { title: "Students", url: "/students" },
-      { title: "Announcements", url: "/announcements" },
-      { title: "Analytics", url: "/analytics" },
-    ],
-  }],
-};
-
-// Role aliasing — multiple roles share a nav template
-const ROLE_ALIASES: Record<string, string> = {
-  subject_teacher: "teacher",
-  academic_master: "teacher",
-  finance_admin: "bursar",
-  finance_user: "bursar",
-  clinic_admin: "nurse",
-  clinic_user: "nurse",
-  security_user: "security_admin",
-  library_admin: "librarian",
-  library_user: "librarian",
-  boarding_user: "boarding_admin",
-  boarding: "boarding_admin",
-  kitchen_user: "kitchen_admin",
-  transport_officer: "transport_admin",
-  sports: "sports_admin",
-  sports_user: "sports_admin",
-};
-
-// Full admin navigation
+// ── Admin nav (full access) ──────────────────────────────────────────────────
 const ADMIN_NAV: NavGroup[] = [
   { label: "Main", items: [
     dashboard,
@@ -261,7 +21,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Staff", url: "/staff" },
     { title: "Classes", url: "/classes" },
     { title: "Classroom", url: "/classroom" },
-      { title: "Live Classes", url: "/live" },
+    { title: "Live Classes", url: "/live" },
     { title: "Announcements", url: "/announcements" },
   ]},
   { label: "Academics", items: [
@@ -319,13 +79,233 @@ const ADMIN_NAV: NavGroup[] = [
   ]},
 ];
 
+// ── Per-role nav items (URL → NavItem). Groups are defined separately below.
+// Each role contributes items into logical named groups. When a user has
+// multiple roles, items are merged by URL — no duplicates.
+
+type RoleNavContribution = { group: string; items: NavItem[] }[];
+
+const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
+  student: [
+    { group: "My School", items: [
+      { title: "My Portal", url: "/portal/student" },
+      { title: "Performance", url: "/portal/student?tab=analytics" },
+      { title: "Results", url: "/portal/student?tab=results" },
+      { title: "Report Cards", url: "/portal/student?tab=reportcards" },
+      { title: "Timetable", url: "/portal/student?tab=timetable" },
+      { title: "Attendance", url: "/portal/student?tab=attendance" },
+      { title: "Fees", url: "/portal/student?tab=fees" },
+      { title: "Classroom", url: "/classroom" },
+      { title: "Live Classes", url: "/live" },
+      { title: "Announcements", url: "/announcements" },
+      { title: "Library", url: "/library" },
+    ]},
+  ],
+  parent: [
+    { group: "Parent Portal", items: [
+      { title: "My Portal", url: "/portal/parent" },
+      { title: "Child Performance", url: "/portal/parent" },
+      { title: "Attendance", url: "/attendance" },
+      { title: "Fees", url: "/finance/invoices" },
+      { title: "Discipline", url: "/discipline" },
+      { title: "Timetable", url: "/timetable" },
+      { title: "Live Classes", url: "/live" },
+      { title: "Announcements", url: "/announcements" },
+    ]},
+  ],
+  teacher: [
+    { group: "Teaching", items: [
+      { title: "My Subjects", url: "/academics/subjects" },
+      { title: "Attendance", url: "/attendance" },
+      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Exams", url: "/academics/exams" },
+      { title: "Students", url: "/students" },
+      { title: "Timetable", url: "/timetable" },
+      { title: "Classroom", url: "/classroom" },
+      { title: "Live Classes", url: "/live" },
+      { title: "Results", url: "/academics/results" },
+    ]},
+  ],
+  class_teacher: [
+    { group: "My Class", items: [
+      { title: "My Class", url: "/classes" },
+      { title: "Attendance", url: "/attendance" },
+      { title: "Discipline", url: "/discipline" },
+      { title: "Performance", url: "/academics/results" },
+      { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Timetable", url: "/timetable" },
+      { title: "Classroom", url: "/classroom" },
+      { title: "Live Classes", url: "/live" },
+    ]},
+  ],
+  hod: [
+    { group: "Department", items: [
+      { title: "My Department", url: "/admin/departments" },
+      { title: "Subjects", url: "/academics/subjects" },
+      { title: "Staff", url: "/staff" },
+      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Results", url: "/academics/results" },
+      { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Analytics", url: "/analytics" },
+      { title: "Announcements", url: "/announcements" },
+    ]},
+  ],
+  exams_admin: [
+    { group: "Examinations", items: [
+      { title: "Exams", url: "/academics/exams" },
+      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Results", url: "/academics/results" },
+      { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Grading Scale", url: "/admin/grading" },
+      { title: "Subjects", url: "/academics/subjects" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  bursar: [
+    { group: "Finance", items: [
+      { title: "Fee Structures", url: "/finance/fees" },
+      { title: "Invoices", url: "/finance/invoices" },
+      { title: "Bulk Generate", url: "/finance/generate" },
+      { title: "Payments", url: "/finance/payments" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  nurse: [
+    { group: "Clinic", items: [
+      { title: "Medical Records", url: "/clinic" },
+      { title: "Announcements", url: "/announcements" },
+    ]},
+  ],
+  matron: [
+    { group: "Boarding", items: [
+      { title: "Boarding", url: "/boarding" },
+      { title: "Dormitories", url: "/boarding/dormitories" },
+      { title: "Night Attendance", url: "/boarding/attendance" },
+      { title: "Students", url: "/students" },
+      { title: "Clinic", url: "/clinic" },
+      { title: "Announcements", url: "/announcements" },
+    ]},
+  ],
+  discipline_admin: [
+    { group: "Discipline", items: [
+      { title: "Incidents", url: "/discipline" },
+      { title: "Students", url: "/students" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  guidance_admin: [
+    { group: "Guidance & Counselling", items: [
+      { title: "Discipline", url: "/discipline" },
+      { title: "Students", url: "/students" },
+      { title: "Announcements", url: "/announcements" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  security_admin: [
+    { group: "Security", items: [
+      { title: "Gate Records", url: "/security" },
+      { title: "Verify Student IDs", url: "/ids/verify" },
+      { title: "Bulk IDs", url: "/ids/bulk" },
+    ]},
+  ],
+  sports_admin: [
+    { group: "Sports & Activities", items: [
+      { title: "Co-curricular", url: "/cocurricular" },
+      { title: "Students", url: "/students" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  librarian: [
+    { group: "Library", items: [
+      { title: "Library", url: "/library" },
+      { title: "Students", url: "/students" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  boarding_admin: [
+    { group: "Boarding", items: [
+      { title: "Boarding", url: "/boarding" },
+      { title: "Students", url: "/students" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  kitchen_admin: [
+    { group: "Kitchen", items: [
+      { title: "Kitchen", url: "/kitchen" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  store_admin: [
+    { group: "Store / Inventory", items: [
+      { title: "Inventory", url: "/inventory" },
+      { title: "Analytics", url: "/analytics" },
+      { title: "Announcements", url: "/announcements" },
+    ]},
+  ],
+  transport_admin: [
+    { group: "Transport", items: [
+      { title: "Transport", url: "/transport" },
+      { title: "Students", url: "/students" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
+  ict_admin: [
+    { group: "ICT", items: [
+      { title: "ICT Overview", url: "/admin/ict" },
+      { title: "Users & Credentials", url: "/admin/users" },
+      { title: "User Roles", url: "/admin/roles" },
+      { title: "Field Permissions", url: "/admin/permissions" },
+      { title: "Portal Links", url: "/admin/links" },
+      { title: "Activity Log", url: "/admin/activity" },
+      { title: "CSV Import", url: "/admin/import" },
+      { title: "Feature Modules", url: "/admin/features" },
+      { title: "Support Tickets", url: "/admin/support" },
+      { title: "Settings", url: "/admin/settings" },
+    ]},
+  ],
+  admission_officer: [
+    { group: "Admissions", items: [
+      { title: "Students", url: "/students" },
+      { title: "CSV Import", url: "/admin/import" },
+      { title: "Documents", url: "/admin/student-documents" },
+    ]},
+  ],
+};
+
+// Role aliasing
+const ROLE_ALIASES: Record<string, string> = {
+  subject_teacher: "teacher",
+  academic_master: "teacher",
+  finance_admin: "bursar",
+  finance_user: "bursar",
+  clinic_admin: "nurse",
+  clinic_user: "nurse",
+  security_user: "security_admin",
+  library_admin: "librarian",
+  library_user: "librarian",
+  boarding_user: "boarding_admin",
+  boarding: "boarding_admin",
+  kitchen_user: "kitchen_admin",
+  transport_officer: "transport_admin",
+  sports: "sports_admin",
+  sports_user: "sports_admin",
+  exams_user: "exams_admin",
+  store_user: "store_admin",
+  guidance_user: "guidance_admin",
+};
+
 export function isAdminRole(roles: string[]): boolean {
   return roles.some((r) => ADMIN_ROLES.has(r));
 }
 
 /**
- * Build the role-scoped navigation. Admins get the full menu; everyone else
- * gets the union of their roles' scoped groups, de-duplicated by URL.
+ * Build a SINGLE unified sidebar navigation for the user.
+ *
+ * Rules:
+ * - Admins → full ADMIN_NAV (unchanged)
+ * - Single role → their focused nav group(s)
+ * - Multiple roles → ONE Dashboard at the top, then every group from every
+ *   role merged together, de-duplicated by URL. No group or link appears twice.
  */
 export function buildNavigation(roles: string[]): NavGroup[] {
   if (!roles || roles.length === 0) {
@@ -333,20 +313,34 @@ export function buildNavigation(roles: string[]): NavGroup[] {
   }
   if (isAdminRole(roles)) return ADMIN_NAV;
 
-  // Collect groups for every role the user has
-  const groupsByLabel = new Map<string, Map<string, NavItem>>();
+  // Accumulate contributions from every role, merging items by URL across groups.
+  // groupOrder preserves the first time we see each group label.
+  const groupOrder: string[] = [];
+  const groupItems = new Map<string, Map<string, NavItem>>(); // groupLabel → url → NavItem
+  const seenUrls = new Set<string>(); // global dedup across all groups
+
+  // Dashboard is always first, never repeated
+  seenUrls.add("/dashboard");
+
   let matched = 0;
   for (const role of roles) {
     const key = ROLE_ALIASES[role] ?? role;
-    const groups = ROLE_GROUPS[key];
-    if (!groups) continue;
+    const contributions = ROLE_NAV_CONTRIBUTIONS[key];
+    if (!contributions) continue;
     matched++;
-    for (const g of groups) {
-      const bucket = groupsByLabel.get(g.label) ?? new Map<string, NavItem>();
-      for (const it of g.items) {
-        if (!bucket.has(it.url)) bucket.set(it.url, it);
+
+    for (const { group, items } of contributions) {
+      if (!groupItems.has(group)) {
+        groupItems.set(group, new Map());
+        groupOrder.push(group);
       }
-      groupsByLabel.set(g.label, bucket);
+      const bucket = groupItems.get(group)!;
+      for (const item of items) {
+        if (!seenUrls.has(item.url)) {
+          seenUrls.add(item.url);
+          bucket.set(item.url, item);
+        }
+      }
     }
   }
 
@@ -354,8 +348,12 @@ export function buildNavigation(roles: string[]): NavGroup[] {
     return [{ label: "Main", items: [dashboard] }];
   }
 
-  return Array.from(groupsByLabel.entries()).map(([label, items]) => ({
-    label,
-    items: Array.from(items.values()),
-  }));
+  // Build final groups with Dashboard prepended once
+  const groups: NavGroup[] = [{ label: "Main", items: [dashboard] }];
+  for (const label of groupOrder) {
+    const items = Array.from(groupItems.get(label)!.values());
+    if (items.length > 0) groups.push({ label, items });
+  }
+
+  return groups;
 }

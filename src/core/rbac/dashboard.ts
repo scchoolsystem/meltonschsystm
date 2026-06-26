@@ -9,7 +9,7 @@ export type DashboardWidgetKey =
   | "admin.kpis"
   | "admin.studentsPerClass"
   | "admin.schoolStructure"
-  // Wave 2: deputy principal focus widgets
+  // Deputy principal focus widgets
   | "deputy.attendanceToday"
   | "deputy.disciplineToday"
   | "deputy.staffOnLeave"
