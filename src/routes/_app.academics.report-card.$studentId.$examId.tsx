@@ -1,3 +1,4 @@
+import React from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -162,7 +163,7 @@ function ReportCardContent({
     },
   });
 
-  const { data: summary, isFetching: summaryLoading } = useQuery({
+  const { data: summary } = useQuery({
     queryKey: ["rc-summary", studentId, examId],
     enabled: results.length > 0,
     queryFn: async () => {
@@ -251,12 +252,8 @@ function ReportCardContent({
   const displayTotal = totalMethod === "sum" ? totalScore : meanScore;
   const displayMax   = totalMethod === "sum" ? maxPerSubject * results.length : maxPerSubject;
 
-  // Wait for summary to load before committing to a grade so the value
-  // doesn't flicker from the fallback to the DB-computed grade.
-  const overallGrade   = summaryLoading && !summary
-    ? "…"
-    : (summary?.overall_grade ?? fallbackGrade(meanScore));
-  const gradeColour    = overallGrade === "…" ? "#94a3b8" : gradeColor(overallGrade);
+  const overallGrade   = summary?.overall_grade ?? fallbackGrade(meanScore);
+  const gradeColour    = gradeColor(overallGrade);
   const overallRemarks = summary?.overall_remarks ?? rcSettings?.grade_remarks?.[overallGrade] ?? "—";
   const position       = summary?.position;
 
@@ -306,9 +303,11 @@ function ReportCardContent({
     return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }, [results]);
 
-  // QR verification string
-  const qrData = `${school?.name ?? ""} | ${student?.first_name ?? ""} ${student?.last_name ?? ""} | Adm: ${student?.admission_no ?? ""} | ${exam?.name ?? ""} | Grade: ${overallGrade}`;
-  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}`;
+  // QR encodes ONLY the unique_id so the Verify page can look it up by scanning.
+  // The verify page does: supabase.from("students").select(...).eq("unique_id", scannedValue)
+  const uniqueId = (student as any)?.unique_id ?? "";
+  const qrData   = uniqueId; // e.g. "STU-2026-000005"
+  const qrUrl    = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}`;
 
   if (resultsLoading) return (
     <div className="h-screen grid place-items-center">
@@ -416,13 +415,30 @@ function ReportCardContent({
                     </td>
                   </tr>
                 )}
-                {(results as any[]).map((r, i) => {
+                {([...(results as any[])].sort((a, b) => Number(b.score) - Number(a.score))).map((r, i, arr) => {
                   const g      = r.grade ?? fallbackGrade(r.score);
                   const gc     = gradeColor(g);
                   const prev   = prevScoreMap[r.subject_id];
                   const growth = prev !== undefined ? r.score - prev : null;
+                  // Show a grade-band divider row when the grade letter changes
+                  const prevG     = i > 0 ? (arr[i-1].grade ?? fallbackGrade(Number(arr[i-1].score))) : null;
+                  const bandStart = i === 0 || g !== prevG;
+                  const colSpan   = 5 + (rcSettings?.show_subject_position ? 1 : 0) + (rcSettings?.show_subject_position ? 0 : 0);
                   return (
-                    <tr key={i} className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
+                    <React.Fragment key={i}>
+                    {bandStart && (
+                      <tr>
+                        <td colSpan={colSpan + 3} className="px-3 pt-3 pb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold uppercase tracking-widest" style={{ color: gc }}>
+                              Grade {g}
+                            </span>
+                            <div className="flex-1 h-px" style={{ backgroundColor: gc + "40" }} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
                       <td className="px-3 py-2 font-medium">
                         {r.subjects?.name}
                         {r.subjects?.code && (
@@ -475,6 +491,7 @@ function ReportCardContent({
                           : <span className="text-gray-400 text-[10px]">Pending</span>}
                       </td>
                     </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
