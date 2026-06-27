@@ -103,6 +103,8 @@ import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.r
 import { Route as AppFinanceAnalyticsRouteImport } from './routes/_app.finance.analytics'
 import { Route as AppFinanceBudgetRouteImport } from './routes/_app.finance.budget'
 import { Route as AppFinanceExpensesRouteImport } from './routes/_app.finance.expenses'
+import { Route as AppAcademicsRemarksRouteImport } from './routes/_app.academics.remarks'
+import { Route as AppAcademicsOversightRouteImport } from './routes/_app.academics.oversight'
 import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
@@ -584,6 +586,16 @@ const AppFinanceExpensesRoute = AppFinanceExpensesRouteImport.update({
   path: '/finance/expenses',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsRemarksRoute = AppAcademicsRemarksRouteImport.update({
+  id: '/academics/remarks',
+  path: '/academics/remarks',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsOversightRoute = AppAcademicsOversightRouteImport.update({
+  id: '/academics/oversight',
+  path: '/academics/oversight',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminLeavingCertificateIdRoute =
   AppAdminLeavingCertificateIdRouteImport.update({
     id: '/admin/leaving-certificate/$id',
@@ -669,6 +681,8 @@ export interface FileRoutesByFullPath {
   '/finance/analytics': typeof AppFinanceAnalyticsRoute
   '/finance/budget': typeof AppFinanceBudgetRoute
   '/finance/expenses': typeof AppFinanceExpensesRoute
+  '/academics/remarks': typeof AppAcademicsRemarksRoute
+  '/academics/oversight': typeof AppAcademicsOversightRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -766,6 +780,8 @@ export interface FileRoutesByTo {
   '/finance/analytics': typeof AppFinanceAnalyticsRoute
   '/finance/budget': typeof AppFinanceBudgetRoute
   '/finance/expenses': typeof AppFinanceExpensesRoute
+  '/academics/remarks': typeof AppAcademicsRemarksRoute
+  '/academics/oversight': typeof AppAcademicsOversightRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -865,6 +881,8 @@ export interface FileRoutesById {
   '/_app/finance/analytics': typeof AppFinanceAnalyticsRoute
   '/_app/finance/budget': typeof AppFinanceBudgetRoute
   '/_app/finance/expenses': typeof AppFinanceExpensesRoute
+  '/_app/academics/remarks': typeof AppAcademicsRemarksRoute
+  '/_app/academics/oversight': typeof AppAcademicsOversightRoute
   '/_app/ids/bulk': typeof AppIdsBulkRoute
   '/_app/ids/verify': typeof AppIdsVerifyRoute
   '/_app/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -964,6 +982,8 @@ export interface FileRouteTypes {
     | '/finance/analytics'
     | '/finance/budget'
     | '/finance/expenses'
+    | '/academics/remarks'
+    | '/academics/oversight'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1061,6 +1081,8 @@ export interface FileRouteTypes {
     | '/finance/analytics'
     | '/finance/budget'
     | '/finance/expenses'
+    | '/academics/remarks'
+    | '/academics/oversight'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1159,6 +1181,8 @@ export interface FileRouteTypes {
     | '/_app/finance/analytics'
     | '/_app/finance/budget'
     | '/_app/finance/expenses'
+    | '/_app/academics/remarks'
+    | '/_app/academics/oversight'
     | '/_app/ids/bulk'
     | '/_app/ids/verify'
     | '/_app/live/$sessionId'
@@ -1586,6 +1610,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceFeesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/finance/analytics': {
+      id: '/_app/finance/analytics'
+      path: '/finance/analytics'
+      fullPath: '/finance/analytics'
+      preLoaderRoute: typeof AppFinanceAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/budget': {
+      id: '/_app/finance/budget'
+      path: '/finance/budget'
+      fullPath: '/finance/budget'
+      preLoaderRoute: typeof AppFinanceBudgetRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/finance/expenses': {
+      id: '/_app/finance/expenses'
+      path: '/finance/expenses'
+      fullPath: '/finance/expenses'
+      preLoaderRoute: typeof AppFinanceExpensesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/remarks': {
+      id: '/_app/academics/remarks'
+      path: '/academics/remarks'
+      fullPath: '/academics/remarks'
+      preLoaderRoute: typeof AppAcademicsRemarksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/oversight': {
+      id: '/_app/academics/oversight'
+      path: '/academics/oversight'
+      fullPath: '/academics/oversight'
+      preLoaderRoute: typeof AppAcademicsOversightRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/users': {
       id: '/_app/admin/users'
       path: '/admin/users'
@@ -1953,6 +2012,8 @@ interface AppRouteChildren {
   AppFinanceAnalyticsRoute: typeof AppFinanceAnalyticsRoute
   AppFinanceBudgetRoute: typeof AppFinanceBudgetRoute
   AppFinanceExpensesRoute: typeof AppFinanceExpensesRoute
+  AppAcademicsRemarksRoute: typeof AppAcademicsRemarksRoute
+  AppAcademicsOversightRoute: typeof AppAcademicsOversightRoute
   AppIdsBulkRoute: typeof AppIdsBulkRoute
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
   AppPortalMeRoute: typeof AppPortalMeRoute
@@ -2024,6 +2085,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceAnalyticsRoute: AppFinanceAnalyticsRoute,
   AppFinanceBudgetRoute: AppFinanceBudgetRoute,
   AppFinanceExpensesRoute: AppFinanceExpensesRoute,
+  AppAcademicsRemarksRoute: AppAcademicsRemarksRoute,
+  AppAcademicsOversightRoute: AppAcademicsOversightRoute,
   AppIdsBulkRoute: AppIdsBulkRoute,
   AppIdsVerifyRoute: AppIdsVerifyRoute,
   AppPortalMeRoute: AppPortalMeRoute,
