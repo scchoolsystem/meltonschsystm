@@ -162,7 +162,7 @@ function ReportCardContent({
     },
   });
 
-  const { data: summary } = useQuery({
+  const { data: summary, isFetching: summaryLoading } = useQuery({
     queryKey: ["rc-summary", studentId, examId],
     enabled: results.length > 0,
     queryFn: async () => {
@@ -251,8 +251,12 @@ function ReportCardContent({
   const displayTotal = totalMethod === "sum" ? totalScore : meanScore;
   const displayMax   = totalMethod === "sum" ? maxPerSubject * results.length : maxPerSubject;
 
-  const overallGrade   = summary?.overall_grade ?? fallbackGrade(meanScore);
-  const gradeColour    = gradeColor(overallGrade);
+  // Wait for summary to load before committing to a grade so the value
+  // doesn't flicker from the fallback to the DB-computed grade.
+  const overallGrade   = summaryLoading && !summary
+    ? "…"
+    : (summary?.overall_grade ?? fallbackGrade(meanScore));
+  const gradeColour    = overallGrade === "…" ? "#94a3b8" : gradeColor(overallGrade);
   const overallRemarks = summary?.overall_remarks ?? rcSettings?.grade_remarks?.[overallGrade] ?? "—";
   const position       = summary?.position;
 
