@@ -20,19 +20,24 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Students", url: "/students" },
     { title: "Staff", url: "/staff" },
     { title: "Classes", url: "/classes" },
-    { title: "Classroom", url: "/classroom" },
-    { title: "Live Classes", url: "/live" },
     { title: "Announcements", url: "/announcements" },
   ]},
   { label: "Academics", items: [
-    { title: "Subjects", url: "/academics/subjects" },
-    { title: "Exams", url: "/academics/exams" },
+    // Daily academic workflow first
     { title: "Mark Entry", url: "/academics/marks" },
     { title: "Results", url: "/academics/results" },
     { title: "Report Cards", url: "/academics/report-cards" },
-    { title: "Exam Oversight", url: "/academics/oversight" },
     { title: "Remarks", url: "/academics/remarks" },
+    // Setup
+    { title: "Exams", url: "/academics/exams" },
+    { title: "Subjects", url: "/academics/subjects" },
+    { title: "Exam Oversight", url: "/academics/oversight" },
+  ]},
+  { label: "Planning", items: [
     { title: "Timetable", url: "/timetable" },
+    { title: "Classroom", url: "/classroom" },
+    { title: "Live Classes", url: "/live" },
+    { title: "Department", url: "/department" },
   ]},
   { label: "Operations", items: [
     { title: "Attendance", url: "/attendance" },
@@ -57,30 +62,36 @@ const ADMIN_NAV: NavGroup[] = [
   ]},
   { label: "Digital IDs", items: [
     { title: "Bulk Print Cards", url: "/ids/bulk" },
-    { title: "Verify ID", url: "/ids/verify" },
+    { title: "Verify ID (QR)", url: "/ids/verify" },
   ]},
   { label: "Administration", items: [
+    // People & Access
     { title: "Departments", url: "/admin/departments" },
-    { title: "School Brain", url: "/admin/brain" },
     { title: "Users & Credentials", url: "/admin/users" },
-    { title: "Portal Links", url: "/admin/links" },
     { title: "User Roles", url: "/admin/roles" },
     { title: "Field Permissions", url: "/admin/permissions" },
-    { title: "CSV Import", url: "/admin/import" },
-    { title: "Activity Log", url: "/admin/activity" },
-    { title: "Lifecycle Events", url: "/admin/lifecycle" },
-    { title: "Field Edit Audit", url: "/admin/field-edits" },
-    { title: "Override Log", url: "/admin/overrides" },
-    { title: "Insurance", url: "/admin/insurance" },
+    { title: "Portal Links", url: "/admin/links" },
+    // Academic config
+    { title: "Grading Scale", url: "/admin/grading" },
+    { title: "Feature Modules", url: "/admin/features" },
+    // Student records
     { title: "Student Documents", url: "/admin/student-documents" },
     { title: "Leaving Certificates", url: "/admin/leaving-certificates" },
-    { title: "Grading Scale", url: "/admin/grading" },
+    { title: "Lifecycle Events", url: "/admin/lifecycle" },
+    { title: "Insurance", url: "/admin/insurance" },
+    // Data & tooling
+    { title: "CSV Import", url: "/admin/import" },
+    { title: "School Brain", url: "/admin/brain" },
+    { title: "ICT Overview", url: "/admin/ict" },
+    // Comms
+    { title: "Communications", url: "/admin/communications", feature: "communications" },
+    { title: "Support Tickets", url: "/admin/support" },
+    // Audit & Finance
+    { title: "Activity Log", url: "/admin/activity" },
+    { title: "Field Edit Audit", url: "/admin/field-edits" },
+    { title: "Override Log", url: "/admin/overrides" },
     { title: "Billing", url: "/admin/billing" },
     { title: "Settings", url: "/admin/settings" },
-    { title: "Communications", url: "/admin/communications", feature: "communications" },
-    { title: "Feature Modules", url: "/admin/features" },
-    { title: "Support Tickets", url: "/admin/support" },
-    { title: "ICT Overview", url: "/admin/ict" },
   ]},
 ];
 
