@@ -100,6 +100,9 @@ import { Route as AppLiveSessionIdAttendanceRouteImport } from './routes/_app.li
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
+import { Route as AppFinanceAnalyticsRouteImport } from './routes/_app.finance.analytics'
+import { Route as AppFinanceBudgetRouteImport } from './routes/_app.finance.budget'
+import { Route as AppFinanceExpensesRouteImport } from './routes/_app.finance.expenses'
 import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
@@ -566,6 +569,21 @@ const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
   path: '/finance/receipt/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceAnalyticsRoute = AppFinanceAnalyticsRouteImport.update({
+  id: '/finance/analytics',
+  path: '/finance/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceBudgetRoute = AppFinanceBudgetRouteImport.update({
+  id: '/finance/budget',
+  path: '/finance/budget',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceExpensesRoute = AppFinanceExpensesRouteImport.update({
+  id: '/finance/expenses',
+  path: '/finance/expenses',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminLeavingCertificateIdRoute =
   AppAdminLeavingCertificateIdRouteImport.update({
     id: '/admin/leaving-certificate/$id',
@@ -648,6 +666,9 @@ export interface FileRoutesByFullPath {
   '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
+  '/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/finance/budget': typeof AppFinanceBudgetRoute
+  '/finance/expenses': typeof AppFinanceExpensesRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -742,6 +763,9 @@ export interface FileRoutesByTo {
   '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
+  '/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/finance/budget': typeof AppFinanceBudgetRoute
+  '/finance/expenses': typeof AppFinanceExpensesRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -838,6 +862,9 @@ export interface FileRoutesById {
   '/_app/finance/generate': typeof AppFinanceGenerateRoute
   '/_app/finance/invoices': typeof AppFinanceInvoicesRoute
   '/_app/finance/payments': typeof AppFinancePaymentsRoute
+  '/_app/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/_app/finance/budget': typeof AppFinanceBudgetRoute
+  '/_app/finance/expenses': typeof AppFinanceExpensesRoute
   '/_app/ids/bulk': typeof AppIdsBulkRoute
   '/_app/ids/verify': typeof AppIdsVerifyRoute
   '/_app/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -934,6 +961,9 @@ export interface FileRouteTypes {
     | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
+    | '/finance/analytics'
+    | '/finance/budget'
+    | '/finance/expenses'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1028,6 +1058,9 @@ export interface FileRouteTypes {
     | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
+    | '/finance/analytics'
+    | '/finance/budget'
+    | '/finance/expenses'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1123,6 +1156,9 @@ export interface FileRouteTypes {
     | '/_app/finance/generate'
     | '/_app/finance/invoices'
     | '/_app/finance/payments'
+    | '/_app/finance/analytics'
+    | '/_app/finance/budget'
+    | '/_app/finance/expenses'
     | '/_app/ids/bulk'
     | '/_app/ids/verify'
     | '/_app/live/$sessionId'
@@ -1914,6 +1950,9 @@ interface AppRouteChildren {
   AppFinanceGenerateRoute: typeof AppFinanceGenerateRoute
   AppFinanceInvoicesRoute: typeof AppFinanceInvoicesRoute
   AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
+  AppFinanceAnalyticsRoute: typeof AppFinanceAnalyticsRoute
+  AppFinanceBudgetRoute: typeof AppFinanceBudgetRoute
+  AppFinanceExpensesRoute: typeof AppFinanceExpensesRoute
   AppIdsBulkRoute: typeof AppIdsBulkRoute
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
   AppPortalMeRoute: typeof AppPortalMeRoute
@@ -1982,6 +2021,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceGenerateRoute: AppFinanceGenerateRoute,
   AppFinanceInvoicesRoute: AppFinanceInvoicesRoute,
   AppFinancePaymentsRoute: AppFinancePaymentsRoute,
+  AppFinanceAnalyticsRoute: AppFinanceAnalyticsRoute,
+  AppFinanceBudgetRoute: AppFinanceBudgetRoute,
+  AppFinanceExpensesRoute: AppFinanceExpensesRoute,
   AppIdsBulkRoute: AppIdsBulkRoute,
   AppIdsVerifyRoute: AppIdsVerifyRoute,
   AppPortalMeRoute: AppPortalMeRoute,
