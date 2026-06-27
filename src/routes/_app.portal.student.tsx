@@ -2548,22 +2548,29 @@ function StudentPortal() {
                             const { color, grade } = gradeLabel(score);
                             return (
                               <motion.div key={r.id} variants={slideRight}
-                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
-                                <div className="flex-1 text-sm font-medium min-w-0 truncate">{r.subjects?.name}</div>
-                                <div className="w-28 hidden sm:block">
-                                  <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                                    <motion.div
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${score}%` }}
-                                      transition={{ duration: 1, delay: 0.2 }}
-                                      className="h-full rounded-full" style={{ backgroundColor: color }}
-                                    />
+                                className="flex flex-col gap-1 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 text-sm font-medium min-w-0 truncate">{r.subjects?.name}</div>
+                                  <div className="w-28 hidden sm:block">
+                                    <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                                      <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${score}%` }}
+                                        transition={{ duration: 1, delay: 0.2 }}
+                                        className="h-full rounded-full" style={{ backgroundColor: color }}
+                                      />
+                                    </div>
                                   </div>
+                                  <span className="text-sm font-bold w-12 text-right" style={{ color }}>{r.score}%</span>
+                                  <Badge variant="outline" className="w-9 text-center text-xs" style={{ color, borderColor: color }}>
+                                    {r.grade ?? grade}
+                                  </Badge>
                                 </div>
-                                <span className="text-sm font-bold w-12 text-right" style={{ color }}>{r.score}%</span>
-                                <Badge variant="outline" className="w-9 text-center text-xs" style={{ color, borderColor: color }}>
-                                  {r.grade ?? grade}
-                                </Badge>
+                                {r.remarks && (
+                                  <p className="text-xs text-muted-foreground italic ml-1 mt-0.5 border-l-2 border-muted pl-2">
+                                    {r.remarks}
+                                  </p>
+                                )}
                               </motion.div>
                             );
                           })}
