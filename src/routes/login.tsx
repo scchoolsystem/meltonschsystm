@@ -148,7 +148,7 @@ function LoginPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground mt-6">
-          <Link to="/" className="hover:underline">← Back home</Link>
+          <button type="button" onClick={() => window.history.back()} className="hover:underline text-sm text-muted-foreground cursor-pointer">← Back</button>
           {clicks >= 5 && (<>{" · "}<a href="https://admin.smartdev.co.ke" className="hover:underline text-primary">Platform admin</a>{" · "}<Link to="/sys/control-room" className="hover:underline text-primary">Control room</Link></>)}
         </p>
       </div>
