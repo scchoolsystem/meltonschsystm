@@ -280,7 +280,7 @@ function Page() {
 
         {/* ── Health Records ── */}
         <TabsContent value="health_records" className="mt-4">
-          <HealthRecordsTab can={can} />
+          <HealthRecordsTab can={can} schoolId={schoolId} />
         </TabsContent>
 
         {/* ── Inventory ── */}
@@ -857,7 +857,7 @@ function StudentHistorySheet({ student }: { student: any }) {
 
 /* ═══════════════════════ HEALTH RECORDS TAB ═══════════════════════ */
 
-function HealthRecordsTab({ can }: { can: boolean }) {
+function HealthRecordsTab({ can, schoolId }: { can: boolean; schoolId?: string }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editRecord, setEditRecord] = useState<any>(null);
@@ -886,7 +886,7 @@ function HealthRecordsTab({ can }: { can: boolean }) {
 
   const upsert = useMutation({
     mutationFn: async (data: any) => {
-      const { error } = await supabase.from("student_health_records").upsert(data, { onConflict: "student_id" });
+      const { error } = await supabase.from("student_health_records").upsert({ ...data, school_id: schoolId }, { onConflict: "student_id" });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1070,7 +1070,7 @@ function HealthRecordDialog({ students, existing, existingStudent, onDone, isPen
 
 /* ═══════════════════════ INVENTORY TAB ═══════════════════════ */
 
-function InventoryTab({ inventory, can, schoolId }: { inventory: any[]; can: boolean; schoolId?: string }) {
+function InventoryTab({ inventory, can }: { inventory: any[]; can: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
@@ -1087,7 +1087,6 @@ function InventoryTab({ inventory, can, schoolId }: { inventory: any[]; can: boo
         const { error } = await supabase.from("clinic_inventory").update(payload).eq("id", editItem.id);
         if (error) throw error;
       } else {
-        payload.school_id = schoolId;
         const { error } = await supabase.from("clinic_inventory").insert(payload);
         if (error) throw error;
       }
