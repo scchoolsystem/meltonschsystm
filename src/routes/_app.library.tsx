@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, Search, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { format, differenceInDays } from "date-fns";
 
 export const Route = createFileRoute("/_app/library")({ component: () => (<FeatureGate feature="library"><Page /></FeatureGate>) });
@@ -55,6 +56,8 @@ function BorrowerCell({ loan }: { loan: any }) {
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { school } = useTenant();
+  const schoolId = school?.id;
   const can = isAdmin || hasRole("librarian") || hasRole("library_admin") || hasRole("library_user");
 
   const [bookSearch, setBookSearch] = useState("");
@@ -112,10 +115,10 @@ function Page() {
         {can && (
           <div className="flex gap-2">
             <Dialog open={addBook} onOpenChange={setAddBook}><DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Add Book</Button></DialogTrigger>
-              <BookDialog onDone={() => { setAddBook(false); qc.invalidateQueries({ queryKey: ["library-books"] }); }} />
+              <BookDialog schoolId={schoolId} onDone={() => { setAddBook(false); qc.invalidateQueries({ queryKey: ["library-books"] }); }} />
             </Dialog>
             <Dialog open={issueLoan} onOpenChange={setIssueLoan}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Issue Loan</Button></DialogTrigger>
-              <LoanDialog books={books as any[]} onDone={() => { setIssueLoan(false); qc.invalidateQueries({ queryKey: ["library-loans"] }); }} />
+              <LoanDialog schoolId={schoolId} books={books as any[]} onDone={() => { setIssueLoan(false); qc.invalidateQueries({ queryKey: ["library-loans"] }); }} />
             </Dialog>
           </div>
         )}
@@ -216,11 +219,11 @@ function Page() {
   );
 }
 
-function BookDialog({ onDone }: { onDone: () => void }) {
+function BookDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ title: "", author: "", isbn: "", category: "", copies_total: "1" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("books").insert({ ...f, copies_total: Number(f.copies_total) });
+      const { error } = await supabase.from("books").insert({ ...f, copies_total: Number(f.copies_total), school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Book added"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -239,7 +242,7 @@ function BookDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
+function LoanDialog({ books, onDone, schoolId }: { books: any[]; onDone: () => void; schoolId?: string }) {
   const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
   const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
   const { data: students = [] } = useActiveStudents();
@@ -253,6 +256,7 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
         status: "active",
         student_id: borrowerType === "student" ? f.student_id : null,
         staff_id: borrowerType === "staff" ? f.staff_id : null,
+        school_id: schoolId,
       };
       const { error } = await supabase.from("book_loans").insert(payload);
       if (error) throw error;
