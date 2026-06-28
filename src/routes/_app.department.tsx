@@ -47,18 +47,26 @@ function Page() {
 
   const postCommMutation = useMutation({
     mutationFn: async () => {
+      // Look up the staff row linked to this auth user
       const { data: staffData } = await supabase
         .from("staff")
-        .select("id")
+        .select("id, school_id")
         .eq("user_id", user?.id)
         .maybeSingle();
 
-      if (!staffData?.id) throw new Error("Staff identity not found for user.");
+      // If no staff row exists (e.g. platform admin without a staff record),
+      // give a clear, actionable error instead of a generic one.
+      if (!staffData?.id) {
+        throw new Error(
+          "Your account is not linked to a staff record. Ask the school admin to link your user account to a staff profile before posting announcements."
+        );
+      }
 
       const { error } = await supabase.from("department_communications").insert([
         {
           department_id: activeDeptId,
           sender_id: staffData.id,
+          school_id: staffData.school_id, // required for tenant-scoped RLS
           title: commTitle,
           content: commContent,
         },
@@ -171,7 +179,7 @@ function Page() {
                     <div>
                       <CardTitle className="text-xl">{c.title}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Posted by {c.sender ? `${c.sender.first_name} ${c.sender.last_name}` : "System"}{" "}
+                        Posted by {c.staff ? `${c.staff.first_name} ${c.staff.last_name}` : "System"}{" "}
                         · {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                       </p>
                     </div>
@@ -229,16 +237,30 @@ function Page() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="title">Announcement Title</Label>
-              <Input id="title" value={commTitle} onChange={(e) => setCommTitle(e.target.value)} placeholder="e.g. End of term grading deadline" />
+              <Input
+                id="title"
+                value={commTitle}
+                onChange={(e) => setCommTitle(e.target.value)}
+                placeholder="e.g. End of term grading deadline"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="content">Content</Label>
-              <Textarea id="content" value={commContent} onChange={(e) => setCommContent(e.target.value)} placeholder="Write details here..." className="h-32" />
+              <Textarea
+                id="content"
+                value={commContent}
+                onChange={(e) => setCommContent(e.target.value)}
+                placeholder="Write details here..."
+                className="h-32"
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCommOpen(false)}>Cancel</Button>
-            <Button onClick={() => postCommMutation.mutate()} disabled={postCommMutation.isPending || !commTitle || !commContent}>
+            <Button
+              onClick={() => postCommMutation.mutate()}
+              disabled={postCommMutation.isPending || !commTitle || !commContent}
+            >
               {postCommMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Post
             </Button>
           </DialogFooter>
