@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { useActiveStudents } from "@/lib/students.functions";
 import { format } from "date-fns";
 
@@ -24,6 +25,8 @@ export const Route = createFileRoute("/_app/discipline")({ component: () => (<Fe
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { school } = useTenant();
+  const schoolId = school?.id;
   const can = isAdmin || hasRole("teacher") || hasRole("deputy_principal") || hasRole("discipline_admin") || hasRole("guidance_admin");
   const canCounsel = isAdmin || hasRole("guidance_admin");
 
@@ -67,11 +70,11 @@ function Page() {
         {can && (
           <div className="flex gap-2 flex-wrap">
             <Dialog open={addRecord} onOpenChange={setAddRecord}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Log Incident</Button></DialogTrigger>
-              <IncidentDialog onDone={() => { setAddRecord(false); qc.invalidateQueries({ queryKey: ["discipline"] }); }} />
+              <IncidentDialog schoolId={schoolId} onDone={() => { setAddRecord(false); qc.invalidateQueries({ queryKey: ["discipline"] }); }} />
             </Dialog>
             {canCounsel && (
               <Dialog open={addSession} onOpenChange={setAddSession}><DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Counselling Session</Button></DialogTrigger>
-                <CounsellingDialog onDone={() => { setAddSession(false); qc.invalidateQueries({ queryKey: ["counselling"] }); }} />
+                <CounsellingDialog schoolId={schoolId} onDone={() => { setAddSession(false); qc.invalidateQueries({ queryKey: ["counselling"] }); }} />
               </Dialog>
             )}
           </div>
@@ -161,13 +164,13 @@ function Page() {
   );
 }
 
-function IncidentDialog({ onDone }: { onDone: () => void }) {
+function IncidentDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ student_id: "", incident_date: format(new Date(), "yyyy-MM-dd"), description: "", severity: "low", action_taken: "" });
   const { data: students = [] } = useActiveStudents();
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("discipline_records").insert({ ...f, reported_by: u.user?.id });
+      const { error } = await supabase.from("discipline_records").insert({ ...f, reported_by: u.user?.id, school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Incident logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -194,7 +197,7 @@ function IncidentDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-function CounsellingDialog({ onDone }: { onDone: () => void }) {
+function CounsellingDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ student_id: "", counsellor_id: "", session_date: format(new Date(), "yyyy-MM-dd"), notes: "", follow_up_date: "" });
   const { data: students = [] } = useActiveStudents();
   const { data: staff = [] } = useQuery({ queryKey: ["staff-min"], queryFn: async () => (await supabase.from("staff").select("id,first_name,last_name").order("first_name")).data ?? [] });
@@ -203,7 +206,7 @@ function CounsellingDialog({ onDone }: { onDone: () => void }) {
       const payload: any = { ...f };
       if (!payload.follow_up_date) delete payload.follow_up_date;
       if (!payload.counsellor_id) delete payload.counsellor_id;
-      const { error } = await supabase.from("counselling_sessions").insert(payload);
+      const { error } = await supabase.from("counselling_sessions").insert({ ...payload, school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Session logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
