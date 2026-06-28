@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, Bus, ChevronDown, ChevronUp, Phone, User } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_app/transport")({ component: () => (<FeatureGate feature="transport"><Page /></FeatureGate>) });
@@ -22,6 +23,8 @@ export const Route = createFileRoute("/_app/transport")({ component: () => (<Fea
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { school } = useTenant();
+  const schoolId = school?.id;
   const can = isAdmin || hasRole("transport_officer") || hasRole("transport_admin");
 
   const { data: routes = [], isLoading: rLoading } = useQuery({
@@ -51,10 +54,10 @@ function Page() {
         {can && (
           <div className="flex gap-2 flex-wrap">
             <Dialog open={addRoute} onOpenChange={setAddRoute}><DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Route</Button></DialogTrigger>
-              <RouteDialog onDone={() => { setAddRoute(false); qc.invalidateQueries({ queryKey: ["transport-routes"] }); }} />
+              <RouteDialog schoolId={schoolId} onDone={() => { setAddRoute(false); qc.invalidateQueries({ queryKey: ["transport-routes"] }); }} />
             </Dialog>
             <Dialog open={addAssign} onOpenChange={setAddAssign}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Assign Student</Button></DialogTrigger>
-              <AssignDialog routes={routes as any[]} onDone={() => { setAddAssign(false); qc.invalidateQueries({ queryKey: ["transport-assignments"] }); }} />
+              <AssignDialog schoolId={schoolId} routes={routes as any[]} onDone={() => { setAddAssign(false); qc.invalidateQueries({ queryKey: ["transport-assignments"] }); }} />
             </Dialog>
           </div>
         )}
@@ -198,11 +201,11 @@ function Page() {
   );
 }
 
-function RouteDialog({ onDone }: { onDone: () => void }) {
+function RouteDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ name: "", vehicle_reg: "", driver_name: "", driver_phone: "", monthly_fee: "", capacity: "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("transport_routes").insert({ ...f, monthly_fee: f.monthly_fee ? Number(f.monthly_fee) : null, capacity: f.capacity ? Number(f.capacity) : null });
+      const { error } = await supabase.from("transport_routes").insert({ ...f, monthly_fee: f.monthly_fee ? Number(f.monthly_fee) : null, capacity: f.capacity ? Number(f.capacity) : null, school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Route added"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -222,13 +225,13 @@ function RouteDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-function AssignDialog({ routes, onDone }: { routes: any[]; onDone: () => void }) {
+function AssignDialog({ routes, onDone, schoolId }: { routes: any[]; onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ student_id: "", route_id: "", pickup_point: "" });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-transport"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const selectedRoute = routes.find(r => r.id === f.route_id);
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("transport_assignments").insert(f);
+      const { error } = await supabase.from("transport_assignments").insert({ ...f, school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
