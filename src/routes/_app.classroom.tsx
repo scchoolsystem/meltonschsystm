@@ -224,7 +224,7 @@ function SubmissionsDialog({ open, onOpenChange, post, canManage }: { open: bool
     queryFn: async () => {
       const { data, error } = await supabase
         .from("classroom_submissions")
-        .select("id, student_id, content, attachment_url, status, grade, feedback, submitted_at, graded_at, students!inner(first_name, last_name, unique_id)")
+        .select("id, student_id, content, attachment_url, file_url, file_name, answers, marks_obtained, grade, status, feedback, submitted_at, graded_at, students!inner(first_name, last_name, unique_id)")
         .eq("post_id", post.id)
         .order("submitted_at", { ascending: false });
       if (error) throw error;
@@ -258,6 +258,7 @@ function SubmissionsDialog({ open, onOpenChange, post, canManage }: { open: bool
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase.from("classroom_submissions").update({
         grade: grade ? Number(grade) : null,
+        marks_obtained: grade ? Number(grade) : null,
         feedback: feedback || null,
         status: "graded",
         graded_by: user?.id ?? null,
@@ -284,7 +285,7 @@ function SubmissionsDialog({ open, onOpenChange, post, canManage }: { open: bool
               <Card className="bg-muted/30">
                 <CardContent className="py-3 text-sm">
                   <div className="font-medium">Your submission</div>
-                  <div className="text-xs text-muted-foreground mb-1">Status: {myExisting.status}{myExisting.grade != null && ` • Grade: ${myExisting.grade}`}</div>
+                  <div className="text-xs text-muted-foreground mb-1">Status: {myExisting.status}{(myExisting.marks_obtained ?? myExisting.grade) != null && ` • Marks: ${myExisting.marks_obtained ?? myExisting.grade}`}</div>
                   {myExisting.content && <p className="whitespace-pre-wrap">{myExisting.content}</p>}
                   {myExisting.feedback && <p className="mt-2 text-xs italic">Feedback: {myExisting.feedback}</p>}
                 </CardContent>
@@ -315,10 +316,31 @@ function SubmissionsDialog({ open, onOpenChange, post, canManage }: { open: bool
                         <div className="text-sm font-medium">{s.students?.first_name} {s.students?.last_name} <span className="text-xs text-muted-foreground">({s.students?.unique_id})</span></div>
                         <Badge variant={s.status === "graded" ? "default" : "secondary"}>{s.status}</Badge>
                       </div>
-                      {s.content && <p className="text-sm whitespace-pre-wrap">{s.content}</p>}
-                      {s.attachment_url && <a className="text-xs text-primary underline" href={s.attachment_url} target="_blank" rel="noreferrer">Attachment</a>}
+                      {/* Per-question answers (from /assignments rich submissions) */}
+                      {(s.answers as any[])?.length > 0 && (
+                        <div className="space-y-1.5">
+                          {(s.answers as any[]).map((a: any, qi: number) => (
+                            <div key={a.question_id ?? qi} className="rounded bg-muted/40 p-2 text-xs">
+                              <span className="font-medium text-muted-foreground">Q{qi + 1}: </span>
+                              {a.text && <span>{a.text}</span>}
+                              {a.selected && <span className="text-primary font-medium">✓ {a.selected}</span>}
+                              {a.diagram_url && (
+                                <a href={a.diagram_url} target="_blank" rel="noreferrer" className="text-primary underline ml-1">View diagram</a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Plain text answer */}
+                      {s.content && !(s.answers as any[])?.length && <p className="text-sm whitespace-pre-wrap">{s.content}</p>}
+                      {/* File attachment (file_url from /assignments, attachment_url from /classroom) */}
+                      {(s.file_url || s.attachment_url) && (
+                        <a className="text-xs text-primary underline" href={s.file_url || s.attachment_url} target="_blank" rel="noreferrer">
+                          {s.file_name ?? "View attachment"}
+                        </a>
+                      )}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                        <Input placeholder="Grade" inputMode="numeric" value={g.grade} onChange={(e) => setGrades({ ...grades, [s.id]: { ...g, grade: e.target.value } })} />
+                        <Input placeholder="Marks" inputMode="numeric" value={g.grade} onChange={(e) => setGrades({ ...grades, [s.id]: { ...g, grade: e.target.value } })} />
                         <Input className="sm:col-span-2" placeholder="Feedback" value={g.feedback} onChange={(e) => setGrades({ ...grades, [s.id]: { ...g, feedback: e.target.value } })} />
                       </div>
                       <div className="flex justify-end">
