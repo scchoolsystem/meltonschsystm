@@ -75,6 +75,10 @@ const ADMIN_NAV: NavGroup[] = [
     // Academic config
     { title: "Grading Scale", url: "/admin/grading" },
     { title: "Feature Modules", url: "/admin/features" },
+    // Promotion system
+    { title: "Class Structure", url: "/admin/class-structure" },
+    { title: "Promotion Settings", url: "/admin/promotion-settings" },
+    { title: "Year Promotion", url: "/admin/promotion" },
     // Student records
     { title: "Student Documents", url: "/admin/student-documents" },
     { title: "Leaving Certificates", url: "/admin/leaving-certificates" },
@@ -188,6 +192,10 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Grading Scale", url: "/admin/grading" },
       { title: "Subjects", url: "/academics/subjects" },
       { title: "Analytics", url: "/analytics" },
+      // Promotion system
+      { title: "Class Structure", url: "/admin/class-structure" },
+      { title: "Promotion Settings", url: "/admin/promotion-settings" },
+      { title: "Year Promotion", url: "/admin/promotion" },
     ]},
   ],
   bursar: [
