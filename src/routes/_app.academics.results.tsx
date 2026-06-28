@@ -575,7 +575,7 @@ function Page() {
 
   // Radar chart for top subject performance
   const radarData = useMemo(() =>
-    subjectAnalytics.slice(0, 8).map((s) => ({ subject: s.name.slice(0, 8), avg: s.avg, passRate: s.passRate })),
+    subjectAnalytics.slice(0, 8).map((s) => ({ subject: (s.name ?? "").slice(0, 8), avg: s.avg, passRate: s.passRate })),
     [subjectAnalytics]
   );
 
