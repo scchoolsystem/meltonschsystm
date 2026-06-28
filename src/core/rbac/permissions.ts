@@ -157,6 +157,11 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.features": [...ADMIN_ROLES, "ict_admin"],
   "admin.support": [...ADMIN_ROLES, "ict_admin"],
 
+  // Promotion system
+  "admin.promotion": [...ADMIN_ROLES, "academic_master"],
+  "admin.promotion-settings": [...ADMIN_ROLES],
+  "admin.class-structure": [...ADMIN_ROLES],
+
   // Platform
   platform: PLATFORM_ROLES,
 };
