@@ -45,6 +45,10 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     "discipline_admin", "guidance_admin",
   ],
   staff: [...ADMIN_ROLES, "hod", "hr_admin", "hr"],
+  // /staff/payslips specifically — broader than the staff directory itself,
+  // since every staff member needs to view their own payslip. Page restricts
+  // create/edit/issue actions to canManage (admin/finance_admin/bursar).
+  "staff.payslips": [...ADMIN_ROLES, "hr_admin", "hr", "bursar", "finance_admin", ...TEACHING_ROLES, "staff"],
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   // exams_admin also gets a Subjects link in their nav group.
   subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "student", "parent"],
@@ -114,6 +118,10 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // teacher/student/parent sidebar entries stop bouncing to /dashboard.
   live: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   ids: [...ADMIN_ROLES, "admission_officer", "security_admin", "security_user"],
+  // Assignments: teachers create/grade, students submit. Page itself
+  // branches internally on isTeacher/isStudent — was previously missing
+  // from this map entirely, so canAccess() fell back to admin-only.
+  assignments: [...ADMIN_ROLES, ...TEACHING_ROLES, "student"],
 
   // Portals (role-specific)
   "portal.student": ["student"],
@@ -176,6 +184,7 @@ export function moduleForPath(pathname: string): string | null {
     if (seg[1] === "remarks") return "remarks";
   }
   if (seg[0] === "finance") return "finance";
+  if (seg[0] === "staff" && seg[1] === "payslips") return "staff.payslips";
   if (seg[0] === "timetable") return "timetable";
   if (seg[0] === "ids") return "ids";
   if (seg[0] === "cocurricular") return "cocurricular";
