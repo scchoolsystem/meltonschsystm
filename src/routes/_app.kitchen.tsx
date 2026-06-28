@@ -284,7 +284,7 @@ function StockDialog({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ item: "", quantity: "", unit: "", low_threshold: "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("kitchen_stock").insert({ ...f, quantity: Number(f.quantity), low_threshold: f.low_threshold ? Number(f.low_threshold) : null });
+      const { error } = await supabase.from("kitchen_stock").insert({ ...f, quantity: Number(f.quantity), low_threshold: f.low_threshold ? Number(f.low_threshold) : 0 });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Stock item added"); onDone(); }, onError: (e: any) => toast.error(e.message),
