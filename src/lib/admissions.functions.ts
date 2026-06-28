@@ -322,7 +322,7 @@ async function syncStaffOrgLinks(staffId: string, schoolId: string, data: any) {
       const { error } = await supabaseAdmin
         .from("department_members")
         .upsert(
-          { department_id: data.department_id, staff_id: staffId, role: "member", school_id: schoolId },
+          { department_id: data.department_id, staff_id: staffId, school_id: schoolId },
           { onConflict: "department_id,staff_id", ignoreDuplicates: true }
         );
       if (error) throw new Error(error.message);
