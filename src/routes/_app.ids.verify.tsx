@@ -34,11 +34,9 @@ interface VerifyResult {
   dob?: string;
   className?: string;
   stream?: string;
-  year?: string;
   active: boolean;
   parents?: ParentContact[];
   medicalNotes?: string;
-  bloodGroup?: string;
   address?: string;
   phone?: string;
   role?: string;
@@ -65,8 +63,6 @@ function InfoRow({
 }
 
 // ── Camera QR scanner ─────────────────────────────────────────────────────────
-// Uses the browser's BarcodeDetector API where available (Chrome/Edge/Android)
-// and falls back gracefully with a clear message for Safari / iOS.
 
 function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
   const videoRef  = useRef<HTMLVideoElement>(null);
@@ -136,7 +132,6 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
     }
   }, [supported, onDetect, stop]);
 
-  // Clean up when unmounted
   useEffect(() => () => stop(), [stop]);
 
   return (
@@ -149,7 +144,6 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
             playsInline
             className="w-full h-full object-cover"
           />
-          {/* targeting crosshair overlay */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-40 h-40 border-2 border-white/70 rounded-xl relative">
               <span className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
@@ -195,46 +189,63 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function Page() {
-  const [code, setCode]     = useState("");
+  const [code, setCode]       = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<VerifyResult | null>(null);
-  const [error, setError]   = useState<string | null>(null);
-  const [tab, setTab]       = useState<"manual" | "camera">("manual");
+  const [result, setResult]   = useState<VerifyResult | null>(null);
+  const [error, setError]     = useState<string | null>(null);
+  const [tab, setTab]         = useState<"manual" | "camera">("manual");
 
   async function lookup(uid: string) {
     const u = uid.trim().toUpperCase();
     if (!u) return;
     setLoading(true); setError(null); setResult(null);
+
     try {
-      // ── Student lookup ───────────────────────────────────────────────
-      const { data: stu } = await supabase
+      // ── Student lookup ────────────────────────────────────────────────
+      // FIXED: removed non-existent joins (parent_links, blood_group,
+      // year_of_admission, phone). Using actual schema columns.
+      const { data: stu, error: stuErr } = await supabase
         .from("students")
         .select(`
-          id, first_name, last_name, unique_id, admission_no, status,
-          gender, date_of_birth, photo_url, phone, address, blood_group,
-          medical_notes, year_of_admission,
-          classes(name, stream),
-          parent_links(
-            relationship,
-            parents(first_name, last_name, phone, email)
-          )
+          id,
+          first_name,
+          last_name,
+          full_name,
+          unique_id,
+          admission_no,
+          status,
+          gender,
+          date_of_birth,
+          photo_url,
+          medical_notes,
+          address,
+          parent_name,
+          parent_phone,
+          parent_email,
+          classes:class_id(name, stream)
         `)
         .eq("unique_id", u)
         .maybeSingle();
 
+      // Surface real errors to console so you can debug
+      if (stuErr) console.error("[verify] student lookup error:", stuErr);
+
       if (stu) {
-        const s: any = stu;
-        const parents: ParentContact[] = (s.parent_links ?? [])
-          .filter((pl: any) => pl.parents)
-          .map((pl: any) => ({
-            name: `${pl.parents.first_name ?? ""} ${pl.parents.last_name ?? ""}`.trim(),
-            phone: pl.parents.phone ?? "",
-            email: pl.parents.email ?? "",
-            relationship: pl.relationship ?? "Guardian",
-          }));
+        const s = stu as any;
+
+        // Build parent contact from denormalised columns on students table
+        const parents: ParentContact[] = s.parent_name
+          ? [{
+              name: s.parent_name,
+              phone: s.parent_phone ?? "",
+              email: s.parent_email ?? "",
+              relationship: "Guardian",
+            }]
+          : [];
+
         setResult({
           kind: "student",
-          name: `${s.first_name} ${s.last_name}`,
+          name: s.full_name ?? `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim(),
           uniqueId: u,
           admissionNo: s.admission_no,
           photo: s.photo_url,
@@ -242,34 +253,44 @@ function Page() {
           dob: s.date_of_birth,
           className: s.classes?.name,
           stream: s.classes?.stream,
-          year: s.year_of_admission,
           active: s.status === "active",
           parents,
           medicalNotes: s.medical_notes,
-          bloodGroup: s.blood_group,
           address: s.address,
-          phone: s.phone,
         });
         return;
       }
 
-      // ── Staff lookup ─────────────────────────────────────────────────
-      const { data: stf } = await supabase
+      // ── Staff lookup ──────────────────────────────────────────────────
+      const { data: stf, error: stfErr } = await supabase
         .from("staff")
-        .select("first_name,last_name,unique_id,employee_no,role,department,status,phone,email,photo_url,gender,date_of_birth")
+        .select(`
+          first_name,
+          last_name,
+          unique_id,
+          employee_no,
+          role,
+          department,
+          status,
+          phone,
+          email,
+          photo_url,
+          gender
+        `)
         .eq("unique_id", u)
         .maybeSingle();
 
+      if (stfErr) console.error("[verify] staff lookup error:", stfErr);
+
       if (stf) {
-        const s: any = stf;
+        const s = stf as any;
         setResult({
           kind: "staff",
-          name: `${s.first_name} ${s.last_name}`,
+          name: `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim(),
           uniqueId: u,
           active: s.status === "active",
           photo: s.photo_url,
           gender: s.gender,
-          dob: s.date_of_birth,
           role: s.role,
           department: s.department,
           employeeNo: s.employee_no,
@@ -281,18 +302,17 @@ function Page() {
 
       setError(`No record found for ID "${u}". Check the ID and try again.`);
     } catch (e: any) {
+      console.error("[verify] unexpected error:", e);
       setError(e.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // Physical QR scanners emit Enter after the code
   function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") { e.preventDefault(); lookup(code); }
   }
 
-  // Called by camera scanner when a QR is read
   function handleCameraDetect(val: string) {
     setCode(val);
     lookup(val);
@@ -405,7 +425,7 @@ function Page() {
             <div className="space-y-2">
               {result.kind === "student" ? (
                 <>
-                  <InfoRow label="Admission No" value={result.admissionNo}      icon={<GraduationCap className="w-4 h-4" />} />
+                  <InfoRow label="Admission No"   value={result.admissionNo}   icon={<GraduationCap className="w-4 h-4" />} />
                   <InfoRow
                     label="Class / Stream"
                     value={result.className
@@ -413,25 +433,22 @@ function Page() {
                       : null}
                     icon={<GraduationCap className="w-4 h-4" />}
                   />
-                  <InfoRow label="Year Joined"   value={result.year}             icon={<Calendar className="w-4 h-4" />} />
-                  <InfoRow label="Gender"         value={result.gender}           icon={<User className="w-4 h-4" />} />
+                  <InfoRow label="Gender"         value={result.gender}         icon={<User className="w-4 h-4" />} />
                   <InfoRow
                     label="Date of Birth"
                     value={result.dob ? new Date(result.dob).toLocaleDateString() : null}
                     icon={<Calendar className="w-4 h-4" />}
                   />
-                  <InfoRow label="Phone"          value={result.phone}            icon={<Phone className="w-4 h-4" />} />
-                  <InfoRow label="Address"        value={result.address}          icon={<MapPin className="w-4 h-4" />} />
-                  <InfoRow label="Blood Group"    value={result.bloodGroup}       icon={<Heart className="w-4 h-4" />} />
+                  <InfoRow label="Address"        value={result.address}        icon={<MapPin className="w-4 h-4" />} />
                 </>
               ) : (
                 <>
-                  <InfoRow label="Employee No"   value={result.employeeNo}       icon={<User className="w-4 h-4" />} />
-                  <InfoRow label="Role"           value={result.role}             icon={<GraduationCap className="w-4 h-4" />} />
-                  <InfoRow label="Department"     value={result.department}       icon={<GraduationCap className="w-4 h-4" />} />
-                  <InfoRow label="Gender"         value={result.gender}           icon={<User className="w-4 h-4" />} />
-                  <InfoRow label="Phone"          value={result.phone}            icon={<Phone className="w-4 h-4" />} />
-                  <InfoRow label="Email"          value={result.email}            icon={<Mail className="w-4 h-4" />} />
+                  <InfoRow label="Employee No"    value={result.employeeNo}     icon={<User className="w-4 h-4" />} />
+                  <InfoRow label="Role"           value={result.role}           icon={<GraduationCap className="w-4 h-4" />} />
+                  <InfoRow label="Department"     value={result.department}     icon={<GraduationCap className="w-4 h-4" />} />
+                  <InfoRow label="Gender"         value={result.gender}         icon={<User className="w-4 h-4" />} />
+                  <InfoRow label="Phone"          value={result.phone}          icon={<Phone className="w-4 h-4" />} />
+                  <InfoRow label="Email"          value={result.email}          icon={<Mail className="w-4 h-4" />} />
                 </>
               )}
             </div>
