@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type DeptRole = "hod" | "deputy_hod" | "secretary" | "member";
+export type DeptRole = "head" | "coordinator" | "member";
 
 export interface Department {
   id: string;
@@ -20,7 +20,7 @@ export interface DepartmentMember {
   id: string;
   department_id: string;
   staff_id: string;
-  dept_role: DeptRole;
+  role: DeptRole;
   created_at: string;
   staff?: {
     id: string;
@@ -28,6 +28,7 @@ export interface DepartmentMember {
     last_name: string;
     email: string | null;
     photo_url: string | null;
+    position_title: string | null;
     department_id: string | null;
   };
 }
@@ -57,13 +58,35 @@ export async function getDepartments(): Promise<Department[]> {
 }
 
 export async function getDepartmentMembers(departmentId: string): Promise<DepartmentMember[]> {
-  const { data, error } = await supabase
-    .from("department_members")
-    .select("*, staff(id, first_name, last_name, email, photo_url, department_id)")
+  // Source of truth: staff who have this department set on their profile
+  // (this is the "Department" field shown/edited on the Staff page).
+  const { data: staffRows, error: staffError } = await supabase
+    .from("staff")
+    .select("id, first_name, last_name, email, photo_url, position_title, department_id")
     .eq("department_id", departmentId)
-    .order("dept_role");
-  if (error) throw error;
-  return (data ?? []) as DepartmentMember[];
+    .order("first_name");
+  if (staffError) throw staffError;
+
+  // Overlay any explicit head/coordinator designation recorded for this department.
+  const { data: roleRows, error: roleError } = await supabase
+    .from("department_members")
+    .select("id, department_id, staff_id, role, joined_at")
+    .eq("department_id", departmentId);
+  if (roleError) throw roleError;
+
+  const roleByStaffId = new Map((roleRows ?? []).map((r) => [r.staff_id, r]));
+
+  return (staffRows ?? []).map((s) => {
+    const explicit = roleByStaffId.get(s.id);
+    return {
+      id: explicit?.id ?? s.id,
+      department_id: departmentId,
+      staff_id: s.id,
+      role: (explicit?.role as DeptRole) ?? "member",
+      created_at: explicit?.joined_at ?? "",
+      staff: s,
+    } satisfies DepartmentMember;
+  });
 }
 
 export async function getDepartmentCommunications(departmentId: string): Promise<DepartmentCommunication[]> {
