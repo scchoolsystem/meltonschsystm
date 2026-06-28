@@ -335,7 +335,7 @@ function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
       // Retire any existing active assignment for this student first —
       // otherwise they'd show up as a current boarder in two dorms at once.
       await supabase.from("dorm_assignments").update({ active: false }).eq("student_id", f.student_id).eq("active", true);
-      const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? Number(f.bed_no) : null, active: true });
+      const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? String(f.bed_no) : null, active: true });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
