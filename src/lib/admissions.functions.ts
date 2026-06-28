@@ -307,6 +307,27 @@ async function syncStaffOrgLinks(staffId: string, schoolId: string, data: any) {
       if (error) throw new Error(error.message);
     }
   }
+  // Sync department_members from staff.department_id.
+  // The DB trigger handles INSERT/UPDATE automatically, but we also do it here
+  // explicitly so it works even if the trigger isn't present yet.
+  if (data.department_id !== undefined) {
+    // Remove any old membership rows for this staff member that don't match the new dept
+    await supabaseAdmin
+      .from("department_members")
+      .delete()
+      .eq("staff_id", staffId)
+      .neq("department_id", data.department_id || "00000000-0000-0000-0000-000000000000");
+
+    if (data.department_id) {
+      const { error } = await supabaseAdmin
+        .from("department_members")
+        .upsert(
+          { department_id: data.department_id, staff_id: staffId, role: "member", school_id: schoolId },
+          { onConflict: "department_id,staff_id", ignoreDuplicates: true }
+        );
+      if (error) throw new Error(error.message);
+    }
+  }
 }
 
 function pickOrgPatch(data: any) {
