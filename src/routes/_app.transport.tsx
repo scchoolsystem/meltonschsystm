@@ -231,7 +231,7 @@ function AssignDialog({ routes, onDone, schoolId }: { routes: any[]; onDone: () 
   const selectedRoute = routes.find(r => r.id === f.route_id);
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("transport_assignments").insert({ ...f, school_id: schoolId });
+      const { error } = await supabase.from("transport_assignments").upsert({ ...f, school_id: schoolId }, { onConflict: "student_id" });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
