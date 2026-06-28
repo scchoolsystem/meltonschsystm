@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_app/boarding")({ component: () => (<FeatureGate feature="boarding"><Page /></FeatureGate>) });
@@ -24,6 +25,8 @@ export const Route = createFileRoute("/_app/boarding")({ component: () => (<Feat
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { school } = useTenant();
+  const schoolId = school?.id;
   const can = isAdmin || hasRole("matron") || hasRole("boarding_admin") || hasRole("boarding_user");
 
   const { data: dorms = [], isLoading: dLoading } = useQuery({
@@ -107,10 +110,10 @@ function Page() {
         {can && (
           <div className="flex gap-2 flex-wrap">
             <Dialog open={addDorm} onOpenChange={setAddDorm}><DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Dorm</Button></DialogTrigger>
-              <DormDialog onDone={() => { setAddDorm(false); qc.invalidateQueries({ queryKey: ["dormitories"] }); }} />
+              <DormDialog schoolId={schoolId} onDone={() => { setAddDorm(false); qc.invalidateQueries({ queryKey: ["dormitories"] }); }} />
             </Dialog>
             <Dialog open={addAssign} onOpenChange={setAddAssign}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Assign Student</Button></DialogTrigger>
-              <AssignDialog dorms={dorms as any[]} onDone={() => { setAddAssign(false); qc.invalidateQueries({ queryKey: ["dorm-assignments"] }); }} />
+              <AssignDialog schoolId={schoolId} dorms={dorms as any[]} onDone={() => { setAddAssign(false); qc.invalidateQueries({ queryKey: ["dorm-assignments"] }); }} />
             </Dialog>
           </div>
         )}
@@ -305,10 +308,17 @@ function WelfareNotesPanel({ assignment, onSave, loading }: { assignment: any; o
   );
 }
 
-function DormDialog({ onDone }: { onDone: () => void }) {
+function DormDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ name: "", gender: "", capacity: "" });
   const m = useMutation({
-    mutationFn: async () => { const { error } = await supabase.from("dormitories").insert({ ...f, capacity: f.capacity ? Number(f.capacity) : null }); if (error) throw error; },
+    mutationFn: async () => {
+      const { error } = await supabase.from("dormitories").insert({
+        ...f,
+        capacity: f.capacity ? Number(f.capacity) : null,
+        school_id: schoolId,
+      });
+      if (error) throw error;
+    },
     onSuccess: () => { toast.success("Dorm added"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
   return (
@@ -327,15 +337,18 @@ function DormDialog({ onDone }: { onDone: () => void }) {
   );
 }
 
-function AssignDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
+function AssignDialog({ dorms, onDone, schoolId }: { dorms: any[]; onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ student_id: "", dormitory_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
   const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
   const m = useMutation({
     mutationFn: async () => {
-      // Retire any existing active assignment for this student first —
-      // otherwise they'd show up as a current boarder in two dorms at once.
       await supabase.from("dorm_assignments").update({ active: false }).eq("student_id", f.student_id).eq("active", true);
-      const { error } = await supabase.from("dorm_assignments").insert({ ...f, bed_no: f.bed_no ? String(f.bed_no) : null, active: true });
+      const { error } = await supabase.from("dorm_assignments").insert({
+        ...f,
+        bed_no: f.bed_no ? String(f.bed_no) : null,
+        active: true,
+        school_id: schoolId,
+      });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Student assigned"); onDone(); }, onError: (e: any) => toast.error(e.message),
