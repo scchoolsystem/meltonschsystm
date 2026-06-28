@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { Receipt, Smartphone } from "lucide-react";
 import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
 
-export const Route = createFileRoute("/api/public/platform/invoices")({
+export const Route = createFileRoute("/platform/invoices")({
   component: PlatformInvoices,
 });
 
