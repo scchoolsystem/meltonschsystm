@@ -43,25 +43,33 @@ function RolesPage() {
     queryKey: ["users-with-roles", schoolId],
     enabled: !!schoolId,
     queryFn: async () => {
-      // Only fetch profiles that have a role in THIS school
-      // profiles table has all users; user_roles is scoped by RLS to current school
-      const [{ data: profiles }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name"),
-        // RLS on user_roles now scopes this to current school only
-        supabase.from("user_roles").select("id, user_id, role, school_id"),
+      // Start from user_roles (RLS already scopes to current school),
+      // then enrich with names from staff table (also readable by admin).
+      // Avoids the profiles RLS which requires a user_credentials join and
+      // silently returns empty when that join finds no rows.
+      const [{ data: roles }, { data: staffRows }] = await Promise.all([
+        supabase.from("user_roles").select("id, user_id, role, school_id").eq("school_id", schoolId!),
+        supabase.from("staff").select("user_id, first_name, last_name").eq("school_id", schoolId!),
       ]);
 
-      // Only show users who have at least one role in this school,
-      // OR show all profiles but tag which have no school role
-      const schoolRoles = (roles ?? []).filter((r) => r.school_id === schoolId);
-      const userIdsWithRole = new Set(schoolRoles.map((r) => r.user_id));
+      const staffByUserId = new Map(
+        (staffRows ?? []).map((s) => [s.user_id, `${s.first_name} ${s.last_name}`.trim()])
+      );
 
-      return (profiles ?? [])
-        .filter((p) => userIdsWithRole.has(p.id))
-        .map((p) => ({
-          ...p,
-          roles: schoolRoles.filter((r) => r.user_id === p.id),
-        }));
+      // Group roles by user_id
+      const byUser = new Map<string, { id: string; full_name: string; roles: any[] }>();
+      for (const r of roles ?? []) {
+        if (!byUser.has(r.user_id)) {
+          byUser.set(r.user_id, {
+            id: r.user_id,
+            full_name: staffByUserId.get(r.user_id) ?? "Unknown user",
+            roles: [],
+          });
+        }
+        byUser.get(r.user_id)!.roles.push(r);
+      }
+
+      return [...byUser.values()].sort((a, b) => a.full_name.localeCompare(b.full_name));
     },
   });
 
@@ -70,7 +78,7 @@ function RolesPage() {
       if (!schoolId) throw new Error("No school context");
       const { error } = await supabase
         .from("user_roles")
-        .insert({ user_id, role: role as any, school_id: schoolId }); // ← school_id now included
+        .insert({ user_id, role: role as any, school_id: schoolId });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -128,6 +136,10 @@ function RolesPage() {
             <div className="h-40 grid place-items-center">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
+          ) : !data?.length ? (
+            <div className="h-40 grid place-items-center text-sm text-muted-foreground">
+              No users with roles found for this school.
+            </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <Table>
@@ -139,7 +151,7 @@ function RolesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data?.map((u) => (
+                  {data.map((u) => (
                     <UserRow
                       key={u.id}
                       user={u}
