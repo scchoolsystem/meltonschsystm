@@ -1,14 +1,27 @@
 /**
- * _app.department.tsx — Department Workspace (v3 Enterprise)
+ * _app.department.tsx — Department Workspace (v4 Role-Aware)
  *
- * Aggregates from existing SmartDev ERP modules — NO duplicate tables:
- *  • Staff        → staff table, filtered by department_id
- *  • Subjects     → subjects table (no dept FK yet, linked via teacher_subjects)
- *  • Students     → students → classes → timetable_slots → dept subjects
- *  • Attendance   → attendance_records, filtered by dept class/student set
- *  • Exams        → exam_results, filtered by dept subject set
- *  • Announcements→ department_communications (existing table)
- *  • HOD          → department_members WHERE role = 'head'
+ * Role access model:
+ *  platform_owner / school_owner / school_admin / principal /
+ *  deputy_principal / academic_master
+ *    → "Admin tier": see ALL departments, dept switcher visible,
+ *      full management (assign HOD, add/remove members, post anywhere)
+ *
+ *  hod (user with hod role AND is department_members.role='head' for active dept)
+ *    → See own department only, can post announcements, can manage members
+ *      within their dept
+ *
+ *  subject_teacher / class_teacher / teacher / staff / coordinator
+ *    → See their own dept only (scoped by staff.department_id or membership),
+ *      read-only (no management, no posting)
+ *
+ * Data sources — NO duplicate tables:
+ *  Staff        → staff table, filtered by department_id
+ *  Subjects     → teacher_subjects JOIN subjects
+ *  Students     → exam_results → students
+ *  Exams        → exam_results
+ *  Announcements→ department_communications
+ *  HOD / Members→ department_members
  */
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -43,15 +56,19 @@ import {
   Users, Crown, Megaphone, BookOpen, GraduationCap, BarChart3,
   Plus, Loader2, Building2, ChevronDown, UserCircle2, Search,
   CheckCircle2, AlertTriangle, TrendingUp, Star, Mail,
-  CalendarDays, ClipboardList, Activity, Pencil,
+  CalendarDays, ClipboardList, Activity, Pencil, ShieldCheck,
+  Trash2, UserPlus, Settings,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import {
-  getDepartments,
+  getMyDepartments,
   getDepartmentMembers,
   getDepartmentCommunications,
+  upsertDepartmentMember,
+  removeDepartmentMember,
   type Department,
   type DepartmentMember,
+  type DeptRole,
 } from "@/lib/departments.functions";
 import { fadeUp, stagger } from "@/components/motion-variants";
 import { AnimatedNumber } from "@/components/portal-shared";
@@ -63,6 +80,11 @@ export const Route = createFileRoute("/_app/department")({ component: Page });
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const CHART_COLORS = ["#6366f1","#22c55e","#f97316","#06b6d4","#ec4899","#eab308","#8b5cf6"];
+
+const ADMIN_TIER_ROLES = [
+  "platform_owner","school_owner","school_admin","principal",
+  "deputy_principal","academic_master","super_admin",
+] as const;
 
 function fallbackGrade(s: number) {
   if (s >= 80) return "A";  if (s >= 75) return "A-"; if (s >= 70) return "B+";
@@ -148,33 +170,57 @@ function HodCard({ hod }: { hod: DepartmentMember | null }) {
       <CardContent className="p-5 flex items-center gap-4">
         <div className="h-16 w-16 rounded-full bg-muted overflow-hidden shrink-0 ring-2 ring-primary/20">
           {s?.photo_url
-            ? <img src={s.photo_url} alt="HOD" className="h-full w-full object-cover" />
-            : <div className="h-full w-full flex items-center justify-center"><UserCircle2 className="w-8 h-8 text-muted-foreground" /></div>}
+            ? <img src={s.photo_url} alt="" className="h-full w-full object-cover" />
+            : <div className="h-full w-full flex items-center justify-center">
+                <Crown className="w-7 h-7 text-primary/60" />
+              </div>}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Crown className="w-4 h-4 text-amber-500" />
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Head of Department</span>
+            <span className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Head of Department</span>
           </div>
           <h3 className="font-bold text-lg leading-tight">{s?.first_name} {s?.last_name}</h3>
-          <p className="text-sm text-muted-foreground">{s?.email ?? "No email on record"}</p>
+          {s?.email && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Mail className="w-3 h-3" />{s.email}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
             Since {format(new Date(hod.joined_at), "MMM yyyy")}
           </p>
         </div>
-        <Badge className="bg-amber-500 text-white text-xs">HOD</Badge>
       </CardContent>
     </Card>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// ── Role badge helper ──────────────────────────────────────────────────────────
+
+function RoleBadgeIndicator({ isAdminTier, isHOD }: { isAdminTier: boolean; isHOD: boolean }) {
+  if (isAdminTier) return (
+    <Badge className="gap-1 bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300">
+      <ShieldCheck className="w-3 h-3" /> Admin View
+    </Badge>
+  );
+  if (isHOD) return (
+    <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300">
+      <Crown className="w-3 h-3" /> HOD
+    </Badge>
+  );
+  return null;
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 function Page() {
   const qc = useQueryClient();
   const { user, isAdmin, hasRole } = useAuth();
-  const canPost = isAdmin || hasRole("hod") || hasRole("academic_master") || hasRole("principal");
 
+  // ── Role resolution ─────────────────────────────────────────────────────────
+  const isAdminTier = isAdmin || ADMIN_TIER_ROLES.some((r) => hasRole(r as any));
+
+  // ── State ───────────────────────────────────────────────────────────────────
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [search, setSearch] = useState("");
@@ -186,16 +232,22 @@ function Page() {
   const [commTitle, setCommTitle] = useState("");
   const [commBody, setCommBody] = useState("");
 
-  // ── Departments ─────────────────────────────────────────────────────────────
+  // Member management dialog
+  const [memberMgmtOpen, setMemberMgmtOpen] = useState(false);
+  const [addMemberStaffId, setAddMemberStaffId] = useState("");
+  const [addMemberRole, setAddMemberRole] = useState<DeptRole>("member");
+
+  // ── My departments (scoped by role) ─────────────────────────────────────────
   const { data: departments = [], isLoading: deptsLoading } = useQuery({
-    queryKey: ["user-departments"],
-    queryFn: getDepartments,
+    queryKey: ["my-departments", user?.id, isAdminTier],
+    queryFn: () => getMyDepartments(user!.id, isAdminTier),
+    enabled: !!user?.id,
   });
 
   const activeDeptId = selectedDeptId ?? departments[0]?.id ?? null;
   const activeDept = departments.find((d) => d.id === activeDeptId) ?? null;
 
-  // ── Department Members (HOD / members) ──────────────────────────────────────
+  // ── Department Members ──────────────────────────────────────────────────────
   const { data: members = [], isLoading: membersLoading } = useQuery({
     queryKey: ["dept-members", activeDeptId],
     queryFn: () => getDepartmentMembers(activeDeptId!),
@@ -203,6 +255,29 @@ function Page() {
   });
 
   const hod = members.find((m) => m.role === "head") ?? null;
+
+  // ── Derive: is the logged-in user the HOD of the active dept? ───────────────
+  const { data: myStaffRow } = useQuery({
+    queryKey: ["my-staff-row", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff")
+        .select("id, department_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data ?? null;
+    },
+    enabled: !!user?.id,
+  });
+
+  const isHOD = useMemo(() => {
+    if (!myStaffRow?.id) return false;
+    return members.some((m) => m.staff_id === myStaffRow.id && m.role === "head");
+  }, [members, myStaffRow]);
+
+  // Combined permission flags
+  const canManage = isAdminTier || isHOD;      // manage members, assign HOD
+  const canPost   = isAdminTier || isHOD || hasRole("academic_master") || hasRole("principal");
 
   // ── Department Staff (via staff.department_id) ───────────────────────────────
   const { data: deptStaff = [], isLoading: staffLoading } = useQuery({
@@ -213,6 +288,20 @@ function Page() {
         .from("staff")
         .select("id,first_name,last_name,employee_no,unique_id,email,photo_url,position_title,staff_category,lifecycle_status,department_id,department")
         .eq("department_id", activeDeptId!)
+        .order("first_name");
+      return data ?? [];
+    },
+  });
+
+  // All staff in school for member-add dropdown (only loaded when manage dialog opens)
+  const { data: allSchoolStaff = [] } = useQuery({
+    queryKey: ["all-school-staff-for-dept"],
+    enabled: memberMgmtOpen && canManage,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff")
+        .select("id, first_name, last_name, employee_no, department_id")
+        .eq("lifecycle_status", "active")
         .order("first_name");
       return data ?? [];
     },
@@ -233,7 +322,6 @@ function Page() {
     },
   });
 
-  // map staffId → subject list
   const staffSubjectMap = useMemo(() => {
     const m: Record<string, any[]> = {};
     (teacherSubjects as any[]).forEach((ts) => {
@@ -243,7 +331,6 @@ function Page() {
     return m;
   }, [teacherSubjects]);
 
-  // All unique subjects in this department
   const deptSubjects = useMemo(() => {
     const seen = new Map<string, any>();
     (teacherSubjects as any[]).forEach((ts) => {
@@ -254,7 +341,7 @@ function Page() {
 
   const subjectIds = useMemo(() => deptSubjects.map((s) => s.id), [deptSubjects]);
 
-  // ── Exam Results for dept subjects ──────────────────────────────────────────
+  // ── Exam Results ─────────────────────────────────────────────────────────────
   const { data: examResults = [], isLoading: resultsLoading } = useQuery({
     queryKey: ["dept-exam-results", subjectIds.join(",")],
     enabled: subjectIds.length > 0,
@@ -285,8 +372,7 @@ function Page() {
     return Array.from(map.values());
   }, [examResults]);
 
-  // ── Analytics ────────────────────────────────────────────────────────────────
-
+  // ── Analytics ─────────────────────────────────────────────────────────────────
   const subjectPerf = useMemo(() => {
     const m = new Map<string, { name: string; total: number; count: number; pass: number }>();
     (examResults as any[]).forEach((r) => {
@@ -323,7 +409,6 @@ function Page() {
     return Object.entries(b).map(([grade, count]) => ({ grade, count })).sort((a, b) => b.count - a.count).slice(0, 8);
   }, [examResults]);
 
-  // Top & struggling students
   const studentAvgs = useMemo(() => {
     const m = new Map<string, { name: string; adm: string; cls: string; total: number; count: number }>();
     (examResults as any[]).forEach((r) => {
@@ -344,7 +429,7 @@ function Page() {
   const topStudents   = useMemo(() => [...studentAvgs].sort((a, b) => b.avg - a.avg).slice(0, 10), [studentAvgs]);
   const weakStudents  = useMemo(() => [...studentAvgs].filter((s) => s.avg < 40).sort((a, b) => a.avg - b.avg).slice(0, 10), [studentAvgs]);
 
-  // ── Announcements ────────────────────────────────────────────────────────────
+  // ── Announcements ─────────────────────────────────────────────────────────────
   const { data: comms = [], isLoading: commsLoading } = useQuery({
     queryKey: ["dept-comms", activeDeptId],
     queryFn: () => getDepartmentCommunications(activeDeptId!),
@@ -353,13 +438,13 @@ function Page() {
 
   const postMutation = useMutation({
     mutationFn: async () => {
-      const { data: staffRow } = await supabase
-        .from("staff").select("id,school_id").eq("user_id", user?.id).maybeSingle();
-      if (!staffRow?.id) throw new Error("Your account is not linked to a staff record.");
+      if (!myStaffRow?.id) throw new Error("Your account is not linked to a staff record.");
+      const { data: staffCheck } = await supabase.from("staff").select("id,school_id").eq("id", myStaffRow.id).maybeSingle();
+      if (!staffCheck?.id) throw new Error("Staff record not found.");
       const { error } = await supabase.from("department_communications").insert([{
         department_id: activeDeptId,
-        sender_id: staffRow.id,
-        school_id: staffRow.school_id,
+        sender_id: staffCheck.id,
+        school_id: staffCheck.school_id,
         title: commTitle,
         content: commBody,
       }]);
@@ -373,7 +458,43 @@ function Page() {
     onError: (e: any) => toast.error(e.message || "Failed to post"),
   });
 
-  // ── Filtered staff for table ─────────────────────────────────────────────────
+  // ── Member management mutations ───────────────────────────────────────────────
+  const addMemberMutation = useMutation({
+    mutationFn: async () => {
+      if (!addMemberStaffId) throw new Error("Select a staff member.");
+      await upsertDepartmentMember(activeDeptId!, addMemberStaffId, addMemberRole);
+    },
+    onSuccess: () => {
+      toast.success("Member added / role updated");
+      setAddMemberStaffId(""); setAddMemberRole("member");
+      qc.invalidateQueries({ queryKey: ["dept-members", activeDeptId] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to add member"),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (memberId: string) => removeDepartmentMember(memberId),
+    onSuccess: () => {
+      toast.success("Member removed");
+      qc.invalidateQueries({ queryKey: ["dept-members", activeDeptId] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to remove"),
+  });
+
+  const promoteToHODMutation = useMutation({
+    mutationFn: async (staffId: string) => {
+      // demote current HOD first
+      if (hod) await upsertDepartmentMember(activeDeptId!, hod.staff_id, "coordinator");
+      await upsertDepartmentMember(activeDeptId!, staffId, "head");
+    },
+    onSuccess: () => {
+      toast.success("HOD updated");
+      qc.invalidateQueries({ queryKey: ["dept-members", activeDeptId] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to update HOD"),
+  });
+
+  // ── Filtered staff ────────────────────────────────────────────────────────────
   const filteredStaff = useMemo(() => {
     const q = search.toLowerCase();
     return (deptStaff as any[]).filter((s) =>
@@ -387,7 +508,7 @@ function Page() {
   const staffPageCount = Math.max(1, Math.ceil(filteredStaff.length / PAGE_SIZE));
   const pagedStaff = filteredStaff.slice(staffPage * PAGE_SIZE, staffPage * PAGE_SIZE + PAGE_SIZE);
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Loading / empty states ────────────────────────────────────────────────────
   if (deptsLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -403,14 +524,18 @@ function Page() {
           <CardContent className="py-10 text-center space-y-3">
             <Building2 className="w-10 h-10 mx-auto text-muted-foreground" />
             <h2 className="font-semibold text-lg">No Department Assigned</h2>
-            <p className="text-sm text-muted-foreground">Ask your administrator to assign you to a department.</p>
+            <p className="text-sm text-muted-foreground">
+              {isAdminTier
+                ? "No departments have been created yet. Set them up in Admin → Departments."
+                : "Ask your administrator to assign you to a department."}
+            </p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6 max-w-7xl">
 
@@ -421,18 +546,28 @@ function Page() {
             <Building2 className="w-7 h-7 text-primary" />
             {activeDept?.name ?? "Department"} Workspace
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {activeDept?.kind && <Badge variant="outline" className="mr-2 capitalize text-xs">{activeDept.kind}</Badge>}
-            Department operational hub
-          </p>
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {activeDept?.kind && <Badge variant="outline" className="capitalize text-xs">{activeDept.kind}</Badge>}
+            <RoleBadgeIndicator isAdminTier={isAdminTier} isHOD={isHOD} />
+            {canManage && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 h-7 text-xs"
+                onClick={() => setMemberMgmtOpen(true)}
+              >
+                <Settings className="w-3 h-3" /> Manage Members
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Department switcher */}
+        {/* Dept switcher — only for admin tier or users with multiple depts */}
         {departments.length > 1 && (
           <div className="flex items-center gap-2 shrink-0">
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
             <Select value={activeDeptId ?? ""} onValueChange={(v) => { setSelectedDeptId(v); setActiveTab("overview"); }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-52">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -464,7 +599,7 @@ function Page() {
               <Activity className="w-3.5 h-3.5" /> Overview
             </TabsTrigger>
             <TabsTrigger value="hod" className="gap-1.5 whitespace-nowrap text-xs sm:text-sm">
-              <Crown className="w-3.5 h-3.5" /> HOD
+              <Crown className="w-3.5 h-3.5" /> HOD & Members
             </TabsTrigger>
             <TabsTrigger value="staff" className="gap-1.5 whitespace-nowrap text-xs sm:text-sm">
               <Users className="w-3.5 h-3.5" /> Staff
@@ -489,9 +624,8 @@ function Page() {
           </TabsList>
         </div>
 
-        {/* ── OVERVIEW ─────────────────────────────────────────────────────────── */}
+        {/* ── OVERVIEW ──────────────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="mt-4 space-y-6">
-          {/* KPIs */}
           <motion.div variants={stagger} initial="hidden" animate="show"
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <KpiCard icon={<Users className="w-4 h-4" />} label="Staff Members" value={deptStaff.length} color="indigo" />
@@ -503,12 +637,9 @@ function Page() {
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* HOD snapshot */}
             <div className="lg:col-span-1">
               <HodCard hod={hod} />
             </div>
-
-            {/* Recent announcements */}
             <SectionCard title="Recent Announcements" icon={<Megaphone className="w-4 h-4" />} className="lg:col-span-2">
               {commsLoading ? <Loader2 className="animate-spin text-muted-foreground" /> :
                comms.length === 0 ? (
@@ -535,7 +666,6 @@ function Page() {
             </SectionCard>
           </div>
 
-          {/* Subject performance overview */}
           {subjectPerf.length > 0 && (
             <SectionCard title="Subject Performance Overview" icon={<TrendingUp className="w-4 h-4" />}>
               <ResponsiveContainer width="100%" height={220}>
@@ -555,12 +685,18 @@ function Page() {
           )}
         </TabsContent>
 
-        {/* ── HOD ──────────────────────────────────────────────────────────────── */}
+        {/* ── HOD & MEMBERS ─────────────────────────────────────────────────────── */}
         <TabsContent value="hod" className="mt-4 space-y-4">
           <HodCard hod={hod} />
 
-          {/* All members with roles */}
           <SectionCard title="Department Members & Roles" icon={<Users className="w-4 h-4" />}>
+            {canManage && (
+              <div className="mb-3 flex justify-end">
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMemberMgmtOpen(true)}>
+                  <UserPlus className="w-3.5 h-3.5" /> Add / Manage Members
+                </Button>
+              </div>
+            )}
             {membersLoading ? <Loader2 className="animate-spin text-muted-foreground" /> :
              members.length === 0 ? (
               <p className="text-sm text-muted-foreground italic text-center py-6">
@@ -585,6 +721,29 @@ function Page() {
                     <span className="text-[10px] text-muted-foreground hidden sm:block">
                       Since {format(new Date(m.joined_at), "MMM yyyy")}
                     </span>
+                    {/* HOD can promote/demote within their dept; admin tier always can */}
+                    {canManage && m.role !== "head" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[10px] gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                        onClick={() => promoteToHODMutation.mutate(m.staff_id)}
+                        disabled={promoteToHODMutation.isPending}
+                      >
+                        <Crown className="w-3 h-3" /> Make HOD
+                      </Button>
+                    )}
+                    {canManage && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                        onClick={() => removeMemberMutation.mutate(m.id)}
+                        disabled={removeMemberMutation.isPending}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -592,7 +751,7 @@ function Page() {
           </SectionCard>
         </TabsContent>
 
-        {/* ── STAFF ────────────────────────────────────────────────────────────── */}
+        {/* ── STAFF ─────────────────────────────────────────────────────────────── */}
         <TabsContent value="staff" className="mt-4 space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -632,6 +791,7 @@ function Page() {
                       <TableHead>Employee #</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Subjects</TableHead>
+                      <TableHead>Dept Role</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                     </TableRow>
@@ -639,6 +799,7 @@ function Page() {
                   <TableBody>
                     {pagedStaff.map((s: any) => {
                       const subs = staffSubjectMap[s.id] ?? [];
+                      const deptMember = members.find((m) => m.staff_id === s.id);
                       return (
                         <TableRow key={s.id} className="hover:bg-muted/40 transition-colors">
                           <TableCell>
@@ -667,6 +828,16 @@ function Page() {
                                 : <span className="text-xs text-muted-foreground">—</span>}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            {deptMember ? (
+                              <Badge variant={deptMember.role === "head" ? "default" : "outline"} className="capitalize text-[10px]">
+                                {deptMember.role === "head" && <Crown className="w-2.5 h-2.5 mr-1" />}
+                                {deptMember.role}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{s.email ?? "—"}</TableCell>
                           <TableCell className="text-center">
                             <StatusBadge status={s.lifecycle_status} />
@@ -682,7 +853,7 @@ function Page() {
           )}
         </TabsContent>
 
-        {/* ── SUBJECTS ─────────────────────────────────────────────────────────── */}
+        {/* ── SUBJECTS ──────────────────────────────────────────────────────────── */}
         <TabsContent value="subjects" className="mt-4 space-y-4">
           <h2 className="text-lg font-semibold">
             Department Subjects <span className="text-muted-foreground text-sm font-normal ml-1">({deptSubjects.length})</span>
@@ -725,7 +896,6 @@ function Page() {
                             </div>
                           )}
                         </div>
-
                         {perf && (
                           <div className="space-y-1">
                             <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -734,7 +904,6 @@ function Page() {
                             <Progress value={perf.passRate} className="h-1.5" />
                           </div>
                         )}
-
                         <div className="text-xs text-muted-foreground">
                           {teachers.length > 0
                             ? <><span className="font-medium text-foreground">Teachers:</span> {teachers.join(", ")}</>
@@ -749,7 +918,7 @@ function Page() {
           )}
         </TabsContent>
 
-        {/* ── STUDENTS ─────────────────────────────────────────────────────────── */}
+        {/* ── STUDENTS ──────────────────────────────────────────────────────────── */}
         <TabsContent value="students" className="mt-4 space-y-4">
           <h2 className="text-lg font-semibold">
             Department Students <span className="text-muted-foreground text-sm font-normal ml-1">({deptStudents.length})</span>
@@ -794,7 +963,7 @@ function Page() {
           )}
         </TabsContent>
 
-        {/* ── EXAMS ────────────────────────────────────────────────────────────── */}
+        {/* ── EXAMS ─────────────────────────────────────────────────────────────── */}
         <TabsContent value="exams" className="mt-4 space-y-4">
           <h2 className="text-lg font-semibold">
             Exam Results <span className="text-muted-foreground text-sm font-normal ml-1">({(examResults as any[]).length} records)</span>
@@ -870,9 +1039,8 @@ function Page() {
           )}
         </TabsContent>
 
-        {/* ── ANALYTICS ────────────────────────────────────────────────────────── */}
+        {/* ── ANALYTICS ─────────────────────────────────────────────────────────── */}
         <TabsContent value="analytics" className="mt-4 space-y-6">
-          {/* KPI row */}
           <motion.div variants={stagger} initial="hidden" animate="show"
             className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <KpiCard icon={<BarChart3 className="w-4 h-4" />} label="Overall Avg" value={overallAvg !== null ? `${overallAvg}%` : "—"} color="indigo" />
@@ -882,7 +1050,6 @@ function Page() {
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Subject bar chart */}
             <SectionCard title="Subject Average Scores" icon={<BarChart3 className="w-4 h-4" />}>
               {subjectPerf.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No exam data.</p>
@@ -903,7 +1070,6 @@ function Page() {
               )}
             </SectionCard>
 
-            {/* Grade distribution pie */}
             <SectionCard title="Grade Distribution" icon={<Activity className="w-4 h-4" />}>
               {gradeDistrib.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No exam data.</p>
@@ -921,7 +1087,6 @@ function Page() {
             </SectionCard>
           </div>
 
-          {/* Pass rate by subject area chart */}
           {subjectPerf.length > 0 && (
             <SectionCard title="Pass Rate by Subject" icon={<TrendingUp className="w-4 h-4" />}>
               <ResponsiveContainer width="100%" height={200}>
@@ -942,7 +1107,6 @@ function Page() {
             </SectionCard>
           )}
 
-          {/* Top & Struggling students */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SectionCard title={`Top Performers (${topStudents.length})`} icon={<Star className="w-4 h-4 text-amber-500" />}>
               {topStudents.length === 0
@@ -984,7 +1148,7 @@ function Page() {
           </div>
         </TabsContent>
 
-        {/* ── ANNOUNCEMENTS ────────────────────────────────────────────────────── */}
+        {/* ── ANNOUNCEMENTS ─────────────────────────────────────────────────────── */}
         <TabsContent value="announcements" className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Department Announcements</h2>
@@ -994,6 +1158,12 @@ function Page() {
               </Button>
             )}
           </div>
+
+          {!canPost && (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
+              Only the HOD and administrators can post announcements for this department.
+            </p>
+          )}
 
           {commsLoading ? (
             <div className="h-32 flex items-center justify-center"><Loader2 className="animate-spin text-muted-foreground" /></div>
@@ -1032,7 +1202,7 @@ function Page() {
         </TabsContent>
       </Tabs>
 
-      {/* Post Announcement Dialog */}
+      {/* ── Post Announcement Dialog ────────────────────────────────────────────── */}
       <Dialog open={commOpen} onOpenChange={setCommOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Post Department Announcement</DialogTitle></DialogHeader>
@@ -1059,6 +1229,97 @@ function Page() {
             >
               {postMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Post
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Member Management Dialog ────────────────────────────────────────────── */}
+      <Dialog open={memberMgmtOpen} onOpenChange={setMemberMgmtOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-4 h-4" /> Manage Department Members
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            {/* Add member */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Add / Update Member</h3>
+              <div className="space-y-2">
+                <Label>Staff Member</Label>
+                <Select value={addMemberStaffId} onValueChange={setAddMemberStaffId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select staff..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(allSchoolStaff as any[]).map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.first_name} {s.last_name}
+                        {s.employee_no ? ` (${s.employee_no})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Role in Department</Label>
+                <Select value={addMemberRole} onValueChange={(v) => setAddMemberRole(v as DeptRole)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="head">
+                      <span className="flex items-center gap-2"><Crown className="w-3 h-3 text-amber-500" /> Head of Department</span>
+                    </SelectItem>
+                    <SelectItem value="coordinator">Coordinator</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={() => addMemberMutation.mutate()}
+                disabled={addMemberMutation.isPending || !addMemberStaffId}
+              >
+                {addMemberMutation.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <UserPlus className="w-4 h-4" />}
+                Add / Update Member
+              </Button>
+            </div>
+
+            {/* Current members list */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Current Members ({members.length})</h3>
+              {members.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No formal members yet.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                  {members.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg border">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{m.staff?.first_name} {m.staff?.last_name}</p>
+                        <Badge variant={m.role === "head" ? "default" : "outline"} className="text-[10px] capitalize mt-0.5">
+                          {m.role === "head" && <Crown className="w-2.5 h-2.5 mr-1" />}{m.role}
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
+                        onClick={() => removeMemberMutation.mutate(m.id)}
+                        disabled={removeMemberMutation.isPending}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMemberMgmtOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
