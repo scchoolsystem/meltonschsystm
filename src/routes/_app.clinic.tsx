@@ -75,6 +75,7 @@ function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
   const { school } = useTenant();
+  const schoolId = school?.id;
   const can = isAdmin || hasRole("nurse") || hasRole("clinic_admin") || hasRole("clinic_user") || hasRole("matron");
 
   const [search, setSearch] = useState("");
@@ -284,7 +285,7 @@ function Page() {
 
         {/* ── Inventory ── */}
         <TabsContent value="inventory" className="mt-4">
-          <InventoryTab inventory={inventory as any[]} can={can} />
+          <InventoryTab inventory={inventory as any[]} can={can} schoolId={schoolId} />
         </TabsContent>
       </Tabs>
 
@@ -1069,7 +1070,7 @@ function HealthRecordDialog({ students, existing, existingStudent, onDone, isPen
 
 /* ═══════════════════════ INVENTORY TAB ═══════════════════════ */
 
-function InventoryTab({ inventory, can }: { inventory: any[]; can: boolean }) {
+function InventoryTab({ inventory, can, schoolId }: { inventory: any[]; can: boolean; schoolId?: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
@@ -1086,6 +1087,7 @@ function InventoryTab({ inventory, can }: { inventory: any[]; can: boolean }) {
         const { error } = await supabase.from("clinic_inventory").update(payload).eq("id", editItem.id);
         if (error) throw error;
       } else {
+        payload.school_id = schoolId;
         const { error } = await supabase.from("clinic_inventory").insert(payload);
         if (error) throw error;
       }
