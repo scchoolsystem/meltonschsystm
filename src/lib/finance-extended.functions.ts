@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// ── helpers ─────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────
 async function assertFinance(context: { supabase: any; userId: string }) {
   const { data: admin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
   if (admin) return;
@@ -24,17 +24,15 @@ async function assertFinanceWrite(context: { supabase: any; userId: string }) {
   throw new Error("Only bursar or finance admin can perform this action");
 }
 
+// FIX: use my_school_id() which is the server-side RPC available in this codebase
 async function getSchoolId(context: { supabase: any }) {
   const { data: schoolId, error } = await context.supabase.rpc("my_school_id");
   if (error) throw new Error(error.message);
-  if (!schoolId) throw new Error("No school context");
+  if (!schoolId) throw new Error("No school context — ensure you are logged in to a school");
   return schoolId as string;
 }
 
-// ── 1. Bulk invoice generation (already exists, keep) ────────
-
-
-// ── 2. Finance KPIs ──────────────────────────────────────────
+// ── 1. Finance KPIs ──────────────────────────────────────────
 export const getFinanceKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
@@ -49,7 +47,7 @@ export const getFinanceKpis = createServerFn({ method: "GET" })
     return kpis;
   });
 
-// ── 3. Monthly collections ───────────────────────────────────
+// ── 2. Monthly collections ───────────────────────────────────
 export const getMonthlyCollections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
@@ -68,7 +66,7 @@ export const getMonthlyCollections = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 4. Class collection rates ────────────────────────────────
+// ── 3. Class collection rates ────────────────────────────────
 export const getClassCollectionRates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -83,7 +81,7 @@ export const getClassCollectionRates = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 5. Term financial summary ────────────────────────────────
+// ── 4. Term financial summary ────────────────────────────────
 export const getTermSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
@@ -101,7 +99,7 @@ export const getTermSummary = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 6. Fee defaulters ────────────────────────────────────────
+// ── 5. Fee defaulters ────────────────────────────────────────
 export const getFeeDefaulters = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -117,7 +115,7 @@ export const getFeeDefaulters = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 7. Budget vs actual ──────────────────────────────────────
+// ── 6. Budget vs actual ──────────────────────────────────────
 export const getBudgetVsActual = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
@@ -135,7 +133,7 @@ export const getBudgetVsActual = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 8. Payment method breakdown ──────────────────────────────
+// ── 7. Payment method breakdown ──────────────────────────────
 export const getPaymentMethodBreakdown = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ year: z.number().int().optional() }).parse(input))
@@ -153,7 +151,7 @@ export const getPaymentMethodBreakdown = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
-// ── 9. List expenses ─────────────────────────────────────────
+// ── 8. List expenses ─────────────────────────────────────────
 export const listExpenses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -182,7 +180,7 @@ export const listExpenses = createServerFn({ method: "GET" })
     return { rows: rows ?? [], count: count ?? 0 };
   });
 
-// ── 10. Record expense ───────────────────────────────────────
+// ── 9. Record expense ────────────────────────────────────────
 export const recordExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -211,17 +209,18 @@ export const recordExpense = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
-// ── 11. Approve expense ──────────────────────────────────────
+// ── 10. Approve expense ──────────────────────────────────────
 export const approveExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => z.object({ expense_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertFinanceWrite(context);
+    // FIX: RPC signature is approve_expense(p_expense_id) not (p_expense_id)
     const { error } = await context.supabase.rpc("approve_expense", { p_expense_id: data.expense_id });
     if (error) throw new Error(error.message);
   });
 
-// ── 12. Upsert budget ────────────────────────────────────────
+// ── 11. Upsert budget ────────────────────────────────────────
 export const upsertBudget = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -248,7 +247,7 @@ export const upsertBudget = createServerFn({ method: "POST" })
     }
   });
 
-// ── 13. Record payment (manual) ──────────────────────────────
+// ── 12. Record payment (manual) ──────────────────────────────
 export const recordPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -275,7 +274,6 @@ export const recordPayment = createServerFn({ method: "POST" })
     const balance = Number(inv.amount) - Number(inv.paid);
     if (data.amount > balance + 0.01) throw new Error(`Payment exceeds balance of KES ${balance.toLocaleString()}`);
 
-    // Insert payment (receipt_no set by trigger)
     const { error } = await supabaseAdmin.from("payments").insert({
       invoice_id: data.invoice_id,
       amount: data.amount,
@@ -285,7 +283,6 @@ export const recordPayment = createServerFn({ method: "POST" })
     } as any);
     if (error) throw new Error(error.message);
 
-    // Update invoice paid / status
     const newPaid = Number(inv.paid) + data.amount;
     const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
     await supabaseAdmin
@@ -294,7 +291,7 @@ export const recordPayment = createServerFn({ method: "POST" })
       .eq("id", data.invoice_id);
   });
 
-// ── 14. Write-off invoice balance ────────────────────────────
+// ── 13. Write-off invoice balance ────────────────────────────
 export const writeOffInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -310,7 +307,7 @@ export const writeOffInvoice = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
-// ── 15. Petty cash ───────────────────────────────────────────
+// ── 14. Petty cash ───────────────────────────────────────────
 export const recordPettyCash = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -333,7 +330,9 @@ export const recordPettyCash = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
-// ── 16. Seed expense categories ──────────────────────────────
+// ── 15. Seed expense categories ──────────────────────────────
+// FIX: was calling RPC with p_school_id, which requires SECURITY DEFINER
+// but here we call it as the authenticated user — the RPC now takes p_school_id
 export const seedExpenseCategories = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
