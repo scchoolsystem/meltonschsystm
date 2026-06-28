@@ -548,7 +548,7 @@ function CreateActivityDialog({ onDone }: { onDone: () => void }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
-              {(departments as any[]).map((d) => (
+              {(departments as any[]).filter((d) => d.id).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
                 </SelectItem>
@@ -616,7 +616,7 @@ function EditActivityDialog({ activity, onDone }: { activity: any; onDone: () =>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
-              {(departments as any[]).map((d) => (
+              {(departments as any[]).filter((d) => d.id).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
                 </SelectItem>
@@ -689,11 +689,11 @@ function AssignCoachDialog({
             </SelectTrigger>
             <SelectContent>
               {available.length === 0 && (
-                <SelectItem value="" disabled>
+                <SelectItem value="__none__" disabled>
                   All staff already assigned
                 </SelectItem>
               )}
-              {available.map((s) => (
+              {available.filter((s) => s.id).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.first_name} {s.last_name}{s.employee_no ? ` (${s.employee_no})` : ""}
                 </SelectItem>
@@ -795,11 +795,11 @@ function EnrolStudentDialog({
             </SelectTrigger>
             <SelectContent>
               {(students as any[]).length === 0 && (
-                <SelectItem value="" disabled>
+                <SelectItem value="__none__" disabled>
                   No students found
                 </SelectItem>
               )}
-              {(students as any[]).map((s) => (
+              {(students as any[]).filter((s) => s.id).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.first_name} {s.last_name} — {s.admission_no}
                   {s.classes?.name ? ` (${s.classes.name})` : ""}
@@ -918,7 +918,7 @@ function FixtureDialog({ activities, onDone }: { activities: any[]; onDone: () =
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Activity</Label>
           <Select value={f.activity_id} onValueChange={v => setF(p => ({ ...p, activity_id: v }))}><SelectTrigger><SelectValue placeholder="Choose activity" /></SelectTrigger>
-            <SelectContent>{activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{activities.filter((a: any) => a.id).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div><Label>Opponent / Event *</Label><Input required value={f.opponent} onChange={e => setF(p => ({ ...p, opponent: e.target.value }))} /></div>
@@ -953,12 +953,12 @@ function AchievementDialog({ activities, onDone }: { activities: any[]; onDone: 
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
           <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+            <SelectContent>{(students as any[]).filter((s: any) => s.id).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div><Label>Activity</Label>
           <Select value={f.activity_id} onValueChange={v => setF(p => ({ ...p, activity_id: v }))}><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
-            <SelectContent>{activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{activities.filter((a: any) => a.id).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div><Label>Description *</Label><Input required value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))} /></div>
