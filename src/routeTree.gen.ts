@@ -68,6 +68,9 @@ import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSupportRouteImport } from './routes/_app.admin.support'
 import { Route as AppAdminStudentDocumentsRouteImport } from './routes/_app.admin.student-documents'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
+import { Route as AppAdminPromotionSettingsRouteImport } from './routes/_app.admin.promotion-settings'
+import { Route as AppAdminPromotionRouteImport } from './routes/_app.admin.promotion'
+import { Route as AppAdminClassStructureRouteImport } from './routes/_app.admin.class-structure'
 import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
 import { Route as AppAdminRoomsRouteImport } from './routes/_app.admin.rooms'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
@@ -405,6 +408,21 @@ const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminPromotionSettingsRoute = AppAdminPromotionSettingsRouteImport.update({
+  id: '/admin/promotion-settings',
+  path: '/admin/promotion-settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminPromotionRoute = AppAdminPromotionRouteImport.update({
+  id: '/admin/promotion',
+  path: '/admin/promotion',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminClassStructureRoute = AppAdminClassStructureRouteImport.update({
+  id: '/admin/class-structure',
+  path: '/admin/class-structure',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminSchoolsRoute = AppAdminSchoolsRouteImport.update({
   id: '/admin/schools',
   path: '/admin/schools',
@@ -671,6 +689,9 @@ export interface FileRoutesByFullPath {
   '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
+  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
+  '/admin/promotion': typeof AppAdminPromotionRoute
+  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -770,6 +791,9 @@ export interface FileRoutesByTo {
   '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
+  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
+  '/admin/promotion': typeof AppAdminPromotionRoute
+  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
@@ -871,6 +895,9 @@ export interface FileRoutesById {
   '/_app/admin/rooms': typeof AppAdminRoomsRoute
   '/_app/admin/schools': typeof AppAdminSchoolsRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
+  '/_app/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
+  '/_app/admin/promotion': typeof AppAdminPromotionRoute
+  '/_app/admin/class-structure': typeof AppAdminClassStructureRoute
   '/_app/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/_app/admin/support': typeof AppAdminSupportRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
@@ -972,6 +999,9 @@ export interface FileRouteTypes {
     | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
+    | '/admin/promotion-settings'
+    | '/admin/promotion'
+    | '/admin/class-structure'
     | '/admin/student-documents'
     | '/admin/support'
     | '/admin/users'
@@ -1071,6 +1101,9 @@ export interface FileRouteTypes {
     | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
+    | '/admin/promotion-settings'
+    | '/admin/promotion'
+    | '/admin/class-structure'
     | '/admin/student-documents'
     | '/admin/support'
     | '/admin/users'
@@ -1171,6 +1204,9 @@ export interface FileRouteTypes {
     | '/_app/admin/rooms'
     | '/_app/admin/schools'
     | '/_app/admin/settings'
+    | '/_app/admin/promotion-settings'
+    | '/_app/admin/promotion'
+    | '/_app/admin/class-structure'
     | '/_app/admin/student-documents'
     | '/_app/admin/support'
     | '/_app/admin/users'
@@ -1664,6 +1700,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminSupportRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/promotion-settings': {
+      id: '/_app/admin/promotion-settings'
+      path: '/admin/promotion-settings'
+      fullPath: '/admin/promotion-settings'
+      preLoaderRoute: typeof AppAdminPromotionSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/promotion': {
+      id: '/_app/admin/promotion'
+      path: '/admin/promotion'
+      fullPath: '/admin/promotion'
+      preLoaderRoute: typeof AppAdminPromotionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/class-structure': {
+      id: '/_app/admin/class-structure'
+      path: '/admin/class-structure'
+      fullPath: '/admin/class-structure'
+      preLoaderRoute: typeof AppAdminClassStructureRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/student-documents': {
       id: '/_app/admin/student-documents'
       path: '/admin/student-documents'
@@ -2000,6 +2057,9 @@ interface AppRouteChildren {
   AppAdminRoomsRoute: typeof AppAdminRoomsRoute
   AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
+  AppAdminPromotionSettingsRoute: typeof AppAdminPromotionSettingsRoute
+  AppAdminPromotionRoute: typeof AppAdminPromotionRoute
+  AppAdminClassStructureRoute: typeof AppAdminClassStructureRoute
   AppAdminStudentDocumentsRoute: typeof AppAdminStudentDocumentsRoute
   AppAdminSupportRoute: typeof AppAdminSupportRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
@@ -2073,6 +2133,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminRoomsRoute: AppAdminRoomsRoute,
   AppAdminSchoolsRoute: AppAdminSchoolsRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
+  AppAdminPromotionSettingsRoute: AppAdminPromotionSettingsRoute,
+  AppAdminPromotionRoute: AppAdminPromotionRoute,
+  AppAdminClassStructureRoute: AppAdminClassStructureRoute,
   AppAdminStudentDocumentsRoute: AppAdminStudentDocumentsRoute,
   AppAdminSupportRoute: AppAdminSupportRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
