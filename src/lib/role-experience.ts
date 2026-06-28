@@ -19,6 +19,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Analytics", url: "/analytics" },
     { title: "Students", url: "/students" },
     { title: "Staff", url: "/staff" },
+    { title: "Payslips", url: "/staff/payslips" },
     { title: "Classes", url: "/classes" },
     { title: "Announcements", url: "/announcements" },
   ]},
@@ -109,6 +110,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Results", url: "/portal/student?tab=results" },
       { title: "Report Cards", url: "/portal/student?tab=reportcards" },
       { title: "Timetable", url: "/portal/student?tab=timetable" },
+      { title: "Assignments", url: "/assignments" },
       { title: "Attendance", url: "/portal/student?tab=attendance" },
       { title: "Fees", url: "/portal/student?tab=fees" },
       { title: "Classroom", url: "/classroom" },
@@ -134,6 +136,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "My Subjects", url: "/academics/subjects" },
       { title: "Attendance", url: "/attendance" },
       { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Assignments", url: "/assignments" },
       { title: "Exams", url: "/academics/exams" },
       { title: "Students", url: "/students" },
       { title: "Timetable", url: "/timetable" },
@@ -141,12 +144,14 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Live Classes", url: "/live" },
       { title: "Results", url: "/academics/results" },
       { title: "Remarks", url: "/academics/remarks" },
+      { title: "Payslips", url: "/staff/payslips" },
     ]},
   ],
   class_teacher: [
     { group: "My Class", items: [
       { title: "My Class", url: "/classes" },
       { title: "Attendance", url: "/attendance" },
+      { title: "Assignments", url: "/assignments" },
       { title: "Discipline", url: "/discipline" },
       { title: "Performance", url: "/academics/results" },
       { title: "Report Cards", url: "/academics/report-cards" },
@@ -154,6 +159,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Timetable", url: "/timetable" },
       { title: "Classroom", url: "/classroom" },
       { title: "Live Classes", url: "/live" },
+      { title: "Payslips", url: "/staff/payslips" },
     ]},
   ],
   hod: [
@@ -162,11 +168,13 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Subjects", url: "/academics/subjects" },
       { title: "Staff", url: "/staff" },
       { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Assignments", url: "/assignments" },
       { title: "Results", url: "/academics/results" },
       { title: "Report Cards", url: "/academics/report-cards" },
       { title: "Remarks", url: "/academics/remarks" },
       { title: "Analytics", url: "/analytics" },
       { title: "Announcements", url: "/announcements" },
+      { title: "Payslips", url: "/staff/payslips" },
     ]},
   ],
   exams_admin: [
@@ -291,6 +299,15 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Students", url: "/students" },
       { title: "CSV Import", url: "/admin/import" },
       { title: "Documents", url: "/admin/student-documents" },
+    ]},
+  ],
+  // Generic "staff" role with no teaching/admin role — still needs to see
+  // their own payslip. Was previously missing: matched 0 contributions,
+  // so they got nothing but the bare Dashboard.
+  staff: [
+    { group: "My Account", items: [
+      { title: "Payslips", url: "/staff/payslips" },
+      { title: "Announcements", url: "/announcements" },
     ]},
   ],
 };
