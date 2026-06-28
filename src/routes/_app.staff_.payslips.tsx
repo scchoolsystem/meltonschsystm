@@ -131,8 +131,14 @@ function PayslipsPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (!school) {
+        throw new Error("School info is still loading — please wait a moment and try again.");
+      }
+      if (!user) {
+        throw new Error("You're not signed in. Please refresh and log in again.");
+      }
       const payload = {
-        school_id:    school!.id,
+        school_id:    school.id,
         staff_id:     staffId,
         month:        Number(month),
         year:         Number(year),
@@ -142,7 +148,7 @@ function PayslipsPage() {
         notes:        notes || null,
         status,
         net_pay:      netPay,
-        created_by:   user!.id,
+        created_by:   user.id,
       };
       if (editing) {
         const { error } = await supabase.from("staff_payslips").update(payload).eq("id", editing.id);
@@ -387,7 +393,7 @@ function PayslipsPage() {
               <DialogFooter>
                 <Button
                   onClick={() => saveMutation.mutate()}
-                  disabled={saveMutation.isPending || !staffId || !basic}
+                  disabled={saveMutation.isPending || !staffId || !basic || !school}
                 >
                   {saveMutation.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
                   {editing ? "Update" : "Create Payslip"}
