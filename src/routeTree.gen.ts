@@ -17,6 +17,7 @@ import { Route as LegalRouteImport } from './routes/legal'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
+import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformWebsiteRouteImport } from './routes/platform.website'
 import { Route as PlatformSupportRouteImport } from './routes/platform.support'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
@@ -95,7 +96,6 @@ import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.e
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
-import { Route as ApiPublicPlatformInvoicesRouteImport } from './routes/api/public/platform.invoices'
 import { Route as AppLiveSessionIdAttendanceRouteImport } from './routes/_app.live.$sessionId.attendance'
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
@@ -146,6 +146,11 @@ const SysControlRoomRoute = SysControlRoomRouteImport.update({
   id: '/sys/control-room',
   path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformInvoicesRoute = PlatformInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformWebsiteRoute = PlatformWebsiteRouteImport.update({
   id: '/website',
@@ -544,12 +549,6 @@ const LovableEmailQueueProcessRoute =
     path: '/lovable/email/queue/process',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicPlatformInvoicesRoute =
-  ApiPublicPlatformInvoicesRouteImport.update({
-    id: '/api/public/platform/invoices',
-    path: '/api/public/platform/invoices',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const AppLiveSessionIdAttendanceRoute =
   AppLiveSessionIdAttendanceRouteImport.update({
     id: '/attendance',
@@ -643,6 +642,7 @@ export interface FileRoutesByFullPath {
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
@@ -702,7 +702,6 @@ export interface FileRoutesByFullPath {
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
   '/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
-  '/api/public/platform/invoices': typeof ApiPublicPlatformInvoicesRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -742,6 +741,7 @@ export interface FileRoutesByTo {
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
@@ -801,7 +801,6 @@ export interface FileRoutesByTo {
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/ids/student/$id': typeof AppIdsStudentIdRoute
   '/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
-  '/api/public/platform/invoices': typeof ApiPublicPlatformInvoicesRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -843,6 +842,7 @@ export interface FileRoutesById {
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
@@ -902,7 +902,6 @@ export interface FileRoutesById {
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
   '/_app/ids/student/$id': typeof AppIdsStudentIdRoute
   '/_app/live/$sessionId/attendance': typeof AppLiveSessionIdAttendanceRoute
-  '/api/public/platform/invoices': typeof ApiPublicPlatformInvoicesRoute
   '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
@@ -944,6 +943,7 @@ export interface FileRouteTypes {
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
+    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/academics/exams'
@@ -1003,7 +1003,6 @@ export interface FileRouteTypes {
     | '/ids/staff/$id'
     | '/ids/student/$id'
     | '/live/$sessionId/attendance'
-    | '/api/public/platform/invoices'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -1043,6 +1042,7 @@ export interface FileRouteTypes {
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
+    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/academics/exams'
@@ -1102,7 +1102,6 @@ export interface FileRouteTypes {
     | '/ids/staff/$id'
     | '/ids/student/$id'
     | '/live/$sessionId/attendance'
-    | '/api/public/platform/invoices'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -1143,6 +1142,7 @@ export interface FileRouteTypes {
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
+    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/_app/academics/exams'
@@ -1202,7 +1202,6 @@ export interface FileRouteTypes {
     | '/_app/ids/staff/$id'
     | '/_app/ids/student/$id'
     | '/_app/live/$sessionId/attendance'
-    | '/api/public/platform/invoices'
     | '/lovable/email/queue/process'
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
@@ -1224,7 +1223,6 @@ export interface RootRouteChildren {
   ApiPublicPlatformMpesaCallbackRoute: typeof ApiPublicPlatformMpesaCallbackRoute
   ApiPublicPlatformMpesaStkRoute: typeof ApiPublicPlatformMpesaStkRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
-  ApiPublicPlatformInvoicesRoute: typeof ApiPublicPlatformInvoicesRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
@@ -1287,6 +1285,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sys/control-room'
       preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/platform/invoices': {
+      id: '/platform/invoices'
+      path: '/invoices'
+      fullPath: '/platform/invoices'
+      preLoaderRoute: typeof PlatformInvoicesRouteImport
+      parentRoute: typeof PlatformRoute
     }
     '/platform/website': {
       id: '/platform/website'
@@ -1869,13 +1874,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/platform/invoices': {
-      id: '/api/public/platform/invoices'
-      path: '/api/public/platform/invoices'
-      fullPath: '/api/public/platform/invoices'
-      preLoaderRoute: typeof ApiPublicPlatformInvoicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app/live/$sessionId/attendance': {
       id: '/_app/live/$sessionId/attendance'
       path: '/attendance'
@@ -2118,6 +2116,7 @@ const PlatformSchoolsRouteWithChildren = PlatformSchoolsRoute._addFileChildren(
 
 interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
+  PlatformInvoicesRoute: typeof PlatformInvoicesRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
   PlatformPlansRoute: typeof PlatformPlansRoute
   PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
@@ -2127,6 +2126,7 @@ interface PlatformRouteChildren {
 
 const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
+  PlatformInvoicesRoute: PlatformInvoicesRoute,
   PlatformLoginRoute: PlatformLoginRoute,
   PlatformPlansRoute: PlatformPlansRoute,
   PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
@@ -2153,7 +2153,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPlatformMpesaCallbackRoute: ApiPublicPlatformMpesaCallbackRoute,
   ApiPublicPlatformMpesaStkRoute: ApiPublicPlatformMpesaStkRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
-  ApiPublicPlatformInvoicesRoute: ApiPublicPlatformInvoicesRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
