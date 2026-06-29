@@ -10,7 +10,6 @@ import { Loader2, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/admin/roles")({
   component: RolesPage,
@@ -35,28 +34,45 @@ const ALL_ROLES = [
 
 function RolesPage() {
   const qc = useQueryClient();
-  const { isAdmin } = useAuth();
-  const { school } = useTenant();
-  const schoolId = school?.id;
+  const { user, isAdmin } = useAuth();
 
+  // Step 1: get school_id from the current user's own role row
+  // (avoids useTenant which returns null on app.smartdev.co.ke)
+  const { data: schoolId } = useQuery({
+    queryKey: ["my-school-id", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_roles")
+        .select("school_id")
+        .eq("user_id", user!.id)
+        .not("school_id", "is", null)
+        .limit(1)
+        .maybeSingle();
+      return data?.school_id ?? null;
+    },
+  });
+
+  // Step 2: load all users+roles for that school
   const { data, isLoading } = useQuery({
     queryKey: ["users-with-roles", schoolId],
     enabled: !!schoolId,
     queryFn: async () => {
-      // Start from user_roles (RLS already scopes to current school),
-      // then enrich with names from staff table (also readable by admin).
-      // Avoids the profiles RLS which requires a user_credentials join and
-      // silently returns empty when that join finds no rows.
       const [{ data: roles }, { data: staffRows }] = await Promise.all([
-        supabase.from("user_roles").select("id, user_id, role, school_id").eq("school_id", schoolId!),
-        supabase.from("staff").select("user_id, first_name, last_name").eq("school_id", schoolId!),
+        supabase
+          .from("user_roles")
+          .select("id, user_id, role, school_id")
+          .eq("school_id", schoolId!),
+        supabase
+          .from("staff")
+          .select("user_id, first_name, last_name")
+          .eq("school_id", schoolId!),
       ]);
 
       const staffByUserId = new Map(
         (staffRows ?? []).map((s) => [s.user_id, `${s.first_name} ${s.last_name}`.trim()])
       );
 
-      // Group roles by user_id
       const byUser = new Map<string, { id: string; full_name: string; roles: any[] }>();
       for (const r of roles ?? []) {
         if (!byUser.has(r.user_id)) {
@@ -87,8 +103,8 @@ function RolesPage() {
     },
     onError: (e: any) => {
       const msg = String(e?.message ?? "");
-      if (/duplicate key|unique constraint|user_roles_user_id_role_key/i.test(msg)) {
-        toast.error("This role is already assigned to this user in this school.");
+      if (/duplicate key|unique/i.test(msg)) {
+        toast.error("Role already assigned to this user.");
       } else {
         toast.error(msg || "Failed to add role");
       }
@@ -123,16 +139,14 @@ function RolesPage() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-3xl font-bold">User Roles</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Assign permissions across the school
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Assign permissions across the school</p>
       </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">All Users</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || !schoolId ? (
             <div className="h-40 grid place-items-center">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
@@ -169,9 +183,7 @@ function RolesPage() {
   );
 }
 
-function UserRow({
-  user, onAdd, onRemove,
-}: {
+function UserRow({ user, onAdd, onRemove }: {
   user: any;
   onAdd: (role: string) => void;
   onRemove: (id: string) => void;
@@ -188,10 +200,7 @@ function UserRow({
           {user.roles.map((r: any) => (
             <Badge key={r.id} variant="secondary" className="gap-1 pr-1">
               {r.role.replace(/_/g, " ")}
-              <button
-                onClick={() => onRemove(r.id)}
-                className="hover:text-destructive ml-0.5"
-              >
+              <button onClick={() => onRemove(r.id)} className="hover:text-destructive ml-0.5">
                 <X className="w-3 h-3" />
               </button>
             </Badge>
@@ -205,20 +214,12 @@ function UserRow({
               <SelectValue placeholder="Choose role" />
             </SelectTrigger>
             <SelectContent>
-              {ALL_ROLES.filter(
-                (r) => !user.roles.some((ur: any) => ur.role === r)
-              ).map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r.replace(/_/g, " ")}
-                </SelectItem>
+              {ALL_ROLES.filter((r) => !user.roles.some((ur: any) => ur.role === r)).map((r) => (
+                <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button
-            size="sm"
-            disabled={!pick}
-            onClick={() => { onAdd(pick); setPick(""); }}
-          >
+          <Button size="sm" disabled={!pick} onClick={() => { onAdd(pick); setPick(""); }}>
             <Plus className="w-3.5 h-3.5" />
           </Button>
         </div>
