@@ -58,27 +58,25 @@ function RolesPage() {
     queryKey: ["users-with-roles", schoolId],
     enabled: !!schoolId,
     queryFn: async () => {
-      const [{ data: roles }, { data: staffRows }] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("id, user_id, role, school_id")
-          .eq("school_id", schoolId!),
-        supabase
-          .from("staff")
-          .select("user_id, first_name, last_name")
-          .eq("school_id", schoolId!),
+      const [{ data: roles }, { data: staffRows }, { data: studentRows }, { data: profileRows }] = await Promise.all([
+        supabase.from("user_roles").select("id, user_id, role, school_id").eq("school_id", schoolId!),
+        supabase.from("staff").select("user_id, first_name, last_name").eq("school_id", schoolId!),
+        supabase.from("students").select("user_id, first_name, last_name").eq("school_id", schoolId!),
+        supabase.from("profiles").select("id, full_name"),
       ]);
 
-      const staffByUserId = new Map(
-        (staffRows ?? []).map((s) => [s.user_id, `${s.first_name} ${s.last_name}`.trim()])
-      );
+      // Build name lookup: profiles first (broadest), then students, then staff (most authoritative)
+      const nameMap = new Map<string, string>();
+      for (const p of profileRows ?? []) if (p.full_name?.trim()) nameMap.set(p.id, p.full_name.trim());
+      for (const s of studentRows ?? []) if (s.user_id) nameMap.set(s.user_id, `${s.first_name} ${s.last_name}`.trim());
+      for (const s of staffRows ?? []) if (s.user_id) nameMap.set(s.user_id, `${s.first_name} ${s.last_name}`.trim());
 
       const byUser = new Map<string, { id: string; full_name: string; roles: any[] }>();
       for (const r of roles ?? []) {
         if (!byUser.has(r.user_id)) {
           byUser.set(r.user_id, {
             id: r.user_id,
-            full_name: staffByUserId.get(r.user_id) ?? "Unknown user",
+            full_name: nameMap.get(r.user_id) ?? "Unknown user",
             roles: [],
           });
         }
