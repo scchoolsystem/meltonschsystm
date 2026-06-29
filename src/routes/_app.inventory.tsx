@@ -293,22 +293,54 @@ function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string | unde
   );
 }
 
+// Destinations that auto-route stock to their respective module
+const ISSUE_DESTINATIONS = [
+  { value: "clinic",     label: "🏥 Clinic",          hint: "Auto-adds to clinic inventory" },
+  { value: "kitchen",    label: "🍽️ Kitchen",          hint: "Auto-adds to kitchen stock" },
+  { value: "library",    label: "📚 Library",          hint: "General library supplies" },
+  { value: "admin",      label: "🏢 Administration",   hint: "Admin office" },
+  { value: "maintenance",label: "🔧 Maintenance",      hint: "Maintenance & repairs" },
+  { value: "security",   label: "🔒 Security",         hint: "Security department" },
+  { value: "transport",  label: "🚌 Transport",        hint: "Transport department" },
+  { value: "boarding",   label: "🛏️ Boarding",         hint: "Boarding / dormitory" },
+  { value: "class",      label: "🏫 Classroom",        hint: "Issued to a specific class" },
+  { value: "staff",      label: "👤 Staff member",     hint: "Issued to individual staff" },
+  { value: "other",      label: "📦 Other",            hint: "Other / specify in notes" },
+];
+
 function IssueDialog({ schoolId, items }: { schoolId: string | undefined; items: any[] }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ item_id: "", qty: 1, issued_to: "", notes: "" });
+  const [form, setForm] = useState({ item_id: "", qty: 1, destination: "", person: "", notes: "" });
   const qc = useQueryClient();
   const { user } = useAuth();
+
+  const selectedDest = ISSUE_DESTINATIONS.find(d => d.value === form.destination);
+
+  // Build issued_to string: destination + optional person name
+  const buildIssuedTo = () => {
+    if (!form.destination) return null;
+    if (form.person.trim()) return `${form.destination}:${form.person.trim()}`;
+    return form.destination;
+  };
+
   const m = useMutation({
     mutationFn: async () => {
       if (!form.item_id) throw new Error("Pick an item");
+      if (!form.destination) throw new Error("Select a destination");
       const item = items.find((i) => i.id === form.item_id);
       const available = item?.current_qty ?? 0;
       if (form.qty > available) throw new Error(`Only ${available} ${item?.unit ?? "units"} in stock`);
       const { error: insErr } = await supabase.from("inventory_issues").insert({
-        school_id: schoolId, item_id: form.item_id, qty: form.qty,
-        issued_to: form.issued_to || null, notes: form.notes || null, issued_by: user?.id ?? null,
+        school_id: schoolId,
+        item_id: form.item_id,
+        qty: form.qty,
+        issued_to: buildIssuedTo(),
+        notes: form.notes || null,
+        issued_by: user?.id ?? null,
       });
       if (insErr) throw insErr;
+      // Note: trg_stock_issue trigger handles current_qty deduction automatically
+      // but the frontend also updates optimistically for immediate UI refresh
       const { error: updErr } = await supabase.from("inventory_items")
         .update({ current_qty: available - form.qty }).eq("id", form.item_id);
       if (updErr) throw updErr;
@@ -318,7 +350,7 @@ function IssueDialog({ schoolId, items }: { schoolId: string | undefined; items:
       qc.invalidateQueries({ queryKey: ["inventory", "inventory_items", schoolId] });
       toast.success("Issue recorded");
       setOpen(false);
-      setForm({ item_id: "", qty: 1, issued_to: "", notes: "" });
+      setForm({ item_id: "", qty: 1, destination: "", person: "", notes: "" });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -327,24 +359,57 @@ function IssueDialog({ schoolId, items }: { schoolId: string | undefined; items:
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" disabled={!items.length}><Plus className="w-4 h-4 mr-1" />Issue</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Issue stock</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Issue Stock</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Item</Label>
             <Select value={form.item_id} onValueChange={(v) => setForm({ ...form, item_id: v })}>
               <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-              <SelectContent>{items.map((i) => <SelectItem key={i.id} value={i.id}>{i.name} ({i.current_qty} in stock)</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {items.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>
+                    {i.name} <span className="text-muted-foreground">({i.current_qty} {i.unit} in stock)</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label>Quantity</Label><Input type="number" min={1} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} /></div>
-            <div><Label>Issued to</Label><Input value={form.issued_to} onChange={(e) => setForm({ ...form, issued_to: e.target.value })} placeholder="Name / dept / class" /></div>
+          <div>
+            <Label>Destination</Label>
+            <Select value={form.destination} onValueChange={(v) => setForm({ ...form, destination: v, person: "" })}>
+              <SelectTrigger><SelectValue placeholder="Where is this going?" /></SelectTrigger>
+              <SelectContent>
+                {ISSUE_DESTINATIONS.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>
+                    <span>{d.label}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{d.hint}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedDest && (
+              <p className="text-xs text-muted-foreground mt-1">{selectedDest.hint}</p>
+            )}
           </div>
-          <div><Label>Notes</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          {(form.destination === "class" || form.destination === "staff" || form.destination === "other") && (
+            <div>
+              <Label>{form.destination === "class" ? "Class name" : form.destination === "staff" ? "Staff name" : "Specify recipient"}</Label>
+              <Input
+                value={form.person}
+                onChange={(e) => setForm({ ...form, person: e.target.value })}
+                placeholder={form.destination === "class" ? "e.g. Form 3A" : form.destination === "staff" ? "e.g. John Kamau" : "Recipient name"}
+              />
+            </div>
+          )}
+          <div>
+            <Label>Quantity</Label>
+            <Input type="number" min={1} value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
+          </div>
+          <div><Label>Notes</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional notes" /></div>
         </div>
         <DialogFooter>
-          <Button disabled={!form.item_id || form.qty <= 0 || m.isPending} onClick={() => m.mutate()}>
-            {m.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+          <Button disabled={!form.item_id || !form.destination || form.qty <= 0 || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Issue"}
           </Button>
         </DialogFooter>
       </DialogContent>
