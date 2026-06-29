@@ -330,7 +330,69 @@ export const recordPettyCash = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
-// ── 15. Seed expense categories ──────────────────────────────
+// ── 15. Update expense (pending only) ────────────────────────
+export const updateExpense = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) =>
+    z.object({
+      expense_id: z.string().uuid(),
+      category_id: z.string().uuid().optional(),
+      title: z.string().min(1).optional(),
+      description: z.string().optional(),
+      amount: z.number().positive().optional(),
+      expense_date: z.string().optional(),
+      payment_method: z.enum(["cash", "cheque", "bank_transfer", "mpesa", "card", "other"]).optional(),
+      reference: z.string().optional(),
+      payee: z.string().optional(),
+      term: z.string().optional(),
+      year: z.number().int().optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinance(context);
+    const schoolId = await getSchoolId(context);
+    const { expense_id, ...fields } = data;
+    const { data: exp } = await supabaseAdmin
+      .from("expenses")
+      .select("status, school_id")
+      .eq("id", expense_id)
+      .eq("school_id", schoolId)
+      .single();
+    if (!exp) throw new Error("Expense not found");
+    if (exp.status !== "pending") throw new Error("Only pending expenses can be edited");
+    const { error } = await supabaseAdmin
+      .from("expenses")
+      .update(fields as any)
+      .eq("id", expense_id)
+      .eq("school_id", schoolId);
+    if (error) throw new Error(error.message);
+  });
+
+// ── 16. Delete expense (pending only) ────────────────────────
+// Only pending expenses can be deleted; approved/paid ones must be rejected via approval flow
+export const deleteExpense = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => z.object({ expense_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertFinanceWrite(context);
+    const schoolId = await getSchoolId(context);
+    const { data: exp, error: fetchErr } = await supabaseAdmin
+      .from("expenses")
+      .select("id, status, school_id")
+      .eq("id", data.expense_id)
+      .eq("school_id", schoolId)
+      .single();
+    if (fetchErr || !exp) throw new Error("Expense not found");
+    if (exp.status !== "pending") throw new Error("Only pending expenses can be deleted");
+    const { error } = await supabaseAdmin
+      .from("expenses")
+      .delete()
+      .eq("id", data.expense_id)
+      .eq("school_id", schoolId);
+    if (error) throw new Error(error.message);
+  });
+
+// ── 16. Seed expense categories ──────────────────────────────
 // FIX: was calling RPC with p_school_id, which requires SECURITY DEFINER
 // but here we call it as the authenticated user — the RPC now takes p_school_id
 export const seedExpenseCategories = createServerFn({ method: "POST" })
