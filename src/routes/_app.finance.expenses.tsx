@@ -103,7 +103,7 @@ function Page() {
 
   async function handleDelete(id: string) {
     try {
-      await deleteFn({ data: { id } });
+      await deleteFn({ data: { expense_id: id } });
       toast.success("Expense deleted");
       invalidate();
     } catch (e: any) { toast.error(e.message); }
@@ -323,7 +323,7 @@ function ExpenseDialog({ initial, onDone }: { initial?: any; onDone: () => void 
   const m = useMutation({
     mutationFn: () =>
       isEdit
-        ? updFn({ data: { id: initial.id, ...f, category_id: f.category_id || undefined } })
+        ? updFn({ data: { expense_id: initial.id, ...f, category_id: f.category_id || undefined } })
         : recFn({ data: { ...f, category_id: f.category_id || undefined } }),
     onSuccess: () => { toast.success(isEdit ? "Expense updated" : "Expense recorded"); onDone(); },
     onError: (e: any) => toast.error(e.message),
