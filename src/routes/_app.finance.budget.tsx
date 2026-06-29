@@ -68,7 +68,7 @@ function Page() {
 
   async function handleDelete(id: string, name: string) {
     try {
-      await delFn({ data: { id } });
+      await delFn({ data: { budget_id: id } });
       toast.success(`"${name}" deleted`);
       invalidate();
     } catch (e: any) { toast.error(e.message); }
