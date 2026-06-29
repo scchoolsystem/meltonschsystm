@@ -22,57 +22,74 @@ export const Route = createFileRoute("/_app/analytics")({ component: Analytics }
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
 
+// ─── Tab definitions ──────────────────────────────────────────────────────────
 const ALL_TABS = [
-  { key: "overview",   label: "Overview",   icon: TrendingUp,    roles: [] },
-  { key: "academics",  label: "Academics",  icon: GraduationCap, roles: ["teacher","class_teacher","subject_teacher","hod","academic_master","exams_admin","exams_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "finance",    label: "Finance",    icon: DollarSign,    roles: ["bursar","finance_admin","finance_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "library",    label: "Library",    icon: Library,       roles: ["librarian","library_admin","library_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "kitchen",    label: "Kitchen",    icon: Utensils,      roles: ["kitchen_admin","kitchen_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "store",      label: "Store",      icon: Package,       roles: ["store_admin","store_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "transport",  label: "Transport",  icon: Bus,           roles: ["transport_admin","transport_officer","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "clinic",     label: "Clinic",     icon: Stethoscope,   roles: ["nurse","clinic_admin","clinic_user","matron","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "security",   label: "Security",   icon: ShieldCheck,   roles: ["security_admin","security_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "sports",     label: "Sports",     icon: Trophy,        roles: ["sports_admin","sports_user","sports","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "overview",    label: "Overview",     icon: TrendingUp,    roles: [] },          // all
+  { key: "academics",   label: "Academics",    icon: GraduationCap, roles: ["teacher","class_teacher","subject_teacher","hod","academic_master","exams_admin","exams_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "finance",     label: "Finance",      icon: DollarSign,    roles: ["bursar","finance_admin","finance_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "library",     label: "Library",      icon: Library,       roles: ["librarian","library_admin","library_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "kitchen",     label: "Kitchen",      icon: Utensils,      roles: ["kitchen_admin","kitchen_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "store",       label: "Store",        icon: Package,       roles: ["store_admin","store_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "transport",   label: "Transport",    icon: Bus,           roles: ["transport_admin","transport_officer","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "clinic",      label: "Clinic",       icon: Stethoscope,   roles: ["nurse","clinic_admin","clinic_user","matron","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "security",    label: "Security",     icon: ShieldCheck,   roles: ["security_admin","security_user","principal","deputy_principal","school_admin","super_admin"] },
+  { key: "sports",      label: "Sports",       icon: Trophy,        roles: ["sports_admin","sports_user","sports","principal","deputy_principal","school_admin","super_admin"] },
 ];
 
 function Analytics() {
   const { roles } = useAuth();
   const userRoles = (roles ?? []) as AppRole[];
-  const visibleTabs = ALL_TABS.filter((t) => t.roles.length === 0 || t.roles.some((r) => userRoles.includes(r as AppRole)));
+
+  const visibleTabs = ALL_TABS.filter(
+    (t) => t.roles.length === 0 || t.roles.some((r) => userRoles.includes(r as AppRole))
+  );
   const [activeTab, setActiveTab] = useState(visibleTabs[0]?.key ?? "overview");
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Analytics & Intelligence</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <TrendingUp className="w-5 h-5" /> Analytics & Intelligence
+        </h1>
         <p className="text-sm text-muted-foreground">Real-time insights across all departments</p>
       </div>
+
+      {/* Tab bar */}
       <div className="flex gap-1 overflow-x-auto pb-1 border-b">
         {visibleTabs.map((t) => {
           const Icon = t.icon;
           return (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-t whitespace-nowrap transition-colors ${activeTab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-              <Icon className="w-4 h-4" />{t.label}
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-t whitespace-nowrap transition-colors ${
+                activeTab === t.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
             </button>
           );
         })}
       </div>
-      {activeTab === "overview"   && <OverviewTab />}
-      {activeTab === "academics"  && <AcademicsTab />}
-      {activeTab === "finance"    && <FinanceTab />}
-      {activeTab === "library"    && <LibraryTab />}
-      {activeTab === "kitchen"    && <KitchenTab />}
-      {activeTab === "store"      && <StoreTab />}
-      {activeTab === "transport"  && <TransportTab />}
-      {activeTab === "clinic"     && <ClinicTab />}
-      {activeTab === "security"   && <SecurityTab />}
-      {activeTab === "sports"     && <SportsTab />}
+
+      {activeTab === "overview"  && <OverviewTab />}
+      {activeTab === "academics" && <AcademicsTab />}
+      {activeTab === "finance"   && <FinanceTab />}
+      {activeTab === "library"   && <LibraryTab />}
+      {activeTab === "kitchen"   && <KitchenTab />}
+      {activeTab === "store"     && <StoreTab />}
+      {activeTab === "transport" && <TransportTab />}
+      {activeTab === "clinic"    && <ClinicTab />}
+      {activeTab === "security"  && <SecurityTab />}
+      {activeTab === "sports"    && <SportsTab />}
     </div>
   );
 }
 
-// ─── Overview ─────────────────────────────────────────────────────────────────
+// ─── Overview tab ─────────────────────────────────────────────────────────────
 function OverviewTab() {
   const { data: kpis } = useQuery({
     queryKey: ["analytics-kpis"],
@@ -137,11 +154,12 @@ function OverviewTab() {
         <Kpi icon={<Wallet className="w-4 h-4" />} label="Fee Collection" value={`${(kpis?.collection ?? 0).toFixed(0)}%`} sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`} />
         <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Defaulters" value={kpis?.defaulters ?? 0} />
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader><CardTitle className="text-base">Attendance trend (30 days)</CardTitle></CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <LineChart data={attTrend}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis /><Tooltip /><Legend />
                 <Line type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} />
@@ -153,7 +171,7 @@ function OverviewTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Student gender mix</CardTitle></CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <PieChart>
                 <Pie data={genderMix} dataKey="value" nameKey="name" outerRadius={90} label>
                   {genderMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -164,6 +182,7 @@ function OverviewTab() {
           </CardContent>
         </Card>
       </div>
+
       <Card>
         <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-destructive" /> At-risk students</CardTitle></CardHeader>
         <CardContent>
@@ -188,7 +207,7 @@ function OverviewTab() {
   );
 }
 
-// ─── Academics ────────────────────────────────────────────────────────────────
+// ─── Academics tab ────────────────────────────────────────────────────────────
 function AcademicsTab() {
   const { data: subjectAvg = [] } = useQuery({
     queryKey: ["analytics-subject-means"],
@@ -197,6 +216,7 @@ function AcademicsTab() {
       return (data ?? []).map((r: any) => ({ code: r.subject_code ?? "—", mean: Number(r.mean_score) }));
     },
   });
+
   const { data: classPerf = [] } = useQuery({
     queryKey: ["analytics-class-perf"],
     queryFn: async () => {
@@ -211,6 +231,7 @@ function AcademicsTab() {
       return Array.from(map.values()).map((c) => ({ className: c.className, mean: c.count ? Math.round((c.sum / c.count) * 10) / 10 : 0 })).sort((a, b) => b.mean - a.mean);
     },
   });
+
   const { data: weakStudents = [] } = useQuery({
     queryKey: ["analytics-weak"],
     queryFn: async () => {
@@ -226,7 +247,7 @@ function AcademicsTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Subject performance (avg score)</CardTitle></CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <BarChart data={subjectAvg.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="code" /><YAxis domain={[0, 100]} /><Tooltip />
                 <Bar dataKey="mean" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
@@ -237,7 +258,7 @@ function AcademicsTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Class performance comparison</CardTitle></CardHeader>
           <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <BarChart data={classPerf}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="className" /><YAxis domain={[0, 100]} /><Tooltip />
                 <Bar dataKey="mean" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} />
@@ -265,7 +286,7 @@ function AcademicsTab() {
   );
 }
 
-// ─── Finance ──────────────────────────────────────────────────────────────────
+// ─── Finance tab ──────────────────────────────────────────────────────────────
 function FinanceTab() {
   const { data: financeTrend = [] } = useQuery({
     queryKey: ["analytics-finance-trend"],
@@ -283,6 +304,7 @@ function FinanceTab() {
       return Array.from(buckets.values()).sort((a, b) => a.month.localeCompare(b.month));
     },
   });
+
   const { data: summary } = useQuery({
     queryKey: ["analytics-finance-summary"],
     queryFn: async () => {
@@ -302,7 +324,7 @@ function FinanceTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Revenue trend (last 6 months)</CardTitle></CardHeader>
         <CardContent className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer>
             <LineChart data={financeTrend}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip /><Legend />
               <Line type="monotone" dataKey="invoiced" stroke="hsl(var(--primary))" strokeWidth={2} />
@@ -315,30 +337,23 @@ function FinanceTab() {
   );
 }
 
-// ─── Library ──────────────────────────────────────────────────────────────────
+// ─── Library tab ──────────────────────────────────────────────────────────────
 function LibraryTab() {
   const { data: loans = [] } = useQuery({
     queryKey: ["analytics-library-loans"],
     queryFn: async () => {
-      // table: book_loans  columns: status, due_on, borrowed_on
-      const { data } = await supabase
-        .from("book_loans")
-        .select("id, status, due_on, borrowed_on, book_id, student_id, staff_id");
+      const { data } = await supabase.from("library_loans").select("id, returned, due_date, created_at, book_id, student_id");
       return data ?? [];
     },
   });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const active   = loans.filter((l: any) => l.status === "active").length;
-  const overdue  = loans.filter((l: any) => l.status === "active" && l.due_on && l.due_on < today).length;
-  const returned = loans.filter((l: any) => l.status === "returned").length;
+  const active = loans.filter((l: any) => !l.returned).length;
+  const overdue = loans.filter((l: any) => !l.returned && l.due_date && new Date(l.due_date) < new Date()).length;
+  const returned = loans.filter((l: any) => l.returned).length;
 
   const monthly = (() => {
     const m = new Map<string, number>();
-    loans.forEach((l: any) => {
-      const k = (l.borrowed_on ?? "").slice(0, 7);   // use borrowed_on, not created_at
-      if (k) m.set(k, (m.get(k) ?? 0) + 1);
-    });
+    loans.forEach((l: any) => { const k = (l.created_at ?? "").slice(0, 7); if (k) m.set(k, (m.get(k) ?? 0) + 1); });
     return Array.from(m.entries()).sort().map(([month, count]) => ({ month, count }));
   })();
 
@@ -352,7 +367,7 @@ function LibraryTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Monthly loan activity</CardTitle></CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer>
             <BarChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis /><Tooltip />
               <Bar dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
@@ -364,7 +379,7 @@ function LibraryTab() {
   );
 }
 
-// ─── Kitchen ──────────────────────────────────────────────────────────────────
+// ─── Kitchen tab ──────────────────────────────────────────────────────────────
 function KitchenTab() {
   const { data: meals = [] } = useQuery({
     queryKey: ["analytics-kitchen-meals"],
@@ -397,7 +412,7 @@ function KitchenTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Servings by meal type</CardTitle></CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <PieChart>
                 <Pie data={byType} dataKey="value" nameKey="name" outerRadius={80} label>
                   {byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -410,7 +425,7 @@ function KitchenTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Daily servings trend</CardTitle></CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <LineChart data={daily}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis /><Tooltip />
                 <Line type="monotone" dataKey="servings" stroke="hsl(var(--primary))" strokeWidth={2} />
@@ -423,7 +438,7 @@ function KitchenTab() {
   );
 }
 
-// ─── Store ────────────────────────────────────────────────────────────────────
+// ─── Store / Inventory tab ────────────────────────────────────────────────────
 function StoreTab() {
   const { data: items = [] } = useQuery({
     queryKey: ["analytics-inventory"],
@@ -451,7 +466,7 @@ function StoreTab() {
         <Card>
           <CardHeader><CardTitle className="text-base">Items by category</CardTitle></CardHeader>
           <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer>
               <BarChart data={byCategory}>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip />
                 <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
@@ -464,7 +479,7 @@ function StoreTab() {
           <CardContent>
             {lowStock.length === 0 ? <p className="text-sm text-muted-foreground">All items are sufficiently stocked.</p> : (
               <ul className="text-sm space-y-1.5">
-                {(lowStock as any[]).map((i: any) => (
+                {lowStock.map((i: any) => (
                   <li key={i.id} className="flex items-center justify-between border-b pb-1.5">
                     <div><div className="font-medium">{i.name}</div><div className="text-xs text-muted-foreground">{i.category}</div></div>
                     <Badge variant="destructive">{i.quantity} {i.unit}</Badge>
@@ -479,7 +494,7 @@ function StoreTab() {
   );
 }
 
-// ─── Transport ────────────────────────────────────────────────────────────────
+// ─── Transport tab ────────────────────────────────────────────────────────────
 function TransportTab() {
   const { data: routes = [] } = useQuery({
     queryKey: ["analytics-transport-routes"],
@@ -503,8 +518,8 @@ function TransportTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Route capacity vs assigned</CardTitle></CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={(routes as any[]).map((r: any) => ({ name: r.name, capacity: Number(r.capacity ?? 0), assigned: Number(r.assigned_students ?? 0) }))}>
+          <ResponsiveContainer>
+            <BarChart data={routes.map((r: any) => ({ name: r.name, capacity: Number(r.capacity ?? 0), assigned: Number(r.assigned_students ?? 0) }))}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Legend />
               <Bar dataKey="capacity" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
               <Bar dataKey="assigned" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -516,7 +531,7 @@ function TransportTab() {
   );
 }
 
-// ─── Clinic ───────────────────────────────────────────────────────────────────
+// ─── Clinic tab ───────────────────────────────────────────────────────────────
 function ClinicTab() {
   const { data: visits = [] } = useQuery({
     queryKey: ["analytics-clinic-visits"],
@@ -542,7 +557,7 @@ function ClinicTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Top complaints (30 days)</CardTitle></CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer>
             <BarChart data={byComplaint} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} /><Tooltip />
               <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
@@ -554,7 +569,7 @@ function ClinicTab() {
   );
 }
 
-// ─── Security ─────────────────────────────────────────────────────────────────
+// ─── Security tab ─────────────────────────────────────────────────────────────
 function SecurityTab() {
   const { data: logs = [] } = useQuery({
     queryKey: ["analytics-security-logs"],
@@ -580,7 +595,7 @@ function SecurityTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Events by type (7 days)</CardTitle></CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer>
             <PieChart>
               <Pie data={byType} dataKey="value" nameKey="name" outerRadius={80} label>
                 {byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -594,7 +609,7 @@ function SecurityTab() {
   );
 }
 
-// ─── Sports ───────────────────────────────────────────────────────────────────
+// ─── Sports tab ───────────────────────────────────────────────────────────────
 function SportsTab() {
   const { data: activities = [] } = useQuery({
     queryKey: ["analytics-cocurricular"],
@@ -621,7 +636,7 @@ function SportsTab() {
       <Card>
         <CardHeader><CardTitle className="text-base">Activities by category</CardTitle></CardHeader>
         <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer>
             <BarChart data={byCategory}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip />
               <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
@@ -633,7 +648,7 @@ function SportsTab() {
   );
 }
 
-// ─── Shared ───────────────────────────────────────────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: any; sub?: string }) {
   return (
     <Card>
