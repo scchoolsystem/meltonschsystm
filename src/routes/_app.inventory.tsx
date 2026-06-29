@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -12,57 +12,77 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Plus, Package, AlertTriangle, Search, Filter, X } from "lucide-react";
+import { Loader2, Plus, AlertTriangle, Search, Filter, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTenant } from "@/hooks/use-tenant";
 import { useAuth } from "@/hooks/use-auth";
-
-// ─── SQL to run once in Supabase SQL editor (not a migration file) ──────────
-// ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS category text DEFAULT 'general';
-// ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS description text;
-// ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS location text;
-// ─────────────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/_app/inventory")({
   component: InventoryPage,
 });
 
-// ─── Item categories ─────────────────────────────────────────────────────────
+// ─── Item categories ──────────────────────────────────────────────────────────
 const ITEM_CATEGORIES = [
-  { value: "furniture",     label: "🪑 Furniture",        hint: "Desks, chairs, shelves, beds" },
-  { value: "stationery",    label: "✏️ Stationery",       hint: "Pens, paper, books, files" },
-  { value: "electronics",   label: "💻 Electronics",      hint: "Computers, projectors, cables" },
-  { value: "medical",       label: "💊 Medical",          hint: "Medicines, bandages, equipment" },
-  { value: "kitchen",       label: "🍽️ Kitchen",          hint: "Food items, utensils, gas" },
-  { value: "cleaning",      label: "🧹 Cleaning",         hint: "Detergents, mops, bins" },
-  { value: "sports",        label: "⚽ Sports",           hint: "Balls, nets, jerseys" },
-  { value: "laboratory",    label: "🔬 Laboratory",       hint: "Chemicals, glassware, specimens" },
-  { value: "library",       label: "📚 Library",          hint: "Books, journals, CDs" },
-  { value: "tools",         label: "🔧 Tools",            hint: "Hardware, maintenance tools" },
-  { value: "transport",     label: "🚌 Transport",        hint: "Spare parts, fuel, tyres" },
-  { value: "security",      label: "🔒 Security",         hint: "Torches, uniforms, equipment" },
-  { value: "boarding",      label: "🛏️ Boarding",         hint: "Bedding, mattresses, lockers" },
-  { value: "general",       label: "📦 General",          hint: "Miscellaneous" },
+  { value: "furniture",   label: "🪑 Furniture",      hint: "Desks, chairs, shelves, beds" },
+  { value: "stationery",  label: "✏️ Stationery",     hint: "Pens, paper, books, files" },
+  { value: "electronics", label: "💻 Electronics",    hint: "Computers, projectors, cables" },
+  { value: "medical",     label: "💊 Medical",        hint: "Medicines, bandages, equipment" },
+  { value: "kitchen",     label: "🍽️ Kitchen",        hint: "Food items, utensils, gas" },
+  { value: "cleaning",    label: "🧹 Cleaning",       hint: "Detergents, mops, bins" },
+  { value: "sports",      label: "⚽ Sports",         hint: "Balls, nets, jerseys" },
+  { value: "laboratory",  label: "🔬 Laboratory",     hint: "Chemicals, glassware, specimens" },
+  { value: "library",     label: "📚 Library",        hint: "Books, journals, CDs" },
+  { value: "tools",       label: "🔧 Tools",          hint: "Hardware, maintenance tools" },
+  { value: "transport",   label: "🚌 Transport",      hint: "Spare parts, fuel, tyres" },
+  { value: "security",    label: "🔒 Security",       hint: "Torches, uniforms, equipment" },
+  { value: "boarding",    label: "🛏️ Boarding",       hint: "Bedding, mattresses, lockers" },
+  { value: "general",     label: "📦 General",        hint: "Miscellaneous" },
 ];
 
 const categoryLabel = (v: string) => ITEM_CATEGORIES.find(c => c.value === v)?.label ?? v;
 
 // ─── Issue destinations ───────────────────────────────────────────────────────
 const ISSUE_DESTINATIONS = [
-  { value: "class",       label: "🏫 Classroom",      hint: "Issued to a specific class — picks students & desk count", hasClass: true },
-  { value: "clinic",      label: "🏥 Clinic",         hint: "Auto-routes to clinic stock", suggestCategories: ["medical", "cleaning"] },
-  { value: "kitchen",     label: "🍽️ Kitchen",        hint: "Auto-routes to kitchen stock", suggestCategories: ["kitchen", "cleaning"] },
-  { value: "library",     label: "📚 Library",        hint: "Library department",            suggestCategories: ["library", "stationery"] },
-  { value: "boarding",    label: "🛏️ Boarding",       hint: "Dormitory / boarding",          suggestCategories: ["boarding", "cleaning"] },
-  { value: "laboratory",  label: "🔬 Laboratory",     hint: "Science laboratory",            suggestCategories: ["laboratory"] },
-  { value: "sports",      label: "⚽ Sports",         hint: "Sports & PE department",        suggestCategories: ["sports"] },
-  { value: "admin",       label: "🏢 Administration", hint: "Admin office",                  suggestCategories: ["stationery", "electronics"] },
-  { value: "maintenance", label: "🔧 Maintenance",    hint: "Maintenance & repairs",         suggestCategories: ["tools", "cleaning"] },
-  { value: "security",    label: "🔒 Security",       hint: "Security department",           suggestCategories: ["security"] },
-  { value: "transport",   label: "🚌 Transport",      hint: "Transport department",          suggestCategories: ["transport"] },
+  { value: "class",       label: "🏫 Classroom",      hint: "Issued to a specific class", hasClass: true },
+  { value: "clinic",      label: "🏥 Clinic",         hint: "Auto-routes to clinic stock",       suggestCategories: ["medical", "cleaning"] },
+  { value: "kitchen",     label: "🍽️ Kitchen",        hint: "Auto-routes to kitchen stock",      suggestCategories: ["kitchen", "cleaning"] },
+  { value: "library",     label: "📚 Library",        hint: "Library department",                suggestCategories: ["library", "stationery"] },
+  { value: "boarding",    label: "🛏️ Boarding",       hint: "Dormitory / boarding",              suggestCategories: ["boarding", "cleaning"] },
+  { value: "laboratory",  label: "🔬 Laboratory",     hint: "Science laboratory",                suggestCategories: ["laboratory"] },
+  { value: "sports",      label: "⚽ Sports",         hint: "Sports & PE department",            suggestCategories: ["sports"] },
+  { value: "admin",       label: "🏢 Administration", hint: "Admin office",                      suggestCategories: ["stationery", "electronics"] },
+  { value: "maintenance", label: "🔧 Maintenance",    hint: "Maintenance & repairs",             suggestCategories: ["tools", "cleaning"] },
+  { value: "security",    label: "🔒 Security",       hint: "Security department",               suggestCategories: ["security"] },
+  { value: "transport",   label: "🚌 Transport",      hint: "Transport department",              suggestCategories: ["transport"] },
   { value: "staff",       label: "👤 Staff Member",   hint: "Issued to individual staff" },
   { value: "other",       label: "📦 Other",          hint: "Other — specify in notes" },
 ];
+
+// ─── Hook: resolve schoolId (useTenant + direct DB fallback) ─────────────────
+function useSchoolId() {
+  const { school } = useTenant();
+  const [fallbackId, setFallbackId] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // If useTenant already gave us an id, no need for fallback
+    if (school?.id) return;
+    // Only attempt fallback once
+    if (fallbackId) return;
+    setLoading(true);
+    supabase
+      .from("schools" as any)
+      .select("id")
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data?.id) setFallbackId(data.id);
+        setLoading(false);
+      });
+  }, [school?.id, fallbackId]);
+
+  return { schoolId: school?.id ?? fallbackId, loading: !school?.id && loading };
+}
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 function useInv<T = any>(table: string, schoolId: string | undefined) {
@@ -133,22 +153,29 @@ function useInvMutation(table: string, schoolId: string | undefined, onDone: () 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 function InventoryPage() {
   const [tab, setTab] = useState("items");
-  const { school } = useTenant();
-  const schoolId = school?.id;
+  const { schoolId, loading: schoolLoading } = useSchoolId();
   const { isAdmin, hasRole } = useAuth();
   const canEdit = isAdmin || hasRole("store_admin") || hasRole("store_user") || hasRole("bursar");
 
-  const itemsQ    = useInv<any>("inventory_items", schoolId);
+  const itemsQ     = useInv<any>("inventory_items", schoolId);
   const suppliersQ = useInv<any>("inventory_suppliers", schoolId);
   const receiptsQ  = useInv<any>("inventory_receipts", schoolId);
   const issuesQ    = useInv<any>("inventory_issues", schoolId);
   const classesQ   = useClasses(schoolId);
 
-  // Low stock items for quick alert
   const lowStock = useMemo(() =>
-    (itemsQ.data ?? []).filter((i: any) => Number(i.current_qty) <= Number(i.reorder_level) && Number(i.reorder_level) > 0),
-    [itemsQ.data]
+    (itemsQ.data ?? []).filter((i: any) =>
+      Number(i.current_qty) <= Number(i.reorder_level) && Number(i.reorder_level) > 0
+    ), [itemsQ.data]
   );
+
+  if (schoolLoading || !schoolId) {
+    return (
+      <div className="grid place-items-center py-24">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -173,48 +200,32 @@ function InventoryPage() {
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
 
-        {/* ── ITEMS ── */}
         <TabsContent value="items">
-          <ItemsTab
-            q={itemsQ}
-            schoolId={schoolId}
-            canEdit={canEdit}
-          />
+          <ItemsTab q={itemsQ} schoolId={schoolId} canEdit={canEdit} />
         </TabsContent>
 
-        {/* ── RECEIPTS ── */}
         <TabsContent value="receipts">
           <GenericTab
             q={receiptsQ}
             cols={["received_at", "item_id", "qty", "unit_cost"]}
             lookups={{ item_id: itemsQ.data }}
             action={canEdit && (
-              <ReceiptDialog
-                schoolId={schoolId}
-                items={itemsQ.data ?? []}
-                suppliers={suppliersQ.data ?? []}
-              />
+              <ReceiptDialog schoolId={schoolId} items={itemsQ.data ?? []} suppliers={suppliersQ.data ?? []} />
             )}
           />
         </TabsContent>
 
-        {/* ── ISSUES ── */}
         <TabsContent value="issues">
           <GenericTab
             q={issuesQ}
             cols={["issued_at", "item_id", "qty", "issued_to", "notes"]}
             lookups={{ item_id: itemsQ.data }}
             action={canEdit && (
-              <IssueDialog
-                schoolId={schoolId}
-                items={itemsQ.data ?? []}
-                classes={classesQ.data ?? []}
-              />
+              <IssueDialog schoolId={schoolId} items={itemsQ.data ?? []} classes={classesQ.data ?? []} />
             )}
           />
         </TabsContent>
 
-        {/* ── SUPPLIERS ── */}
         <TabsContent value="suppliers">
           <GenericTab
             q={suppliersQ}
@@ -227,11 +238,10 @@ function InventoryPage() {
   );
 }
 
-// ─── Items tab (grouped by category) ─────────────────────────────────────────
-function ItemsTab({ q, schoolId, canEdit }: { q: any; schoolId: string | undefined; canEdit: boolean }) {
+// ─── Items tab ────────────────────────────────────────────────────────────────
+function ItemsTab({ q, schoolId, canEdit }: { q: any; schoolId: string; canEdit: boolean }) {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState<string>("all");
-
   const items: any[] = q.data ?? [];
 
   const filtered = useMemo(() => items.filter((i) => {
@@ -240,7 +250,6 @@ function ItemsTab({ q, schoolId, canEdit }: { q: any; schoolId: string | undefin
     return matchSearch && matchCat;
   }), [items, search, filterCat]);
 
-  // Group by category
   const grouped = useMemo(() => {
     const map = new Map<string, any[]>();
     for (const item of filtered) {
@@ -258,7 +267,6 @@ function ItemsTab({ q, schoolId, canEdit }: { q: any; schoolId: string | undefin
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -313,7 +321,9 @@ function ItemsTab({ q, schoolId, canEdit }: { q: any; schoolId: string | undefin
 function CategoryGroup({ category, items }: { category: string; items: any[] }) {
   const [collapsed, setCollapsed] = useState(false);
   const catDef = ITEM_CATEGORIES.find(c => c.value === category);
-  const lowCount = items.filter(i => Number(i.current_qty) <= Number(i.reorder_level) && Number(i.reorder_level) > 0).length;
+  const lowCount = items.filter(i =>
+    Number(i.current_qty) <= Number(i.reorder_level) && Number(i.reorder_level) > 0
+  ).length;
 
   return (
     <Card>
@@ -324,9 +334,7 @@ function CategoryGroup({ category, items }: { category: string; items: any[] }) 
         <div className="flex items-center gap-2">
           <span className="font-semibold">{catDef?.label ?? category}</span>
           <Badge variant="secondary">{items.length}</Badge>
-          {lowCount > 0 && (
-            <Badge variant="destructive" className="text-xs">{lowCount} low</Badge>
-          )}
+          {lowCount > 0 && <Badge variant="destructive" className="text-xs">{lowCount} low</Badge>}
         </div>
         <span className="text-xs text-muted-foreground">{catDef?.hint}</span>
       </CardHeader>
@@ -380,7 +388,7 @@ function CategoryGroup({ category, items }: { category: string; items: any[] }) 
   );
 }
 
-// ─── Generic tab (receipts / issues / suppliers) ──────────────────────────────
+// ─── Generic tab ──────────────────────────────────────────────────────────────
 function GenericTab({ q, cols, lookups, action }: {
   q: any;
   cols: string[];
@@ -419,9 +427,7 @@ function GenericTab({ q, cols, lookups, action }: {
                 <TableRow key={row.id}>
                   {cols.map((c) => (
                     <TableCell key={c} className="text-sm">
-                      {lookups?.[c]
-                        ? formatLookup(row[c], lookups[c])
-                        : formatCell(row[c])}
+                      {lookups?.[c] ? formatLookup(row[c], lookups[c]) : formatCell(row[c])}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -446,12 +452,11 @@ function formatLookup(id: any, rows?: any[]): string {
 }
 
 // ─── Item dialog ──────────────────────────────────────────────────────────────
-function ItemDialog({ schoolId }: { schoolId: string | undefined }) {
+function ItemDialog({ schoolId }: { schoolId: string }) {
   const [open, setOpen] = useState(false);
   const empty = { sku: "", name: "", category: "general", unit: "unit", current_qty: 0, reorder_level: 0, location: "", description: "" };
   const [form, setForm] = useState(empty);
   const m = useInvMutation("inventory_items", schoolId, () => { setOpen(false); setForm(empty); });
-
   const f = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value });
 
   return (
@@ -516,7 +521,7 @@ function ItemDialog({ schoolId }: { schoolId: string | undefined }) {
 }
 
 // ─── Supplier dialog ──────────────────────────────────────────────────────────
-function SupplierDialog({ schoolId }: { schoolId: string | undefined }) {
+function SupplierDialog({ schoolId }: { schoolId: string }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", contact: "", notes: "" });
   const m = useInvMutation("inventory_suppliers", schoolId, () => { setOpen(false); setForm({ name: "", contact: "", notes: "" }); });
@@ -545,7 +550,7 @@ function SupplierDialog({ schoolId }: { schoolId: string | undefined }) {
 }
 
 // ─── Receipt dialog ───────────────────────────────────────────────────────────
-function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string | undefined; items: any[]; suppliers: any[] }) {
+function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string; items: any[]; suppliers: any[] }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ item_id: "", supplier_id: "", qty: 1, unit_cost: 0 });
   const qc = useQueryClient();
@@ -555,13 +560,16 @@ function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string | unde
     mutationFn: async () => {
       if (!form.item_id) throw new Error("Pick an item");
       const { error: insErr } = await supabase.from("inventory_receipts").insert({
-        school_id: schoolId, item_id: form.item_id, supplier_id: form.supplier_id || null,
-        qty: form.qty, unit_cost: form.unit_cost || null, received_by: user?.id ?? null,
+        school_id: schoolId, item_id: form.item_id,
+        supplier_id: form.supplier_id || null,
+        qty: form.qty, unit_cost: form.unit_cost || null,
+        received_by: user?.id ?? null,
       });
       if (insErr) throw insErr;
       const item = items.find((i) => i.id === form.item_id);
       const { error: updErr } = await supabase.from("inventory_items")
-        .update({ current_qty: (item?.current_qty ?? 0) + form.qty }).eq("id", form.item_id);
+        .update({ current_qty: (item?.current_qty ?? 0) + form.qty })
+        .eq("id", form.item_id);
       if (updErr) throw updErr;
     },
     onSuccess: () => {
@@ -607,7 +615,7 @@ function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string | unde
             </Select>
             {selectedItem && (
               <p className="text-xs text-muted-foreground mt-1">
-                Current stock: <strong>{selectedItem.current_qty}</strong> {selectedItem.unit} · Category: {categoryLabel(selectedItem.category ?? "general")}
+                Current stock: <strong>{selectedItem.current_qty}</strong> {selectedItem.unit} · {categoryLabel(selectedItem.category ?? "general")}
               </p>
             )}
           </div>
@@ -636,34 +644,19 @@ function ReceiptDialog({ schoolId, items, suppliers }: { schoolId: string | unde
   );
 }
 
-// ─── Issue dialog (smart: class-aware, destination-aware) ─────────────────────
-function IssueDialog({ schoolId, items, classes }: {
-  schoolId: string | undefined;
-  items: any[];
-  classes: any[];
-}) {
+// ─── Issue dialog ─────────────────────────────────────────────────────────────
+function IssueDialog({ schoolId, items, classes }: { schoolId: string; items: any[]; classes: any[] }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    item_id: "",
-    qty: 1,
-    destination: "",
-    class_id: "",
-    staff_name: "",
-    notes: "",
-  });
+  const [form, setForm] = useState({ item_id: "", qty: 1, destination: "", class_id: "", staff_name: "", notes: "" });
   const qc = useQueryClient();
   const { user } = useAuth();
 
   const destDef = ISSUE_DESTINATIONS.find(d => d.value === form.destination);
-
-  // Fetch students when a class is selected
   const studentsQ = useStudentsByClass(form.destination === "class" && form.class_id ? form.class_id : undefined);
-
   const selectedClass = classes.find(c => c.id === form.class_id);
   const selectedItem = items.find(i => i.id === form.item_id);
   const studentCount = studentsQ.data?.length ?? 0;
 
-  // Items filtered to suggested categories for the selected destination
   const suggestedItems = useMemo(() => {
     if (!destDef?.suggestCategories?.length) return items;
     return items.filter(i => destDef.suggestCategories!.includes(i.category ?? "general"));
@@ -692,17 +685,11 @@ function IssueDialog({ schoolId, items, classes }: {
       if (!form.destination) throw new Error("Select a destination");
       const available = selectedItem?.current_qty ?? 0;
       if (form.qty > available) throw new Error(`Only ${available} ${selectedItem?.unit ?? "units"} in stock`);
-
       const { error: insErr } = await supabase.from("inventory_issues").insert({
-        school_id: schoolId,
-        item_id: form.item_id,
-        qty: form.qty,
-        issued_to: buildIssuedTo(),
-        notes: form.notes || null,
-        issued_by: user?.id ?? null,
+        school_id: schoolId, item_id: form.item_id, qty: form.qty,
+        issued_to: buildIssuedTo(), notes: form.notes || null, issued_by: user?.id ?? null,
       });
       if (insErr) throw insErr;
-      // Optimistic qty deduction (trigger also handles this server-side)
       const { error: updErr } = await supabase.from("inventory_items")
         .update({ current_qty: available - form.qty }).eq("id", form.item_id);
       if (updErr) throw updErr;
@@ -717,7 +704,6 @@ function IssueDialog({ schoolId, items, classes }: {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // Reset class/staff when destination changes
   const handleDestChange = (v: string) => {
     setForm({ ...form, destination: v, class_id: "", staff_name: "", item_id: "" });
   };
@@ -731,25 +717,19 @@ function IssueDialog({ schoolId, items, classes }: {
         <DialogHeader><DialogTitle>Issue Stock</DialogTitle></DialogHeader>
         <div className="space-y-4">
 
-          {/* Destination */}
           <div>
             <Label>Destination *</Label>
             <Select value={form.destination} onValueChange={handleDestChange}>
               <SelectTrigger><SelectValue placeholder="Where is this going?" /></SelectTrigger>
               <SelectContent>
                 {ISSUE_DESTINATIONS.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    <span>{d.label}</span>
-                  </SelectItem>
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {destDef && (
-              <p className="text-xs text-muted-foreground mt-1">{destDef.hint}</p>
-            )}
+            {destDef && <p className="text-xs text-muted-foreground mt-1">{destDef.hint}</p>}
           </div>
 
-          {/* Class selector — shown when destination = class */}
           {form.destination === "class" && (
             <div>
               <Label>Class *</Label>
@@ -760,16 +740,12 @@ function IssueDialog({ schoolId, items, classes }: {
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.name}
                       {cls.students?.[0]?.count != null && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          · {cls.students[0].count} students
-                        </span>
+                        <span className="ml-2 text-xs text-muted-foreground">· {cls.students[0].count} students</span>
                       )}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* Class info panel */}
               {form.class_id && (
                 <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm space-y-2">
                   <p className="font-medium">{selectedClass?.name}</p>
@@ -779,7 +755,7 @@ function IssueDialog({ schoolId, items, classes }: {
                     <>
                       <p className="text-muted-foreground text-xs">
                         <strong>{studentCount}</strong> active student{studentCount !== 1 ? "s" : ""}
-                        {studentCount > 0 && " — suggested qty: " + studentCount + " (1 per student)"}
+                        {studentCount > 0 && ` — suggested qty: ${studentCount} (1 per student)`}
                       </p>
                       {studentCount > 0 && studentsQ.data && studentsQ.data.length <= 15 && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -791,13 +767,8 @@ function IssueDialog({ schoolId, items, classes }: {
                         </div>
                       )}
                       {studentCount > 0 && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-7"
-                          onClick={() => setForm(f => ({ ...f, qty: studentCount }))}
-                        >
+                        <Button type="button" size="sm" variant="outline" className="text-xs h-7"
+                          onClick={() => setForm(f => ({ ...f, qty: studentCount }))}>
                           Set qty to {studentCount} (1 per student)
                         </Button>
                       )}
@@ -808,7 +779,6 @@ function IssueDialog({ schoolId, items, classes }: {
             </div>
           )}
 
-          {/* Staff name — shown when destination = staff or other */}
           {(form.destination === "staff" || form.destination === "other") && (
             <div>
               <Label>{form.destination === "staff" ? "Staff Member Name *" : "Recipient *"}</Label>
@@ -820,7 +790,6 @@ function IssueDialog({ schoolId, items, classes }: {
             </div>
           )}
 
-          {/* Item selector — grouped + suggested categories highlighted */}
           {form.destination && (
             <div>
               <Label>Item *</Label>
@@ -836,23 +805,17 @@ function IssueDialog({ schoolId, items, classes }: {
                       )}
                       {suggestedItems.map((i) => (
                         <SelectItem key={i.id} value={i.id}>
-                          <span className="flex items-center gap-1.5">
-                            <span>{i.name}</span>
-                            <span className="text-xs text-muted-foreground">({i.current_qty} {i.unit})</span>
-                          </span>
+                          {i.name} <span className="text-xs text-muted-foreground ml-1">({i.current_qty} {i.unit})</span>
                         </SelectItem>
                       ))}
                     </>
                   )}
                   {otherItems.length > 0 && (
                     <>
-                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-b mt-1">
-                        Other items
-                      </div>
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground border-b mt-1">Other items</div>
                       {otherItems.map((i) => (
                         <SelectItem key={i.id} value={i.id}>
-                          <span>{i.name}</span>
-                          <span className="text-xs text-muted-foreground ml-1">({i.current_qty} {i.unit})</span>
+                          {i.name} <span className="text-xs text-muted-foreground ml-1">({i.current_qty} {i.unit})</span>
                         </SelectItem>
                       ))}
                     </>
@@ -869,34 +832,24 @@ function IssueDialog({ schoolId, items, classes }: {
             </div>
           )}
 
-          {/* Quantity */}
           {form.item_id && (
             <div>
               <Label>Quantity *</Label>
               <Input
-                type="number"
-                min={1}
-                max={selectedItem?.current_qty ?? undefined}
+                type="number" min={1} max={selectedItem?.current_qty ?? undefined}
                 value={form.qty}
                 onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
               />
               {selectedItem && form.qty > selectedItem.current_qty && (
-                <p className="text-xs text-destructive mt-1">
-                  Exceeds available stock ({selectedItem.current_qty})
-                </p>
+                <p className="text-xs text-destructive mt-1">Exceeds available stock ({selectedItem.current_qty})</p>
               )}
             </div>
           )}
 
-          {/* Notes */}
           <div>
             <Label>Notes</Label>
-            <Textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Optional — purpose, reference number, etc."
-              rows={2}
-            />
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Optional — purpose, reference number, etc." rows={2} />
           </div>
         </div>
 
