@@ -1,15 +1,20 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { createParentAccount } from "@/lib/admissions.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
 import {
-  ArrowLeft, Loader2, Phone, IdCard as IdCardIcon, Printer, User, Pencil,
+  ArrowLeft, Loader2, Phone, IdCard as IdCardIcon, Printer, User, Pencil, UserPlus,
   Award, Bed, Bus, Stethoscope, FileText, BookOpen, ExternalLink, Mail, Home,
 } from "lucide-react";
 import { LifecycleActions } from "@/components/LifecycleActions";
@@ -39,6 +44,7 @@ function StudentProfilePage() {
   const qc = useQueryClient();
   const canEdit = isAdmin || hasRole("admission_officer") || hasRole("deputy_principal");
   const [editOpen, setEditOpen] = useState(false);
+  const [parentOpen, setParentOpen] = useState(false);
 
   const { data: student, isLoading } = useQuery({
     queryKey: ["student-profile", id],
@@ -247,6 +253,20 @@ function StudentProfilePage() {
           <Link to="/ids/student/$id" params={{ id: student.id }}>
             <Button size="sm" variant="outline"><Printer className="w-4 h-4 mr-2" />ID Card</Button>
           </Link>
+          {canEdit && (
+            <Dialog open={parentOpen} onOpenChange={setParentOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline"><UserPlus className="w-4 h-4 mr-2" />Create Parent Account</Button>
+              </DialogTrigger>
+              {parentOpen && (
+                <CreateParentAccountDialog
+                  studentId={student.id}
+                  defaultName={student.parent_name ?? ""}
+                  onDone={() => setParentOpen(false)}
+                />
+              )}
+            </Dialog>
+          )}
           {canEdit && (
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
@@ -683,5 +703,75 @@ function Field({ label, value }: { label: string; value?: string | null }) {
       <div className="text-muted-foreground text-xs uppercase">{label}</div>
       <div>{value || "—"}</div>
     </div>
+  );
+}
+
+function CreateParentAccountDialog({ studentId, defaultName, onDone }: {
+  studentId: string; defaultName: string; onDone: () => void;
+}) {
+  const create = useServerFn(createParentAccount);
+  const [fullName, setFullName] = useState(defaultName);
+  const [relationship, setRelationship] = useState("parent");
+  const [result, setResult] = useState<null | {
+    uniqueId: string; password: string; studentName: string;
+  }>(null);
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const res = await create({ data: { full_name: fullName, student_id: studentId, relationship } });
+      return res;
+    },
+    onSuccess: (res) => {
+      toast.success("Parent account created");
+      setResult({ uniqueId: res.uniqueId, password: res.password, studentName: res.studentName });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (result) {
+    return (
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Parent account created ✓</DialogTitle>
+          <p className="text-xs text-muted-foreground">Share these credentials with the parent — the password is shown only once.</p>
+        </DialogHeader>
+        <div className="rounded-md border bg-muted/40 p-3 text-sm font-mono space-y-1">
+          <div>Login ID: <span className="font-bold">{result.uniqueId}</span></div>
+          <div>Password: <span className="font-bold">{result.password}</span></div>
+          <div>Linked to: {result.studentName}</div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => window.print()}>Print</Button>
+          <Button onClick={onDone}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    );
+  }
+
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Create Parent Account</DialogTitle>
+        <p className="text-xs text-muted-foreground">
+          Generates a login ID and password for the parent, and links them to this student.
+        </p>
+      </DialogHeader>
+      <div className="space-y-3">
+        <div>
+          <Label>Parent full name</Label>
+          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Jane Mwangi" />
+        </div>
+        <div>
+          <Label>Relationship</Label>
+          <Input value={relationship} onChange={(e) => setRelationship(e.target.value)} placeholder="parent / guardian" />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button disabled={!fullName.trim() || m.isPending} onClick={() => m.mutate()}>
+          {m.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+          Create account
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
