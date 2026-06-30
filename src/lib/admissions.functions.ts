@@ -315,7 +315,7 @@ export const createParentAccount = createServerFn({ method: "POST" })
       verified: true,
       linked_by: context.userId,
       school_id: acct.schoolId,
-    } as any, { onConflict: "student_id,school_id" } as any);
+    } as any, { onConflict: "parent_user_id,student_id" } as any);
     if (linkErr) throw new Error(`Account created but linking failed: ${linkErr.message}`);
 
     return {
