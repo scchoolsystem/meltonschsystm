@@ -274,6 +274,60 @@ export const admitStudent = createServerFn({ method: "POST" })
     };
   });
 
+// ---------- CREATE PARENT ACCOUNT ----------
+// Provisions a parent login (PRN-YYYY-NNNNNN unique id + generated password),
+// the same way admitStudent provisions students, and immediately links the
+// new parent to the named student via parent_student_links.
+export const createParentAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      full_name: z.string().trim().min(1).max(120),
+      student_id: z.string().uuid(),
+      phone: z.string().trim().max(40).optional(),
+      relationship: z.string().trim().max(40).default("parent"),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const isAdmin = await assertAdmin(context);
+    if (!isAdmin) {
+      const { data: ok1 } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admission_officer" as never });
+      const { data: ok2 } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "deputy_principal" as never });
+      if (!ok1 && !ok2) throw new Error("Not authorized to create parent accounts");
+    }
+
+    // Confirm the student exists in the caller's school before linking.
+    const { data: student, error: stuErr } = await supabaseAdmin
+      .from("students")
+      .select("id, school_id, first_name, last_name")
+      .eq("id", data.student_id)
+      .maybeSingle();
+    if (stuErr) throw new Error(stuErr.message);
+    if (!student) throw new Error("Student not found");
+
+    const acct = await provisionAccount({ category: "PRN", role: "parent", fullName: data.full_name, context });
+
+    const { error: linkErr } = await supabaseAdmin.from("parent_student_links").upsert({
+      parent_user_id: acct.userId,
+      student_id: student.id,
+      relationship: data.relationship,
+      link_method: "admin_created",
+      verified: true,
+      linked_by: context.userId,
+      school_id: acct.schoolId,
+    } as any, { onConflict: "student_id,school_id" } as any);
+    if (linkErr) throw new Error(`Account created but linking failed: ${linkErr.message}`);
+
+    return {
+      userId: acct.userId,
+      uniqueId: acct.uniqueId,
+      password: acct.password,
+      syntheticEmail: acct.syntheticEmail,
+      studentId: student.id,
+      studentName: `${student.first_name} ${student.last_name}`,
+    };
+  });
+
 // ---------- CREATE STAFF ----------
 const orgFieldsSchema = {
   staff_category: z.enum(["teaching", "administration", "support"]).optional(),
