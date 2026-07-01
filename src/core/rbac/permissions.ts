@@ -156,6 +156,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.departments": [...ADMIN_ROLES, "hod"],
   "admin.features": [...ADMIN_ROLES, "ict_admin"],
   "admin.support": [...ADMIN_ROLES, "ict_admin"],
+  "admin.compliance": [...ADMIN_ROLES],
 
   // Promotion system
   "admin.promotion": [...ADMIN_ROLES, "academic_master"],
