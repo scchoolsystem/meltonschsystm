@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Receipt, LifeBuoy, DollarSign, TrendingUp, Filter } from "lucide-react";
+import { Building2, Receipt, LifeBuoy, DollarSign, TrendingUp, Filter, ShieldAlert, ShieldCheck } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -78,11 +78,28 @@ function PlatformDashboard() {
     },
   });
 
+  const { data: compliance = [] } = useQuery({
+    queryKey: ["platform-compliance-summary"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("platform_compliance_summary");
+      if (error) return [];
+      return data ?? [];
+    },
+  });
+
+  const complianceStats = {
+    verified: compliance.filter((c: any) => c.legal_status === "verified").length,
+    needsAttention: compliance.filter((c: any) => c.legal_status !== "verified" || c.documents_expired > 0).length,
+    expiringDocs: compliance.reduce((s: number, c: any) => s + (c.documents_expiring ?? 0), 0),
+    expiredDocs: compliance.reduce((s: number, c: any) => s + (c.documents_expired ?? 0), 0),
+  };
+
   const stats = [
     { label: "Total schools", value: data?.totalSchools ?? "—", sub: `${data?.activeSchools ?? 0} active`, icon: Building2, link: "/platform/schools" },
     { label: "Monthly recurring", value: data ? `KES ${data.mrr.toLocaleString()}` : "—", sub: "from active plans", icon: DollarSign, link: "/platform/plans" },
     { label: "Outstanding billing", value: data ? `KES ${data.outstanding.toLocaleString()}` : "—", sub: "unpaid + partial", icon: Receipt, link: "/platform/invoices" },
     { label: "Open tickets", value: data?.openTickets ?? "—", sub: "needs attention", icon: LifeBuoy, link: "/platform/support" },
+    { label: "Compliance", value: `${complianceStats.needsAttention}`, sub: "schools need attention", icon: ShieldAlert, link: "/platform/schools" },
   ] as const;
 
   return (
@@ -92,7 +109,7 @@ function PlatformDashboard() {
         <p className="text-sm text-muted-foreground mt-1">Cross-tenant overview of all schools on the platform.</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map((s) => (
           <Link key={s.label} to={s.link}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
@@ -212,6 +229,58 @@ function PlatformDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><ShieldAlert className="w-4 h-4" />Legal &amp; compliance</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-80 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>School</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Docs verified</TableHead>
+                  <TableHead className="text-right">Expiring</TableHead>
+                  <TableHead className="text-right">Expired</TableHead>
+                  <TableHead>Missing</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {compliance.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">No compliance data yet.</TableCell></TableRow>
+                )}
+                {compliance.map((c: any) => (
+                  <TableRow key={c.school_id}>
+                    <TableCell>
+                      <Link to="/platform/schools/$id" params={{ id: c.school_id }} className="font-medium hover:underline truncate max-w-[180px] block">
+                        {c.school_name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={c.legal_status === "verified" ? "default" : c.legal_status === "rejected" ? "destructive" : "secondary"} className="text-[10px] capitalize inline-flex items-center gap-1">
+                        {c.legal_status === "verified" ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                        {String(c.legal_status).replace("_", " ")}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right text-xs">{c.documents_verified}/{c.documents_uploaded}</TableCell>
+                    <TableCell className="text-right text-xs">
+                      {c.documents_expiring > 0 ? <span className="text-amber-600 font-medium">{c.documents_expiring}</span> : "—"}
+                    </TableCell>
+                    <TableCell className="text-right text-xs">
+                      {c.documents_expired > 0 ? <span className="text-destructive font-medium">{c.documents_expired}</span> : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {[c.missing_kra_pin && "KRA PIN", c.missing_registration && "Registration no."].filter(Boolean).join(", ") || "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
 
       <Card>
