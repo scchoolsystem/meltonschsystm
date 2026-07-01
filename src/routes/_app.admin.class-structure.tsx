@@ -92,6 +92,30 @@ function ClassStructurePage() {
     if (structure.length > 0) setRows(structure);
   }, [structure]);
 
+  // Live proof of the auto-link: how many real classes/streams and students
+  // currently sit under each rung of the ladder (classes.class_level_id).
+  const { data: linkCounts = {} } = useQuery({
+    queryKey: ["class-structure-links", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return {};
+      const { data, error } = await supabase
+        .from("classes")
+        .select("class_level_id, students(count)")
+        .eq("school_id", schoolId);
+      if (error) throw error;
+      const map: Record<string, { classes: number; students: number }> = {};
+      for (const c of (data ?? []) as any[]) {
+        if (!c.class_level_id) continue;
+        const entry = map[c.class_level_id] ?? { classes: 0, students: 0 };
+        entry.classes += 1;
+        entry.students += c.students?.[0]?.count ?? 0;
+        map[c.class_level_id] = entry;
+      }
+      return map;
+    },
+    enabled: !!schoolId,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!schoolId) throw new Error("No school context");
@@ -281,6 +305,17 @@ function ClassStructurePage() {
                       {visIdx + 1}.
                     </span>
                     <span className="flex-1 font-medium text-sm">{row.class_name}</span>
+                    {row.id && (
+                      linkCounts[row.id] ? (
+                        <Badge variant="outline" className="shrink-0 text-xs font-normal">
+                          {linkCounts[row.id].classes} class{linkCounts[row.id].classes === 1 ? "" : "es"} · {linkCounts[row.id].students} student{linkCounts[row.id].students === 1 ? "" : "s"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 text-xs font-normal border-amber-400 text-amber-600 dark:text-amber-400">
+                          Not linked — add a class named "{row.class_name}"
+                        </Badge>
+                      )
+                    )}
                     {isLast && (
                       <Badge variant="secondary" className="gap-1 shrink-0">
                         <GraduationCap className="w-3 h-3" />
