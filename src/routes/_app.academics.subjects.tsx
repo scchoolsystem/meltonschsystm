@@ -11,7 +11,7 @@
  *  • Full add dialog with all columns
  */
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
@@ -160,6 +160,18 @@ function Page() {
     },
   });
 
+  // Classes teaching this subject (class_subjects link)
+  const { data: classLinks = [] } = useQuery({
+    queryKey: ["subject-class-links"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("class_subjects")
+        .select("id, subject_id, class_id, lessons_per_week, classes(id,name,stream)");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   // Exam result stats per subject
   const { data: examStats = [] } = useQuery({
     queryKey: ["subject-exam-stats"],
@@ -201,6 +213,15 @@ function Page() {
     (slotCounts as any[]).forEach((s) => { m[s.subject_id] = (m[s.subject_id] ?? 0) + 1; });
     return m;
   }, [slotCounts]);
+
+  const classLinkMap = useMemo(() => {
+    const m: Record<string, any[]> = {};
+    (classLinks as any[]).forEach((cl) => {
+      if (!m[cl.subject_id]) m[cl.subject_id] = [];
+      m[cl.subject_id].push(cl);
+    });
+    return m;
+  }, [classLinks]);
 
   const examMap = useMemo(() => {
     const m: Record<string, { total: number; count: number; pass: number }> = {};
@@ -759,6 +780,34 @@ function Page() {
                       <p className="text-2xl font-bold">{slots}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Timetable slots</p>
                     </div>
+                  </div>
+
+                  {/* Classes teaching this subject */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold">
+                        Classes ({(classLinkMap[detailSub.id] ?? []).length})
+                      </p>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
+                        <Link to="/timetable">
+                          <BookOpen className="w-3 h-3" /> Manage in Timetable
+                        </Link>
+                      </Button>
+                    </div>
+                    {(classLinkMap[detailSub.id] ?? []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        Not assigned to any class yet — add it from the Timetable page's Class Subjects tab.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {(classLinkMap[detailSub.id] ?? []).map((cl: any) => (
+                          <Badge key={cl.id} variant="outline" className="font-normal">
+                            {cl.classes?.name}{cl.classes?.stream ? ` - ${cl.classes.stream}` : ""}
+                            <span className="text-muted-foreground ml-1">· {cl.lessons_per_week}/wk</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Performance */}
