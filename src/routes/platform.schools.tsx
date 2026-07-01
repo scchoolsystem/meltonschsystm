@@ -13,8 +13,50 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, Plus, ExternalLink, Settings, KeyRound, Trash2 } from "lucide-react";
+import { Building2, Plus, ExternalLink, Settings, KeyRound, Trash2, ShieldCheck, ShieldAlert, ShieldQuestion } from "lucide-react";
+
+export const KENYA_COUNTIES = [
+  "Baringo","Bomet","Bungoma","Busia","Elgeyo-Marakwet","Embu","Garissa","Homa Bay",
+  "Isiolo","Kajiado","Kakamega","Kericho","Kiambu","Kilifi","Kirinyaga","Kisii","Kisumu",
+  "Kitui","Kwale","Laikipia","Lamu","Machakos","Makueni","Mandera","Marsabit","Meru",
+  "Migori","Mombasa","Murang'a","Nairobi","Nakuru","Nandi","Narok","Nyamira","Nyandarua",
+  "Nyeri","Samburu","Siaya","Taita-Taveta","Tana River","Tharaka-Nithi","Trans Nzoia",
+  "Turkana","Uasin Gishu","Vihiga","Wajir","West Pokot",
+];
+
+export const OWNERSHIP_TYPES = [
+  { value: "government", label: "Government / Public" },
+  { value: "private", label: "Private" },
+  { value: "faith_based", label: "Faith-based" },
+  { value: "community", label: "Community" },
+  { value: "ngo", label: "NGO" },
+  { value: "trust", label: "Trust" },
+  { value: "other", label: "Other" },
+];
+
+export const INSTITUTION_LEVELS = [
+  { value: "ecde", label: "ECDE / Pre-primary" },
+  { value: "primary", label: "Primary" },
+  { value: "junior_secondary", label: "Junior Secondary" },
+  { value: "senior_secondary", label: "Senior Secondary" },
+  { value: "secondary", label: "Secondary" },
+  { value: "tvet", label: "TVET" },
+  { value: "college", label: "College" },
+  { value: "university", label: "University" },
+  { value: "mixed", label: "Mixed levels" },
+];
+
+export const CURRICULA = ["CBC", "8-4-4", "IGCSE", "Cambridge", "IB", "Other"];
+
+export function legalStatusBadge(status: string | null | undefined) {
+  const s = status ?? "unverified";
+  if (s === "verified") return { label: "Verified", variant: "default" as const, Icon: ShieldCheck };
+  if (s === "pending_review") return { label: "Pending review", variant: "secondary" as const, Icon: ShieldQuestion };
+  if (s === "rejected") return { label: "Rejected", variant: "destructive" as const, Icon: ShieldAlert };
+  return { label: "Unverified", variant: "outline" as const, Icon: ShieldQuestion };
+}
 
 function PlatformSchoolsLayout() {
   const location = useLocation();
@@ -38,7 +80,12 @@ function PlatformSchools() {
   const provision = useServerFn(provisionSchoolAdmin);
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+  const [form, setForm] = useState({
+    slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9",
+    registration_number: "", nemis_code: "", kra_pin: "", county: "", sub_county: "",
+    ownership_type: "", institution_level: "", curriculum: "", year_established: "",
+    legal_entity_name: "",
+  });
   const [credentials, setCredentials] = useState<{ email: string; password: string; portal_url: string; school_name: string } | null>(null);
 
   const { data: schools, isLoading } = useQuery({
@@ -75,7 +122,17 @@ function PlatformSchools() {
           slug, name: form.name.trim(),
           email: form.email.trim(), phone: form.phone || null,
           primary_color: form.primary_color || null,
-        })
+          registration_number: form.registration_number.trim() || null,
+          nemis_code: form.nemis_code.trim() || null,
+          kra_pin: form.kra_pin.trim().toUpperCase() || null,
+          county: form.county || null,
+          sub_county: form.sub_county.trim() || null,
+          ownership_type: (form.ownership_type || null) as any,
+          institution_level: (form.institution_level || null) as any,
+          curriculum: form.curriculum || null,
+          year_established: form.year_established ? Number(form.year_established) : null,
+          legal_entity_name: form.legal_entity_name.trim() || null,
+        } as any)
         .select()
         .single();
       if (error || !school) throw error ?? new Error("Failed to create school");
@@ -102,7 +159,12 @@ function PlatformSchools() {
     onSuccess: ({ school, res }: any) => {
       toast.success("School created");
       setOpen(false);
-      setForm({ slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9" });
+      setForm({
+        slug: "", name: "", email: "", phone: "", primary_color: "#0ea5e9",
+        registration_number: "", nemis_code: "", kra_pin: "", county: "", sub_county: "",
+        ownership_type: "", institution_level: "", curriculum: "", year_established: "",
+        legal_entity_name: "",
+      });
       setCredentials({
         email: res.email, password: res.password, portal_url: res.portal_url, school_name: school.name,
       });
@@ -193,6 +255,75 @@ function PlatformSchools() {
                     Then in <strong>Project Settings → Domains</strong>, add <code>{form.slug || "[slug]"}.{rootDomain}</code> so SSL is issued.
                   </div>
                 </div>
+
+                <div className="pt-2 border-t">
+                  <p className="text-sm font-medium mb-2">Legal &amp; registration details</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Optional here — can be completed and verified from the school's Manage page. Needed for compliance and official communication (KRA, MOE, county).
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>MOE registration no.</Label>
+                      <Input value={form.registration_number} onChange={e => setForm({ ...form, registration_number: e.target.value })} placeholder="e.g. 12/34/567" />
+                    </div>
+                    <div>
+                      <Label>NEMIS code</Label>
+                      <Input value={form.nemis_code} onChange={e => setForm({ ...form, nemis_code: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>KRA PIN</Label>
+                      <Input value={form.kra_pin} onChange={e => setForm({ ...form, kra_pin: e.target.value.toUpperCase() })} placeholder="P0XXXXXXXXA" />
+                    </div>
+                    <div>
+                      <Label>Legal entity / proprietor name</Label>
+                      <Input value={form.legal_entity_name} onChange={e => setForm({ ...form, legal_entity_name: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>County</Label>
+                      <Select value={form.county} onValueChange={v => setForm({ ...form, county: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select county..." /></SelectTrigger>
+                        <SelectContent>
+                          {KENYA_COUNTIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Sub-county</Label>
+                      <Input value={form.sub_county} onChange={e => setForm({ ...form, sub_county: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Ownership type</Label>
+                      <Select value={form.ownership_type} onValueChange={v => setForm({ ...form, ownership_type: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectContent>
+                          {OWNERSHIP_TYPES.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Institution level</Label>
+                      <Select value={form.institution_level} onValueChange={v => setForm({ ...form, institution_level: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectContent>
+                          {INSTITUTION_LEVELS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Curriculum</Label>
+                      <Select value={form.curriculum} onValueChange={v => setForm({ ...form, curriculum: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectContent>
+                          {CURRICULA.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Year established</Label>
+                      <Input type="number" value={form.year_established} onChange={e => setForm({ ...form, year_established: e.target.value })} placeholder="e.g. 1998" />
+                    </div>
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -240,6 +371,7 @@ function PlatformSchools() {
                   <TableHead>Portal URL</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Compliance</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -265,6 +397,12 @@ function PlatformSchools() {
                       <TableCell>{counts?.[s.id] ?? 0}</TableCell>
                       <TableCell>
                         <Badge variant={s.status === "active" ? "default" : "destructive"}>{s.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const { label, variant, Icon } = legalStatusBadge(s.legal_status);
+                          return <Badge variant={variant} className="inline-flex items-center gap-1"><Icon className="h-3 w-3" />{label}</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
                         <Link to="/platform/schools/$id" params={{ id: s.id }}>
