@@ -96,6 +96,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Field Edit Audit", url: "/admin/field-edits" },
     { title: "Override Log", url: "/admin/overrides" },
     { title: "Billing", url: "/admin/billing" },
+    { title: "Compliance", url: "/admin/compliance" },
     { title: "Settings", url: "/admin/settings" },
   ]},
 ];
