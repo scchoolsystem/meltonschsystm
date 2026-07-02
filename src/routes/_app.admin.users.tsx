@@ -7,6 +7,8 @@ import {
   createAccount,
   resetPassword,
   setAccountActive,
+  bulkCreateStaffAccounts,
+  bulkCreateStudentAccounts,
 } from "@/lib/auth-admin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,9 @@ import {
   Users,
   GraduationCap,
   Briefcase,
+  Download,
+  UserPlus,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -128,6 +133,67 @@ function UsersPage() {
   const createFn = useServerFn(createAccount);
   const resetFn = useServerFn(resetPassword);
   const setActiveFn = useServerFn(setAccountActive);
+  const bulkStaffFn = useServerFn(bulkCreateStaffAccounts);
+  const bulkStudentFn = useServerFn(bulkCreateStudentAccounts);
+  const [backfillBusy, setBackfillBusy] = useState<"staff" | "students" | null>(null);
+  const [backfillResult, setBackfillResult] = useState<{
+    kind: "staff" | "students";
+    idKey: string;
+    created: { full_name: string; uniqueId: string; password: string; [key: string]: any }[];
+    skipped: { reason: string; [key: string]: any }[];
+    errors: { error: string; [key: string]: any }[];
+  } | null>(null);
+
+  async function handleBackfill(kind: "staff" | "students") {
+    setBackfillBusy(kind);
+    try {
+      if (kind === "staff") {
+        const { data: rows, error } = await supabase
+          .from("staff")
+          .select("employee_no, first_name, last_name, role, email")
+          .is("user_id", null);
+        if (error) throw new Error(error.message);
+        if (!rows?.length) { toast.success("Every staff record already has a login."); return; }
+        const items = rows.map((r: any) => ({
+          employee_no: r.employee_no,
+          full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
+          role: r.role || "staff",
+          email: r.email || undefined,
+        }));
+        const res = await bulkStaffFn({ data: { items } });
+        setBackfillResult({ kind, idKey: "employee_no", ...res });
+        toast.success(
+          `Created ${res.created.length} staff login${res.created.length === 1 ? "" : "s"}` +
+          `${res.skipped.length ? `, ${res.skipped.length} skipped` : ""}` +
+          `${res.errors.length ? `, ${res.errors.length} failed` : ""}.`
+        );
+      } else {
+        const { data: rows, error } = await supabase
+          .from("students")
+          .select("admission_no, first_name, last_name, parent_email")
+          .is("user_id", null);
+        if (error) throw new Error(error.message);
+        if (!rows?.length) { toast.success("Every student record already has a login."); return; }
+        const items = rows.map((r: any) => ({
+          admission_no: r.admission_no,
+          full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
+          email: r.parent_email || undefined,
+        }));
+        const res = await bulkStudentFn({ data: { items } });
+        setBackfillResult({ kind, idKey: "admission_no", ...res });
+        toast.success(
+          `Created ${res.created.length} student login${res.created.length === 1 ? "" : "s"}` +
+          `${res.skipped.length ? `, ${res.skipped.length} skipped` : ""}` +
+          `${res.errors.length ? `, ${res.errors.length} failed` : ""}.`
+        );
+      }
+      qc.invalidateQueries({ queryKey: ["all-credentials"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBackfillBusy(null);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["all-credentials"],
@@ -243,20 +309,119 @@ function UsersPage() {
             Manage system accounts — staff, students, and external users
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />Create user</Button>
-          </DialogTrigger>
-          <CreateDialog
-            onDone={(c) => {
-              setOpen(false);
-              setCreds({ ...c, title: "Account created" });
-              qc.invalidateQueries({ queryKey: ["all-credentials"] });
-            }}
-            createFn={createFn}
-          />
-        </Dialog>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => handleBackfill("staff")}
+            disabled={backfillBusy !== null}
+          >
+            {backfillBusy === "staff" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+            Generate staff logins
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleBackfill("students")}
+            disabled={backfillBusy !== null}
+          >
+            {backfillBusy === "students" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+            Generate student logins
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" />Create user</Button>
+            </DialogTrigger>
+            <CreateDialog
+              onDone={(c) => {
+                setOpen(false);
+                setCreds({ ...c, title: "Account created" });
+                qc.invalidateQueries({ queryKey: ["all-credentials"] });
+              }}
+              createFn={createFn}
+            />
+          </Dialog>
+        </div>
       </div>
+
+      {/* Backfill result */}
+      {backfillResult && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+              <KeyRound className="w-4 h-4" />
+              {backfillResult.kind === "staff" ? "Staff" : "Student"} logins generated
+              <Badge variant="default" className="gap-1"><CheckCircle2 className="w-3 h-3" />{backfillResult.created.length} created</Badge>
+              {backfillResult.skipped.length > 0 && (
+                <Badge variant="outline" className="text-[10px]">{backfillResult.skipped.length} already had one</Badge>
+              )}
+              {backfillResult.errors.length > 0 && (
+                <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" />{backfillResult.errors.length} failed</Badge>
+              )}
+            </CardTitle>
+            <div className="flex gap-2">
+              {backfillResult.created.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const idKey = backfillResult.idKey;
+                    const csv =
+                      `${idKey},full_name,unique_id,password\n` +
+                      backfillResult.created
+                        .map((c) => [c[idKey], c.full_name, c.uniqueId, c.password].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+                        .join("\n");
+                    const blob = new Blob([csv], { type: "text/csv" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `${backfillResult.kind}-credentials.csv`; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" /> Download credentials CSV
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setBackfillResult(null)}>Dismiss</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {backfillResult.created.length > 0 && (
+              <div className="text-xs text-warning">
+                Passwords are only shown once — download the CSV now and share credentials securely with each person.
+              </div>
+            )}
+            {backfillResult.created.length > 0 && (
+              <div className="overflow-x-auto border rounded max-h-80 overflow-y-auto">
+                <table className="text-xs w-full">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1 text-left">{backfillResult.idKey}</th>
+                      <th className="px-2 py-1 text-left">Name</th>
+                      <th className="px-2 py-1 text-left">Unique ID</th>
+                      <th className="px-2 py-1 text-left">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {backfillResult.created.map((c, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1 font-mono">{c[backfillResult.idKey]}</td>
+                        <td className="px-2 py-1">{c.full_name}</td>
+                        <td className="px-2 py-1 font-mono">{c.uniqueId}</td>
+                        <td className="px-2 py-1 font-mono">{c.password}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {backfillResult.errors.length > 0 && (
+              <div className="text-xs space-y-1 max-h-40 overflow-auto font-mono">
+                {backfillResult.errors.map((e, i) => (
+                  <div key={i} className="text-destructive">{e[backfillResult.idKey]}: {e.error}</div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
