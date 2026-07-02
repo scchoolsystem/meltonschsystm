@@ -717,14 +717,16 @@ function SlotDialog({ classId, subjects, staff, existing, onDone }: {
 }
 
 /* ─────────────────────────────── Generate Panel ────────────────────────── */
+// NOTE: "Lessons per subject / week" and "Replace existing" controls were
+// removed — they didn't match the real generateTimetable() signature anyway
+// (lesson counts come from the Class Subjects tab per class/subject, and
+// existing slots for the selected classes are always replaced).
 
 function GeneratePanel({ classes, activeClassId, onGenerated }: {
   classes: any[]; activeClassId: string; onGenerated: (firstId?: string) => void;
 }) {
   const run = useServerFn(generateTimetable);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(activeClassId ? [activeClassId] : []));
-  const [perWeek, setPerWeek] = useState(4);
-  const [replace, setReplace] = useState(true);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -733,7 +735,7 @@ function GeneratePanel({ classes, activeClassId, onGenerated }: {
   const submit = async () => {
     setBusy(true); setResult(null);
     try {
-      const out = await run({ data: { classIds: [...selected], lessonsPerSubjectPerWeek: perWeek, replaceExisting: replace } });
+      const out = await run({ data: { classIds: [...selected], replaceExisting: true, maxLessonsPerTeacherPerDay: 6 } });
       setResult(out);
       if (out.ok) { toast.success(`Generated ${out.inserted} slots across ${selected.size} class(es)`); onGenerated([...selected][0]); }
       else toast.error(out.error ?? "Generation failed");
@@ -752,19 +754,14 @@ function GeneratePanel({ classes, activeClassId, onGenerated }: {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Auto-builds a clash-free weekly schedule using the periods and rooms you configured in the tabs above.
-            Make sure you've added <strong>Periods</strong> and at least one <strong>Room</strong> first.
+            Auto-builds a clash-free weekly schedule from the <strong>Class Subjects</strong> tab —
+            lesson counts, double-lesson requirements, preferred rooms and elective groups are all
+            read from there. Double lessons are always scheduled back-to-back, science subjects
+            auto-match their lab (Chemistry → Lab 1, Biology → Lab 2, Physics → Lab 3), and
+            elective-group subjects are blocked into the same shared slot across every class in
+            the group. Existing slots for the selected classes are always replaced. Make sure
+            you've set up <strong>Periods</strong> and at least one <strong>Room</strong> first.
           </p>
-          <div className="grid grid-cols-2 gap-4 max-w-md">
-            <div>
-              <Label>Lessons per subject / week</Label>
-              <Input type="number" min={1} max={10} value={perWeek} onChange={(e) => setPerWeek(+e.target.value)} />
-            </div>
-            <div className="flex items-end gap-2">
-              <Checkbox id="rep" checked={replace} onCheckedChange={(v) => setReplace(!!v)} />
-              <Label htmlFor="rep">Replace existing</Label>
-            </div>
-          </div>
           <div>
             <Label>Classes ({selected.size} selected)</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 max-h-72 overflow-auto border rounded p-3">
@@ -806,7 +803,7 @@ function GeneratePanel({ classes, activeClassId, onGenerated }: {
           )}
           {result.summary && (
             <CardContent className="pt-0 text-xs text-muted-foreground">
-              {result.summary.classes} class(es) · {result.summary.periodsAvailable} periods available · {result.summary.lessonsRequested} lessons requested
+              {result.summary.classes} class(es) · {result.summary.periodsAvailable} periods available
             </CardContent>
           )}
         </Card>
@@ -1172,6 +1169,10 @@ function ClassSubjectsPanel({
                   value={editRow.elective_group}
                   onChange={(e) => setEditRow({ ...editRow, elective_group: e.target.value })}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Subjects sharing the same elective group across 2+ classes are scheduled into the
+                  same shared slot, so students can be regrouped between classes for that period.
+                </p>
               </div>
 
               {/* Double / triple lesson toggles */}
