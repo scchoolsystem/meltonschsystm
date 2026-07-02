@@ -125,6 +125,26 @@ const STAFF_ROLES = [
 ];
 const ALL_ROLES = [...STAFF_ROLES, ...ROLE_GROUPS.portal.roles];
 
+// Reverse lookup: role -> group key, so a role badge can be colored by
+// which department/group it belongs to at a glance.
+const ROLE_TO_GROUP: Record<string, string> = {};
+Object.entries(ROLE_GROUPS).forEach(([key, group]) => {
+  group.roles.forEach((r) => { ROLE_TO_GROUP[r] = key; });
+});
+
+// One consistent color per group, used for both the quick-filter pills and
+// the role badges in the table — this is the main visual thread that makes
+// "who belongs to which department" scannable at a glance.
+const GROUP_COLORS: Record<string, string> = {
+  admin: "bg-indigo-500/15 text-indigo-700 border-indigo-500/30 dark:text-indigo-300",
+  teaching: "bg-blue-500/15 text-blue-700 border-blue-500/30 dark:text-blue-300",
+  exams: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300",
+  finance: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-300",
+  support: "bg-slate-500/15 text-slate-700 border-slate-500/30 dark:text-slate-300",
+  portal: "bg-pink-500/15 text-pink-700 border-pink-500/30 dark:text-pink-300",
+};
+const DEFAULT_BADGE_COLOR = "bg-muted text-muted-foreground border-transparent";
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -348,7 +368,12 @@ function UsersPage() {
         u.full_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         u.unique_id?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         u.synthetic_email?.toLowerCase().includes(debouncedSearch.toLowerCase());
-      const matchRole = roleFilter === "all" || u.roles.includes(roleFilter);
+      const matchRole =
+        roleFilter === "all"
+          ? true
+          : roleFilter.startsWith("group:")
+          ? (ROLE_GROUPS[roleFilter.slice(6)]?.roles ?? []).some((r) => u.roles.includes(r))
+          : u.roles.includes(roleFilter);
       const matchStatus =
         statusFilter === "all" ||
         (statusFilter === "active" && u.is_active) ||
@@ -364,6 +389,17 @@ function UsersPage() {
   }, [tab, staffData, studentData, data, debouncedSearch, roleFilter, statusFilter]);
 
   const filtersActive = !!search || roleFilter !== "all" || statusFilter !== "all";
+
+  // Counts per role-group, used to power the quick-navigation pills below —
+  // computed off the full dataset (not the current filter) so the pills
+  // always show "how many total", like a directory.
+  const roleGroupCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const [key, group] of Object.entries(ROLE_GROUPS)) {
+      counts[key] = (data ?? []).filter((u) => group.roles.some((r) => u.roles.includes(r))).length;
+    }
+    return counts;
+  }, [data]);
 
   if (!isAdmin) {
     return (
@@ -475,6 +511,36 @@ function UsersPage() {
         ))}
       </div>
 
+      {/* Quick navigation — browse by department at a glance */}
+      <div className="flex flex-wrap gap-1.5 items-center">
+        <button
+          type="button"
+          onClick={() => setRoleFilter("all")}
+          className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+            roleFilter === "all"
+              ? "bg-foreground text-background border-foreground"
+              : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+          }`}
+        >
+          All roles ({total})
+        </button>
+        {Object.entries(ROLE_GROUPS).map(([key, group]) => {
+          const active = roleFilter === `group:${key}`;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setRoleFilter(active ? "all" : `group:${key}`)}
+              className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                active ? GROUP_COLORS[key].replace("/15", "/25") : `${GROUP_COLORS[key]} hover:opacity-80`
+              }`}
+            >
+              {group.label} ({roleGroupCounts[key] ?? 0})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative">
@@ -487,8 +553,8 @@ function UsersPage() {
             aria-label="Search accounts"
           />
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="All roles" /></SelectTrigger>
+        <Select value={roleFilter.startsWith("group:") ? "all" : roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Specific role" /></SelectTrigger>
           <SelectContent className="max-h-72">
             <SelectItem value="all">All roles</SelectItem>
             {Object.entries(ROLE_GROUPS).map(([, group]) => (
@@ -517,6 +583,26 @@ function UsersPage() {
           </Button>
         )}
       </div>
+
+      {/* Active filter chips — shows exactly what's narrowing the list, each removable on its own */}
+      {filtersActive && (
+        <div className="flex flex-wrap gap-1.5 items-center text-xs">
+          <span className="text-muted-foreground">Filtered by:</span>
+          {search && (
+            <Chip onRemove={() => setSearch("")}>Search "{search}"</Chip>
+          )}
+          {roleFilter !== "all" && (
+            <Chip onRemove={() => setRoleFilter("all")}>
+              {roleFilter.startsWith("group:")
+                ? ROLE_GROUPS[roleFilter.slice(6)]?.label
+                : roleFilter.replace(/_/g, " ")}
+            </Chip>
+          )}
+          {statusFilter !== "all" && (
+            <Chip onRemove={() => setStatusFilter("all")}>{statusFilter}</Chip>
+          )}
+        </div>
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.size > 0 && (
@@ -684,7 +770,7 @@ function AccountTable({
     <div className="space-y-3">
       <div className="rounded-md border overflow-x-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead className="w-9">
                 <Checkbox
@@ -743,7 +829,18 @@ function AccountTable({
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px]">{u.category ?? u.staff_category ?? "—"}</Badge>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${
+                      u.student_id
+                        ? "bg-teal-500/15 text-teal-700 border-teal-500/30 dark:text-teal-300"
+                        : u.staff_id
+                        ? "bg-sky-500/15 text-sky-700 border-sky-500/30 dark:text-sky-300"
+                        : DEFAULT_BADGE_COLOR
+                    }`}
+                  >
+                    {u.category ?? u.staff_category ?? "—"}
+                  </Badge>
                 </TableCell>
                 {showClass && (
                   <TableCell className="text-xs">
@@ -904,14 +1001,33 @@ function SortHeader({
   );
 }
 
-// Role badges grouped by category
+// Small dismissible chip used for the active-filters row
+function Chip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-muted/60 px-2 py-0.5 capitalize">
+      {children}
+      <button type="button" onClick={onRemove} aria-label="Remove filter" className="hover:text-foreground">
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
+// Role badges grouped by category, colored by department so staff/student
+// rosters are scannable by team at a glance.
 function RoleBadges({ roles }: { roles: string[] }) {
   if (!roles.length) return <span className="text-xs text-muted-foreground">—</span>;
   return (
-    <div className="flex flex-wrap gap-1 max-w-[200px]">
-      {roles.map((r) => (
-        <Badge key={r} variant="secondary" className="text-[10px]">{r.replace(/_/g, " ")}</Badge>
-      ))}
+    <div className="flex flex-wrap gap-1 max-w-[220px]">
+      {roles.map((r) => {
+        const groupKey = ROLE_TO_GROUP[r];
+        const colorClass = groupKey ? GROUP_COLORS[groupKey] : DEFAULT_BADGE_COLOR;
+        return (
+          <Badge key={r} variant="outline" className={`text-[10px] ${colorClass}`}>
+            {r.replace(/_/g, " ")}
+          </Badge>
+        );
+      })}
     </div>
   );
 }
