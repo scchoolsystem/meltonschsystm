@@ -3,17 +3,30 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // =============================================================================
-// SMARTDEV ERP TIMETABLE ENGINE v2
-// Replaces the flat "same lessons-per-week for every subject" generator with
-// an aSc/Zeraki-style solver:
+// SMARTDEV ERP TIMETABLE ENGINE v3
+// aSc/Zeraki-style solver:
 //   1. Lesson demand per class from class_subjects (+ subjects.lessons_per_week)
 //   2. Teacher matching: teacher_subjects ∩ teacher_class_assignments ∩ staff_availability
-//   3. Room allocation: subject_room_requirements room_type > class capacity fit > any active room
-//   4. Double periods: subjects.allow_double_period → consecutive period pairs
-//   5. Breaks respected via period_templates.is_break = false filter (already excluded)
-//   6. Workload balancing: per-teacher per-day cap + gap minimization
-//   7. Subject distribution: no subject repeats same day unless it's its double period
-//   8. Conflict engine: teacher/room/class usage tracked per (day, start_time) slot
+//   3. Room allocation, in priority order:
+//        a) class_subjects.preferred_room_id (explicit pin)
+//        b) subject-name lab convention: Chemistry → Lab 1, Biology → Lab 2, Physics → Lab 3
+//        c) subject_room_requirements room_type
+//        d) any "classroom"-type room that fits class capacity
+//        e) any free room
+//   4. Double periods: class_subjects.requires_double_lesson (falls back to
+//      subjects.allow_double_period) → ALWAYS consecutive period pairs, one
+//      double block per subject per week, remaining lessons spread as singles
+//      across the fewest-repeat days.
+//   5. Electives: subjects sharing the same class_subjects.elective_group across
+//      2+ selected classes are block-scheduled into the SAME day/period across
+//      every class in the group (so students can be regrouped between classes
+//      for that slot), before normal per-class scheduling runs. Any lessons
+//      that can't find a common free slot fall back to normal per-class
+//      scheduling and are reported as a warning.
+//   6. Breaks respected via period_templates.is_break = false filter (already excluded)
+//   7. Workload balancing: per-teacher per-day cap + gap minimization
+//   8. Subject distribution: no subject repeats same day unless it's its double period
+//   9. Conflict engine: teacher/room/class usage tracked per (day, start_time) slot
 // Storage: timetable_slots (the live table — auto_timetable is unused legacy/drift)
 // =============================================================================
 
@@ -21,8 +34,19 @@ type Period = {
   id: string; day_of_week: number; period_index: number;
   label: string; start_time: string; end_time: string; is_break: boolean;
 };
-type ClassSubjectDemand = { subject_id: string; lessons: number; allow_double: boolean; preferred_room_type: string | null };
+type ClassSubjectDemand = {
+  subject_id: string; lessons: number; allow_double: boolean;
+  preferred_room_type: string | null; preferred_room_id: string | null;
+};
 type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string> };
+
+// Subject-name → lab convention. First matching hint whose room regex finds a
+// free room wins; falls through to the generic room-type/capacity logic below.
+const SUBJECT_LAB_HINTS: { subject: RegExp; room: RegExp }[] = [
+  { subject: /chem/i, room: /lab\s*1\b|chem/i },
+  { subject: /bio/i, room: /lab\s*2\b|bio/i },
+  { subject: /phys/i, room: /lab\s*3\b|phys/i },
+];
 
 export const generateTimetable = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -84,7 +108,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
     const subjectMap = new Map((subjects as any[]).map((s) => [s.id, s]));
 
     const { data: classSubjectRows = [], error: csErr } = await supabase
-      .from("class_subjects").select("class_id,subject_id,lessons_per_week").in("class_id", data.classIds);
+      .from("class_subjects")
+      .select("class_id,subject_id,lessons_per_week,requires_double_lesson,elective_group,preferred_room_id")
+      .in("class_id", data.classIds);
     if (csErr) throw new Error("Could not load class_subjects: " + csErr.message + " (run the class_subjects migration first)");
 
     const { data: roomReqRows = [] } = await supabase
@@ -166,6 +192,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
       periodsByDay.set(p.day_of_week, arr);
     });
     periodsByDay.forEach((arr) => arr.sort((a, b) => a.period_index - b.period_index));
+    const allDays = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
 
     const isTeacherFree = (staffId: string, day: number, periodIndex: number, k: string) => {
       const u = ensureUsage(k);
@@ -174,20 +201,166 @@ export const generateTimetable = createServerFn({ method: "POST" })
       return true;
     };
 
-    const pickRoom = (subjectId: string, classId: string, k: string): { id: string | null; name: string | null } => {
+    const pickRoom = (
+      subjectId: string, classId: string, k: string, preferredRoomId?: string | null
+    ): { id: string | null; name: string | null } => {
       const u = ensureUsage(k);
+
+      // 1) Explicit room pin from class_subjects.preferred_room_id
+      if (preferredRoomId) {
+        const pinned = rooms.find((rm) => rm.id === preferredRoomId && !u.rooms.has(rm.id));
+        if (pinned) return { id: pinned.id, name: pinned.name };
+      }
+
+      // 2) Subject-name lab convention (Chemistry → Lab 1, Biology → Lab 2, Physics → Lab 3)
+      const subj = subjectMap.get(subjectId);
+      const label = `${subj?.name ?? ""} ${subj?.code ?? ""}`;
+      for (const hint of SUBJECT_LAB_HINTS) {
+        if (hint.subject.test(label)) {
+          const labRoom = rooms.find((rm) => hint.room.test(rm.name) && !u.rooms.has(rm.id));
+          if (labRoom) return { id: labRoom.id, name: labRoom.name };
+        }
+      }
+
+      // 3) subject_room_requirements room_type
       const requiredType = roomReqFor.get(subjectId);
       const cap = classCapacity.get(classId) ?? 0;
       if (requiredType) {
         const r = rooms.find((rm) => rm.room_type === requiredType && !u.rooms.has(rm.id));
         if (r) return { id: r.id, name: r.name };
       }
+
+      // 4) Any classroom that fits the class
       const fit = rooms.find((rm) => rm.room_type === "classroom" && rm.capacity >= cap && !u.rooms.has(rm.id));
       if (fit) return { id: fit.id, name: fit.name };
+
+      // 5) Any free room at all
       const any = rooms.find((rm) => !u.rooms.has(rm.id));
       if (any) return { id: any.id, name: any.name };
+
       return { id: null, name: null };
     };
+
+    // ── Phase 0: Elective group blocking (aSc-style option block) ─────────
+    // Subjects sharing the same elective_group across 2+ selected classes get
+    // the SAME day/period across every class in the group, so students can be
+    // regrouped between classes for that slot. Leftover (unplaced) lessons
+    // fall through to normal per-class scheduling below.
+    type ElectiveMember = {
+      classId: string; subjectId: string; lessons: number; allowDouble: boolean; preferredRoomId: string | null;
+    };
+    const electiveGroups = new Map<string, ElectiveMember[]>();
+    (classSubjectRows as any[]).forEach((cs) => {
+      if (!cs.elective_group) return;
+      const subj = subjectMap.get(cs.subject_id);
+      const member: ElectiveMember = {
+        classId: cs.class_id,
+        subjectId: cs.subject_id,
+        lessons: cs.lessons_per_week ?? subj?.lessons_per_week ?? 4,
+        allowDouble: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
+        preferredRoomId: cs.preferred_room_id ?? null,
+      };
+      const arr = electiveGroups.get(cs.elective_group) ?? [];
+      arr.push(member);
+      electiveGroups.set(cs.elective_group, arr);
+    });
+
+    // `${classId}:${subjectId}` -> lessons already placed via an elective block
+    const electivePlacedCount = new Map<string, number>();
+
+    for (const [groupName, members] of electiveGroups) {
+      if (members.length < 2) continue; // not shared across classes — treat as a normal subject
+      const targetLessons = Math.max(...members.map((m) => m.lessons));
+      let attemptDouble = members.every((m) => m.allowDouble);
+      let lessonsPlaced = 0;
+
+      while (lessonsPlaced < targetLessons) {
+        const need = attemptDouble && targetLessons - lessonsPlaced >= 2 ? 2 : 1;
+        let placedThisRound = false;
+
+        for (const day of allDays) {
+          if (placedThisRound) break;
+          const dayPeriods = periodsByDay.get(day)!;
+
+          for (let pi = 0; pi < dayPeriods.length; pi++) {
+            if (placedThisRound) break;
+            const period = dayPeriods[pi];
+            const nextPeriod = need === 2 ? dayPeriods[pi + 1] : null;
+            if (need === 2 && !nextPeriod) continue;
+
+            const k = slotKey(period.day_of_week, period.start_time);
+            const u = ensureUsage(k);
+            if (members.some((m) => u.classes.has(m.classId))) continue;
+
+            let u2: SlotUsage | null = null;
+            if (nextPeriod) {
+              u2 = ensureUsage(slotKey(nextPeriod.day_of_week, nextPeriod.start_time));
+              if (members.some((m) => u2!.classes.has(m.classId))) continue;
+            }
+
+            // Find a distinct free qualified teacher for every member at this slot
+            const chosenTeachers = new Map<string, string>(); // classId:subjectId -> staffId
+            let allTeachersOk = true;
+            for (const m of members) {
+              const qualifiedIds = qualifiedFor.get(m.subjectId);
+              const pool = qualifiedIds && qualifiedIds.length ? qualifiedIds : Array.from(staffById.keys());
+              const used = new Set(chosenTeachers.values());
+              const teacherId = pool.find((id) =>
+                !used.has(id) &&
+                isTeacherFree(id, day, period.period_index, k) &&
+                (!nextPeriod || (!u2!.teachers.has(id) && !unavailable.get(id)?.has(`${day}-${nextPeriod.period_index}`)))
+              );
+              if (!teacherId) { allTeachersOk = false; break; }
+              chosenTeachers.set(`${m.classId}:${m.subjectId}`, teacherId);
+            }
+            if (!allTeachersOk) continue;
+
+            // Commit this slot for every class in the group
+            for (const m of members) {
+              const teacherId = chosenTeachers.get(`${m.classId}:${m.subjectId}`)!;
+              const room = pickRoom(m.subjectId, m.classId, k, m.preferredRoomId);
+              u.teachers.add(teacherId); u.classes.add(m.classId);
+              if (room.id) u.rooms.add(room.id);
+              bumpLoad(teacherId, day);
+              inserts.push({
+                class_id: m.classId, subject_id: m.subjectId, teacher_id: teacherId,
+                day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
+                room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+              });
+              const key = `${m.classId}:${m.subjectId}`;
+              electivePlacedCount.set(key, (electivePlacedCount.get(key) ?? 0) + 1);
+
+              if (nextPeriod && u2) {
+                const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
+                const room2 = pickRoom(m.subjectId, m.classId, k2, m.preferredRoomId);
+                u2.teachers.add(teacherId); u2.classes.add(m.classId);
+                if (room2.id) u2.rooms.add(room2.id);
+                bumpLoad(teacherId, day);
+                inserts.push({
+                  class_id: m.classId, subject_id: m.subjectId, teacher_id: teacherId,
+                  day_of_week: nextPeriod.day_of_week, start_time: nextPeriod.start_time, end_time: nextPeriod.end_time,
+                  room: room2.name, room_id: room2.id, period_template_id: nextPeriod.id, school_id: schoolId,
+                });
+                electivePlacedCount.set(key, (electivePlacedCount.get(key) ?? 0) + 1);
+              }
+            }
+
+            lessonsPlaced += need;
+            placedThisRound = true;
+          }
+        }
+
+        if (!placedThisRound) {
+          if (attemptDouble) { attemptDouble = false; continue; } // retry as singles
+          if (lessonsPlaced < targetLessons) {
+            conflicts.push(
+              `Elective group "${groupName}": placed ${lessonsPlaced}/${targetLessons} shared lesson(s) — no common free slot across all ${members.length} classes. Remainder scheduled per-class where possible.`
+            );
+          }
+          break;
+        }
+      }
+    }
 
     // ── Main scheduling loop ──────────────────────────────────────────────
     for (const classId of data.classIds) {
@@ -197,35 +370,75 @@ export const generateTimetable = createServerFn({ method: "POST" })
         continue;
       }
 
-      const demand: ClassSubjectDemand[] = csForClass.map((cs) => {
-        const subj = subjectMap.get(cs.subject_id);
-        return {
-          subject_id: cs.subject_id,
-          lessons: cs.lessons_per_week ?? subj?.lessons_per_week ?? 4,
-          allow_double: !!subj?.allow_double_period,
-          preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
-        };
-      });
+      const demand: ClassSubjectDemand[] = csForClass
+        .map((cs) => {
+          const subj = subjectMap.get(cs.subject_id);
+          const total = cs.lessons_per_week ?? subj?.lessons_per_week ?? 4;
+          const key = `${cs.class_id}:${cs.subject_id}`;
+          const placedViaElective = electivePlacedCount.get(key) ?? 0;
+          return {
+            subject_id: cs.subject_id,
+            lessons: total - placedViaElective,
+            allow_double: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
+            preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
+            preferred_room_id: cs.preferred_room_id ?? null,
+          };
+        })
+        .filter((d) => d.lessons > 0);
 
-      const days = Array.from(periodsByDay.keys()).sort((a, b) => a - b);
+      const preferredRoomBySubject = new Map(demand.map((d) => [d.subject_id, d.preferred_room_id]));
+
+      if (!demand.length) continue; // fully covered by elective blocks
+
+      const days = allDays;
       const numDays = days.length || 1;
 
       type Unit = { subject_id: string; periodsNeeded: 1 | 2 };
       const dayUnits = new Map<number, Unit[]>();
       days.forEach((d) => dayUnits.set(d, []));
 
-      demand.forEach((d, subjectIdx) => {
-        const base = Math.floor(d.lessons / numDays);
-        const extra = d.lessons % numDays;
-        const rotation = subjectIdx % numDays;
-        days.forEach((day, i) => {
-          const pos = (i - rotation + numDays) % numDays;
-          let count = base + (pos < extra ? 1 : 0);
-          if (d.allow_double) {
-            while (count >= 2) { dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 2 }); count -= 2; }
+      // Respect each day's real period count (Friday is shorter than Mon–Thu),
+      // and give every double-lesson subject exactly ONE back-to-back block per week
+      // (e.g. lab practicals), with remaining lessons spread as singles.
+      const dayCapacity = new Map<number, number>();
+      days.forEach((d) => dayCapacity.set(d, (periodsByDay.get(d) ?? []).length));
+      const dayLoad = new Map<number, number>();
+      days.forEach((d) => dayLoad.set(d, 0));
+      const daySubjects = new Map<number, Set<string>>();
+      days.forEach((d) => daySubjects.set(d, new Set<string>()));
+
+      const pickDay = (need: number, subjectId: string, avoidRepeat: boolean): number | null => {
+        const candidates = days
+          .filter((d) => dayCapacity.get(d)! - dayLoad.get(d)! >= need)
+          .filter((d) => !avoidRepeat || !daySubjects.get(d)!.has(subjectId));
+        if (!candidates.length) return null;
+        candidates.sort((a, b) => (dayCapacity.get(b)! - dayLoad.get(b)!) - (dayCapacity.get(a)! - dayLoad.get(a)!));
+        return candidates[0];
+      };
+
+      demand.forEach((d) => {
+        let remaining = d.lessons;
+
+        // Phase 1: single double block per week, back-to-back, for subjects that need it
+        if (d.allow_double && remaining >= 2) {
+          const day = pickDay(2, d.subject_id, true) ?? pickDay(2, d.subject_id, false);
+          if (day !== null) {
+            dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 2 });
+            dayLoad.set(day, dayLoad.get(day)! + 2);
+            daySubjects.get(day)!.add(d.subject_id);
+            remaining -= 2;
           }
-          while (count >= 1) { dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 1 }); count -= 1; }
-        });
+        }
+
+        // Phase 2: remaining lessons placed as singles, spread across different days first
+        while (remaining > 0) {
+          const day = pickDay(1, d.subject_id, true) ?? pickDay(1, d.subject_id, false);
+          if (day === null) break; // no capacity left anywhere — will surface as "unscheduled"
+          dayUnits.get(day)!.push({ subject_id: d.subject_id, periodsNeeded: 1 });
+          dayLoad.set(day, dayLoad.get(day)! + 1);
+          daySubjects.get(day)!.add(d.subject_id);
+          remaining -= 1;
+        }
       });
 
       const scheduledTodayForClass = new Map<number, Set<string>>();
@@ -302,7 +515,8 @@ export const generateTimetable = createServerFn({ method: "POST" })
             }
           }
 
-          const room = pickRoom(unit.subject_id, classId, k);
+          const preferredRoomId = preferredRoomBySubject.get(unit.subject_id) ?? null;
+          const room = pickRoom(unit.subject_id, classId, k, preferredRoomId);
 
           u.teachers.add(teacherId!);
           u.classes.add(classId);
@@ -319,7 +533,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
           if (unit.periodsNeeded === 2 && nextPeriod) {
             const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
             const u2 = ensureUsage(k2);
-            const room2 = pickRoom(unit.subject_id, classId, k2);
+            const room2 = pickRoom(unit.subject_id, classId, k2, preferredRoomId);
             u2.teachers.add(teacherId!);
             u2.classes.add(classId);
             if (room2.id) u2.rooms.add(room2.id);
