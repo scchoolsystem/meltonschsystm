@@ -40,12 +40,15 @@ type ClassSubjectDemand = {
 };
 type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string> };
 
-// Subject-name → lab convention. First matching hint whose room regex finds a
-// free room wins; falls through to the generic room-type/capacity logic below.
+// Subject-name → lab convention. Only matched against rooms whose room_type
+// is "science_lab" (so "Computer Lab 1" can never be picked for Chemistry
+// just because its name also contains "Lab 1"). First matching hint whose
+// regex finds a free science_lab room wins; falls through to the generic
+// room-type/capacity logic below.
 const SUBJECT_LAB_HINTS: { subject: RegExp; room: RegExp }[] = [
-  { subject: /chem/i, room: /lab\s*1\b|chem/i },
-  { subject: /bio/i, room: /lab\s*2\b|bio/i },
-  { subject: /phys/i, room: /lab\s*3\b|phys/i },
+  { subject: /chem/i, room: /\b1\b/ },
+  { subject: /bio/i, room: /\b2\b/ },
+  { subject: /phys/i, room: /\b3\b/ },
 ];
 
 export const generateTimetable = createServerFn({ method: "POST" })
@@ -217,7 +220,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
       const label = `${subj?.name ?? ""} ${subj?.code ?? ""}`;
       for (const hint of SUBJECT_LAB_HINTS) {
         if (hint.subject.test(label)) {
-          const labRoom = rooms.find((rm) => hint.room.test(rm.name) && !u.rooms.has(rm.id));
+          const labRoom = rooms.find(
+            (rm) => rm.room_type === "science_lab" && hint.room.test(rm.name) && !u.rooms.has(rm.id)
+          );
           if (labRoom) return { id: labRoom.id, name: labRoom.name };
         }
       }
