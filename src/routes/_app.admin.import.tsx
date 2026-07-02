@@ -209,7 +209,7 @@ function ImportPage() {
             headers={TEACHER_ASSIGNMENT_HEADERS}
             example={TEACHER_ASSIGNMENT_EXAMPLE}
             requiredCols={["employee_no", "class_name"]}
-            buildPayload={buildTeacherAssignmentPayload}
+            buildPayload={(r) => buildTeacherAssignmentPayload(r, schoolId)}
             tableName="teacher_class_assignments"
             keyCol="employee_no"
             // NOTE: no upsertConflict — the live table has no unique constraint on
@@ -287,18 +287,21 @@ async function buildClassSubjectPayload(r: Record<string, string>, schoolId?: st
   };
 }
 
-async function buildTeacherAssignmentPayload(r: Record<string, string>): Promise<Record<string, any>> {
+async function buildTeacherAssignmentPayload(r: Record<string, string>, schoolId?: string | null): Promise<Record<string, any>> {
+  if (!schoolId) throw new Error("No school resolved for your account — reload and try again.");
+
   const { data: staffRow } = await supabase
     .from("staff").select("user_id").eq("employee_no", r.employee_no?.trim()).maybeSingle();
   if (!staffRow?.user_id) throw new Error(`Staff "${r.employee_no}" has no linked login account yet — invite them first.`);
 
-  let classQuery = supabase.from("classes").select("id").ilike("name", r.class_name?.trim() ?? "");
+  let classQuery = supabase.from("classes").select("id").eq("school_id", schoolId).ilike("name", r.class_name?.trim() ?? "");
   if (r.stream?.trim()) classQuery = classQuery.ilike("stream", r.stream.trim());
   const { data: classRows } = await classQuery.limit(1);
   const class_id = classRows?.[0]?.id ?? null;
   if (!class_id) throw new Error(`Class not found: "${r.class_name}"${r.stream ? ` - ${r.stream}` : ""}. Import Classes first.`);
 
   return {
+    school_id: schoolId,
     teacher_user_id: staffRow.user_id,
     class_id,
     is_active: r.is_active === undefined || r.is_active === "" ? true : truthy(r.is_active),
