@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { admitStudent, createStaff } from "@/lib/admissions.functions";
 
 export const Route = createFileRoute("/_app/admin/import")({ component: ImportPage });
 
