@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck, KeyRound, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { bulkCreateStaffAccounts } from "@/lib/auth-admin.functions";
+import { bulkCreateStaffAccounts, bulkCreateStudentAccounts } from "@/lib/auth-admin.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -121,6 +121,7 @@ function parseCSV(text: string): Record<string, string>[] {
 function ImportPage() {
   const { isAdmin } = useAuth();
   const bulkCreateStaffFn = useServerFn(bulkCreateStaffAccounts);
+  const bulkCreateStudentFn = useServerFn(bulkCreateStudentAccounts);
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -152,6 +153,10 @@ function ImportPage() {
           <TabsTrigger value="teacher-assignments"><UserCheck className="w-3.5 h-3.5 mr-1" />Teacher ↔ Classes</TabsTrigger>
         </TabsList>
         <TabsContent value="students" className="mt-4">
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            After each row is saved to Students, a login is generated automatically and linked back
+            to that student record — no separate step needed.
+          </p>
           <ImportPanel
             kind="students"
             headers={STUDENT_HEADERS}
@@ -160,6 +165,15 @@ function ImportPage() {
             buildPayload={buildStudentPayload}
             tableName="students"
             keyCol="admission_no"
+            linkAccounts={{
+              idKey: "admission_no",
+              bulkCreateFn: bulkCreateStudentFn,
+              buildAccountInput: (r) => ({
+                admission_no: r.admission_no.trim(),
+                full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
+                email: r.parent_email?.trim() || undefined,
+              }),
+            }}
           />
         </TabsContent>
         <TabsContent value="staff" className="mt-4">
@@ -176,6 +190,7 @@ function ImportPage() {
             tableName="staff"
             keyCol="employee_no"
             linkAccounts={{
+              idKey: "employee_no",
               bulkCreateFn: bulkCreateStaffFn,
               buildAccountInput: (r) => ({
                 employee_no: r.employee_no.trim(),
@@ -384,11 +399,10 @@ async function buildTeacherAssignmentPayload(r: Record<string, string>): Promise
 }
 
 // ─── Shared import panel ──────────────────────────────────────────────────────
-type StaffAccountInput = { employee_no: string; full_name: string; role: string; email?: string };
 type BulkAccountResult = {
-  created: { employee_no: string; full_name: string; uniqueId: string; password: string }[];
-  skipped: { employee_no: string; reason: string }[];
-  errors: { employee_no: string; error: string }[];
+  created: { full_name: string; uniqueId: string; password: string; [key: string]: any }[];
+  skipped: { reason: string; [key: string]: any }[];
+  errors: { error: string; [key: string]: any }[];
 };
 
 function ImportPanel({
@@ -412,10 +426,11 @@ function ImportPanel({
   upsertConflict?: string; // e.g. "class_id,subject_id" — pass the DB unique constraint's columns to upsert instead of insert
   // When set, every row that saves successfully is also turned into a login
   // account (unique ID + password) via a single bulk server call, and linked
-  // back to its row. Currently only wired up for the Staff tab.
+  // back to its row. Wired up for the Staff and Students tabs.
   linkAccounts?: {
-    buildAccountInput: (r: Record<string, string>) => StaffAccountInput;
-    bulkCreateFn: (args: { data: { items: StaffAccountInput[] } }) => Promise<BulkAccountResult>;
+    idKey: string; // field name that identifies each row in the account result, e.g. "employee_no" or "admission_no"
+    buildAccountInput: (r: Record<string, string>) => Record<string, any>;
+    bulkCreateFn: (args: { data: { items: Record<string, any>[] } }) => Promise<BulkAccountResult>;
   };
 }) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -626,15 +641,16 @@ function ImportPanel({
                 size="sm"
                 variant="outline"
                 onClick={() => {
+                  const idKey = linkAccounts?.idKey ?? "id";
                   const csv =
-                    "employee_no,full_name,unique_id,password\n" +
+                    `${idKey},full_name,unique_id,password\n` +
                     acctResult.created
-                      .map((c) => [c.employee_no, c.full_name, c.uniqueId, c.password].map((v) => `"${v.replace(/"/g, '""')}"`).join(","))
+                      .map((c) => [c[idKey], c.full_name, c.uniqueId, c.password].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
                       .join("\n");
                   const blob = new Blob([csv], { type: "text/csv" });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
-                  a.href = url; a.download = "new-staff-credentials.csv"; a.click();
+                  a.href = url; a.download = `new-${kind}-credentials.csv`; a.click();
                   URL.revokeObjectURL(url);
                 }}
               >
@@ -645,7 +661,7 @@ function ImportPanel({
           <CardContent className="space-y-3">
             {acctResult.created.length > 0 && (
               <div className="text-xs text-warning">
-                Passwords are only shown once — download the CSV now and share credentials securely with each staff member.
+                Passwords are only shown once — download the CSV now and share credentials securely with each person.
               </div>
             )}
             {acctResult.created.length > 0 && (
@@ -653,16 +669,16 @@ function ImportPanel({
                 <table className="text-xs w-full">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-2 py-1 text-left">Employee No</th>
+                      <th className="px-2 py-1 text-left">{linkAccounts?.idKey ?? "ID"}</th>
                       <th className="px-2 py-1 text-left">Name</th>
                       <th className="px-2 py-1 text-left">Unique ID</th>
                       <th className="px-2 py-1 text-left">Password</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {acctResult.created.map((c) => (
-                      <tr key={c.employee_no} className="border-t">
-                        <td className="px-2 py-1 font-mono">{c.employee_no}</td>
+                    {acctResult.created.map((c, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-2 py-1 font-mono">{c[linkAccounts?.idKey ?? "id"]}</td>
                         <td className="px-2 py-1">{c.full_name}</td>
                         <td className="px-2 py-1 font-mono">{c.uniqueId}</td>
                         <td className="px-2 py-1 font-mono">{c.password}</td>
@@ -675,7 +691,7 @@ function ImportPanel({
             {acctResult.errors.length > 0 && (
               <div className="text-xs space-y-1 max-h-40 overflow-auto font-mono">
                 {acctResult.errors.map((e, i) => (
-                  <div key={i} className="text-destructive">{e.employee_no}: {e.error}</div>
+                  <div key={i} className="text-destructive">{e[linkAccounts?.idKey ?? "id"]}: {e.error}</div>
                 ))}
               </div>
             )}
