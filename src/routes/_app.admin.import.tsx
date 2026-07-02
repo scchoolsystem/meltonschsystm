@@ -12,51 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
-import { admitStudent, createStaff } from "@/lib/admissions.functions";
+import { StudentImportPanel, StaffImportPanel } from "@/components/admin/ProvisioningImportPanel";
 
 export const Route = createFileRoute("/_app/admin/import")({ component: ImportPage });
 
 // ─── Column definitions ───────────────────────────────────────────────────────
-const STUDENT_HEADERS = [
-  "admission_no",
-  "first_name",
-  "last_name",
-  "gender",           // M / F
-  "date_of_birth",    // YYYY-MM-DD
-  "class_name",       // must match an existing class name e.g. "Form 1A"
-  "year_of_admission",// e.g. 2023
-  "parent_name",
-  "parent_phone",
-  "parent_email",
-  "address",
-  "nationality",
-  "special_needs",    // optional free text
-];
-
-const STAFF_HEADERS = [
-  "employee_no",
-  "first_name",
-  "last_name",
-  "role",             // must be a valid system role e.g. "teacher"
-  "staff_category",   // teaching / non-teaching / support
-  "department",       // department name (matched by name)
-  "gender",
-  "date_of_birth",    // YYYY-MM-DD
-  "hire_date",        // YYYY-MM-DD
-  "email",
-  "phone",
-  "national_id",
-  "qualifications",   // optional free text
-];
-
-const STUDENT_EXAMPLE =
-  `${STUDENT_HEADERS.join(",")}\n` +
-  `ADM001,Jane,Doe,F,2010-04-12,Form 1A,2023,Mary Doe,+254700000000,mary@example.com,Nairobi,Kenyan,\n`;
-
-const STAFF_EXAMPLE =
-  `${STAFF_HEADERS.join(",")}\n` +
-  `EMP001,John,Smith,teacher,teaching,Mathematics,M,1985-06-20,2020-01-15,john.smith@school.ac.ke,+254711000001,12345678,,\n`;
+// NOTE: Students and Staff are handled by StudentImportPanel / StaffImportPanel
+// (see @/components/admin/ProvisioningImportPanel), which route every row
+// through the existing admitStudent / createStaff provisioning pipeline so
+// CSV-imported users get an Auth account, Profile, User Roles, User
+// Credentials, and School Member record — exactly like manually created users.
+// The generic ImportPanel below (raw table insert) remains for structural,
+// non-user data: Classes, Class Structure, Subjects, and their links.
 
 const CLASS_HEADERS = [
   "name",                      // e.g. "Grade 5" — used as the promotion-ladder level name
@@ -151,26 +118,10 @@ function ImportPage() {
           <TabsTrigger value="teacher-assignments"><UserCheck className="w-3.5 h-3.5 mr-1" />Teacher ↔ Classes</TabsTrigger>
         </TabsList>
         <TabsContent value="students" className="mt-4">
-          <ImportPanel
-            kind="students"
-            headers={STUDENT_HEADERS}
-            example={STUDENT_EXAMPLE}
-            requiredCols={["admission_no", "first_name"]}
-            buildPayload={buildStudentPayload}
-            tableName="students"
-            keyCol="admission_no"
-          />
+          <StudentImportPanel />
         </TabsContent>
         <TabsContent value="staff" className="mt-4">
-          <ImportPanel
-            kind="staff"
-            headers={STAFF_HEADERS}
-            example={STAFF_EXAMPLE}
-            requiredCols={["employee_no", "first_name"]}
-            buildPayload={buildStaffPayload}
-            tableName="staff"
-            keyCol="employee_no"
-          />
+          <StaffImportPanel />
         </TabsContent>
         <TabsContent value="classes" className="mt-4">
           <ImportPanel
@@ -246,61 +197,7 @@ function ImportPage() {
   );
 }
 
-// ─── Payload builders ─────────────────────────────────────────────────────────
-async function buildStudentPayload(r: Record<string, string>): Promise<Record<string, any>> {
-  // Resolve class_name → class_id (and level, so both stay in sync)
-  let class_id: string | null = null;
-  let level: string | null = null;
-  if (r.class_name?.trim()) {
-    const { data } = await supabase.from("classes").select("id, name").ilike("name", r.class_name.trim()).maybeSingle();
-    class_id = data?.id ?? null;
-    level = data?.name ?? null;
-  }
-  if (!class_id) {
-    throw new Error(`Class not found: "${r.class_name}". Import Classes first, or check spelling.`);
-  }
-  return {
-    admission_no: r.admission_no,
-    first_name: r.first_name,
-    last_name: r.last_name || "",
-    gender: r.gender || null,
-    date_of_birth: r.date_of_birth || null,
-    class_id,
-    level,
-    year_of_admission: r.year_of_admission ? parseInt(r.year_of_admission) : null,
-    parent_name: r.parent_name || null,
-    parent_phone: r.parent_phone || null,
-    parent_email: r.parent_email || null,
-    address: r.address || null,
-    nationality: r.nationality || null,
-    special_needs: r.special_needs || null,
-  };
-}
-
-async function buildStaffPayload(r: Record<string, string>): Promise<Record<string, any>> {
-  // Resolve department name → department_id
-  let department_id: string | null = null;
-  if (r.department?.trim()) {
-    const { data } = await supabase.from("departments").select("id").ilike("name", r.department.trim()).maybeSingle();
-    department_id = data?.id ?? null;
-  }
-  return {
-    employee_no: r.employee_no,
-    first_name: r.first_name,
-    last_name: r.last_name || "",
-    role: r.role || "staff",
-    staff_category: r.staff_category || null,
-    department_id,
-    gender: r.gender || null,
-    date_of_birth: r.date_of_birth || null,
-    hire_date: r.hire_date || null,
-    email: r.email || null,
-    phone: r.phone || null,
-    national_id: r.national_id || null,
-    qualifications: r.qualifications || null,
-  };
-}
-
+// ─── Payload builders (structural data only — see note above) ────────────────
 const truthy = (v?: string) => /^(true|yes|1)$/i.test((v || "").trim());
 
 async function buildClassPayload(r: Record<string, string>): Promise<Record<string, any>> {
