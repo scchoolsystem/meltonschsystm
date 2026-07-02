@@ -182,7 +182,7 @@ export function StudentImportPanel() {
     }
 
     // ── Step: Validate that every referenced Class (+ Stream) exists ───────
-    const { data: allClasses } = await supabase.from("classes").select("id, name, stream");
+    const { data: allClasses } = await supabase.from("classes").select("id, name, stream").eq("school_id", schoolId);
     const classByNameStream = new Map<string, { id: string; stream: string | null }[]>();
     (allClasses ?? []).forEach((c: any) => {
       const key = String(c.name).trim().toLowerCase();
