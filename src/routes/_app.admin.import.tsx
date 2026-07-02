@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck } from "lucide-react";
+import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck, KeyRound, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { bulkCreateStaffAccounts } from "@/lib/auth-admin.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -118,6 +120,7 @@ function parseCSV(text: string): Record<string, string>[] {
 
 function ImportPage() {
   const { isAdmin } = useAuth();
+  const bulkCreateStaffFn = useServerFn(bulkCreateStaffAccounts);
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -160,6 +163,10 @@ function ImportPage() {
           />
         </TabsContent>
         <TabsContent value="staff" className="mt-4">
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            After each row is saved to Staff, a login is generated automatically (same as clicking
+            "Create user" one at a time) and linked back to that staff record — no separate step needed.
+          </p>
           <ImportPanel
             kind="staff"
             headers={STAFF_HEADERS}
@@ -168,6 +175,15 @@ function ImportPage() {
             buildPayload={buildStaffPayload}
             tableName="staff"
             keyCol="employee_no"
+            linkAccounts={{
+              bulkCreateFn: bulkCreateStaffFn,
+              buildAccountInput: (r) => ({
+                employee_no: r.employee_no.trim(),
+                full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
+                role: (r.role || "staff").trim(),
+                email: r.email?.trim() || undefined,
+              }),
+            }}
           />
         </TabsContent>
         <TabsContent value="classes" className="mt-4">
@@ -368,6 +384,13 @@ async function buildTeacherAssignmentPayload(r: Record<string, string>): Promise
 }
 
 // ─── Shared import panel ──────────────────────────────────────────────────────
+type StaffAccountInput = { employee_no: string; full_name: string; role: string; email?: string };
+type BulkAccountResult = {
+  created: { employee_no: string; full_name: string; uniqueId: string; password: string }[];
+  skipped: { employee_no: string; reason: string }[];
+  errors: { employee_no: string; error: string }[];
+};
+
 function ImportPanel({
   kind,
   headers,
@@ -377,6 +400,7 @@ function ImportPanel({
   tableName,
   keyCol,
   upsertConflict,
+  linkAccounts,
 }: {
   kind: string;
   headers: string[];
@@ -386,11 +410,20 @@ function ImportPanel({
   tableName: string;
   keyCol: string;
   upsertConflict?: string; // e.g. "class_id,subject_id" — pass the DB unique constraint's columns to upsert instead of insert
+  // When set, every row that saves successfully is also turned into a login
+  // account (unique ID + password) via a single bulk server call, and linked
+  // back to its row. Currently only wired up for the Staff tab.
+  linkAccounts?: {
+    buildAccountInput: (r: Record<string, string>) => StaffAccountInput;
+    bulkCreateFn: (args: { data: { items: StaffAccountInput[] } }) => Promise<BulkAccountResult>;
+  };
 }) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null);
+  const [acctResult, setAcctResult] = useState<BulkAccountResult | null>(null);
+  const [provisioning, setProvisioning] = useState(false);
 
   const onFile = async (f: File) => {
     const t = await f.text();
@@ -411,9 +444,10 @@ function ImportPanel({
 
   const runImport = async () => {
     if (!rows.length) return;
-    setBusy(true); setResult(null);
+    setBusy(true); setResult(null); setAcctResult(null);
     let ok = 0, fail = 0;
     const errors: string[] = [];
+    const savedRows: Record<string, string>[] = [];
 
     for (const r of rows) {
       const missingRequired = requiredCols.filter((c) => !r[c]?.trim());
@@ -428,7 +462,7 @@ function ImportPanel({
           ? await supabase.from(tableName as any).upsert(payload as any, { onConflict: upsertConflict })
           : await supabase.from(tableName as any).insert(payload as any);
         if (error) { fail++; errors.push(`${r[keyCol]}: ${error.message}`); }
-        else ok++;
+        else { ok++; savedRows.push(r); }
       } catch (e: any) {
         fail++; errors.push(`${r[keyCol]}: ${e.message}`);
       }
@@ -437,6 +471,25 @@ function ImportPanel({
     setResult({ ok, fail, errors });
     setBusy(false);
     toast.success(`Imported ${ok} ${kind}${fail ? `, ${fail} failed` : ""}.`);
+
+    // Provision logins for whatever just saved successfully.
+    if (linkAccounts && savedRows.length) {
+      setProvisioning(true);
+      try {
+        const items = savedRows.map(linkAccounts.buildAccountInput);
+        const acctRes = await linkAccounts.bulkCreateFn({ data: { items } });
+        setAcctResult(acctRes);
+        toast.success(
+          `Created ${acctRes.created.length} login${acctRes.created.length === 1 ? "" : "s"}` +
+          `${acctRes.skipped.length ? `, ${acctRes.skipped.length} already had one` : ""}` +
+          `${acctRes.errors.length ? `, ${acctRes.errors.length} failed` : ""}.`
+        );
+      } catch (e: any) {
+        toast.error(`Account provisioning failed: ${e.message}`);
+      } finally {
+        setProvisioning(false);
+      }
+    }
   };
 
   // Validate detected columns vs expected headers
@@ -498,8 +551,9 @@ function ImportPanel({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">3. Preview ({rows.length} rows)</CardTitle>
-            <Button onClick={runImport} disabled={busy || missingHeaders.length > 0}>
-              <Upload className="w-4 h-4 mr-2" /> {busy ? "Importing…" : `Import ${kind}`}
+            <Button onClick={runImport} disabled={busy || provisioning || missingHeaders.length > 0}>
+              <Upload className="w-4 h-4 mr-2" />
+              {busy ? "Importing…" : provisioning ? "Creating logins…" : `Import ${kind}`}
             </Button>
           </CardHeader>
           <CardContent>
@@ -541,6 +595,91 @@ function ImportPanel({
               </div>
             </CardContent>
           )}
+        </Card>
+      )}
+
+      {/* Provisioning in progress */}
+      {provisioning && (
+        <Card>
+          <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Generating logins and linking accounts…
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Account provisioning result */}
+      {acctResult && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <KeyRound className="w-4 h-4" /> Logins created
+              <Badge variant="default" className="gap-1"><CheckCircle2 className="w-3 h-3" />{acctResult.created.length} created</Badge>
+              {acctResult.skipped.length > 0 && (
+                <Badge variant="outline" className="text-[10px]">{acctResult.skipped.length} already had a login</Badge>
+              )}
+              {acctResult.errors.length > 0 && (
+                <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" />{acctResult.errors.length} failed</Badge>
+              )}
+            </CardTitle>
+            {acctResult.created.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const csv =
+                    "employee_no,full_name,unique_id,password\n" +
+                    acctResult.created
+                      .map((c) => [c.employee_no, c.full_name, c.uniqueId, c.password].map((v) => `"${v.replace(/"/g, '""')}"`).join(","))
+                      .join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = "new-staff-credentials.csv"; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="w-3.5 h-3.5 mr-1" /> Download credentials CSV
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {acctResult.created.length > 0 && (
+              <div className="text-xs text-warning">
+                Passwords are only shown once — download the CSV now and share credentials securely with each staff member.
+              </div>
+            )}
+            {acctResult.created.length > 0 && (
+              <div className="overflow-x-auto border rounded">
+                <table className="text-xs w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Employee No</th>
+                      <th className="px-2 py-1 text-left">Name</th>
+                      <th className="px-2 py-1 text-left">Unique ID</th>
+                      <th className="px-2 py-1 text-left">Password</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {acctResult.created.map((c) => (
+                      <tr key={c.employee_no} className="border-t">
+                        <td className="px-2 py-1 font-mono">{c.employee_no}</td>
+                        <td className="px-2 py-1">{c.full_name}</td>
+                        <td className="px-2 py-1 font-mono">{c.uniqueId}</td>
+                        <td className="px-2 py-1 font-mono">{c.password}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {acctResult.errors.length > 0 && (
+              <div className="text-xs space-y-1 max-h-40 overflow-auto font-mono">
+                {acctResult.errors.map((e, i) => (
+                  <div key={i} className="text-destructive">{e.employee_no}: {e.error}</div>
+                ))}
+              </div>
+            )}
+          </CardContent>
         </Card>
       )}
     </div>
