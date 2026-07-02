@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck, KeyRound, Loader2 } from "lucide-react";
+import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { bulkCreateStaffAccounts, bulkCreateStudentAccounts } from "@/lib/auth-admin.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -120,8 +118,6 @@ function parseCSV(text: string): Record<string, string>[] {
 
 function ImportPage() {
   const { isAdmin } = useAuth();
-  const bulkCreateStaffFn = useServerFn(bulkCreateStaffAccounts);
-  const bulkCreateStudentFn = useServerFn(bulkCreateStudentAccounts);
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -153,10 +149,6 @@ function ImportPage() {
           <TabsTrigger value="teacher-assignments"><UserCheck className="w-3.5 h-3.5 mr-1" />Teacher ↔ Classes</TabsTrigger>
         </TabsList>
         <TabsContent value="students" className="mt-4">
-          <p className="text-xs text-muted-foreground -mt-2 mb-3">
-            After each row is saved to Students, a login is generated automatically and linked back
-            to that student record — no separate step needed.
-          </p>
           <ImportPanel
             kind="students"
             headers={STUDENT_HEADERS}
@@ -165,22 +157,9 @@ function ImportPage() {
             buildPayload={buildStudentPayload}
             tableName="students"
             keyCol="admission_no"
-            linkAccounts={{
-              idKey: "admission_no",
-              bulkCreateFn: bulkCreateStudentFn,
-              buildAccountInput: (r) => ({
-                admission_no: r.admission_no.trim(),
-                full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
-                email: r.parent_email?.trim() || undefined,
-              }),
-            }}
           />
         </TabsContent>
         <TabsContent value="staff" className="mt-4">
-          <p className="text-xs text-muted-foreground -mt-2 mb-3">
-            After each row is saved to Staff, a login is generated automatically (same as clicking
-            "Create user" one at a time) and linked back to that staff record — no separate step needed.
-          </p>
           <ImportPanel
             kind="staff"
             headers={STAFF_HEADERS}
@@ -189,16 +168,6 @@ function ImportPage() {
             buildPayload={buildStaffPayload}
             tableName="staff"
             keyCol="employee_no"
-            linkAccounts={{
-              idKey: "employee_no",
-              bulkCreateFn: bulkCreateStaffFn,
-              buildAccountInput: (r) => ({
-                employee_no: r.employee_no.trim(),
-                full_name: `${r.first_name} ${r.last_name || ""}`.trim(),
-                role: (r.role || "staff").trim(),
-                email: r.email?.trim() || undefined,
-              }),
-            }}
           />
         </TabsContent>
         <TabsContent value="classes" className="mt-4">
@@ -277,11 +246,16 @@ function ImportPage() {
 
 // ─── Payload builders ─────────────────────────────────────────────────────────
 async function buildStudentPayload(r: Record<string, string>): Promise<Record<string, any>> {
-  // Resolve class_name → class_id
+  // Resolve class_name → class_id (and level, so both stay in sync)
   let class_id: string | null = null;
+  let level: string | null = null;
   if (r.class_name?.trim()) {
-    const { data } = await supabase.from("classes").select("id").ilike("name", r.class_name.trim()).maybeSingle();
+    const { data } = await supabase.from("classes").select("id, name").ilike("name", r.class_name.trim()).maybeSingle();
     class_id = data?.id ?? null;
+    level = data?.name ?? null;
+  }
+  if (!class_id) {
+    throw new Error(`Class not found: "${r.class_name}". Import Classes first, or check spelling.`);
   }
   return {
     admission_no: r.admission_no,
@@ -290,6 +264,7 @@ async function buildStudentPayload(r: Record<string, string>): Promise<Record<st
     gender: r.gender || null,
     date_of_birth: r.date_of_birth || null,
     class_id,
+    level,
     year_of_admission: r.year_of_admission ? parseInt(r.year_of_admission) : null,
     parent_name: r.parent_name || null,
     parent_phone: r.parent_phone || null,
@@ -399,12 +374,6 @@ async function buildTeacherAssignmentPayload(r: Record<string, string>): Promise
 }
 
 // ─── Shared import panel ──────────────────────────────────────────────────────
-type BulkAccountResult = {
-  created: { full_name: string; uniqueId: string; password: string; [key: string]: any }[];
-  skipped: { reason: string; [key: string]: any }[];
-  errors: { error: string; [key: string]: any }[];
-};
-
 function ImportPanel({
   kind,
   headers,
@@ -414,7 +383,6 @@ function ImportPanel({
   tableName,
   keyCol,
   upsertConflict,
-  linkAccounts,
 }: {
   kind: string;
   headers: string[];
@@ -424,21 +392,11 @@ function ImportPanel({
   tableName: string;
   keyCol: string;
   upsertConflict?: string; // e.g. "class_id,subject_id" — pass the DB unique constraint's columns to upsert instead of insert
-  // When set, every row that saves successfully is also turned into a login
-  // account (unique ID + password) via a single bulk server call, and linked
-  // back to its row. Wired up for the Staff and Students tabs.
-  linkAccounts?: {
-    idKey: string; // field name that identifies each row in the account result, e.g. "employee_no" or "admission_no"
-    buildAccountInput: (r: Record<string, string>) => Record<string, any>;
-    bulkCreateFn: (args: { data: { items: Record<string, any>[] } }) => Promise<BulkAccountResult>;
-  };
 }) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: number; fail: number; errors: string[] } | null>(null);
-  const [acctResult, setAcctResult] = useState<BulkAccountResult | null>(null);
-  const [provisioning, setProvisioning] = useState(false);
 
   const onFile = async (f: File) => {
     const t = await f.text();
@@ -459,10 +417,9 @@ function ImportPanel({
 
   const runImport = async () => {
     if (!rows.length) return;
-    setBusy(true); setResult(null); setAcctResult(null);
+    setBusy(true); setResult(null);
     let ok = 0, fail = 0;
     const errors: string[] = [];
-    const savedRows: Record<string, string>[] = [];
 
     for (const r of rows) {
       const missingRequired = requiredCols.filter((c) => !r[c]?.trim());
@@ -477,7 +434,7 @@ function ImportPanel({
           ? await supabase.from(tableName as any).upsert(payload as any, { onConflict: upsertConflict })
           : await supabase.from(tableName as any).insert(payload as any);
         if (error) { fail++; errors.push(`${r[keyCol]}: ${error.message}`); }
-        else { ok++; savedRows.push(r); }
+        else ok++;
       } catch (e: any) {
         fail++; errors.push(`${r[keyCol]}: ${e.message}`);
       }
@@ -486,25 +443,6 @@ function ImportPanel({
     setResult({ ok, fail, errors });
     setBusy(false);
     toast.success(`Imported ${ok} ${kind}${fail ? `, ${fail} failed` : ""}.`);
-
-    // Provision logins for whatever just saved successfully.
-    if (linkAccounts && savedRows.length) {
-      setProvisioning(true);
-      try {
-        const items = savedRows.map(linkAccounts.buildAccountInput);
-        const acctRes = await linkAccounts.bulkCreateFn({ data: { items } });
-        setAcctResult(acctRes);
-        toast.success(
-          `Created ${acctRes.created.length} login${acctRes.created.length === 1 ? "" : "s"}` +
-          `${acctRes.skipped.length ? `, ${acctRes.skipped.length} already had one` : ""}` +
-          `${acctRes.errors.length ? `, ${acctRes.errors.length} failed` : ""}.`
-        );
-      } catch (e: any) {
-        toast.error(`Account provisioning failed: ${e.message}`);
-      } finally {
-        setProvisioning(false);
-      }
-    }
   };
 
   // Validate detected columns vs expected headers
@@ -566,9 +504,8 @@ function ImportPanel({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">3. Preview ({rows.length} rows)</CardTitle>
-            <Button onClick={runImport} disabled={busy || provisioning || missingHeaders.length > 0}>
-              <Upload className="w-4 h-4 mr-2" />
-              {busy ? "Importing…" : provisioning ? "Creating logins…" : `Import ${kind}`}
+            <Button onClick={runImport} disabled={busy || missingHeaders.length > 0}>
+              <Upload className="w-4 h-4 mr-2" /> {busy ? "Importing…" : `Import ${kind}`}
             </Button>
           </CardHeader>
           <CardContent>
@@ -610,92 +547,6 @@ function ImportPanel({
               </div>
             </CardContent>
           )}
-        </Card>
-      )}
-
-      {/* Provisioning in progress */}
-      {provisioning && (
-        <Card>
-          <CardContent className="py-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Generating logins and linking accounts…
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Account provisioning result */}
-      {acctResult && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <KeyRound className="w-4 h-4" /> Logins created
-              <Badge variant="default" className="gap-1"><CheckCircle2 className="w-3 h-3" />{acctResult.created.length} created</Badge>
-              {acctResult.skipped.length > 0 && (
-                <Badge variant="outline" className="text-[10px]">{acctResult.skipped.length} already had a login</Badge>
-              )}
-              {acctResult.errors.length > 0 && (
-                <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" />{acctResult.errors.length} failed</Badge>
-              )}
-            </CardTitle>
-            {acctResult.created.length > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const idKey = linkAccounts?.idKey ?? "id";
-                  const csv =
-                    `${idKey},full_name,unique_id,password\n` +
-                    acctResult.created
-                      .map((c) => [c[idKey], c.full_name, c.uniqueId, c.password].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-                      .join("\n");
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url; a.download = `new-${kind}-credentials.csv`; a.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                <Download className="w-3.5 h-3.5 mr-1" /> Download credentials CSV
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {acctResult.created.length > 0 && (
-              <div className="text-xs text-warning">
-                Passwords are only shown once — download the CSV now and share credentials securely with each person.
-              </div>
-            )}
-            {acctResult.created.length > 0 && (
-              <div className="overflow-x-auto border rounded">
-                <table className="text-xs w-full">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="px-2 py-1 text-left">{linkAccounts?.idKey ?? "ID"}</th>
-                      <th className="px-2 py-1 text-left">Name</th>
-                      <th className="px-2 py-1 text-left">Unique ID</th>
-                      <th className="px-2 py-1 text-left">Password</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {acctResult.created.map((c, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="px-2 py-1 font-mono">{c[linkAccounts?.idKey ?? "id"]}</td>
-                        <td className="px-2 py-1">{c.full_name}</td>
-                        <td className="px-2 py-1 font-mono">{c.uniqueId}</td>
-                        <td className="px-2 py-1 font-mono">{c.password}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {acctResult.errors.length > 0 && (
-              <div className="text-xs space-y-1 max-h-40 overflow-auto font-mono">
-                {acctResult.errors.map((e, i) => (
-                  <div key={i} className="text-destructive">{e[linkAccounts?.idKey ?? "id"]}: {e.error}</div>
-                ))}
-              </div>
-            )}
-          </CardContent>
         </Card>
       )}
     </div>
