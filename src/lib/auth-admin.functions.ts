@@ -317,6 +317,127 @@ export const bulkCreateStaffAccounts = createServerFn({ method: "POST" })
     return { created, skipped, errors };
   });
 
+// ----- 2c. Bulk create student accounts (backfill + import) -----
+// Same shape as bulkCreateStaffAccounts, but looks students up by
+// admission_no and always provisions the "student" role / STU category.
+
+export const bulkCreateStudentAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        items: z
+          .array(
+            z.object({
+              admission_no: z.string().trim().min(1).max(60),
+              full_name: z.string().trim().min(1).max(120),
+              email: z.string().email().max(255).optional().or(z.literal("")),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdminData, error: adminErr } = await context.supabase.rpc(
+      "is_admin",
+      { _user_id: context.userId }
+    );
+    if (adminErr) throw new Error(adminErr.message);
+    if (!isAdminData) throw new Error("Only super admin can create accounts");
+
+    const { data: domainResp } = await context.supabase.rpc("current_school_email_domain");
+    const domain = (domainResp as string) || "school.erp";
+
+    const { data: member } = await supabaseAdmin
+      .from("school_members").select("school_id")
+      .eq("user_id", context.userId).order("is_default", { ascending: false }).limit(1).maybeSingle();
+    const schoolId = (member as any)?.school_id as string | undefined;
+    if (!schoolId) throw new Error("No school context for current user");
+
+    const created: { admission_no: string; full_name: string; uniqueId: string; password: string }[] = [];
+    const skipped: { admission_no: string; reason: string }[] = [];
+    const errors: { admission_no: string; error: string }[] = [];
+
+    for (const item of data.items) {
+      try {
+        const { data: studentRow, error: studentErr } = await supabaseAdmin
+          .from("students")
+          .select("id, user_id")
+          .eq("admission_no", item.admission_no)
+          .eq("school_id", schoolId)
+          .maybeSingle();
+        if (studentErr) throw new Error(studentErr.message);
+        if (!studentRow) {
+          skipped.push({ admission_no: item.admission_no, reason: "No matching student record — import students first" });
+          continue;
+        }
+        if (studentRow.user_id) {
+          skipped.push({ admission_no: item.admission_no, reason: "Already has a login" });
+          continue;
+        }
+
+        const category = "STU";
+
+        const { data: uniqueId, error: idErr } = await context.supabase.rpc(
+          "next_unique_id",
+          { _category: category }
+        );
+        if (idErr || !uniqueId) throw new Error(idErr?.message ?? "ID generation failed");
+
+        const syntheticEmail = `${String(uniqueId).toLowerCase()}@${domain}`;
+        const password = generatePassword(14);
+
+        const { data: createdUser, error: createErr } =
+          await supabaseAdmin.auth.admin.createUser({
+            email: syntheticEmail,
+            password,
+            email_confirm: true,
+            user_metadata: { full_name: item.full_name, unique_id: uniqueId },
+          });
+        if (createErr || !createdUser.user) {
+          throw new Error(createErr?.message ?? "Failed to create account");
+        }
+
+        const userId = createdUser.user.id;
+
+        await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: item.full_name });
+
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+        await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: userId, role: "student" as never, school_id: schoolId });
+
+        await supabaseAdmin.from("user_credentials").insert({
+          user_id: userId,
+          unique_id: uniqueId,
+          category,
+          synthetic_email: syntheticEmail,
+          is_active: true,
+          school_id: schoolId,
+        } as any);
+
+        await supabaseAdmin.from("school_members").upsert(
+          { user_id: userId, school_id: schoolId, is_default: true },
+          { onConflict: "user_id,school_id" }
+        );
+
+        const { error: linkErr } = await supabaseAdmin
+          .from("students")
+          .update({ user_id: userId, unique_id: uniqueId })
+          .eq("id", studentRow.id);
+        if (linkErr) throw new Error(`Account created but failed to link to student row: ${linkErr.message}`);
+
+        created.push({ admission_no: item.admission_no, full_name: item.full_name, uniqueId: uniqueId as string, password });
+      } catch (e: any) {
+        errors.push({ admission_no: item.admission_no, error: e.message ?? String(e) });
+      }
+    }
+
+    return { created, skipped, errors };
+  });
+
 // ----- 3. Admin reset password -----
 
 export const resetPassword = createServerFn({ method: "POST" })
