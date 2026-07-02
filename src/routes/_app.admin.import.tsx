@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase } from "lucide-react";
+import { Upload, Download, CheckCircle2, AlertCircle, GraduationCap, Briefcase, Layers, BookOpen, Link2, ListOrdered, UserCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ShieldAlert } from "lucide-react";
@@ -56,6 +56,52 @@ const STAFF_EXAMPLE =
   `${STAFF_HEADERS.join(",")}\n` +
   `EMP001,John,Smith,teacher,teaching,Mathematics,M,1985-06-20,2020-01-15,john.smith@school.ac.ke,+254711000001,12345678,,\n`;
 
+const CLASS_HEADERS = [
+  "name",                      // e.g. "Grade 5" — used as the promotion-ladder level name
+  "level",                     // primary / secondary
+  "stream",                    // e.g. "Blue" — optional, leave blank if no streams
+  "year",                      // e.g. 2026
+  "capacity",                  // e.g. 40
+  "class_teacher_employee_no", // optional — must match a staff employee_no with a linked login
+];
+const CLASS_EXAMPLE =
+  `${CLASS_HEADERS.join(",")}\n` +
+  `Grade 5,primary,Blue,2026,40,EMP001\n`;
+
+const CLASS_STRUCTURE_HEADERS = [
+  "class_name",  // must match a class "name" above EXACTLY — this is what auto-links it
+  "sort_order",  // 1,2,3... defines the promotion order
+  "is_terminal", // true for the graduating class, otherwise blank/false
+];
+const CLASS_STRUCTURE_EXAMPLE =
+  `${CLASS_STRUCTURE_HEADERS.join(",")}\n` +
+  `Grade 5,5,\n` +
+  `Grade 6,6,\n` +
+  `Grade 8,8,true\n`;
+
+const SUBJECT_HEADERS = ["code", "name", "level"]; // level: primary / secondary
+const SUBJECT_EXAMPLE =
+  `${SUBJECT_HEADERS.join(",")}\n` +
+  `MATH,Mathematics,primary\n`;
+
+const CLASS_SUBJECT_HEADERS = [
+  "class_name",             // must match an existing class name
+  "stream",                 // optional — only needed if that class name has multiple streams
+  "subject_code",           // must match an existing subject code
+  "lessons_per_week",       // e.g. 5
+  "requires_double_lesson", // true/false
+  "requires_triple_lesson", // true/false
+  "priority",                // 1 = highest, used by the timetable generator
+];
+const CLASS_SUBJECT_EXAMPLE =
+  `${CLASS_SUBJECT_HEADERS.join(",")}\n` +
+  `Grade 5,Blue,MATH,5,false,false,1\n`;
+
+const TEACHER_ASSIGNMENT_HEADERS = ["employee_no", "class_name", "stream", "is_active"];
+const TEACHER_ASSIGNMENT_EXAMPLE =
+  `${TEACHER_ASSIGNMENT_HEADERS.join(",")}\n` +
+  `EMP001,Grade 5,Blue,true\n`;
+
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 function parseCSV(text: string): Record<string, string>[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -93,9 +139,14 @@ function ImportPage() {
         </p>
       </div>
       <Tabs defaultValue="students">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="students"><GraduationCap className="w-3.5 h-3.5 mr-1" />Students</TabsTrigger>
           <TabsTrigger value="staff"><Briefcase className="w-3.5 h-3.5 mr-1" />Staff</TabsTrigger>
+          <TabsTrigger value="classes"><Layers className="w-3.5 h-3.5 mr-1" />Classes</TabsTrigger>
+          <TabsTrigger value="structure"><ListOrdered className="w-3.5 h-3.5 mr-1" />Class Structure</TabsTrigger>
+          <TabsTrigger value="subjects"><BookOpen className="w-3.5 h-3.5 mr-1" />Subjects</TabsTrigger>
+          <TabsTrigger value="class-subjects"><Link2 className="w-3.5 h-3.5 mr-1" />Class ↔ Subjects</TabsTrigger>
+          <TabsTrigger value="teacher-assignments"><UserCheck className="w-3.5 h-3.5 mr-1" />Teacher ↔ Classes</TabsTrigger>
         </TabsList>
         <TabsContent value="students" className="mt-4">
           <ImportPanel
@@ -117,6 +168,75 @@ function ImportPage() {
             buildPayload={buildStaffPayload}
             tableName="staff"
             keyCol="employee_no"
+          />
+        </TabsContent>
+        <TabsContent value="classes" className="mt-4">
+          <ImportPanel
+            kind="classes"
+            headers={CLASS_HEADERS}
+            example={CLASS_EXAMPLE}
+            requiredCols={["name", "level"]}
+            buildPayload={buildClassPayload}
+            tableName="classes"
+            keyCol="name"
+          />
+        </TabsContent>
+        <TabsContent value="structure" className="mt-4">
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            Defines the promotion ladder. A class_name here that matches a class you imported above links itself
+            automatically — no extra step needed.
+          </p>
+          <ImportPanel
+            kind="class structure"
+            headers={CLASS_STRUCTURE_HEADERS}
+            example={CLASS_STRUCTURE_EXAMPLE}
+            requiredCols={["class_name"]}
+            buildPayload={buildClassStructurePayload}
+            tableName="school_class_structure"
+            keyCol="class_name"
+            upsertConflict="school_id,class_name"
+          />
+        </TabsContent>
+        <TabsContent value="subjects" className="mt-4">
+          <ImportPanel
+            kind="subjects"
+            headers={SUBJECT_HEADERS}
+            example={SUBJECT_EXAMPLE}
+            requiredCols={["code", "name", "level"]}
+            buildPayload={buildSubjectPayload}
+            tableName="subjects"
+            keyCol="code"
+            upsertConflict="code"
+          />
+        </TabsContent>
+        <TabsContent value="class-subjects" className="mt-4">
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            Import Classes and Subjects first — each row here needs to find a matching class and subject to link them.
+          </p>
+          <ImportPanel
+            kind="class-subject links"
+            headers={CLASS_SUBJECT_HEADERS}
+            example={CLASS_SUBJECT_EXAMPLE}
+            requiredCols={["class_name", "subject_code"]}
+            buildPayload={buildClassSubjectPayload}
+            tableName="class_subjects"
+            keyCol="subject_code"
+            upsertConflict="class_id,subject_id"
+          />
+        </TabsContent>
+        <TabsContent value="teacher-assignments" className="mt-4">
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            The employee_no must belong to a staff member who has already accepted an account invite (has a login).
+          </p>
+          <ImportPanel
+            kind="teacher-class assignments"
+            headers={TEACHER_ASSIGNMENT_HEADERS}
+            example={TEACHER_ASSIGNMENT_EXAMPLE}
+            requiredCols={["employee_no", "class_name"]}
+            buildPayload={buildTeacherAssignmentPayload}
+            tableName="teacher_class_assignments"
+            keyCol="employee_no"
+            upsertConflict="class_id,teacher_user_id"
           />
         </TabsContent>
       </Tabs>
@@ -173,6 +293,80 @@ async function buildStaffPayload(r: Record<string, string>): Promise<Record<stri
   };
 }
 
+const truthy = (v?: string) => /^(true|yes|1)$/i.test((v || "").trim());
+
+async function buildClassPayload(r: Record<string, string>): Promise<Record<string, any>> {
+  // Resolve class_teacher_employee_no → class_teacher_id (auth user of that staff member)
+  let class_teacher_id: string | null = null;
+  if (r.class_teacher_employee_no?.trim()) {
+    const { data } = await supabase
+      .from("staff").select("user_id").eq("employee_no", r.class_teacher_employee_no.trim()).maybeSingle();
+    class_teacher_id = data?.user_id ?? null;
+  }
+  return {
+    name: r.name,
+    level: (r.level || "primary").trim().toLowerCase(),
+    stream: r.stream?.trim() || null,
+    year: r.year ? parseInt(r.year) : new Date().getFullYear(),
+    capacity: r.capacity ? parseInt(r.capacity) : 40,
+    class_teacher_id,
+  };
+}
+
+async function buildClassStructurePayload(r: Record<string, string>): Promise<Record<string, any>> {
+  return {
+    class_name: r.class_name.trim(),
+    sort_order: r.sort_order ? parseInt(r.sort_order) : 1,
+    is_terminal: truthy(r.is_terminal),
+  };
+}
+
+async function buildSubjectPayload(r: Record<string, string>): Promise<Record<string, any>> {
+  return {
+    code: r.code.trim(),
+    name: r.name.trim(),
+    level: (r.level || "primary").trim().toLowerCase(),
+  };
+}
+
+async function buildClassSubjectPayload(r: Record<string, string>): Promise<Record<string, any>> {
+  let classQuery = supabase.from("classes").select("id").ilike("name", r.class_name?.trim() ?? "");
+  if (r.stream?.trim()) classQuery = classQuery.ilike("stream", r.stream.trim());
+  const { data: classRows } = await classQuery.limit(1);
+  const class_id = classRows?.[0]?.id ?? null;
+  if (!class_id) throw new Error(`Class not found: "${r.class_name}"${r.stream ? ` - ${r.stream}` : ""}. Import Classes first.`);
+
+  const { data: subj } = await supabase.from("subjects").select("id").eq("code", r.subject_code?.trim()).maybeSingle();
+  if (!subj?.id) throw new Error(`Subject code not found: "${r.subject_code}". Import Subjects first.`);
+
+  return {
+    class_id,
+    subject_id: subj.id,
+    lessons_per_week: r.lessons_per_week ? parseInt(r.lessons_per_week) : 4,
+    requires_double_lesson: truthy(r.requires_double_lesson),
+    requires_triple_lesson: truthy(r.requires_triple_lesson),
+    priority: r.priority ? parseInt(r.priority) : 1,
+  };
+}
+
+async function buildTeacherAssignmentPayload(r: Record<string, string>): Promise<Record<string, any>> {
+  const { data: staffRow } = await supabase
+    .from("staff").select("user_id").eq("employee_no", r.employee_no?.trim()).maybeSingle();
+  if (!staffRow?.user_id) throw new Error(`Staff "${r.employee_no}" has no linked login account yet — invite them first.`);
+
+  let classQuery = supabase.from("classes").select("id").ilike("name", r.class_name?.trim() ?? "");
+  if (r.stream?.trim()) classQuery = classQuery.ilike("stream", r.stream.trim());
+  const { data: classRows } = await classQuery.limit(1);
+  const class_id = classRows?.[0]?.id ?? null;
+  if (!class_id) throw new Error(`Class not found: "${r.class_name}"${r.stream ? ` - ${r.stream}` : ""}. Import Classes first.`);
+
+  return {
+    teacher_user_id: staffRow.user_id,
+    class_id,
+    is_active: r.is_active === undefined || r.is_active === "" ? true : truthy(r.is_active),
+  };
+}
+
 // ─── Shared import panel ──────────────────────────────────────────────────────
 function ImportPanel({
   kind,
@@ -182,6 +376,7 @@ function ImportPanel({
   buildPayload,
   tableName,
   keyCol,
+  upsertConflict,
 }: {
   kind: string;
   headers: string[];
@@ -190,6 +385,7 @@ function ImportPanel({
   buildPayload: (r: Record<string, string>) => Promise<Record<string, any>>;
   tableName: string;
   keyCol: string;
+  upsertConflict?: string; // e.g. "class_id,subject_id" — pass the DB unique constraint's columns to upsert instead of insert
 }) {
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [text, setText] = useState("");
@@ -228,7 +424,9 @@ function ImportPanel({
       }
       try {
         const payload = await buildPayload(r);
-        const { error } = await supabase.from(tableName as any).insert(payload as any);
+        const { error } = upsertConflict
+          ? await supabase.from(tableName as any).upsert(payload as any, { onConflict: upsertConflict })
+          : await supabase.from(tableName as any).insert(payload as any);
         if (error) { fail++; errors.push(`${r[keyCol]}: ${error.message}`); }
         else ok++;
       } catch (e: any) {
