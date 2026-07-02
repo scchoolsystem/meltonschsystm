@@ -225,12 +225,13 @@ const truthy = (v?: string) => /^(true|yes|1)$/i.test((v || "").trim());
 
 async function buildClassPayload(r: Record<string, string>, schoolId?: string | null): Promise<Record<string, any>> {
   if (!schoolId) throw new Error("No school resolved for your account — reload and try again.");
-  // Resolve class_teacher_employee_no → class_teacher_id (auth user of that staff member)
+  // class_teacher_id FK points at staff(id) (see 20260525120000_fix_class_teacher_fkey.sql),
+  // NOT staff.user_id / auth.users — select the staff row's own id.
   let class_teacher_id: string | null = null;
   if (r.class_teacher_employee_no?.trim()) {
     const { data } = await supabase
-      .from("staff").select("user_id").eq("employee_no", r.class_teacher_employee_no.trim()).maybeSingle();
-    class_teacher_id = data?.user_id ?? null;
+      .from("staff").select("id").eq("employee_no", r.class_teacher_employee_no.trim()).maybeSingle();
+    class_teacher_id = data?.id ?? null;
   }
   return {
     school_id: schoolId,
