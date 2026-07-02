@@ -189,6 +189,134 @@ export const createAccount = createServerFn({ method: "POST" })
     };
   });
 
+// ----- 2b. Bulk create accounts (used by CSV import) -----
+// Same logic as createAccount, run per-row for a batch of already-inserted
+// staff rows. Looks each row up by employee_no, skips rows that already have
+// a linked login, and links the new auth user back onto public.staff.
+
+export const bulkCreateStaffAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        items: z
+          .array(
+            z.object({
+              employee_no: z.string().trim().min(1).max(60),
+              full_name: z.string().trim().min(1).max(120),
+              role: z.string().trim().min(1).max(40),
+              email: z.string().email().max(255).optional().or(z.literal("")),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdminData, error: adminErr } = await context.supabase.rpc(
+      "is_admin",
+      { _user_id: context.userId }
+    );
+    if (adminErr) throw new Error(adminErr.message);
+    if (!isAdminData) throw new Error("Only super admin can create accounts");
+
+    const { data: domainResp } = await context.supabase.rpc("current_school_email_domain");
+    const domain = (domainResp as string) || "school.erp";
+
+    const { data: member } = await supabaseAdmin
+      .from("school_members").select("school_id")
+      .eq("user_id", context.userId).order("is_default", { ascending: false }).limit(1).maybeSingle();
+    const schoolId = (member as any)?.school_id as string | undefined;
+    if (!schoolId) throw new Error("No school context for current user");
+
+    const created: { employee_no: string; full_name: string; uniqueId: string; password: string }[] = [];
+    const skipped: { employee_no: string; reason: string }[] = [];
+    const errors: { employee_no: string; error: string }[] = [];
+
+    // Sequential on purpose: next_unique_id increments a per-school counter,
+    // and auth.admin.createUser calls shouldn't be fired in a burst.
+    for (const item of data.items) {
+      try {
+        const { data: staffRow, error: staffErr } = await supabaseAdmin
+          .from("staff")
+          .select("id, user_id")
+          .eq("employee_no", item.employee_no)
+          .eq("school_id", schoolId)
+          .maybeSingle();
+        if (staffErr) throw new Error(staffErr.message);
+        if (!staffRow) {
+          skipped.push({ employee_no: item.employee_no, reason: "No matching staff record — import staff first" });
+          continue;
+        }
+        if (staffRow.user_id) {
+          skipped.push({ employee_no: item.employee_no, reason: "Already has a login" });
+          continue;
+        }
+
+        const category = CATEGORY_BY_ROLE[item.role] ?? "STF";
+
+        const { data: uniqueId, error: idErr } = await context.supabase.rpc(
+          "next_unique_id",
+          { _category: category }
+        );
+        if (idErr || !uniqueId) throw new Error(idErr?.message ?? "ID generation failed");
+
+        const syntheticEmail = `${String(uniqueId).toLowerCase()}@${domain}`;
+        const password = generatePassword(14);
+
+        const { data: createdUser, error: createErr } =
+          await supabaseAdmin.auth.admin.createUser({
+            email: syntheticEmail,
+            password,
+            email_confirm: true,
+            user_metadata: { full_name: item.full_name, unique_id: uniqueId },
+          });
+        if (createErr || !createdUser.user) {
+          throw new Error(createErr?.message ?? "Failed to create account");
+        }
+
+        const userId = createdUser.user.id;
+
+        await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: item.full_name });
+
+        if (item.role !== "staff") {
+          await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+          await supabaseAdmin
+            .from("user_roles")
+            .insert({ user_id: userId, role: item.role as never, school_id: schoolId });
+        }
+
+        await supabaseAdmin.from("user_credentials").insert({
+          user_id: userId,
+          unique_id: uniqueId,
+          category,
+          synthetic_email: syntheticEmail,
+          is_active: true,
+          school_id: schoolId,
+        } as any);
+
+        await supabaseAdmin.from("school_members").upsert(
+          { user_id: userId, school_id: schoolId, is_default: true },
+          { onConflict: "user_id,school_id" }
+        );
+
+        // Link the new login back onto the staff row the CSV import created.
+        const { error: linkErr } = await supabaseAdmin
+          .from("staff")
+          .update({ user_id: userId, unique_id: uniqueId, role: item.role as never })
+          .eq("id", staffRow.id);
+        if (linkErr) throw new Error(`Account created but failed to link to staff row: ${linkErr.message}`);
+
+        created.push({ employee_no: item.employee_no, full_name: item.full_name, uniqueId: uniqueId as string, password });
+      } catch (e: any) {
+        errors.push({ employee_no: item.employee_no, error: e.message ?? String(e) });
+      }
+    }
+
+    return { created, skipped, errors };
+  });
+
 // ----- 3. Admin reset password -----
 
 export const resetPassword = createServerFn({ method: "POST" })
