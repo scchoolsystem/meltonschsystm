@@ -194,7 +194,7 @@ function ImportPage() {
             headers={CLASS_SUBJECT_HEADERS}
             example={CLASS_SUBJECT_EXAMPLE}
             requiredCols={["class_name", "subject_code"]}
-            buildPayload={buildClassSubjectPayload}
+            buildPayload={(r) => buildClassSubjectPayload(r, schoolId)}
             tableName="class_subjects"
             keyCol="subject_code"
             upsertConflict="class_id,subject_id"
@@ -262,8 +262,10 @@ async function buildSubjectPayload(r: Record<string, string>): Promise<Record<st
   };
 }
 
-async function buildClassSubjectPayload(r: Record<string, string>): Promise<Record<string, any>> {
-  let classQuery = supabase.from("classes").select("id").ilike("name", r.class_name?.trim() ?? "");
+async function buildClassSubjectPayload(r: Record<string, string>, schoolId?: string | null): Promise<Record<string, any>> {
+  if (!schoolId) throw new Error("No school resolved for your account — reload and try again.");
+
+  let classQuery = supabase.from("classes").select("id").eq("school_id", schoolId).ilike("name", r.class_name?.trim() ?? "");
   if (r.stream?.trim()) classQuery = classQuery.ilike("stream", r.stream.trim());
   const { data: classRows } = await classQuery.limit(1);
   const class_id = classRows?.[0]?.id ?? null;
@@ -273,6 +275,7 @@ async function buildClassSubjectPayload(r: Record<string, string>): Promise<Reco
   if (!subj?.id) throw new Error(`Subject code not found: "${r.subject_code}". Import Subjects first.`);
 
   return {
+    school_id: schoolId,
     class_id,
     subject_id: subj.id,
     lessons_per_week: r.lessons_per_week ? parseInt(r.lessons_per_week) : 4,
