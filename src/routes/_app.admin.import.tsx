@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,16 @@ function parseCSV(text: string): Record<string, string>[] {
 
 function ImportPage() {
   const { isAdmin } = useAuth();
+  const [schoolId, setSchoolId] = useState<string | null | undefined>(undefined); // undefined = still loading
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc("current_user_school").then(({ data }) => {
+      if (!cancelled) setSchoolId((data as string | null) ?? null);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   if (!isAdmin) {
     return (
       <div className="p-6">
@@ -94,6 +104,19 @@ function ImportPage() {
           <CardContent className="py-12 text-center text-muted-foreground">
             <ShieldAlert className="w-10 h-10 mx-auto mb-2 opacity-40" />
             Super admin only.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  if (schoolId === null) {
+    return (
+      <div className="p-6">
+        <Card className="border-destructive/50">
+          <CardContent className="py-12 text-center text-destructive">
+            <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-60" />
+            No school could be resolved for your account (current_user_school returned nothing) —
+            imports need a school to attach rows to. Confirm your account has an active school membership.
           </CardContent>
         </Card>
       </div>
@@ -129,7 +152,7 @@ function ImportPage() {
             headers={CLASS_HEADERS}
             example={CLASS_EXAMPLE}
             requiredCols={["name", "level"]}
-            buildPayload={buildClassPayload}
+            buildPayload={(r) => buildClassPayload(r, schoolId)}
             tableName="classes"
             keyCol="name"
           />
@@ -144,7 +167,7 @@ function ImportPage() {
             headers={CLASS_STRUCTURE_HEADERS}
             example={CLASS_STRUCTURE_EXAMPLE}
             requiredCols={["class_name"]}
-            buildPayload={buildClassStructurePayload}
+            buildPayload={(r) => buildClassStructurePayload(r, schoolId)}
             tableName="school_class_structure"
             keyCol="class_name"
             upsertConflict="school_id,class_name"
@@ -200,7 +223,8 @@ function ImportPage() {
 // ─── Payload builders (structural data only — see note above) ────────────────
 const truthy = (v?: string) => /^(true|yes|1)$/i.test((v || "").trim());
 
-async function buildClassPayload(r: Record<string, string>): Promise<Record<string, any>> {
+async function buildClassPayload(r: Record<string, string>, schoolId?: string | null): Promise<Record<string, any>> {
+  if (!schoolId) throw new Error("No school resolved for your account — reload and try again.");
   // Resolve class_teacher_employee_no → class_teacher_id (auth user of that staff member)
   let class_teacher_id: string | null = null;
   if (r.class_teacher_employee_no?.trim()) {
@@ -209,6 +233,7 @@ async function buildClassPayload(r: Record<string, string>): Promise<Record<stri
     class_teacher_id = data?.user_id ?? null;
   }
   return {
+    school_id: schoolId,
     name: r.name,
     level: (r.level || "primary").trim().toLowerCase(),
     stream: r.stream?.trim() || null,
@@ -218,8 +243,10 @@ async function buildClassPayload(r: Record<string, string>): Promise<Record<stri
   };
 }
 
-async function buildClassStructurePayload(r: Record<string, string>): Promise<Record<string, any>> {
+async function buildClassStructurePayload(r: Record<string, string>, schoolId?: string | null): Promise<Record<string, any>> {
+  if (!schoolId) throw new Error("No school resolved for your account — reload and try again.");
   return {
+    school_id: schoolId,
     class_name: r.class_name.trim(),
     sort_order: r.sort_order ? parseInt(r.sort_order) : 1,
     is_terminal: truthy(r.is_terminal),
