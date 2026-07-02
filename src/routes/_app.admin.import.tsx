@@ -212,7 +212,9 @@ function ImportPage() {
             buildPayload={buildTeacherAssignmentPayload}
             tableName="teacher_class_assignments"
             keyCol="employee_no"
-            upsertConflict="class_id,teacher_user_id"
+            // NOTE: no upsertConflict — the live table has no unique constraint on
+            // (class_id, teacher_user_id) yet. Re-add "class_id,teacher_user_id" here
+            // once the migration below is applied, to make re-imports idempotent.
           />
         </TabsContent>
       </Tabs>
