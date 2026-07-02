@@ -109,6 +109,10 @@ export const admitStudent = createServerFn({ method: "POST" })
       medical_notes: z.string().trim().max(1000).optional(),
       photo_url: z.string().url().optional().or(z.literal("")),
       national_id: z.string().trim().max(40).optional(),
+      // Optional caller-supplied admission number (e.g. from a CSV import that already
+      // validated uniqueness). When omitted, the existing gen_admission_no() DB trigger
+      // assigns the next sequential number exactly as it does for manual admissions.
+      admission_no: z.string().trim().min(1).max(40).optional(),
       documents: z.array(z.object({
         doc_type: z.enum([
           "birth_certificate","report_form","passport_photo",
@@ -149,6 +153,7 @@ export const admitStudent = createServerFn({ method: "POST" })
       photo_url: data.photo_url || null,
       school_id: acct.schoolId,
     };
+    if (data.admission_no) insertPayload.admission_no = data.admission_no;
     if (data.gender) insertPayload.gender = data.gender;
     if (data.date_of_birth) insertPayload.date_of_birth = data.date_of_birth;
     if (chosenClassId) insertPayload.class_id = chosenClassId;
@@ -412,6 +417,10 @@ export const createStaff = createServerFn({ method: "POST" })
       department: z.string().trim().max(120).optional(),
       hire_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
       photo_url: z.string().url().optional().or(z.literal("")),
+      // Optional caller-supplied employee number (e.g. from a CSV import that already
+      // validated uniqueness). When omitted, the existing gen_employee_no() DB trigger
+      // assigns the next sequential number exactly as it does for manual staff creation.
+      employee_no: z.string().trim().min(1).max(40).optional(),
       ...orgFieldsSchema,
     }).parse(input)
   )
@@ -439,6 +448,7 @@ export const createStaff = createServerFn({ method: "POST" })
       school_id: acct.schoolId,
       ...pickOrgPatch(data),
     };
+    if (data.employee_no) insertPayload.employee_no = data.employee_no;
     if (data.email) insertPayload.email = data.email;
     if (data.phone) insertPayload.phone = data.phone;
     if (data.department) insertPayload.department = data.department;
