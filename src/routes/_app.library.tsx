@@ -452,8 +452,21 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
   const [bookCategoryFilter, setBookCategoryFilter] = useState("all");
   const [bookSearch, setBookSearch] = useState("");
   const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
-  const { data: students = [] } = useActiveStudents();
+
+  // Full active roster (unfiltered) just to build the class dropdown options.
+  const { data: allStudents = [] } = useActiveStudents();
+  // Server-side filtered roster for the picker itself — only refetches when classFilter changes.
+  const { data: students = [] } = useActiveStudents({ classId: classFilter === "all" ? null : classFilter });
+
   const { data: staffList = [] } = useQuery({ queryKey: ["staff-min-library"], queryFn: async () => (await supabase.from("staff").select("id,employee_no,first_name,last_name,position_title").order("first_name")).data ?? [] });
+
+  const classOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of allStudents as any[]) {
+      if (s.class_id && s.classes?.name) map.set(s.class_id, s.classes.name);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1])); // [classId, className][]
+  }, [allStudents]);
 
   const bookCategoryOptions = useMemo(() => {
     const set = new Set((books as any[]).map(b => b.category || "Uncategorised"));
@@ -469,24 +482,6 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
     }
     return list;
   }, [books, bookCategoryFilter, bookSearch]);
-
-  // Works regardless of which class field your students rows actually use.
-  // If the class dropdown shows "Unassigned" for everyone, tell Claude the
-  // real column name (e.g. school_class_structure join) and it'll be fixed.
-  const getStudentClass = (s: any) =>
-    s.class_name || s.className ||
-    (s.class && s.stream ? `${s.class} ${s.stream}` : s.class) ||
-    s.grade || "Unassigned";
-
-  const classOptions = useMemo(() => {
-    const set = new Set((students as any[]).map(getStudentClass));
-    return Array.from(set).sort();
-  }, [students]);
-
-  const filteredStudents = useMemo(() => {
-    if (classFilter === "all") return students as any[];
-    return (students as any[]).filter(s => getStudentClass(s) === classFilter);
-  }, [students, classFilter]);
 
   const filteredStaff = useMemo(() => {
     if (!staffSearch.trim()) return staffList as any[];
@@ -525,14 +520,17 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
                 <SelectTrigger><SelectValue placeholder="All classes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All classes</SelectItem>
-                  {classOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {classOptions.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Student ({filteredStudents.length})</Label>
+            <div><Label>Student ({(students as any[]).length})</Label>
               <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-                <SelectContent>{filteredStudents.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {(students as any[]).length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">No students in this class.</div>}
+                  {(students as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           </>
