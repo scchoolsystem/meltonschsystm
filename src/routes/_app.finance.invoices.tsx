@@ -52,7 +52,7 @@ function Page() {
     queryFn: async () => {
       const { data, count } = await supabase
         .from("invoices")
-        .select("*, students(first_name,last_name,admission_no)", { count: "exact" })
+        .select("*, students(first_name,last_name,admission_no), fee_structures(name), class_fee_components(component)", { count: "exact" })
         .order("created_at", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       return { rows: data ?? [], count: count ?? 0 };
@@ -101,6 +101,7 @@ function Page() {
                 <TableRow>
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Student</TableHead>
+                  <TableHead>Fee</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Paid</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -111,7 +112,7 @@ function Page() {
               <TableBody>
                 {rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No invoices.
                     </TableCell>
                   </TableRow>
@@ -126,6 +127,9 @@ function Page() {
                         <span className="text-xs text-muted-foreground">
                           ({r.students?.admission_no})
                         </span>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {r.description || r.fee_structures?.name || (r.class_fee_components?.component && `${r.class_fee_components.component} (component)`) || "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         KES {Number(r.amount).toLocaleString()}
@@ -190,7 +194,7 @@ function Page() {
 
 // ── Issue Invoice Dialog ──────────────────────────────────────
 function IssueDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ student_id: "", amount: 0, due_date: "" });
+  const [f, setF] = useState({ student_id: "", amount: 0, due_date: "", description: "" });
   const { data: students = [] } = useQuery({
     queryKey: ["students-min2"],
     queryFn: async () =>
@@ -201,6 +205,7 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
     mutationFn: async () => {
       const payload: any = { ...f };
       if (!payload.due_date) delete payload.due_date;
+      if (!payload.description) payload.description = "Fee";
       // school_id is set by trg_autofill_school trigger
       const { error } = await supabase.from("invoices").insert(payload);
       if (error) throw error;
@@ -232,6 +237,14 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label>Fee (e.g. "Transport - Term 2 2026")</Label>
+          <Input
+            value={f.description}
+            onChange={(e) => setF({ ...f, description: e.target.value })}
+            placeholder="What is this invoice for?"
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
