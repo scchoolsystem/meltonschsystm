@@ -3,54 +3,67 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // =============================================================================
-// SMARTDEV ERP TIMETABLE ENGINE v4
-// ASC/Zeraki-style solver — upgraded scheduling logic, same architecture,
-// same APIs, same DB, same UI.
+// SMARTDEV ERP TIMETABLE ENGINE v5
+// ASC/Zeraki-style solver — same architecture, same APIs, same UI. One DB
+// change this version: subjects.is_core (additive migration), so core
+// subjects can be identified reliably instead of guessed from their name.
 //
 //   1. Lesson demand per class from class_subjects (+ subjects.lessons_per_week)
-//   2. PERMANENT TEACHER ALLOCATION (v4): one teacher is locked per
-//      (class, subject) pair BEFORE any period is placed — chosen from
-//      teacher_subjects ∩ teacher_class_assignments, balanced by running
-//      weekly-load so allocation doesn't dogpile one teacher. Once locked,
-//      the scheduler never substitutes a different teacher for that pair;
-//      it only searches for a free period for the teacher already assigned.
+//   2. PERMANENT TEACHER ALLOCATION: one teacher is locked per (class, subject)
+//      pair BEFORE any period is placed — chosen from teacher_subjects ∩
+//      teacher_class_assignments, balanced by running weekly-load. Once
+//      locked, the scheduler never substitutes a different teacher for that
+//      pair; it only searches for a free period for the teacher already assigned.
 //   3. Room allocation, in priority order:
 //        a) class_subjects.preferred_room_id (explicit pin)
 //        b) subject-name lab convention: Chemistry → Lab 1, Biology → Lab 2, Physics → Lab 3
 //        c) subject_room_requirements room_type
 //        d) any "classroom"-type room that fits class capacity
 //        e) any free room
-//   4. Double periods (v4): class_subjects.requires_double_lesson (falls back
-//      to subjects.allow_double_period) are reserved BEFORE singles, only
-//      into period pairs that are truly wall-clock adjacent (one period's
-//      end_time === the next one's start_time, so a break can never sit
-//      between them). Candidate pairs are scored, preferring the classic
-//      2-3 / 3-4 / 5-6 double slots, then the lightest day for that teacher.
-//   5. Electives (v4 — per class, not across classes): subjects sharing the
-//      same class_subjects.elective_group are grouped by CLASS + group, so
-//      Form1A's option block is independent of Form1B's and Form1C's. Every
-//      subject in one class's group is scheduled into the SAME slot as the
-//      others in THAT class (so the class can split into option groups
-//      simultaneously) — it is never forced into a common slot with other
-//      classes. Placed before normal per-class scheduling; any lessons that
-//      can't find a common free slot within the class fall back to normal
-//      per-subject scheduling and are reported as a warning.
-//   6. Breaks respected via period_templates.is_break = false filter (already excluded)
-//   7. Smart slot scoring (v4): remaining single lessons are placed one at a
-//      time into whichever free (day, period) scores highest — combining
-//      teacher daily-load balance, weekly subject spread (Mon/Wed/Fri over
-//      Mon/Tue), subject time-of-day preference, and light teacher-gap
-//      minimization — rather than the first free slot found.
-//   8. Subject distribution: no subject repeats same day unless it's its double period
-//   9. Conflict engine: teacher/room/class usage tracked per (day, start_time) slot,
-//      checked before every placement — never relies on DB constraints.
-//  10. Duplicate guard (v4): a second in-memory pass re-checks every planned
+//   4. CORE SUBJECTS (v5 — new): subjects flagged subjects.is_core (Math,
+//      English, Kiswahili by default — see migration 20260703070000) are
+//      scheduled FIRST, one lesson every single school day, never doubled,
+//      never skipped. This runs before anything else so core subjects
+//      always get a clean, evenly-spread claim on the week.
+//   5. Double periods: class_subjects.requires_double_lesson (falls back to
+//      subjects.allow_double_period) are reserved next, only into period
+//      pairs that are truly wall-clock adjacent (one period's end_time ===
+//      the next one's start_time, so a break can never sit between them).
+//      Candidates are scored, preferring the classic 2-3 / 3-4 / 5-6 double
+//      slots, the teacher's lightest day, AND a heavy penalty against
+//      chaining a 3rd consecutive double block back-to-back (max 2 in a row).
+//   6. Electives (v5 — simplified): elective_group is read but no longer
+//      used to force multiple subjects into one shared class+slot. The live
+//      DB has a hard trigger — "This class already has a lesson scheduled in
+//      this time slot" — that forbids a class having two rows at an
+//      overlapping time, which made the old same-class parallel-option-block
+//      feature impossible to insert (this was the source of the DB insert
+//      errors and Form 1 silently losing its whole batch). Elective subjects
+//      now simply flow through the normal single-lesson-per-slot pipeline
+//      like every other subject. (Cross-CLASS elective blocking — e.g.
+//      Form1A + Form1B sharing one Agriculture slot — is DB-safe since it's
+//      different class_ids, and can be reintroduced later if you add
+//      streamed classes and want it.)
+//   7. Breaks respected via period_templates.is_break = false filter (already excluded)
+//   8. Smart slot scoring: remaining single lessons are placed one at a time
+//      into whichever free (day, period) scores highest — teacher daily-load
+//      balance, weekly subject spread (Mon/Wed/Fri over Mon/Tue), subject
+//      time-of-day preference, light teacher-gap minimization, AND (v5) a
+//      penalty against sitting directly next to another lesson of the same
+//      subject that day, so a forced same-day repeat doesn't chain into 3
+//      periods in a row.
+//   9. Conflict engine: teacher/room/class usage tracked per (day, start_time)
+//      slot, checked before every placement — never relies on DB constraints.
+//  10. Duplicate guard: a second in-memory pass re-checks every planned
 //      insert for class/teacher/room slot collisions immediately before the
-//      batch insert, so a duplicate can never reach SQL.
-//  13. Reporting (v4): the response carries a `report` block with lessons
-//      required/generated, doubles placed, elective lessons placed and
-//      remaining unscheduled count, in addition to the original fields the
-//      existing UI already reads (ok/inserted/conflicts/summary — unchanged).
+//      batch insert. (v5) Insert batches are also smaller and self-healing:
+//      if a batch is rejected by the DB, it's retried row-by-row so one bad
+//      row can never take out an entire class's schedule the way it took
+//      out all of Form 1 before.
+//  13. Reporting: the response carries a `report` block with lessons
+//      required/generated, doubles placed, and remaining unscheduled count,
+//      in addition to the original fields the existing UI already reads
+//      (ok/inserted/conflicts/summary — unchanged).
 // Storage: timetable_slots (the live table — auto_timetable is unused legacy/drift)
 // =============================================================================
 
@@ -62,11 +75,7 @@ type ClassSubjectDemand = {
   subject_id: string; lessons: number; allow_double: boolean;
   preferred_room_type: string | null; preferred_room_id: string | null;
 };
-// classGroupLock: classId -> elective group key currently occupying that
-// class at this slot. Lets every subject in the SAME per-class elective
-// group share one slot (parallel option groups) while anything else still
-// sees the class as busy.
-type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string>; classGroupLock: Map<string, string> };
+type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string> };
 
 // Subject-name → lab convention. Only matched against rooms whose room_type
 // is "science_lab" (so "Computer Lab 1" can never be picked for Chemistry
@@ -134,7 +143,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
     // ── Load subjects, class_subjects, subject_room_requirements ──────────
     const { data: subjects = [] } = await supabase
-      .from("subjects").select("id,code,name,level,lessons_per_week,allow_double_period,preferred_time_of_day")
+      .from("subjects").select("id,code,name,level,lessons_per_week,allow_double_period,preferred_time_of_day,is_core")
       .eq("school_id", schoolId);
     const subjectMap = new Map((subjects as any[]).map((s) => [s.id, s]));
 
@@ -220,7 +229,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
     const slotKey = (day: number, start: string) => `${day}-${start}`;
     const ensureUsage = (k: string): SlotUsage => {
       let u = usage.get(k);
-      if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set(), classGroupLock: new Map() }; usage.set(k, u); }
+      if (!u) { u = { teachers: new Set(), rooms: new Set(), classes: new Set() }; usage.set(k, u); }
       return u;
     };
     const teacherDailyLoad = new Map<string, Map<number, number>>();
@@ -262,8 +271,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
       return true;
     };
     const isClassFree = (u: SlotUsage, classId: string) => !u.classes.has(classId);
-    const isClassFreeForGroup = (u: SlotUsage, classId: string, groupKey: string) =>
-      !u.classes.has(classId) || u.classGroupLock.get(classId) === groupKey;
 
     const pickRoom = (
       subjectId: string, classId: string, k: string, preferredRoomId?: string | null
@@ -313,7 +320,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
     // "lessons allocated so far" count so allocation order doesn't dogpile
     // one teacher. From this point on the scheduler never substitutes a
     // different teacher for a class+subject — it only searches for a free
-    // period for the teacher already allocated (see Phase 3-8 below).
+    // period for the teacher already allocated.
     const allocatedLoad = new Map<string, number>(); // staffId -> lessons allocated so far
     const teacherAllocation = new Map<string, string>(); // "classId:subjectId" -> staffId
 
@@ -348,132 +355,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
       return chosen;
     };
 
-    // ── PHASE 4/5: Elective engine — grouped by CLASS + elective_group ────
-    // Subjects sharing an elective_group are scheduled together ONLY within
-    // the same class: Form1A's option block never shares a slot with
-    // Form1B's or Form1C's. Every subject in one class's group gets the
-    // SAME slot as the others in that class (so the class splits into
-    // option groups simultaneously), each with its own locked teacher/room.
-    type ElectiveMember = {
-      classId: string; subjectId: string; lessons: number; allowDouble: boolean; preferredRoomId: string | null;
-    };
-    const electiveGroups = new Map<string, ElectiveMember[]>(); // key = "classId::group"
-    (classSubjectRows as any[]).forEach((cs) => {
-      if (!cs.elective_group) return;
-      const subj = subjectMap.get(cs.subject_id);
-      const member: ElectiveMember = {
-        classId: cs.class_id,
-        subjectId: cs.subject_id,
-        lessons: cs.lessons_per_week ?? subj?.lessons_per_week ?? 4,
-        allowDouble: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
-        preferredRoomId: cs.preferred_room_id ?? null,
-      };
-      const key = `${cs.class_id}::${cs.elective_group}`;
-      const arr = electiveGroups.get(key) ?? [];
-      arr.push(member);
-      electiveGroups.set(key, arr);
-    });
-
-    const electivePlacedCount = new Map<string, number>(); // "classId:subjectId" -> lessons placed
-
-    for (const [groupKey, members] of electiveGroups) {
-      if (members.length < 2) continue; // only one option offered in this class — not a parallel block
-
-      // Lock a teacher for every option before placing anything (Phase 2 rule applies here too).
-      members.forEach((m) => allocateTeacher(m.classId, m.subjectId, m.lessons));
-
-      const targetLessons = Math.max(...members.map((m) => m.lessons));
-      let attemptDouble = members.every((m) => m.allowDouble);
-      let lessonsPlaced = 0;
-
-      while (lessonsPlaced < targetLessons) {
-        const need = attemptDouble && targetLessons - lessonsPlaced >= 2 ? 2 : 1;
-        let placedThisRound = false;
-
-        for (const day of allDays) {
-          if (placedThisRound) break;
-          const dayPeriods = periodsByDay.get(day)!;
-
-          for (let pi = 0; pi < dayPeriods.length; pi++) {
-            if (placedThisRound) break;
-            const period = dayPeriods[pi];
-            const nextPeriod = need === 2 ? dayPeriods[pi + 1] : null;
-            if (need === 2 && (!nextPeriod || !isAdjacent(period, nextPeriod))) continue;
-
-            const k = slotKey(period.day_of_week, period.start_time);
-            const u = ensureUsage(k);
-            if (members.some((m) => !isClassFreeForGroup(u, m.classId, groupKey))) continue;
-
-            let u2: SlotUsage | null = null;
-            if (nextPeriod) {
-              u2 = ensureUsage(slotKey(nextPeriod.day_of_week, nextPeriod.start_time));
-              if (members.some((m) => !isClassFreeForGroup(u2!, m.classId, groupKey))) continue;
-            }
-
-            // Every member already has its permanent teacher (Phase 2) — just check availability.
-            const teacherOk = members.every((m) => {
-              const tId = teacherAllocation.get(`${m.classId}:${m.subjectId}`);
-              if (!tId) return false;
-              if (!isTeacherFree(tId, day, period.period_index, k)) return false;
-              if (nextPeriod && (u2!.teachers.has(tId) || unavailable.get(tId)?.has(`${day}-${nextPeriod.period_index}`))) return false;
-              return true;
-            });
-            if (!teacherOk) continue;
-
-            // Commit — same slot, every option in this class's group, distinct teachers/rooms.
-            for (const m of members) {
-              const teacherId = teacherAllocation.get(`${m.classId}:${m.subjectId}`)!;
-              const room = pickRoom(m.subjectId, m.classId, k, m.preferredRoomId);
-              u.teachers.add(teacherId);
-              u.classes.add(m.classId);
-              u.classGroupLock.set(m.classId, groupKey);
-              if (room.id) u.rooms.add(room.id);
-              bumpLoad(teacherId, day);
-              inserts.push({
-                class_id: m.classId, subject_id: m.subjectId, teacher_id: teacherId,
-                day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
-                room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
-              });
-              const pkey = `${m.classId}:${m.subjectId}`;
-              electivePlacedCount.set(pkey, (electivePlacedCount.get(pkey) ?? 0) + 1);
-
-              if (nextPeriod && u2) {
-                const k2 = slotKey(nextPeriod.day_of_week, nextPeriod.start_time);
-                const room2 = pickRoom(m.subjectId, m.classId, k2, m.preferredRoomId);
-                u2.teachers.add(teacherId);
-                u2.classes.add(m.classId);
-                u2.classGroupLock.set(m.classId, groupKey);
-                if (room2.id) u2.rooms.add(room2.id);
-                bumpLoad(teacherId, day);
-                inserts.push({
-                  class_id: m.classId, subject_id: m.subjectId, teacher_id: teacherId,
-                  day_of_week: nextPeriod.day_of_week, start_time: nextPeriod.start_time, end_time: nextPeriod.end_time,
-                  room: room2.name, room_id: room2.id, period_template_id: nextPeriod.id, school_id: schoolId,
-                });
-                electivePlacedCount.set(pkey, (electivePlacedCount.get(pkey) ?? 0) + 1);
-                doublesPlacedCount++;
-              }
-            }
-
-            lessonsPlaced += need;
-            placedThisRound = true;
-          }
-        }
-
-        if (!placedThisRound) {
-          if (attemptDouble) { attemptDouble = false; continue; } // retry as singles
-          if (lessonsPlaced < targetLessons) {
-            const label = groupKey.split("::")[1] ?? groupKey;
-            conflicts.push(
-              `${classNames.get(members[0].classId)} · elective group "${label}": placed ${lessonsPlaced}/${targetLessons} shared lesson(s) — no common free slot across all ${members.length} option(s) in this class. Remainder scheduled per-subject where possible.`
-            );
-          }
-          break;
-        }
-      }
-    }
-
-    // ── PHASE 3 & 6-8: compulsory / remaining subjects ─────────────────────
     // Preferred double-lesson start periods (aSc-style): 2-3, 3-4, 5-6 score
     // highest; any other truly-consecutive pair is still valid, just scores lower.
     const PREFERRED_DOUBLE_STARTS = new Set([2, 3, 5]);
@@ -485,36 +366,103 @@ export const generateTimetable = createServerFn({ method: "POST" })
         continue;
       }
 
-      const demand: ClassSubjectDemand[] = csForClass
-        .map((cs) => {
-          const subj = subjectMap.get(cs.subject_id);
-          const total = cs.lessons_per_week ?? subj?.lessons_per_week ?? 4;
-          const key = `${cs.class_id}:${cs.subject_id}`;
-          const placedViaElective = electivePlacedCount.get(key) ?? 0;
-          return {
-            subject_id: cs.subject_id,
-            lessons: total - placedViaElective,
-            allow_double: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
-            preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
-            preferred_room_id: cs.preferred_room_id ?? null,
-          };
-        })
-        .filter((d) => d.lessons > 0);
+      const demand: ClassSubjectDemand[] = csForClass.map((cs) => {
+        const subj = subjectMap.get(cs.subject_id);
+        return {
+          subject_id: cs.subject_id,
+          lessons: cs.lessons_per_week ?? subj?.lessons_per_week ?? 4,
+          allow_double: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
+          preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
+          preferred_room_id: cs.preferred_room_id ?? null,
+        };
+      });
 
-      if (!demand.length) continue; // fully covered by elective blocks
-
-      // Lock a teacher for every subject this class still needs (Phase 2).
+      // Lock a teacher for every subject this class needs (Phase 2).
       demand.forEach((d) => allocateTeacher(classId, d.subject_id, d.lessons));
       const demandBySubject = new Map(demand.map((d) => [d.subject_id, d]));
 
       const daySubjectCount = new Map<number, Map<string, number>>(); // day -> subjectId -> count today
-      allDays.forEach((d) => daySubjectCount.set(d, new Map()));
+      const subjectPeriodsToday = new Map<number, Map<string, Set<number>>>(); // day -> subjectId -> period_index set (adjacency checks)
+      allDays.forEach((d) => { daySubjectCount.set(d, new Map()); subjectPeriodsToday.set(d, new Map()); });
       const weekSubjectDays = new Map<string, Set<number>>(); // subjectId -> days already used this week
 
-      const isClassFreeAt = (k: string) => isClassFree(ensureUsage(k), classId);
+      // Double-block chain tracking, for the "no more than 2 doubles in a
+      // row" soft rule: per day, the period_index the most recent double
+      // ended on, and how many doubles are already chained back-to-back there.
+      const lastDoubleEndPI = new Map<number, number>();
+      const doubleChainLen = new Map<number, number>();
 
-      // ---- Phase 3: double lessons first, only into truly-consecutive pairs ----
-      for (const d of demand) {
+      const isClassFreeAt = (k: string) => isClassFree(ensureUsage(k), classId);
+      const markSubjectPeriod = (day: number, subjectId: string, periodIndex: number) => {
+        const bySubj = subjectPeriodsToday.get(day)!;
+        const set = bySubj.get(subjectId) ?? new Set<number>();
+        set.add(periodIndex);
+        bySubj.set(subjectId, set);
+      };
+      const adjacentSameSubject = (day: number, subjectId: string, periodIndex: number) => {
+        const set = subjectPeriodsToday.get(day)!.get(subjectId);
+        if (!set || !set.size) return false;
+        return set.has(periodIndex - 1) || set.has(periodIndex + 1);
+      };
+
+      // ---- PHASE 4: core subjects first — one lesson every single day, ----
+      // ---- never doubled, never skipped ------------------------------------
+      const coreDemand = demand.filter((d) => subjectMap.get(d.subject_id)?.is_core);
+      const otherDemand = demand.filter((d) => !subjectMap.get(d.subject_id)?.is_core);
+
+      for (const d of coreDemand) {
+        const teacherId = teacherAllocation.get(`${classId}:${d.subject_id}`);
+        if (!teacherId) continue;
+        let remaining = d.lessons;
+
+        for (const day of allDays) {
+          if (remaining <= 0) break;
+          const dayPeriods = periodsByDay.get(day)!;
+
+          type CoreCandidate = { period: Period; score: number };
+          let best: CoreCandidate | null = null;
+          for (const period of dayPeriods) {
+            const k = slotKey(period.day_of_week, period.start_time);
+            if (!isClassFreeAt(k)) continue;
+            if (!isTeacherFree(teacherId, day, period.period_index, k)) continue;
+            if (loadOn(teacherId, day) >= data.maxLessonsPerTeacherPerDay) continue;
+
+            const subj = subjectMap.get(d.subject_id);
+            let score = 0;
+            if (subj?.preferred_time_of_day === "morning") score += Math.max(0, 6 - period.period_index) * 2;
+            if (subj?.preferred_time_of_day === "afternoon") score += Math.min(period.period_index, 6) * 2;
+            score -= loadOn(teacherId, day) * 3;
+            const cand = { period, score };
+            if (!best || cand.score > best.score) best = cand;
+          }
+          if (!best) continue; // no room for the core subject today — surfaces below if it never lands
+
+          const period = best.period;
+          const k = slotKey(period.day_of_week, period.start_time);
+          const u = ensureUsage(k);
+          const room = pickRoom(d.subject_id, classId, k, d.preferred_room_id);
+          u.teachers.add(teacherId); u.classes.add(classId); if (room.id) u.rooms.add(room.id);
+          bumpLoad(teacherId, day);
+          inserts.push({
+            class_id: classId, subject_id: d.subject_id, teacher_id: teacherId,
+            day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
+            room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+          });
+          const dc = daySubjectCount.get(day)!;
+          dc.set(d.subject_id, (dc.get(d.subject_id) ?? 0) + 1);
+          markSubjectPeriod(day, d.subject_id, period.period_index);
+          const wdays = weekSubjectDays.get(d.subject_id) ?? new Set<number>();
+          wdays.add(day); weekSubjectDays.set(d.subject_id, wdays);
+          remaining -= 1;
+        }
+
+        if (remaining > 0) {
+          conflicts.push(`${classNames.get(classId)}: ${subjectMap.get(d.subject_id)?.name ?? d.subject_id} (core) — only placed ${d.lessons - remaining}/${d.lessons} days, ran out of free slots.`);
+        }
+      }
+
+      // ---- PHASE 5: doubles for non-core subjects, before singles ---------
+      for (const d of otherDemand) {
         if (!d.allow_double || d.lessons < 2) continue;
         const teacherId = teacherAllocation.get(`${classId}:${d.subject_id}`);
         if (!teacherId) continue;
@@ -537,6 +485,12 @@ export const generateTimetable = createServerFn({ method: "POST" })
             if (PREFERRED_DOUBLE_STARTS.has(p1.period_index)) score += 10; // classic 2-3 / 3-4 / 5-6 slots
             score -= loadOn(teacherId, day) * 2; // prefer this teacher's lighter days
             score -= (weekSubjectDays.get(d.subject_id)?.size ?? 0) * 3; // spread across week
+
+            // Soft cap: no more than 2 double-lesson blocks chained back-to-back.
+            const chainsFromPrev = lastDoubleEndPI.get(day) === p1.period_index - 1;
+            const wouldBeChainLen = chainsFromPrev ? (doubleChainLen.get(day) ?? 1) + 1 : 1;
+            if (wouldBeChainLen > 2) score -= 50;
+
             candidates.push({ day, pi, score });
           }
         }
@@ -568,6 +522,12 @@ export const generateTimetable = createServerFn({ method: "POST" })
         });
         doublesPlacedCount++;
 
+        markSubjectPeriod(best.day, d.subject_id, p1.period_index);
+        markSubjectPeriod(best.day, d.subject_id, p2.period_index);
+        const chainsFromPrev = lastDoubleEndPI.get(best.day) === p1.period_index - 1;
+        doubleChainLen.set(best.day, chainsFromPrev ? (doubleChainLen.get(best.day) ?? 1) + 1 : 1);
+        lastDoubleEndPI.set(best.day, p2.period_index);
+
         d.lessons -= 2;
         const dc = daySubjectCount.get(best.day)!;
         dc.set(d.subject_id, (dc.get(d.subject_id) ?? 0) + 2);
@@ -575,11 +535,11 @@ export const generateTimetable = createServerFn({ method: "POST" })
         wdays.add(best.day); weekSubjectDays.set(d.subject_id, wdays);
       }
 
-      // ---- Phase 6-8: remaining singles, highest-scoring free slot wins ----
-      // Units are interleaved round-robin across subjects (rather than
-      // filling one subject's slots before starting the next) so an early
-      // subject can't hog every good slot before later subjects get a turn.
-      const queues = demand.filter((d) => d.lessons > 0).map((d) => ({ id: d.subject_id, n: d.lessons }));
+      // ---- PHASE 6: remaining singles (core + non-core spillover) ---------
+      // Units interleaved round-robin across subjects (rather than filling
+      // one subject's slots before starting the next) so an early subject
+      // can't hog every good slot before later subjects get a turn.
+      const queues = otherDemand.filter((d) => d.lessons > 0).map((d) => ({ id: d.subject_id, n: d.lessons }));
       const remainingUnits: string[] = [];
       let progressed = true;
       while (progressed) {
@@ -621,17 +581,18 @@ export const generateTimetable = createServerFn({ method: "POST" })
             // Workload balance: prefer this teacher's lighter days
             score -= loadOn(teacherId, day) * 3;
             // Weekly subject spread: prefer days furthest from days already used
-            // (Mon/Wed/Fri scores better than Mon/Tue for the same subject)
             const usedDays = weekSubjectDays.get(subjectId);
             if (usedDays?.size) {
               const minGap = Math.min(...Array.from(usedDays).map((ud) => Math.abs(ud - day)));
               score += Math.min(minGap, 3) * 2;
             }
             // Light teacher-gap minimization: small bonus for sitting next to
-            // a period the teacher is already teaching that day (keeps their day compact)
+            // a period the teacher is already teaching that day
             const prev = dayPeriods[idx - 1], next = dayPeriods[idx + 1];
             const teacherBusyAt = (p?: Period) => !!p && ensureUsage(slotKey(p.day_of_week, p.start_time)).teachers.has(teacherId);
             if (teacherBusyAt(prev) || teacherBusyAt(next)) score += 1;
+            // Never let a forced same-day repeat chain into 3 periods in a row
+            if (adjacentSameSubject(day, subjectId, period.period_index)) score -= 25;
 
             const cand: SlotCandidate = { day, period, score };
             if (!best || cand.score > best.score) best = cand;
@@ -661,6 +622,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
         const dc = daySubjectCount.get(day)!;
         dc.set(subjectId, (dc.get(subjectId) ?? 0) + 1);
+        markSubjectPeriod(day, subjectId, period.period_index);
         const wdays = weekSubjectDays.get(subjectId) ?? new Set<number>();
         wdays.add(day); weekSubjectDays.set(subjectId, wdays);
 
@@ -680,18 +642,12 @@ export const generateTimetable = createServerFn({ method: "POST" })
     // ── PHASE 9/10: duplicate guard — never trust the plan, verify again ──
     // Every placement above already went through the `usage` map before
     // being pushed to `inserts`, so this should normally find nothing. It's
-    // a deliberate second, independent check (by class+slot, teacher+slot,
-    // and room+slot) so a duplicate can never reach SQL, which is what was
-    // producing "This class already has a lesson scheduled" errors before.
+    // a deliberate second, independent check (by class+subject+slot,
+    // teacher+slot, and room+slot) so a duplicate can never reach SQL.
     const seenClassSubjectSlot = new Set<string>();
     const seenTeacherSlot = new Set<string>();
     const seenRoomSlot = new Set<string>();
     const validatedInserts = inserts.filter((ins) => {
-      // Keyed by class+SUBJECT+slot (not class+slot alone) — several different
-      // subjects legitimately share one class+slot during a parallel elective
-      // block (Form 3 splitting into Geography/Business/CRE groups at the same
-      // time), so that is NOT a duplicate. The same subject appearing twice in
-      // the same class+slot is.
       const classSubjectKey = `${ins.class_id}-${ins.subject_id}-${ins.day_of_week}-${ins.start_time}`;
       const teacherKey = ins.teacher_id ? `${ins.teacher_id}-${ins.day_of_week}-${ins.start_time}` : null;
       const roomKey = ins.room_id ? `${ins.room_id}-${ins.day_of_week}-${ins.start_time}` : null;
@@ -713,13 +669,29 @@ export const generateTimetable = createServerFn({ method: "POST" })
       return true;
     });
 
-    // ── Batch insert ─────────────────────────────────────────────────────
+    // ── Batch insert (v5: small, self-healing batches) ─────────────────────
+    // A batch insert is one SQL statement — if the DB trigger rejects ANY
+    // row in it, the WHOLE batch is rolled back, not just the bad row (this
+    // is what wiped out Form 1 entirely last run, even though only a few of
+    // its rows were actually bad). Batches are smaller now, and any batch
+    // the DB rejects is retried one row at a time so a single conflicting
+    // row can only ever cost that one lesson, never its neighbours.
     let inserted = 0;
-    for (let i = 0; i < validatedInserts.length; i += 50) {
-      const chunk = validatedInserts.slice(i, i + 50);
+    const BATCH_SIZE = 25;
+    for (let i = 0; i < validatedInserts.length; i += BATCH_SIZE) {
+      const chunk = validatedInserts.slice(i, i + BATCH_SIZE);
       const { data: rows, error } = await supabase.from("timetable_slots").insert(chunk).select("id");
-      if (error) conflicts.push(`DB insert error (batch ${Math.floor(i / 50) + 1}): ${error.message}`);
-      else inserted += rows?.length ?? 0;
+      if (!error) { inserted += rows?.length ?? 0; continue; }
+
+      // Batch rejected — fall back to inserting this batch's rows one at a time.
+      for (const row of chunk) {
+        const { error: rowError } = await supabase.from("timetable_slots").insert(row);
+        if (rowError) {
+          conflicts.push(`${classNames.get(row.class_id)} · ${subjectMap.get(row.subject_id)?.name ?? row.subject_id} at day ${row.day_of_week} ${row.start_time}: ${rowError.message}`);
+        } else {
+          inserted += 1;
+        }
+      }
     }
 
     // ── PHASE 13: reporting ─────────────────────────────────────────────
@@ -727,7 +699,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
       const subj = subjectMap.get(cs.subject_id);
       return sum + (cs.lessons_per_week ?? subj?.lessons_per_week ?? 4);
     }, 0);
-    const electiveLessonsPlaced = Array.from(electivePlacedCount.values()).reduce((a, b) => a + b, 0);
 
     return {
       ok: true,
@@ -739,7 +710,6 @@ export const generateTimetable = createServerFn({ method: "POST" })
         totalLessonsRequired: totalRequired,
         lessonsGenerated: inserted,
         doubleLessonsPlaced: doublesPlacedCount,
-        electiveLessonsPlaced,
         remainingUnscheduled: Math.max(0, totalRequired - inserted),
         warnings: conflicts.length,
       },
