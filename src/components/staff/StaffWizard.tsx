@@ -200,12 +200,10 @@ export function StaffWizard({
       </DialogHeader>
 
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-4">
-        {!isEdit && (
-          <div>
-            <Label className="mb-2 block">Staff Photo</Label>
-            <PhotoCapture value={photo} onChange={setPhoto} />
-          </div>
-        )}
+        <div>
+          <Label className="mb-2 block">Staff Photo</Label>
+          <PhotoCapture value={photo ?? existing?.photo_url ?? null} onChange={setPhoto} />
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div><Label>First Name *</Label><Input required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} disabled={isEdit} /></div>
