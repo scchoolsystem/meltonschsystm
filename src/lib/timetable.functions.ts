@@ -138,11 +138,27 @@ export const generateTimetable = createServerFn({ method: "POST" })
       .eq("school_id", schoolId);
     const subjectMap = new Map((subjects as any[]).map((s) => [s.id, s]));
 
-    const { data: classSubjectRows = [], error: csErr } = await supabase
+    const { data: classSubjectRowsRaw = [], error: csErr } = await supabase
       .from("class_subjects")
       .select("class_id,subject_id,lessons_per_week,requires_double_lesson,elective_group,preferred_room_id")
       .in("class_id", data.classIds);
     if (csErr) throw new Error("Could not load class_subjects: " + csErr.message + " (run the class_subjects migration first)");
+
+    // Guard against duplicate (class_id, subject_id) rows in class_subjects —
+    // these have shown up before from CSV import drift. A duplicate row is
+    // NOT a second lesson requirement; left in, it silently doubles demand
+    // and (for electives) gets inserted twice into the exact same slot,
+    // which is what the Phase 9/10 duplicate guard was rejecting. First row
+    // wins; duplicates are dropped and reported so the underlying data can
+    // be cleaned up in class_subjects itself.
+    const seenClassSubject = new Set<string>();
+    const duplicateClassSubjectPairs = new Set<string>();
+    const classSubjectRows = (classSubjectRowsRaw as any[]).filter((cs) => {
+      const key = `${cs.class_id}:${cs.subject_id}`;
+      if (seenClassSubject.has(key)) { duplicateClassSubjectPairs.add(key); return false; }
+      seenClassSubject.add(key);
+      return true;
+    });
 
     const { data: roomReqRows = [] } = await supabase
       .from("subject_room_requirements").select("subject_id,room_type").eq("school_id", schoolId);
@@ -190,6 +206,14 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
     const conflicts: string[] = [];
     let doublesPlacedCount = 0;
+
+    if (duplicateClassSubjectPairs.size) {
+      const labels = Array.from(duplicateClassSubjectPairs).map((key) => {
+        const [clsId, subjId] = key.split(":");
+        return `${classNames.get(clsId) ?? clsId} · ${subjectMap.get(subjId)?.name ?? subjId}`;
+      });
+      conflicts.push(`Duplicate class_subjects row(s) ignored (data cleanup recommended): ${labels.join(", ")}`);
+    }
 
     // ── Global usage tracking ──────────────────────────────────────────────
     const usage = new Map<string, SlotUsage>();
@@ -659,15 +683,20 @@ export const generateTimetable = createServerFn({ method: "POST" })
     // a deliberate second, independent check (by class+slot, teacher+slot,
     // and room+slot) so a duplicate can never reach SQL, which is what was
     // producing "This class already has a lesson scheduled" errors before.
-    const seenClassSlot = new Set<string>();
+    const seenClassSubjectSlot = new Set<string>();
     const seenTeacherSlot = new Set<string>();
     const seenRoomSlot = new Set<string>();
     const validatedInserts = inserts.filter((ins) => {
-      const classKey = `${ins.class_id}-${ins.day_of_week}-${ins.start_time}`;
+      // Keyed by class+SUBJECT+slot (not class+slot alone) — several different
+      // subjects legitimately share one class+slot during a parallel elective
+      // block (Form 3 splitting into Geography/Business/CRE groups at the same
+      // time), so that is NOT a duplicate. The same subject appearing twice in
+      // the same class+slot is.
+      const classSubjectKey = `${ins.class_id}-${ins.subject_id}-${ins.day_of_week}-${ins.start_time}`;
       const teacherKey = ins.teacher_id ? `${ins.teacher_id}-${ins.day_of_week}-${ins.start_time}` : null;
       const roomKey = ins.room_id ? `${ins.room_id}-${ins.day_of_week}-${ins.start_time}` : null;
-      if (seenClassSlot.has(classKey)) {
-        conflicts.push(`Duplicate prevented: ${classNames.get(ins.class_id)} already has a lesson at day ${ins.day_of_week} ${ins.start_time}.`);
+      if (seenClassSubjectSlot.has(classSubjectKey)) {
+        conflicts.push(`Duplicate prevented: ${classNames.get(ins.class_id)} already has ${subjectMap.get(ins.subject_id)?.name ?? ins.subject_id} at day ${ins.day_of_week} ${ins.start_time}.`);
         return false;
       }
       if (teacherKey && seenTeacherSlot.has(teacherKey)) {
@@ -678,7 +707,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
         conflicts.push(`Duplicate prevented: a room was double-booked at day ${ins.day_of_week} ${ins.start_time}.`);
         return false;
       }
-      seenClassSlot.add(classKey);
+      seenClassSubjectSlot.add(classSubjectKey);
       if (teacherKey) seenTeacherSlot.add(teacherKey);
       if (roomKey) seenRoomSlot.add(roomKey);
       return true;
