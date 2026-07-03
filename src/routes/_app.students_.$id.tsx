@@ -79,7 +79,7 @@ function StudentProfilePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")
-        .select("id, invoice_no, amount, paid, status, due_date")
+        .select("id, invoice_no, description, amount, paid, status, due_date")
         .eq("student_id", id)
         .order("created_at", { ascending: false })
         .limit(15);
@@ -524,6 +524,7 @@ function StudentProfilePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Invoice</TableHead>
+                      <TableHead>Fee</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Paid</TableHead>
                       <TableHead>Due date</TableHead>
@@ -534,6 +535,7 @@ function StudentProfilePage() {
                     {invoices.map((inv: any) => (
                       <TableRow key={inv.id}>
                         <TableCell className="font-mono">{inv.invoice_no}</TableCell>
+                        <TableCell>{inv.description || "—"}</TableCell>
                         <TableCell>KES {Number(inv.amount).toLocaleString()}</TableCell>
                         <TableCell>KES {Number(inv.paid).toLocaleString()}</TableCell>
                         <TableCell>{inv.due_date || "—"}</TableCell>
