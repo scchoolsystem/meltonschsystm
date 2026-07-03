@@ -743,8 +743,8 @@ function ParentPortal() {
                   <div key={i.id} className="border rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium">{i.invoice_no}</div>
-                        <div className="text-xs text-muted-foreground">Due: {i.due_date ?? "—"}</div>
+                        <div className="font-medium">{i.description || i.invoice_no}</div>
+                        <div className="text-xs text-muted-foreground">{i.invoice_no} · Due: {i.due_date ?? "—"}</div>
                       </div>
                       <Badge variant={i.status === "paid" ? "default" : i.status === "partial" ? "secondary" : "destructive"}>{i.status}</Badge>
                     </div>
@@ -1114,8 +1114,3 @@ function LinkChildPanel({ onLinked }: { onLinked: () => void }) {
     </div>
   );
 }
-
-
-
-
-
