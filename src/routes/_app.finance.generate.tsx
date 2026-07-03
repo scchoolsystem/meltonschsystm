@@ -137,7 +137,7 @@ function Page() {
                 <SelectContent>
                   {(components as any[]).length === 0 && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No fee components yet — add one on the Class Fees page.
+                      No fee components yet — add one on the Fees page.
                     </div>
                   )}
                   {(components as any[]).map(c => (
