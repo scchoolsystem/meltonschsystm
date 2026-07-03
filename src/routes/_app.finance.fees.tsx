@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Zap, Coins } from "lucide-react";
+import { Loader2, Plus, Zap, Coins, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/finance/fees")({
@@ -33,6 +33,12 @@ function Page() {
   const [term, setTerm] = useState("Term 1");
   const [year, setYear] = useState(String(CURRENT_YEAR));
 
+  const [fsName, setFsName] = useState("");
+  const [fsLevel, setFsLevel] = useState("");
+  const [fsTerm, setFsTerm] = useState("Term 1");
+  const [fsYear, setFsYear] = useState(String(CURRENT_YEAR));
+  const [fsAmount, setFsAmount] = useState("");
+
   const [genClassId, setGenClassId] = useState("all");
   const [genTerm, setGenTerm] = useState("");
   const [genYear, setGenYear] = useState("");
@@ -41,6 +47,16 @@ function Page() {
     queryKey: ["classes-min"],
     queryFn: async () =>
       (await supabase.from("classes").select("id,name,level,stream,year").order("name")).data ?? [],
+  });
+
+  const { data: feeStructures = [], isLoading: structuresLoading } = useQuery({
+    queryKey: ["fee-structures"],
+    queryFn: async () =>
+      (await supabase
+        .from("fee_structures")
+        .select("id, name, level, term, year, amount")
+        .order("year", { ascending: false })
+        .order("term")).data ?? [],
   });
 
   const { data: components = [], isLoading: componentsLoading } = useQuery({
@@ -54,6 +70,52 @@ function Page() {
   });
 
   const classNameById = new Map((classes as any[]).map((c) => [c.id, `${c.name}${c.stream ? ` – ${c.stream}` : ""}`]));
+
+  const distinctLevels = Array.from(new Set((classes as any[]).map((c) => c.level).filter(Boolean)));
+
+  const addStructure = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("fee_structures").insert({
+        name: fsName,
+        level: fsLevel,
+        term: fsTerm,
+        year: Number(fsYear),
+        amount: Number(fsAmount),
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Fee structure saved.");
+      setFsName("");
+      setFsAmount("");
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to save fee structure"),
+  });
+
+  const deleteStructure = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("fee_structures").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Fee structure deleted.");
+      qc.invalidateQueries({ queryKey: ["fee-structures"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to delete — it may already have invoices against it"),
+  });
+
+  const deleteComponent = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("class_fee_components").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Fee component deleted.");
+      qc.invalidateQueries({ queryKey: ["class-fee-components"] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to delete — it may already have invoices against it"),
+  });
 
   const upsert = useMutation({
     mutationFn: async () =>
@@ -91,12 +153,105 @@ function Page() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Class Fees</h1>
+        <h1 className="text-3xl font-bold">Fees</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Set tuition/boarding/transport/meals amounts per class, then generate term invoices for every
-          active student in that class.
+          Set up flat fee structures (e.g. a whole term's fee for a level) and/or itemized class fee components
+          (tuition/boarding/transport/meals per class). Both show up as sources on the Bulk Invoice Generation and
+          Issue Invoice pages.
         </p>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="w-4 h-4" /> Add fee structure</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Name</Label>
+              <Input value={fsName} onChange={(e) => setFsName(e.target.value)} placeholder="e.g. Term 1 Fees" />
+            </div>
+            <div>
+              <Label>Level</Label>
+              <Input
+                value={fsLevel}
+                onChange={(e) => setFsLevel(e.target.value)}
+                placeholder="e.g. Form 1"
+                list="fee-structure-levels"
+              />
+              <datalist id="fee-structure-levels">
+                {distinctLevels.map((l) => <option key={l} value={l} />)}
+              </datalist>
+            </div>
+            <div>
+              <Label>Amount (KES)</Label>
+              <Input type="number" min="0" value={fsAmount} onChange={(e) => setFsAmount(e.target.value)} placeholder="e.g. 45000" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Term</Label>
+                <Input value={fsTerm} onChange={(e) => setFsTerm(e.target.value)} placeholder="Term 1" />
+              </div>
+              <div>
+                <Label>Year</Label>
+                <Input type="number" value={fsYear} onChange={(e) => setFsYear(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <Button
+            disabled={!fsName || !fsLevel || !fsAmount || !fsTerm || !fsYear || addStructure.isPending}
+            onClick={() => addStructure.mutate()}
+          >
+            {addStructure.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}
+            Save fee structure
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Coins className="w-4 h-4" /> Configured fee structures</CardTitle></CardHeader>
+        <CardContent>
+          {structuresLoading ? (
+            <div className="py-8 text-center text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
+          ) : feeStructures.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">No fee structures configured yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Level</TableHead>
+                  <TableHead>Term</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(feeStructures as any[]).map((f) => (
+                  <TableRow key={f.id}>
+                    <TableCell>{f.name}</TableCell>
+                    <TableCell>{f.level}</TableCell>
+                    <TableCell>{f.term}</TableCell>
+                    <TableCell>{f.year}</TableCell>
+                    <TableCell className="text-right">KES {Number(f.amount).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={deleteStructure.isPending}
+                        onClick={() => {
+                          if (confirm(`Delete "${f.name}"? This cannot be undone.`)) deleteStructure.mutate(f.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="w-4 h-4" /> Add / update fee component</CardTitle></CardHeader>
@@ -167,6 +322,7 @@ function Page() {
                   <TableHead>Term</TableHead>
                   <TableHead>Year</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -177,6 +333,18 @@ function Page() {
                     <TableCell>{c.term}</TableCell>
                     <TableCell>{c.year}</TableCell>
                     <TableCell className="text-right">KES {Number(c.amount).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={deleteComponent.isPending}
+                        onClick={() => {
+                          if (confirm(`Delete this ${c.component} component?`)) deleteComponent.mutate(c.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
