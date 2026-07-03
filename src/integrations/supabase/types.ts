@@ -1515,7 +1515,9 @@ export type Database = {
       invoices: {
         Row: {
           amount: number
+          class_fee_component_id: string | null
           created_at: string
+          description: string | null
           due_date: string | null
           fee_structure_id: string | null
           id: string
@@ -1527,7 +1529,9 @@ export type Database = {
         }
         Insert: {
           amount: number
+          class_fee_component_id?: string | null
           created_at?: string
+          description?: string | null
           due_date?: string | null
           fee_structure_id?: string | null
           id?: string
@@ -1539,7 +1543,9 @@ export type Database = {
         }
         Update: {
           amount?: number
+          class_fee_component_id?: string | null
           created_at?: string
+          description?: string | null
           due_date?: string | null
           fee_structure_id?: string | null
           id?: string
@@ -1550,6 +1556,13 @@ export type Database = {
           student_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_class_fee_component_id_fkey"
+            columns: ["class_fee_component_id"]
+            isOneToOne: false
+            referencedRelation: "class_fee_components"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_fee_structure_id_fkey"
             columns: ["fee_structure_id"]
