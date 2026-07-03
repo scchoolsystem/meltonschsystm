@@ -257,6 +257,76 @@ function Page() {
         </CardContent>
       </Card>
 
+      {/* Bulk action bar — appears once one or more payable invoices are selected */}
+      {can && someRowsSelected && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-3 flex items-center justify-between flex-wrap gap-3">
+            <div className="text-sm flex items-center flex-wrap gap-x-1">
+              <span className="font-medium">{selected.size.toLocaleString()}</span>
+              <span>invoice{selected.size === 1 ? "" : "s"} selected</span>
+              {totalCount > selected.size && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 ml-2"
+                  onClick={() => selectAllMatching.mutate()}
+                  disabled={selectAllMatching.isPending}
+                >
+                  {selectAllMatching.isPending && <Loader2 className="mr-1 w-3 h-3 animate-spin" />}
+                  Select all unpaid matching filters
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </Button>
+              <Dialog open={openBulkPay} onOpenChange={setOpenBulkPay}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <CircleDollarSign className="w-4 h-4 mr-2" />
+                    Mark {selected.size} as Paid
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      Mark {selected.size} invoice{selected.size === 1 ? "" : "s"} as paid
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Each selected invoice's full outstanding balance will be recorded as a payment
+                      with the method below. This can't be undone.
+                    </p>
+                    <div>
+                      <Label>Method</Label>
+                      <Select value={bulkMethod} onValueChange={(v: any) => setBulkMethod(v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="mpesa">M-Pesa</SelectItem>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="card">Card</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => bulkMarkPaid.mutate()} disabled={bulkMarkPaid.isPending}>
+                      {bulkMarkPaid.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}
+                      Confirm
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -267,6 +337,16 @@ function Page() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {can && (
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allPageSelected}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        disabled={payableRows.length === 0}
+                        aria-label="Select all unpaid invoices on this page"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Fee</TableHead>
@@ -280,7 +360,7 @@ function Page() {
               <TableBody>
                 {rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={can ? 9 : 8} className="text-center text-muted-foreground py-8">
                       {hasFilters ? "No invoices match these filters." : "No invoices."}
                     </TableCell>
                   </TableRow>
@@ -288,7 +368,18 @@ function Page() {
                 {(rows as any[]).map((r) => {
                   const balance = Number(r.amount) - Number(r.paid);
                   return (
-                    <TableRow key={r.id}>
+                    <TableRow key={r.id} className={selected.has(r.id) ? "bg-primary/5" : undefined}>
+                      {can && (
+                        <TableCell>
+                          {r.status !== "paid" ? (
+                            <Checkbox
+                              checked={selected.has(r.id)}
+                              onCheckedChange={() => toggleRow(r.id)}
+                              aria-label={`Select invoice ${r.invoice_no}`}
+                            />
+                          ) : null}
+                        </TableCell>
+                      )}
                       <TableCell className="font-mono text-xs">{r.invoice_no}</TableCell>
                       <TableCell>
                         {r.students?.first_name} {r.students?.last_name}{" "}
