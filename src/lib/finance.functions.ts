@@ -80,6 +80,69 @@ export const bulkGenerateInvoices = createServerFn({ method: "POST" })
     return { created: toInsert.length, skipped: students.length - toInsert.length };
   });
 
+// ---- 1b. Bulk invoice generation from a single class fee component ----
+export const bulkGenerateComponentInvoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        class_fee_component_id: z.string().uuid(),
+        due_date: z.string().optional(),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinance(context);
+
+    const { data: schoolId, error: schErr } = await context.supabase.rpc("my_school_id");
+    if (schErr) throw new Error(schErr.message);
+    if (!schoolId) throw new Error("No school context for this user");
+
+    const { data: comp, error: compErr } = await supabaseAdmin
+      .from("class_fee_components")
+      .select("id, class_id, component, amount, term, year, school_id")
+      .eq("id", data.class_fee_component_id)
+      .eq("school_id", schoolId)
+      .single();
+    if (compErr || !comp) throw new Error(compErr?.message ?? "Fee component not found in this school");
+
+    const { data: students, error: stuErr } = await supabaseAdmin
+      .from("students")
+      .select("id")
+      .eq("school_id", schoolId)
+      .eq("class_id", comp.class_id)
+      .eq("status", "active");
+    if (stuErr) throw new Error(stuErr.message);
+    if (!students?.length) return { created: 0, skipped: 0 };
+
+    const ids = students.map((s) => s.id);
+    const { data: existing } = await supabaseAdmin
+      .from("invoices")
+      .select("student_id")
+      .eq("school_id", schoolId)
+      .eq("class_fee_component_id", data.class_fee_component_id)
+      .in("student_id", ids);
+    const existingSet = new Set((existing ?? []).map((e: any) => e.student_id));
+
+    const toInsert = students
+      .filter((s) => !existingSet.has(s.id))
+      .map((s) => ({
+        student_id: s.id,
+        class_fee_component_id: comp.id,
+        amount: comp.amount,
+        due_date: data.due_date || null,
+        school_id: schoolId,
+        description: `${comp.component.charAt(0).toUpperCase()}${comp.component.slice(1)} - ${comp.term} ${comp.year}`,
+      }));
+
+    if (toInsert.length === 0) return { created: 0, skipped: students.length };
+
+    const { error: insErr } = await supabaseAdmin.from("invoices").insert(toInsert as any);
+    if (insErr) throw new Error(insErr.message);
+
+    return { created: toInsert.length, skipped: students.length - toInsert.length };
+  });
+
 // ---- 2. M-Pesa STK Push (Daraja) ----
 export const mpesaStkPush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
