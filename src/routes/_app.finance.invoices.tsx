@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { mpesaStkPush, bulkGenerateInvoices, bulkGenerateComponentInvoices } from "@/lib/finance.functions";
-import { recordPayment } from "@/lib/finance-extended.functions";
+import { recordPayment, bulkMarkInvoicesPaid } from "@/lib/finance-extended.functions";
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogTrigger, DialogFooter,
@@ -30,7 +31,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, Smartphone, ChevronsUpDown, Check, X } from "lucide-react";
+import { Plus, Loader2, Smartphone, ChevronsUpDown, Check, X, CircleDollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Pager } from "@/components/Pager";
@@ -103,6 +104,70 @@ function Page() {
     setClassId("all");
     setPage(0);
   };
+
+  // ── Bulk selection ──
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const payableRows = (rows as any[]).filter((r) => r.status !== "paid");
+  const allPageSelected = payableRows.length > 0 && payableRows.every((r) => selected.has(r.id));
+  const someRowsSelected = selected.size > 0;
+
+  const toggleRow = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        payableRows.forEach((r) => next.delete(r.id));
+      } else {
+        payableRows.forEach((r) => next.add(r.id));
+      }
+      return next;
+    });
+  };
+
+  const selectAllMatching = useMutation({
+    mutationFn: async () => {
+      let q = supabase
+        .from("invoices")
+        .select("id, status, students!inner(class_id)")
+        .neq("status", "paid");
+      if (classId !== "all") q = q.eq("students.class_id", classId);
+      if (search.trim()) {
+        const term = search.trim();
+        q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,admission_no.ilike.%${term}%`, { referencedTable: "students" });
+      }
+      const { data, error } = await q.limit(2000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: (data) => {
+      setSelected(new Set((data as any[]).map((d) => d.id)));
+      toast.success(`Selected ${data.length} unpaid invoice(s) matching the current filters.`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const markPaidFn = useServerFn(bulkMarkInvoicesPaid);
+  const [bulkMethod, setBulkMethod] = useState<"cash" | "cheque" | "bank_transfer" | "mpesa" | "card" | "other">("cash");
+  const [openBulkPay, setOpenBulkPay] = useState(false);
+
+  const bulkMarkPaid = useMutation({
+    mutationFn: () => markPaidFn({ data: { invoice_ids: Array.from(selected), method: bulkMethod } }),
+    onSuccess: (r) => {
+      toast.success(`Marked ${r.updated} invoice(s) as paid${r.skipped ? `, skipped ${r.skipped}` : ""}.`);
+      setSelected(new Set());
+      setOpenBulkPay(false);
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
