@@ -98,6 +98,20 @@ function Page() {
         .order("start_time")
       ).data ?? [],
   });
+  // Period templates (incl. breaks) for the school — used to build the
+  // print grid so breaks show and adjacent double-lessons can be merged.
+  const { data: periods = [] } = useQuery({
+    queryKey: ["period-templates-tt", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () =>
+      (await supabase
+        .from("period_templates")
+        .select("*")
+        .eq("school_id", schoolId!)
+        .order("day_of_week")
+        .order("period_index")
+      ).data ?? [],
+  });
 
   const grid = useMemo(() => {
     const g: Record<number, any[]> = {};
@@ -114,12 +128,86 @@ function Page() {
     const cls = (classes as any[]).find((c) => c.id === classId);
     const w = window.open("", "_blank");
     if (!w) return;
-    const rows = DAYS.map((d, i) => {
-      const daySlots = grid[i + 1] ?? [];
-      if (!daySlots.length) return "";
-      return `<tr><td style="font-weight:600;padding:6px 8px;border:1px solid #ddd;white-space:nowrap">${d}</td>${daySlots.map((s: any) => `<td style="padding:6px 8px;border:1px solid #ddd"><b>${s.subjects?.code ?? ""}</b><br/><span style="font-size:11px;color:#555">${s.start_time?.slice(0,5)}–${s.end_time?.slice(0,5)}</span><br/><span style="font-size:11px">${s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : ""}${s.room ? ` · ${s.room}` : ""}</span></td>`).join("")}</tr>`;
-    }).filter(Boolean).join("");
-    w.document.write(`<!DOCTYPE html><html><head><title>Timetable – ${cls?.name ?? ""}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}@media print{body{padding:0}}</style></head><body><div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">${school?.logo_url ? `<img src="${school.logo_url}" style="height:56px;object-fit:contain" alt="logo"/>` : ""}<div><h2 style="margin:0">${school?.name ?? "School"}</h2><p style="margin:2px 0;font-size:13px;color:#555">Timetable – ${cls?.name ?? ""}${cls?.level ? ` (${cls.level})` : ""}</p></div></div><table>${rows}</table></body></html>`);
+
+    const daysToShow = [1, 2, 3, 4, 5]; // Mon–Fri
+
+    // Periods (incl. breaks) grouped per day, sorted by period_index.
+    const periodsByDay: Record<number, any[]> = {};
+    daysToShow.forEach((d) => {
+      periodsByDay[d] = (periods as any[])
+        .filter((p) => p.day_of_week === d)
+        .sort((a, b) => a.period_index - b.period_index);
+    });
+
+    // Union of period_index values across every day, so a period that only
+    // exists Mon–Thu (e.g. Friday is shorter) still gets its own row.
+    const allIndexes = Array.from(
+      new Set((periods as any[]).map((p) => p.period_index))
+    ).sort((a, b) => a - b);
+
+    // Fast lookup: day + period_template_id -> the lesson booked there.
+    const slotByDayPeriod: Record<string, any> = {};
+    (slots as any[]).forEach((s: any) => {
+      if (s.period_template_id) slotByDayPeriod[`${s.day_of_week}-${s.period_template_id}`] = s;
+    });
+
+    // day-period_index pairs already swallowed into a rowspan above them.
+    const consumed = new Set<string>();
+
+    const renderCell = (day: number, idx: number): string => {
+      const key = `${day}-${idx}`;
+      if (consumed.has(key)) return ""; // covered by rowspan from the row above
+
+      const p = periodsByDay[day]?.find((pp) => pp.period_index === idx);
+      if (!p) return `<td style="padding:6px 8px;border:1px solid #ddd;background:#fafafa"></td>`;
+
+      if (p.is_break) {
+        return `<td style="padding:6px 8px;border:1px solid #ddd;background:#f3f3f3;text-align:center;font-size:11px;color:#666;font-style:italic">${p.label || "Break"}<br/>${p.start_time?.slice(0,5)}–${p.end_time?.slice(0,5)}</td>`;
+      }
+
+      const slot = slotByDayPeriod[`${day}-${p.id}`];
+      if (!slot) return `<td style="padding:6px 8px;border:1px solid #ddd"></td>`;
+
+      // Walk forward merging wall-clock-adjacent periods that carry the
+      // exact same subject+teacher+room into one spanning cell (double
+      // lessons in a single box instead of two).
+      let rowspan = 1;
+      let endTime = slot.end_time;
+      const dayPeriods = periodsByDay[day] ?? [];
+      let curIdx = idx;
+      while (true) {
+        const curPeriod = dayPeriods.find((pp) => pp.period_index === curIdx);
+        const nextPeriod = dayPeriods.find((pp) => pp.period_index === curIdx + 1);
+        if (!curPeriod || !nextPeriod || nextPeriod.is_break) break;
+        if (curPeriod.end_time !== nextPeriod.start_time) break; // gap -> not truly adjacent
+        const nextSlot = slotByDayPeriod[`${day}-${nextPeriod.id}`];
+        if (!nextSlot) break;
+        const sameLesson =
+          nextSlot.subject_id === slot.subject_id &&
+          nextSlot.teacher_id === slot.teacher_id &&
+          (nextSlot.room ?? null) === (slot.room ?? null);
+        if (!sameLesson) break;
+        consumed.add(`${day}-${nextPeriod.period_index}`);
+        endTime = nextSlot.end_time;
+        rowspan++;
+        curIdx = nextPeriod.period_index;
+      }
+
+      return `<td rowspan="${rowspan}" style="padding:6px 8px;border:1px solid #ddd;vertical-align:top"><b>${slot.subjects?.code ?? ""}</b><br/><span style="font-size:11px;color:#555">${slot.start_time?.slice(0,5)}–${endTime?.slice(0,5)}</span><br/><span style="font-size:11px">${slot.staff ? `${slot.staff.first_name} ${slot.staff.last_name}` : ""}${slot.room ? ` · ${slot.room}` : ""}</span></td>`;
+    };
+
+    const header = `<tr><th style="padding:6px 8px;border:1px solid #ddd;background:#f0f0f0;text-align:left">Period</th>${daysToShow.map((d) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#f0f0f0;text-align:left">${DAYS_FULL[d - 1]}</th>`).join("")}</tr>`;
+
+    const bodyRows = allIndexes.map((idx) => {
+      const labelSource = daysToShow
+        .map((d) => periodsByDay[d]?.find((p) => p.period_index === idx))
+        .find(Boolean);
+      const rowLabel = labelSource ? (labelSource.label || (labelSource.is_break ? "Break" : `Period ${idx}`)) : `Period ${idx}`;
+      const cells = daysToShow.map((d) => renderCell(d, idx)).join("");
+      return `<tr><td style="font-weight:600;padding:6px 8px;border:1px solid #ddd;white-space:nowrap;background:#fafafa">${rowLabel}</td>${cells}</tr>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html><html><head><title>Timetable – ${cls?.name ?? ""}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%}@media print{body{padding:0}}</style></head><body><div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">${school?.logo_url ? `<img src="${school.logo_url}" style="height:56px;object-fit:contain" alt="logo"/>` : ""}<div><h2 style="margin:0">${school?.name ?? "School"}</h2><p style="margin:2px 0;font-size:13px;color:#555">Timetable – ${cls?.name ?? ""}${cls?.level ? ` (${cls.level})` : ""}</p></div></div><table>${header}${bodyRows}</table></body></html>`);
     w.document.close();
     w.print();
   };
