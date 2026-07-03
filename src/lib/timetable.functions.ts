@@ -74,6 +74,7 @@ type Period = {
 type ClassSubjectDemand = {
   subject_id: string; lessons: number; allow_double: boolean;
   preferred_room_type: string | null; preferred_room_id: string | null;
+  elective_group: string | null;
 };
 type SlotUsage = { teachers: Set<string>; rooms: Set<string>; classes: Set<string> };
 
@@ -244,7 +245,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
       class_id: string; subject_id: string; teacher_id: string | null;
       day_of_week: number; start_time: string; end_time: string;
       room: string | null; room_id: string | null; period_template_id: string;
-      school_id: string;
+      school_id: string; elective_group: string | null;
     };
     const inserts: Insert[] = [];
     const noQualifiedFor = new Set<string>();
@@ -374,6 +375,13 @@ export const generateTimetable = createServerFn({ method: "POST" })
           allow_double: !!(cs.requires_double_lesson ?? subj?.allow_double_period),
           preferred_room_type: roomReqFor.get(cs.subject_id) ?? null,
           preferred_room_id: cs.preferred_room_id ?? null,
+          // A subject is only ever a real "elective option" if it's NOT
+          // flagged core — a school marking Physics compulsory for the
+          // whole school does that via subjects.is_core (or simply never
+          // setting elective_group on it), not by clearing elective_group.
+          // is_core always wins so a mis-tagged elective_group on a
+          // compulsory subject can't accidentally pull it into a shared block.
+          elective_group: subj?.is_core ? null : (cs.elective_group ?? null),
         };
       });
 
@@ -405,10 +413,35 @@ export const generateTimetable = createServerFn({ method: "POST" })
         return set.has(periodIndex - 1) || set.has(periodIndex + 1);
       };
 
+      // Same-period-every-day tracker (per class). A subject that always
+      // lands on period_index 1 every day it's taught (a common complaint
+      // with naive "morning preference" scoring) gets penalized here so the
+      // solver actively spreads it across different periods during the week,
+      // not just different days.
+      const subjectPeriodIndexUsage = new Map<string, Map<number, number>>();
+      const bumpPeriodIndexUsage = (subjectId: string, periodIndex: number) => {
+        const m = subjectPeriodIndexUsage.get(subjectId) ?? new Map<number, number>();
+        m.set(periodIndex, (m.get(periodIndex) ?? 0) + 1);
+        subjectPeriodIndexUsage.set(subjectId, m);
+      };
+      const periodIndexRepeatCount = (subjectId: string, periodIndex: number) =>
+        subjectPeriodIndexUsage.get(subjectId)?.get(periodIndex) ?? 0;
+
       // ---- PHASE 4: core subjects first — one lesson every single day, ----
       // ---- never doubled, never skipped ------------------------------------
       const coreDemand = demand.filter((d) => subjectMap.get(d.subject_id)?.is_core);
-      const otherDemand = demand.filter((d) => !subjectMap.get(d.subject_id)?.is_core);
+      // Elective-group subjects are scheduled together as parallel blocks in
+      // PHASE 4.5 (see below) — they must NOT also flow through the regular
+      // core/single-lesson pipelines or they'd be double-booked.
+      const electiveDemand = demand.filter((d) => !subjectMap.get(d.subject_id)?.is_core && d.elective_group);
+      const otherDemand = demand.filter((d) => !subjectMap.get(d.subject_id)?.is_core && !d.elective_group);
+
+      const electiveGroups = new Map<string, ClassSubjectDemand[]>();
+      electiveDemand.forEach((d) => {
+        const arr = electiveGroups.get(d.elective_group!) ?? [];
+        arr.push(d);
+        electiveGroups.set(d.elective_group!, arr);
+      });
 
       for (const d of coreDemand) {
         const teacherId = teacherAllocation.get(`${classId}:${d.subject_id}`);
@@ -432,6 +465,12 @@ export const generateTimetable = createServerFn({ method: "POST" })
             if (subj?.preferred_time_of_day === "morning") score += Math.max(0, 6 - period.period_index) * 2;
             if (subj?.preferred_time_of_day === "afternoon") score += Math.min(period.period_index, 6) * 2;
             score -= loadOn(teacherId, day) * 3;
+            // Anti-repetition: every previous day this subject already sat in
+            // this exact period_index makes it score worse, so a core subject
+            // like Math doesn't settle into "always period 1" for the whole
+            // week just because period 1 wins the morning-preference bonus
+            // every single day. Outweighs the morning/afternoon bonus above.
+            score -= periodIndexRepeatCount(d.subject_id, period.period_index) * 6;
             const cand = { period, score };
             if (!best || cand.score > best.score) best = cand;
           }
@@ -447,10 +486,12 @@ export const generateTimetable = createServerFn({ method: "POST" })
             class_id: classId, subject_id: d.subject_id, teacher_id: teacherId,
             day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
             room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+            elective_group: null,
           });
           const dc = daySubjectCount.get(day)!;
           dc.set(d.subject_id, (dc.get(d.subject_id) ?? 0) + 1);
           markSubjectPeriod(day, d.subject_id, period.period_index);
+          bumpPeriodIndexUsage(d.subject_id, period.period_index);
           const wdays = weekSubjectDays.get(d.subject_id) ?? new Set<number>();
           wdays.add(day); weekSubjectDays.set(d.subject_id, wdays);
           remaining -= 1;
@@ -458,6 +499,123 @@ export const generateTimetable = createServerFn({ method: "POST" })
 
         if (remaining > 0) {
           conflicts.push(`${classNames.get(classId)}: ${subjectMap.get(d.subject_id)?.name ?? d.subject_id} (core) — only placed ${d.lessons - remaining}/${d.lessons} days, ran out of free slots.`);
+        }
+      }
+
+      // ---- PHASE 4.5: elective groups — parallel option-subjects sharing ----
+      // one class time-slot. e.g. "Form 3 Options": Geography / History /
+      // Business are three different class_subjects rows, all tagged with
+      // the same elective_group. They are NOT alternatives scheduled one
+      // after another — they are taught AT THE SAME TIME, each to a
+      // different sub-group of the class, by different teachers, in
+      // different rooms. The DB only enforces "no two lessons for the same
+      // class at the same time" UNLESS both rows share an elective_group
+      // (see migration 20260703120000), so this is the only place that ever
+      // sets elective_group on an insert.
+      for (const [groupKey, options] of electiveGroups) {
+        if (!options.length) continue;
+
+        // All options in one elective_group are taught in parallel, so they
+        // must share one weekly lesson-count. If the school configured them
+        // inconsistently, take the max and flag it — under-provisioned
+        // options just get fewer of their own lessons placed as singles below
+        // (their allocateTeacher call already ran with the whole group up top).
+        const lessonsNeeded = Math.max(...options.map((o) => o.lessons));
+        const distinctCounts = new Set(options.map((o) => o.lessons));
+        if (distinctCounts.size > 1) {
+          conflicts.push(
+            `${classNames.get(classId)}: elective group "${groupKey}" has mismatched lessons_per_week across options (${Array.from(distinctCounts).join("/")}) — using ${lessonsNeeded}.`
+          );
+        }
+
+        const optionTeachers = options.map((o) => ({
+          demand: o,
+          teacherId: teacherAllocation.get(`${classId}:${o.subject_id}`) ?? null,
+        }));
+        const missingTeacher = optionTeachers.find((o) => !o.teacherId);
+        if (missingTeacher) {
+          conflicts.push(
+            `${classNames.get(classId)}: elective group "${groupKey}" — no teacher for ${subjectMap.get(missingTeacher.demand.subject_id)?.name ?? missingTeacher.demand.subject_id}, group unscheduled.`
+          );
+          continue;
+        }
+
+        const groupPseudoId = `elective:${groupKey}`; // its own key in the day/period-repeat trackers
+        let placedForGroup = 0;
+
+        for (let unit = 0; unit < lessonsNeeded; unit++) {
+          type GroupCandidate = { day: number; period: Period; score: number };
+          let best: GroupCandidate | null = null;
+          let bestNoRepeat: GroupCandidate | null = null;
+
+          for (const day of allDays) {
+            const dayPeriods = periodsByDay.get(day)!;
+            const todayCount = daySubjectCount.get(day)!.get(groupPseudoId) ?? 0;
+            for (const period of dayPeriods) {
+              const k = slotKey(period.day_of_week, period.start_time);
+              if (!isClassFreeAt(k)) continue; // class must be entirely free — nothing else can sit alongside an elective block
+              // EVERY option's teacher must be simultaneously free — that's
+              // the whole point of "taught in parallel."
+              const allTeachersFree = optionTeachers.every(
+                (o) => isTeacherFree(o.teacherId!, day, period.period_index, k)
+                  && loadOn(o.teacherId!, day) < data.maxLessonsPerTeacherPerDay
+              );
+              if (!allTeachersFree) continue;
+              // Rooms: need at least `options.length` distinct free rooms in this slot.
+              const u = ensureUsage(k);
+              const freeRoomCount = rooms.filter((rm) => !u.rooms.has(rm.id)).length;
+              if (freeRoomCount < options.length) continue;
+
+              let score = 0;
+              score -= optionTeachers.reduce((sum, o) => sum + loadOn(o.teacherId!, day), 0);
+              score -= periodIndexRepeatCount(groupPseudoId, period.period_index) * 6;
+              const usedDays = weekSubjectDays.get(groupPseudoId);
+              if (usedDays?.size) {
+                const minGap = Math.min(...Array.from(usedDays).map((ud) => Math.abs(ud - day)));
+                score += Math.min(minGap, 3) * 2;
+              }
+
+              const cand: GroupCandidate = { day, period, score };
+              if (!best || cand.score > best.score) best = cand;
+              if (todayCount === 0 && (!bestNoRepeat || cand.score > bestNoRepeat.score)) bestNoRepeat = cand;
+            }
+          }
+
+          const chosen = bestNoRepeat ?? best;
+          if (!chosen) {
+            conflicts.push(
+              `${classNames.get(classId)}: elective group "${groupKey}" — no shared free slot for all options (unit ${unit + 1}/${lessonsNeeded}), unscheduled.`
+            );
+            break;
+          }
+
+          const { day, period } = chosen;
+          const k = slotKey(period.day_of_week, period.start_time);
+          const u = ensureUsage(k);
+          for (const o of optionTeachers) {
+            const room = pickRoom(o.demand.subject_id, classId, k, o.demand.preferred_room_id);
+            u.teachers.add(o.teacherId!); u.classes.add(classId); if (room.id) u.rooms.add(room.id);
+            bumpLoad(o.teacherId!, day);
+            inserts.push({
+              class_id: classId, subject_id: o.demand.subject_id, teacher_id: o.teacherId,
+              day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
+              room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+              elective_group: groupKey,
+            });
+          }
+          markSubjectPeriod(day, groupPseudoId, period.period_index);
+          bumpPeriodIndexUsage(groupPseudoId, period.period_index);
+          const dc = daySubjectCount.get(day)!;
+          dc.set(groupPseudoId, (dc.get(groupPseudoId) ?? 0) + 1);
+          const wdays = weekSubjectDays.get(groupPseudoId) ?? new Set<number>();
+          wdays.add(day); weekSubjectDays.set(groupPseudoId, wdays);
+          placedForGroup++;
+        }
+
+        if (placedForGroup < lessonsNeeded) {
+          conflicts.push(
+            `${classNames.get(classId)}: elective group "${groupKey}" — only placed ${placedForGroup}/${lessonsNeeded} shared slots.`
+          );
         }
       }
 
@@ -510,6 +668,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
           class_id: classId, subject_id: d.subject_id, teacher_id: teacherId,
           day_of_week: p1.day_of_week, start_time: p1.start_time, end_time: p1.end_time,
           room: room1.name, room_id: room1.id, period_template_id: p1.id, school_id: schoolId,
+          elective_group: null,
         });
 
         const room2 = pickRoom(d.subject_id, classId, k2, d.preferred_room_id);
@@ -519,11 +678,14 @@ export const generateTimetable = createServerFn({ method: "POST" })
           class_id: classId, subject_id: d.subject_id, teacher_id: teacherId,
           day_of_week: p2.day_of_week, start_time: p2.start_time, end_time: p2.end_time,
           room: room2.name, room_id: room2.id, period_template_id: p2.id, school_id: schoolId,
+          elective_group: null,
         });
         doublesPlacedCount++;
 
         markSubjectPeriod(best.day, d.subject_id, p1.period_index);
         markSubjectPeriod(best.day, d.subject_id, p2.period_index);
+        bumpPeriodIndexUsage(d.subject_id, p1.period_index);
+        bumpPeriodIndexUsage(d.subject_id, p2.period_index);
         const chainsFromPrev = lastDoubleEndPI.get(best.day) === p1.period_index - 1;
         doubleChainLen.set(best.day, chainsFromPrev ? (doubleChainLen.get(best.day) ?? 1) + 1 : 1);
         lastDoubleEndPI.set(best.day, p2.period_index);
@@ -534,6 +696,82 @@ export const generateTimetable = createServerFn({ method: "POST" })
         const wdays = weekSubjectDays.get(d.subject_id) ?? new Set<number>();
         wdays.add(best.day); weekSubjectDays.set(d.subject_id, wdays);
       }
+
+      // ---- Repair pass: min-conflicts relocation ---------------------------
+      // The old behaviour when no free slot existed was to just drop the
+      // lesson ("no free slot left, lesson unscheduled"). This is a classic
+      // greedy-solver dead end: some OTHER already-placed lesson for the same
+      // class is sitting in a slot where the target subject's teacher is
+      // free, and simply relocating that other lesson elsewhere would open
+      // the slot up. This is a bounded, single-level version of what a real
+      // backtracking solver (like FET) does automatically. It only ever
+      // moves a lesson to a slot that is fully free for its own teacher and
+      // class — it never creates a new conflict while resolving one.
+      const tryRepairSlot = (
+        targetClassId: string, targetSubjectId: string, targetTeacherId: string
+      ): { day: number; period: Period } | null => {
+        for (const day of allDays) {
+          for (const period of periodsByDay.get(day)!) {
+            const k = slotKey(period.day_of_week, period.start_time);
+            const u = ensureUsage(k);
+            // Target's own teacher must actually be free here, or moving
+            // the blocker wouldn't help.
+            if (u.teachers.has(targetTeacherId)) continue;
+            if (unavailable.get(targetTeacherId)?.has(`${day}-${period.period_index}`)) continue;
+            if (loadOn(targetTeacherId, day) >= data.maxLessonsPerTeacherPerDay) continue;
+            if (!u.classes.has(targetClassId)) continue; // already free — PHASE 6's normal scan would have found it
+
+            const blocking = inserts.find(
+              (row) => row.class_id === targetClassId
+                && row.day_of_week === period.day_of_week
+                && row.start_time === period.start_time
+            );
+            if (!blocking || !blocking.teacher_id || blocking.elective_group) continue; // never unpick an elective block
+
+            for (const day2 of allDays) {
+              for (const period2 of periodsByDay.get(day2)!) {
+                if (day2 === day && period2.start_time === period.start_time) continue;
+                const k2 = slotKey(period2.day_of_week, period2.start_time);
+                const u2 = ensureUsage(k2);
+                if (u2.classes.has(targetClassId)) continue;
+                if (u2.teachers.has(blocking.teacher_id)) continue;
+                if (unavailable.get(blocking.teacher_id)?.has(`${day2}-${period2.period_index}`)) continue;
+                if (loadOn(blocking.teacher_id, day2) >= data.maxLessonsPerTeacherPerDay) continue;
+
+                // ---- perform the move: vacate old slot, occupy new one ----
+                u.teachers.delete(blocking.teacher_id);
+                u.classes.delete(targetClassId);
+                if (blocking.room_id) u.rooms.delete(blocking.room_id);
+
+                const room2 = pickRoom(blocking.subject_id, targetClassId, k2, null);
+                u2.teachers.add(blocking.teacher_id); u2.classes.add(targetClassId);
+                if (room2.id) u2.rooms.add(room2.id);
+
+                const loadMap = teacherDailyLoad.get(blocking.teacher_id);
+                if (loadMap) loadMap.set(day, Math.max(0, (loadMap.get(day) ?? 1) - 1));
+                bumpLoad(blocking.teacher_id, day2);
+
+                const usage = subjectPeriodIndexUsage.get(blocking.subject_id);
+                if (usage) usage.set(period.period_index, Math.max(0, (usage.get(period.period_index) ?? 1) - 1));
+                bumpPeriodIndexUsage(blocking.subject_id, period2.period_index);
+
+                blocking.day_of_week = period2.day_of_week;
+                blocking.start_time = period2.start_time;
+                blocking.end_time = period2.end_time;
+                blocking.period_template_id = period2.id;
+                blocking.room = room2.name;
+                blocking.room_id = room2.id;
+
+                conflicts.push(
+                  `${classNames.get(targetClassId)}: auto-repair — moved ${subjectMap.get(blocking.subject_id)?.name ?? blocking.subject_id} to free a slot for ${subjectMap.get(targetSubjectId)?.name ?? targetSubjectId}.`
+                );
+                return { day, period };
+              }
+            }
+          }
+        }
+        return null;
+      };
 
       // ---- PHASE 6: remaining singles (core + non-core spillover) ---------
       // Units interleaved round-robin across subjects (rather than filling
@@ -593,6 +831,10 @@ export const generateTimetable = createServerFn({ method: "POST" })
             if (teacherBusyAt(prev) || teacherBusyAt(next)) score += 1;
             // Never let a forced same-day repeat chain into 3 periods in a row
             if (adjacentSameSubject(day, subjectId, period.period_index)) score -= 25;
+            // Anti-repetition: penalize landing in a period_index this
+            // subject has already used on other days this week, so e.g.
+            // Math doesn't settle into "always period 1" all week.
+            score -= periodIndexRepeatCount(subjectId, period.period_index) * 6;
 
             const cand: SlotCandidate = { day, period, score };
             if (!best || cand.score > best.score) best = cand;
@@ -600,7 +842,10 @@ export const generateTimetable = createServerFn({ method: "POST" })
           }
         }
 
-        const chosen = bestNoRepeat ?? best; // strongly prefer a day this subject hasn't used yet
+        let chosen: SlotCandidate | { day: number; period: Period } | null = bestNoRepeat ?? best; // strongly prefer a day this subject hasn't used yet
+        if (!chosen) {
+          chosen = tryRepairSlot(classId, subjectId, teacherId);
+        }
         if (!chosen) {
           conflicts.push(`${classNames.get(classId)}: ${subjectMap.get(subjectId)?.name ?? subjectId} — no free slot left, lesson unscheduled.`);
           remainingUnits.shift();
@@ -618,11 +863,13 @@ export const generateTimetable = createServerFn({ method: "POST" })
           class_id: classId, subject_id: subjectId, teacher_id: teacherId,
           day_of_week: period.day_of_week, start_time: period.start_time, end_time: period.end_time,
           room: room.name, room_id: room.id, period_template_id: period.id, school_id: schoolId,
+          elective_group: null,
         });
 
         const dc = daySubjectCount.get(day)!;
         dc.set(subjectId, (dc.get(subjectId) ?? 0) + 1);
         markSubjectPeriod(day, subjectId, period.period_index);
+        bumpPeriodIndexUsage(subjectId, period.period_index);
         const wdays = weekSubjectDays.get(subjectId) ?? new Set<number>();
         wdays.add(day); weekSubjectDays.set(subjectId, wdays);
 
@@ -714,4 +961,178 @@ export const generateTimetable = createServerFn({ method: "POST" })
         warnings: conflicts.length,
       },
     };
+  });
+
+// =============================================================================
+// TEACHER ABSENCE → AUTO-SUBSTITUTION
+// A teacher is marked absent for a specific date. Every one of their
+// timetable_slots lessons that lands on that weekday gets a substitute
+// candidate: another teacher qualified for the same subject (teacher_subjects)
+// who has no lesson of their own in that exact period on that weekday, and
+// isn't already covering something else that period from an earlier
+// substitution this same call. Results are written to
+// timetable_substitutions so portal/timetable views can show "covered by X"
+// or "uncovered" without touching the base weekly timetable at all.
+// =============================================================================
+export const reportTeacherAbsenceAndSubstitute = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      staffId: z.string().uuid(),
+      absenceDate: z.string(), // YYYY-MM-DD
+      reason: z.string().optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
+      supabase.rpc("is_admin", { _user_id: userId }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
+    ]);
+    if (!isAdmin && !isAcademic)
+      throw new Error("Only admins or academic master can record teacher absences");
+
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    // day_of_week convention already used elsewhere in this file: 1=Mon..7=Sun
+    const dow = new Date(`${data.absenceDate}T00:00:00`).getDay(); // 0=Sun..6=Sat
+    const dayOfWeek = dow === 0 ? 7 : dow;
+
+    // ── Record the absence (idempotent per staff/date) ──────────────────────
+    const { error: absErr } = await supabase
+      .from("teacher_absences")
+      .upsert(
+        { school_id: schoolId, staff_id: data.staffId, absence_date: data.absenceDate, reason: data.reason ?? null, reported_by: userId },
+        { onConflict: "school_id,staff_id,absence_date" }
+      );
+    if (absErr) throw new Error("Could not record absence: " + absErr.message);
+
+    // ── Load the absent teacher's lessons that day ───────────────────────────
+    const { data: slots = [], error: slotsErr } = await supabase
+      .from("timetable_slots")
+      .select("id,class_id,subject_id,teacher_id,day_of_week,start_time,end_time,room,room_id,elective_group")
+      .eq("school_id", schoolId).eq("teacher_id", data.staffId).eq("day_of_week", dayOfWeek);
+    if (slotsErr) throw new Error(slotsErr.message);
+    if (!slots.length) {
+      return { ok: true, absenceRecorded: true, affectedLessons: 0, covered: 0, uncovered: 0, results: [] };
+    }
+
+    // ── Load candidate substitutes: everyone qualified for each subject ─────
+    const subjectIds = Array.from(new Set((slots as any[]).map((s) => s.subject_id)));
+    const { data: teacherSubjectRows = [] } = await supabase
+      .from("teacher_subjects").select("staff_id,subject_id").eq("school_id", schoolId).in("subject_id", subjectIds);
+    const qualifiedFor = new Map<string, string[]>();
+    (teacherSubjectRows as any[]).forEach((r) => {
+      const arr = qualifiedFor.get(r.subject_id) ?? [];
+      arr.push(r.staff_id);
+      qualifiedFor.set(r.subject_id, arr);
+    });
+
+    // ── Everyone else's timetable that same day, to know who's already busy ─
+    const candidateIds = Array.from(new Set(Array.from(qualifiedFor.values()).flat())).filter((id) => id !== data.staffId);
+    const { data: busyRows = [] } = candidateIds.length
+      ? await supabase
+          .from("timetable_slots")
+          .select("teacher_id,start_time,end_time")
+          .eq("school_id", schoolId).eq("day_of_week", dayOfWeek).in("teacher_id", candidateIds)
+      : { data: [] as any[] };
+    const busyAt = new Map<string, Set<string>>(); // staffId -> set of start_time strings already teaching
+    (busyRows as any[]).forEach((r) => {
+      const set = busyAt.get(r.teacher_id) ?? new Set<string>();
+      set.add(r.start_time);
+      busyAt.set(r.teacher_id, set);
+    });
+
+    // ── Also check for absences among candidates that same day ──────────────
+    const { data: absentRows = [] } = candidateIds.length
+      ? await supabase.from("teacher_absences").select("staff_id").eq("school_id", schoolId).eq("absence_date", data.absenceDate).in("staff_id", candidateIds)
+      : { data: [] as any[] };
+    const alsoAbsent = new Set((absentRows as any[]).map((r) => r.staff_id));
+
+    // ── Assign, preferring the least-loaded-today candidate, and never ──────
+    // double-booking a substitute across two lessons in this same run.
+    const usedThisRun = new Map<string, Set<string>>(); // staffId -> start_times just assigned
+    const results: { slotId: string; subjectId: string; classId: string; startTime: string; substituteTeacherId: string | null; status: "covered" | "uncovered" }[] = [];
+
+    for (const slot of slots as any[]) {
+      const pool = (qualifiedFor.get(slot.subject_id) ?? []).filter((id) => !alsoAbsent.has(id));
+      const free = pool.filter((id) => {
+        if (busyAt.get(id)?.has(slot.start_time)) return false;
+        if (usedThisRun.get(id)?.has(slot.start_time)) return false;
+        return true;
+      });
+      // Prefer whoever has fewest lessons already assigned in this run today.
+      free.sort((a, b) => (usedThisRun.get(a)?.size ?? 0) - (usedThisRun.get(b)?.size ?? 0));
+      const substitute = free[0] ?? null;
+
+      if (substitute) {
+        const set = usedThisRun.get(substitute) ?? new Set<string>();
+        set.add(slot.start_time);
+        usedThisRun.set(substitute, set);
+      }
+
+      results.push({
+        slotId: slot.id, subjectId: slot.subject_id, classId: slot.class_id,
+        startTime: slot.start_time, substituteTeacherId: substitute, status: substitute ? "covered" : "uncovered",
+      });
+    }
+
+    // ── Persist ───────────────────────────────────────────────────────────
+    const rows = results.map((r) => ({
+      school_id: schoolId, timetable_slot_id: r.slotId, absence_date: data.absenceDate,
+      original_teacher_id: data.staffId, substitute_teacher_id: r.substituteTeacherId, status: r.status,
+    }));
+    const { error: upsertErr } = await supabase
+      .from("timetable_substitutions")
+      .upsert(rows, { onConflict: "timetable_slot_id,absence_date" });
+    if (upsertErr) throw new Error("Could not save substitutions: " + upsertErr.message);
+
+    return {
+      ok: true,
+      absenceRecorded: true,
+      affectedLessons: results.length,
+      covered: results.filter((r) => r.status === "covered").length,
+      uncovered: results.filter((r) => r.status === "uncovered").length,
+      results,
+    };
+  });
+
+// Manually override a substitute (admin picks someone specific, or marks a
+// lesson cancelled instead of covered) after reviewing reportTeacherAbsenceAndSubstitute's suggestions.
+export const setSubstitute = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      timetableSlotId: z.string().uuid(),
+      absenceDate: z.string(),
+      substituteTeacherId: z.string().uuid().nullable(),
+      status: z.enum(["covered", "uncovered", "cancelled"]),
+      notes: z.string().optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
+      supabase.rpc("is_admin", { _user_id: userId }),
+      supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
+    ]);
+    if (!isAdmin && !isAcademic) throw new Error("Only admins or academic master can set substitutes");
+
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: slot } = await supabase.from("timetable_slots").select("teacher_id").eq("id", data.timetableSlotId).single();
+
+    const { error } = await supabase.from("timetable_substitutions").upsert(
+      {
+        school_id: schoolId, timetable_slot_id: data.timetableSlotId, absence_date: data.absenceDate,
+        original_teacher_id: (slot as any)?.teacher_id ?? null,
+        substitute_teacher_id: data.substituteTeacherId, status: data.status, notes: data.notes ?? null,
+      },
+      { onConflict: "timetable_slot_id,absence_date" }
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
