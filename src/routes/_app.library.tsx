@@ -447,9 +447,40 @@ function BookDialog({ onDone }: { onDone: () => void }) {
 
 function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
   const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
+  const [classFilter, setClassFilter] = useState("all");
+  const [staffSearch, setStaffSearch] = useState("");
   const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
   const { data: students = [] } = useActiveStudents();
   const { data: staffList = [] } = useQuery({ queryKey: ["staff-min-library"], queryFn: async () => (await supabase.from("staff").select("id,employee_no,first_name,last_name,position_title").order("first_name")).data ?? [] });
+
+  // Works regardless of which class field your students rows actually use.
+  // If the class dropdown shows "Unassigned" for everyone, tell Claude the
+  // real column name (e.g. school_class_structure join) and it'll be fixed.
+  const getStudentClass = (s: any) =>
+    s.class_name || s.className ||
+    (s.class && s.stream ? `${s.class} ${s.stream}` : s.class) ||
+    s.grade || "Unassigned";
+
+  const classOptions = useMemo(() => {
+    const set = new Set((students as any[]).map(getStudentClass));
+    return Array.from(set).sort();
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    if (classFilter === "all") return students as any[];
+    return (students as any[]).filter(s => getStudentClass(s) === classFilter);
+  }, [students, classFilter]);
+
+  const filteredStaff = useMemo(() => {
+    if (!staffSearch.trim()) return staffList as any[];
+    const q = staffSearch.toLowerCase();
+    return (staffList as any[]).filter(s =>
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) ||
+      (s.position_title ?? "").toLowerCase().includes(q) ||
+      (s.employee_no ?? "").toLowerCase().includes(q)
+    );
+  }, [staffList, staffSearch]);
+
   const m = useMutation({
     mutationFn: async () => {
       const payload: any = { book_id: f.book_id, borrowed_on: f.borrowed_on, due_on: f.due_on, status: "active", student_id: borrowerType === "student" ? f.student_id : null, staff_id: borrowerType === "staff" ? f.staff_id : null };
@@ -459,28 +490,49 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
     onSuccess: () => { toast.success("Loan issued"); onDone(); }, onError: (e: any) => toast.error(e.message),
   });
   const borrowerChosen = borrowerType === "student" ? !!f.student_id : !!f.staff_id;
+
   return (
     <DialogContent><DialogHeader><DialogTitle>Issue Loan</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Borrower Type</Label>
-          <Select value={borrowerType} onValueChange={(v: "student" | "staff") => { setBorrowerType(v); setF(p => ({ ...p, student_id: "", staff_id: "" })); }}>
+          <Select value={borrowerType} onValueChange={(v: "student" | "staff") => { setBorrowerType(v); setF(p => ({ ...p, student_id: "", staff_id: "" })); setClassFilter("all"); setStaffSearch(""); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="student">Student</SelectItem><SelectItem value="staff">Staff / Teacher</SelectItem></SelectContent>
           </Select>
         </div>
+
         {borrowerType === "student" ? (
-          <div><Label>Student</Label>
-            <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-              <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          <>
+            <div><Label>Class</Label>
+              <Select value={classFilter} onValueChange={v => { setClassFilter(v); setF(p => ({ ...p, student_id: "" })); }}>
+                <SelectTrigger><SelectValue placeholder="All classes" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All classes</SelectItem>
+                  {classOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Student ({filteredStudents.length})</Label>
+              <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
+                <SelectContent>{filteredStudents.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </>
         ) : (
-          <div><Label>Staff / Teacher</Label>
-            <Select value={f.staff_id} onValueChange={v => setF(p => ({ ...p, staff_id: v }))}><SelectTrigger><SelectValue placeholder="Choose staff member" /></SelectTrigger>
-              <SelectContent>{(staffList as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.employee_no} – {s.first_name} {s.last_name}{s.position_title ? ` (${s.position_title})` : ""}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          <>
+            <div><Label>Search Staff</Label>
+              <Input placeholder="Name, position, or staff no…" value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
+            </div>
+            <div><Label>Staff / Teacher ({filteredStaff.length})</Label>
+              <Select value={f.staff_id} onValueChange={v => setF(p => ({ ...p, staff_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Choose staff member" /></SelectTrigger>
+                <SelectContent>{filteredStaff.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.employee_no} – {s.first_name} {s.last_name}{s.position_title ? ` (${s.position_title})` : ""}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </>
         )}
+
         <div><Label>Book</Label>
           <Select value={f.book_id} onValueChange={v => setF(p => ({ ...p, book_id: v }))}><SelectTrigger><SelectValue placeholder="Choose book" /></SelectTrigger>
             <SelectContent>{books.map(b => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent>
