@@ -539,7 +539,7 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
                 <SelectTrigger><SelectValue placeholder="Choose fee component" /></SelectTrigger>
                 <SelectContent>
                   {(components as any[]).length === 0 && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">No components yet — add one on the Class Fees page.</div>
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No components yet — add one on the Fees page.</div>
                   )}
                   {(components as any[]).map((c) => (
                     <SelectItem key={c.id} value={c.id}>
