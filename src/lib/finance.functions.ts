@@ -69,6 +69,7 @@ export const bulkGenerateInvoices = createServerFn({ method: "POST" })
         amount: fee.amount,
         due_date: data.due_date || null,
         school_id: schoolId,
+        description: `${fee.name} - ${fee.term} ${fee.year}`,
       }));
 
     if (toInsert.length === 0) return { created: 0, skipped: students.length };
