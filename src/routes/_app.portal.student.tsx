@@ -2798,8 +2798,8 @@ function StudentPortal() {
                       <motion.div key={inv.id} variants={fadeUp} className="border rounded-xl p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-medium">{inv.invoice_no}</div>
-                            <div className="text-xs text-muted-foreground">Due: {inv.due_date ?? "—"}</div>
+                            <div className="font-medium">{inv.description || inv.invoice_no}</div>
+                            <div className="text-xs text-muted-foreground">{inv.invoice_no} · Due: {inv.due_date ?? "—"}</div>
                           </div>
                           <Badge variant={inv.status === "paid" ? "default" : inv.status === "partial" ? "secondary" : "destructive"}>{inv.status}</Badge>
                         </div>
