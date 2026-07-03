@@ -1,15 +1,24 @@
-import { createFileRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Loader2 } from "lucide-react";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { SchoolSplashScreen } from "@/components/SchoolSplashScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
+    // Sessions live in localStorage, which only exists in the browser.
+    // On the server (e.g. the very first render of a hard refresh) there is
+    // no localStorage, so this check would always look "logged out" and
+    // bounce the user to /login even when they have a valid session. Skip
+    // it on the server and let the client (AppLayout below) verify the real
+    // session once it hydrates and shows a branded loading screen instead.
+    if (typeof window === "undefined") return;
+
     const { data, error } = await supabase.auth.getSession();
     if (error || !data.session) {
       // Save the current path so login can redirect back after auth
@@ -42,13 +51,19 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
   const { loading, session, roles, rolesLoaded } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const navigate = useNavigate();
+
+  // Once auth has finished loading client-side and there is genuinely no
+  // session, send the user to login (this replaces the old server-side
+  // redirect, which couldn't see the real session during SSR on refresh).
+  useEffect(() => {
+    if (!loading && !session) {
+      navigate({ to: "/login", search: { redirect: path }, replace: true });
+    }
+  }, [loading, session, path, navigate]);
 
   if (loading || !session || !rolesLoaded) {
-    return (
-      <div className="min-h-screen grid place-items-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SchoolSplashScreen />;
   }
 
   const appRoles = roles as AppRole[];
