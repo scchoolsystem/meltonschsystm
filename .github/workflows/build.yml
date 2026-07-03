@@ -1,2 +1,2 @@
 # Retired — desktop releases are now handled by release-desktop.yml
-# Trigger a release: git tag v1.0.2 && git push origin v1.0.2
+# Trigger a release: git tag v1.0.9 && git push origin v1.0.9
