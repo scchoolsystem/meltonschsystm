@@ -16,6 +16,7 @@ import { Loader2, Plus, AlertTriangle, Search, Filter, X } from "lucide-react";
 import { toast } from "sonner";
 import { useTenant } from "@/hooks/use-tenant";
 import { useAuth } from "@/hooks/use-auth";
+import { useActiveStudents } from "@/lib/students.functions";
 
 export const Route = createFileRoute("/_app/inventory")({
   component: InventoryPage,
@@ -117,22 +118,16 @@ function useClasses(schoolId: string | undefined) {
   });
 }
 
-function useStudentsByClass(classId: string | undefined) {
-  return useQuery({
-    queryKey: ["students-by-class", classId],
-    enabled: !!classId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, first_name, last_name, adm_no")
-        .eq("class_id", classId!)
-        .eq("status", "active")
-        .order("first_name");
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-}
+// NOTE: previously this file had its own useStudentsByClass() hook that
+// queried `students` directly with `.select("id, first_name, last_name, adm_no")`
+// and only checked `status === "active"`. That column is actually named
+// `admission_no` (per src/lib/students.functions.ts), so the select silently
+// errored and always returned an empty list — which is why the "Issue Stock"
+// dialog showed "0 active students" even though the class dropdown (which
+// just does a raw `students(count)` over ALL students, active or not)
+// correctly showed 30. Replaced with the canonical useActiveStudents() hook
+// so this module agrees with library/attendance/clinic/etc. on both status
+// fields and the correct column names.
 
 function useInvMutation(table: string, schoolId: string | undefined, onDone: () => void) {
   const qc = useQueryClient();
@@ -652,7 +647,15 @@ function IssueDialog({ schoolId, items, classes }: { schoolId: string; items: an
   const { user } = useAuth();
 
   const destDef = ISSUE_DESTINATIONS.find(d => d.value === form.destination);
-  const studentsQ = useStudentsByClass(form.destination === "class" && form.class_id ? form.class_id : undefined);
+
+  // Canonical hook — checks BOTH status and lifecycle_status, uses the real
+  // `admission_no` column, and matches the same active-student definition
+  // used across library, attendance, clinic, discipline, marks, etc.
+  const studentsQ = useActiveStudents({
+    classId: form.destination === "class" && form.class_id ? form.class_id : null,
+    enabled: form.destination === "class" && !!form.class_id,
+  });
+
   const selectedClass = classes.find(c => c.id === form.class_id);
   const selectedItem = items.find(i => i.id === form.item_id);
   const studentCount = studentsQ.data?.length ?? 0;
@@ -751,6 +754,8 @@ function IssueDialog({ schoolId, items, classes }: { schoolId: string; items: an
                   <p className="font-medium">{selectedClass?.name}</p>
                   {studentsQ.isLoading ? (
                     <p className="text-muted-foreground text-xs">Loading students…</p>
+                  ) : studentsQ.error ? (
+                    <p className="text-destructive text-xs">{(studentsQ.error as Error).message}</p>
                   ) : (
                     <>
                       <p className="text-muted-foreground text-xs">
@@ -838,7 +843,7 @@ function IssueDialog({ schoolId, items, classes }: { schoolId: string; items: an
               <Input
                 type="number" min={1} max={selectedItem?.current_qty ?? undefined}
                 value={form.qty}
-                onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, qty: e.target.value === "" ? 0 : Number(e.target.value) })}
               />
               {selectedItem && form.qty > selectedItem.current_qty && (
                 <p className="text-xs text-destructive mt-1">Exceeds available stock ({selectedItem.current_qty})</p>
