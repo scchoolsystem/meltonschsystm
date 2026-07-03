@@ -449,9 +449,26 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
   const [borrowerType, setBorrowerType] = useState<"student" | "staff">("student");
   const [classFilter, setClassFilter] = useState("all");
   const [staffSearch, setStaffSearch] = useState("");
+  const [bookCategoryFilter, setBookCategoryFilter] = useState("all");
+  const [bookSearch, setBookSearch] = useState("");
   const [f, setF] = useState({ student_id: "", staff_id: "", book_id: "", borrowed_on: format(new Date(), "yyyy-MM-dd"), due_on: "" });
   const { data: students = [] } = useActiveStudents();
   const { data: staffList = [] } = useQuery({ queryKey: ["staff-min-library"], queryFn: async () => (await supabase.from("staff").select("id,employee_no,first_name,last_name,position_title").order("first_name")).data ?? [] });
+
+  const bookCategoryOptions = useMemo(() => {
+    const set = new Set((books as any[]).map(b => b.category || "Uncategorised"));
+    return Array.from(set).sort();
+  }, [books]);
+
+  const filteredBooksForLoan = useMemo(() => {
+    let list = books as any[];
+    if (bookCategoryFilter !== "all") list = list.filter(b => (b.category || "Uncategorised") === bookCategoryFilter);
+    if (bookSearch.trim()) {
+      const q = bookSearch.toLowerCase();
+      list = list.filter(b => b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q) || b.isbn?.toLowerCase().includes(q));
+    }
+    return list;
+  }, [books, bookCategoryFilter, bookSearch]);
 
   // Works regardless of which class field your students rows actually use.
   // If the class dropdown shows "Unassigned" for everyone, tell Claude the
@@ -533,9 +550,25 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
           </>
         )}
 
-        <div><Label>Book</Label>
-          <Select value={f.book_id} onValueChange={v => setF(p => ({ ...p, book_id: v }))}><SelectTrigger><SelectValue placeholder="Choose book" /></SelectTrigger>
-            <SelectContent>{books.map(b => <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>)}</SelectContent>
+        <div><Label>Book Category</Label>
+          <Select value={bookCategoryFilter} onValueChange={v => { setBookCategoryFilter(v); setF(p => ({ ...p, book_id: "" })); }}>
+            <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {bookCategoryOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label>Search Book</Label>
+          <Input placeholder="Title, author, or ISBN…" value={bookSearch} onChange={e => setBookSearch(e.target.value)} />
+        </div>
+        <div><Label>Book ({filteredBooksForLoan.length})</Label>
+          <Select value={f.book_id} onValueChange={v => setF(p => ({ ...p, book_id: v }))}>
+            <SelectTrigger><SelectValue placeholder="Choose book" /></SelectTrigger>
+            <SelectContent>
+              {filteredBooksForLoan.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">No books match.</div>}
+              {filteredBooksForLoan.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.title}{b.author ? ` — ${b.author}` : ""}</SelectItem>)}
+            </SelectContent>
           </Select>
         </div>
         <div><Label>Borrowed Date</Label><Input type="date" value={f.borrowed_on} onChange={e => setF(p => ({ ...p, borrowed_on: e.target.value }))} /></div>
