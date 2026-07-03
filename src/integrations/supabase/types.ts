@@ -2281,6 +2281,102 @@ export type Database = {
           },
         ]
       }
+      teacher_absences: {
+        Row: {
+          absence_date: string
+          created_at: string
+          id: string
+          reason: string | null
+          reported_by: string | null
+          school_id: string
+          staff_id: string
+        }
+        Insert: {
+          absence_date: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reported_by?: string | null
+          school_id: string
+          staff_id: string
+        }
+        Update: {
+          absence_date?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          reported_by?: string | null
+          school_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_absences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_absences_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timetable_substitutions: {
+        Row: {
+          absence_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          original_teacher_id: string | null
+          school_id: string
+          status: string
+          substitute_teacher_id: string | null
+          timetable_slot_id: string
+        }
+        Insert: {
+          absence_date: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          original_teacher_id?: string | null
+          school_id: string
+          status?: string
+          substitute_teacher_id?: string | null
+          timetable_slot_id: string
+        }
+        Update: {
+          absence_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          original_teacher_id?: string | null
+          school_id?: string
+          status?: string
+          substitute_teacher_id?: string | null
+          timetable_slot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetable_substitutions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_substitutions_timetable_slot_id_fkey"
+            columns: ["timetable_slot_id"]
+            isOneToOne: false
+            referencedRelation: "timetable_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       period_templates: {
         Row: {
           created_at: string
@@ -3900,6 +3996,7 @@ export type Database = {
           class_id: string
           created_at: string
           day_of_week: number
+          elective_group: string | null
           end_time: string
           id: string
           period_template_id: string | null
@@ -3914,6 +4011,7 @@ export type Database = {
           class_id: string
           created_at?: string
           day_of_week: number
+          elective_group?: string | null
           end_time: string
           id?: string
           period_template_id?: string | null
@@ -3928,6 +4026,7 @@ export type Database = {
           class_id?: string
           created_at?: string
           day_of_week?: number
+          elective_group?: string | null
           end_time?: string
           id?: string
           period_template_id?: string | null
