@@ -418,3 +418,61 @@ export const deleteBudget = createServerFn({ method: "POST" })
       .eq("school_id", schoolId);
     if (error) throw new Error(error.message);
   });
+
+// ── 20. Bulk mark invoices paid ──────────────────────────────
+export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) =>
+    z.object({
+      invoice_ids: z.array(z.string().uuid()).min(1),
+      paid_on: z.string().optional(),
+      method: z.enum(["cash", "cheque", "bank_transfer", "mpesa", "card", "other"]).optional(),
+      reference: z.string().optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    await assertFinanceWrite(context);
+    const schoolId = await getSchoolId(context);
+    const paidOn = data.paid_on ?? new Date().toISOString().slice(0, 10);
+    const method = data.method ?? "cash";
+
+    // Load invoices to confirm ownership and current balances
+    const { data: invoices, error: invErr } = await supabaseAdmin
+      .from("invoices")
+      .select("id, amount, paid, status, school_id")
+      .in("id", data.invoice_ids)
+      .eq("school_id", schoolId);
+    if (invErr) throw new Error(invErr.message);
+    if (!invoices || invoices.length === 0) throw new Error("No invoices found for provided ids");
+
+    let updated = 0;
+    let skipped = 0;
+
+    // For each invoice, add a payment equal to remaining balance and update status
+    for (const inv of invoices) {
+      const balance = Number(inv.amount) - Number(inv.paid || 0);
+      if (balance <= 0) { skipped++; continue; } // already fully paid
+
+      // Insert payment (receipt_no set by DB trigger)
+      const { error: payErr } = await supabaseAdmin.from("payments").insert({
+        invoice_id: inv.id,
+        amount: balance,
+        method,
+        reference: data.reference ?? null,
+        paid_on: paidOn,
+      } as any);
+      if (payErr) throw new Error(payErr.message);
+
+      // Update invoice paid / status
+      const newPaid = Number(inv.paid || 0) + balance;
+      const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
+      const { error: updErr } = await supabaseAdmin
+        .from("invoices")
+        .update({ paid: newPaid, status: newStatus } as any)
+        .eq("id", inv.id);
+      if (updErr) throw new Error(updErr.message);
+      updated++;
+    }
+
+    return { updated, skipped };
+  });
