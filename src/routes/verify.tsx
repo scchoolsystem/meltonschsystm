@@ -16,15 +16,28 @@ import {
   Briefcase,
   Clock,
   BadgeCheck,
+  HeartPulse,
+  Phone,
+  Mail,
+  MapPin,
+  Cake,
+  CalendarDays,
+  Layers,
+  School,
 } from "lucide-react";
 
 // Top-level route — sits OUTSIDE the `_app` layout, so it does NOT go
 // through the `_app` beforeLoad auth check. This is the route the QR
 // codes on ID cards point to, so it has to work for anyone's camera
 // with no login. See src/lib/public-verify.functions.ts for the
-// matching server function, which intentionally returns a reduced set
-// of fields (no medical notes, no parent contacts, no address/phone)
-// since this page is reachable by anyone on the internet with the link.
+// matching server function.
+//
+// NOTE ON DATA EXPOSURE: this page shows medical notes, guardian contact,
+// address, and full school profile info for students — on purpose, so
+// anyone who finds a lost or injured student can act immediately. That
+// means this data is reachable by anyone who has a valid ID code, no
+// login required. Deliberate tradeoff for the emergency-response use
+// case — tighten fields in publicVerifyId if that ever needs to change.
 export const Route = createFileRoute("/verify")({
   component: Page,
   validateSearch: (search: Record<string, unknown>) => ({
@@ -36,6 +49,17 @@ interface SchoolInfo {
   name: string;
   logo: string | null;
   motto: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  academicYear: number | null;
+  currentTerm: string | null;
+}
+
+interface GuardianInfo {
+  name: string;
+  phone: string | null;
+  email: string | null;
 }
 
 interface PublicResult {
@@ -44,14 +68,36 @@ interface PublicResult {
   uniqueId: string;
   photo?: string | null;
   active: boolean;
+  status?: string | null;
+  gender?: string | null;
+  dob?: string | null;
+  admittedOn?: string | null;
   admissionNo?: string;
   className?: string | null;
   stream?: string | null;
+  level?: string | null;
+  classYear?: number | null;
+  medicalNotes?: string | null;
+  address?: string | null;
+  guardian?: GuardianInfo | null;
   employeeNo?: string;
   role?: string | null;
   department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  hireDate?: string | null;
   school?: SchoolInfo | null;
   verifiedAt?: string;
+}
+
+function fmtDate(d?: string | null) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString(undefined, { dateStyle: "medium" } as any);
+}
+
+function statusLabel(status?: string | null) {
+  if (!status) return null;
+  return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
 }
 
 function Page() {
@@ -93,10 +139,7 @@ function Page() {
     : "";
 
   const verifiedAtLabel = result?.verifiedAt
-    ? new Date(result.verifiedAt).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
+    ? new Date(result.verifiedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : null;
 
   return (
@@ -120,6 +163,11 @@ function Page() {
               <h1 className="font-bold text-lg leading-tight">{result.school.name}</h1>
               {result.school.motto && (
                 <p className="text-xs text-muted-foreground italic">{result.school.motto}</p>
+              )}
+              {(result.school.academicYear || result.school.currentTerm) && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {result.school.currentTerm} {result.school.academicYear}
+                </p>
               )}
             </div>
           </div>
@@ -177,7 +225,7 @@ function Page() {
             >
               <span className="flex items-center gap-1.5">
                 {result.active ? <ShieldCheck className="w-4 h-4" /> : <ShieldX className="w-4 h-4" />}
-                {result.active ? "VERIFIED — ELIGIBLE" : "VERIFIED — INACTIVE"}
+                VERIFIED — {statusLabel(result.status)?.toUpperCase() ?? (result.active ? "ELIGIBLE" : "INACTIVE")}
               </span>
               <span className="uppercase text-xs tracking-wide opacity-90">
                 {result.kind === "student" ? "Student" : "Staff"}
@@ -207,16 +255,84 @@ function Page() {
 
               <Separator />
 
+              {/* Core identity details */}
               <div className="space-y-2.5">
                 {result.kind === "student" ? (
-                  <InfoRow icon={<GraduationCap className="w-4 h-4" />} label="Admission No" value={result.admissionNo} />
+                  <>
+                    <InfoRow icon={<GraduationCap className="w-4 h-4" />} label="Admission No" value={result.admissionNo} />
+                    <InfoRow icon={<Layers className="w-4 h-4" />} label="Level" value={result.level ? statusLabel(result.level) : null} />
+                    <InfoRow icon={<CalendarDays className="w-4 h-4" />} label="Class Year" value={result.classYear ? String(result.classYear) : null} />
+                    <InfoRow icon={<Cake className="w-4 h-4" />} label="Date of Birth" value={fmtDate(result.dob)} />
+                    <InfoRow icon={<GraduationCap className="w-4 h-4" />} label="Gender" value={result.gender ? statusLabel(result.gender) : null} />
+                    <InfoRow icon={<CalendarDays className="w-4 h-4" />} label="Admitted On" value={fmtDate(result.admittedOn)} />
+                    <InfoRow icon={<MapPin className="w-4 h-4" />} label="Address" value={result.address} />
+                  </>
                 ) : (
                   <>
                     <InfoRow icon={<BadgeCheck className="w-4 h-4" />} label="Employee No" value={result.employeeNo} />
                     <InfoRow icon={<Briefcase className="w-4 h-4" />} label="Department" value={result.department} />
+                    <InfoRow icon={<GraduationCap className="w-4 h-4" />} label="Gender" value={result.gender ? statusLabel(result.gender) : null} />
+                    <InfoRow icon={<CalendarDays className="w-4 h-4" />} label="Hired On" value={fmtDate(result.hireDate)} />
+                    <InfoRow icon={<Phone className="w-4 h-4" />} label="Phone" value={result.phone} />
+                    <InfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={result.email} />
                   </>
                 )}
               </div>
+
+              {/* Emergency / medical section — student only */}
+              {result.kind === "student" && (result.medicalNotes || result.guardian) && (
+                <>
+                  <Separator />
+                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 space-y-2.5">
+                    <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+                      <HeartPulse className="w-4 h-4" /> Emergency Information
+                    </div>
+                    {result.medicalNotes && (
+                      <p className="text-sm text-red-900 bg-white/60 rounded p-2 border border-red-100">
+                        {result.medicalNotes}
+                      </p>
+                    )}
+                    {result.guardian && (
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium text-red-900">{result.guardian.name} (Guardian)</p>
+                        {result.guardian.phone && (
+                          <a
+                            href={`tel:${result.guardian.phone}`}
+                            className="flex items-center gap-1.5 text-red-700 underline underline-offset-2"
+                          >
+                            <Phone className="w-3.5 h-3.5" /> {result.guardian.phone}
+                          </a>
+                        )}
+                        {result.guardian.email && (
+                          <a
+                            href={`mailto:${result.guardian.email}`}
+                            className="flex items-center gap-1.5 text-red-700 underline underline-offset-2"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> {result.guardian.email}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Full school profile */}
+              {result.school && (result.school.phone || result.school.email || result.school.address) && (
+                <>
+                  <Separator />
+                  <div className="rounded-lg bg-muted/60 border p-3 space-y-2">
+                    <div className="flex items-center gap-2 font-semibold text-sm">
+                      <School className="w-4 h-4" /> {result.school.name}
+                    </div>
+                    <div className="space-y-1.5">
+                      <InfoRow icon={<MapPin className="w-4 h-4" />} label="Address" value={result.school.address} />
+                      <InfoRow icon={<Phone className="w-4 h-4" />} label="Phone" value={result.school.phone} />
+                      <InfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={result.school.email} />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {verifiedAtLabel && (
                 <>
