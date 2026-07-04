@@ -54,7 +54,7 @@ export function IdCard({ schoolName, kind, uniqueId, fullName, subtitle, photoUr
         <QRCodeSVG
           value={
             typeof window !== "undefined"
-              ? `${window.location.origin}/ids/verify?code=${encodeURIComponent(uniqueId)}`
+              ? `${window.location.origin}/verify?code=${encodeURIComponent(uniqueId)}`
               : uniqueId
           }
           size={70}
