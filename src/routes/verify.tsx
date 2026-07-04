@@ -2,13 +2,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { publicVerifyId } from "@/lib/public-verify.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldCheck, ShieldX, ScanLine, User, GraduationCap } from "lucide-react";
+import {
+  Loader2,
+  ShieldCheck,
+  ShieldX,
+  ScanLine,
+  GraduationCap,
+  Briefcase,
+  Clock,
+  BadgeCheck,
+} from "lucide-react";
 
 // Top-level route — sits OUTSIDE the `_app` layout, so it does NOT go
 // through the `_app` beforeLoad auth check. This is the route the QR
@@ -24,6 +32,12 @@ export const Route = createFileRoute("/verify")({
   }),
 });
 
+interface SchoolInfo {
+  name: string;
+  logo: string | null;
+  motto: string | null;
+}
+
 interface PublicResult {
   kind: "student" | "staff";
   name: string;
@@ -36,6 +50,8 @@ interface PublicResult {
   employeeNo?: string;
   role?: string | null;
   department?: string | null;
+  school?: SchoolInfo | null;
+  verifiedAt?: string;
 }
 
 function Page() {
@@ -73,22 +89,50 @@ function Page() {
   }
 
   const initials = result
-    ? result.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
+    ? result.name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase()
     : "";
 
+  const verifiedAtLabel = result?.verifiedAt
+    ? new Date(result.verifiedAt).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : null;
+
   return (
-    <div className="min-h-screen bg-muted/30 flex items-start justify-center p-4 sm:p-8">
+    <div className="min-h-screen bg-gradient-to-b from-muted/50 to-background flex items-start justify-center p-4 sm:p-8">
       <div className="w-full max-w-md space-y-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ScanLine className="w-5 h-5" /> ID Verification
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        {/* School branding header — only appears once we have a match */}
+        {result?.school && (
+          <div className="flex flex-col items-center text-center gap-2 pt-2 pb-1">
+            {result.school.logo ? (
+              <img
+                src={result.school.logo}
+                alt={result.school.name}
+                className="w-14 h-14 rounded-full object-cover border shadow-sm bg-white"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center border">
+                <GraduationCap className="w-7 h-7 text-primary" />
+              </div>
+            )}
+            <div>
+              <h1 className="font-bold text-lg leading-tight">{result.school.name}</h1>
+              {result.school.motto && (
+                <p className="text-xs text-muted-foreground italic">{result.school.motto}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <Card className="shadow-sm">
+          <CardContent className="pt-5 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <ScanLine className="w-4 h-4" /> Official ID Verification
+            </div>
             <div className="flex gap-2">
               <Input
-                autoFocus
+                autoFocus={!codeFromUrl}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={handleKey}
@@ -101,7 +145,7 @@ function Page() {
             </div>
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> Looking up…
+                <Loader2 className="w-4 h-4 animate-spin" /> Checking records…
               </div>
             )}
           </CardContent>
@@ -111,57 +155,85 @@ function Page() {
           <Card className="border-destructive">
             <CardContent className="pt-5 flex items-center gap-3 text-destructive">
               <ShieldX className="w-6 h-6 shrink-0" />
-              <span className="text-sm">{error}</span>
+              <div>
+                <p className="text-sm font-semibold">Not verified</p>
+                <p className="text-sm">{error}</p>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {result && (
-          <Card className={result.active ? "border-green-500" : "border-amber-500"}>
+          <Card
+            className={`overflow-hidden border-2 ${
+              result.active ? "border-green-500" : "border-amber-500"
+            }`}
+          >
+            {/* Status ribbon */}
+            <div
+              className={`px-4 py-2 flex items-center justify-between text-white text-sm font-semibold ${
+                result.active ? "bg-green-600" : "bg-amber-600"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                {result.active ? <ShieldCheck className="w-4 h-4" /> : <ShieldX className="w-4 h-4" />}
+                {result.active ? "VERIFIED — ELIGIBLE" : "VERIFIED — INACTIVE"}
+              </span>
+              <span className="uppercase text-xs tracking-wide opacity-90">
+                {result.kind === "student" ? "Student" : "Staff"}
+              </span>
+            </div>
+
             <CardContent className="pt-5 space-y-4">
               <div className="flex items-center gap-4">
-                <Avatar className="w-16 h-16 border-2 border-border">
+                <Avatar className="w-20 h-20 border-2 border-border shrink-0">
                   <AvatarImage src={result.photo ?? undefined} alt={result.name} />
                   <AvatarFallback className="text-lg font-bold bg-muted">{initials}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <ShieldCheck className={`w-5 h-5 shrink-0 ${result.active ? "text-green-600" : "text-amber-600"}`} />
-                    <h2 className="text-xl font-bold">{result.name}</h2>
-                    <Badge
-                      className={`ml-auto ${result.active ? "bg-green-600 hover:bg-green-700" : ""}`}
-                      variant={result.active ? "default" : "secondary"}
-                    >
-                      {result.kind.toUpperCase()} · {result.active ? "ELIGIBLE" : "INACTIVE"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs font-mono text-muted-foreground mt-1">{result.uniqueId}</p>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold leading-tight">{result.name}</h2>
+                  <p className="text-xs font-mono text-muted-foreground mt-0.5">{result.uniqueId}</p>
+                  {result.kind === "student" && result.className && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {result.className}
+                      {result.stream ? ` — ${result.stream}` : ""}
+                    </p>
+                  )}
+                  {result.kind === "staff" && result.role && (
+                    <p className="text-sm text-muted-foreground mt-1">{result.role}</p>
+                  )}
                 </div>
               </div>
 
               <Separator />
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {result.kind === "student" ? (
-                  <>
-                    <InfoRow label="Admission No" value={result.admissionNo} icon={<GraduationCap className="w-4 h-4" />} />
-                    <InfoRow
-                      label="Class / Stream"
-                      value={result.className ? `${result.className}${result.stream ? " — " + result.stream : ""}` : null}
-                      icon={<GraduationCap className="w-4 h-4" />}
-                    />
-                  </>
+                  <InfoRow icon={<GraduationCap className="w-4 h-4" />} label="Admission No" value={result.admissionNo} />
                 ) : (
                   <>
-                    <InfoRow label="Employee No" value={result.employeeNo} icon={<User className="w-4 h-4" />} />
-                    <InfoRow label="Role" value={result.role} icon={<GraduationCap className="w-4 h-4" />} />
-                    <InfoRow label="Department" value={result.department} icon={<GraduationCap className="w-4 h-4" />} />
+                    <InfoRow icon={<BadgeCheck className="w-4 h-4" />} label="Employee No" value={result.employeeNo} />
+                    <InfoRow icon={<Briefcase className="w-4 h-4" />} label="Department" value={result.department} />
                   </>
                 )}
               </div>
+
+              {verifiedAtLabel && (
+                <>
+                  <Separator />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    Verified {verifiedAtLabel}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
+
+        <p className="text-center text-xs text-muted-foreground pt-2">
+          Secured verification powered by SmartDev ERP
+        </p>
       </div>
     </div>
   );
