@@ -79,3 +79,16 @@ jobs:
             android/app/build/outputs/bundle/release/app-release.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The repo is private, so anonymous visitors on the public marketing site
+      # can no longer reach github.com/.../releases/latest. Publish the APK to
+      # a public Supabase Storage bucket instead, overwriting the same stable
+      # path each release so the landing page's download link never changes.
+      - name: Publish APK to Supabase Storage
+        run: |
+          curl -sf -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/storage/v1/object/releases/android/app-release.apk" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            -H "x-upsert: true" \
+            --data-binary "@android/app/build/outputs/apk/release/app-release.apk"
