@@ -117,7 +117,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // Wave 1, Fix C-4: register `live` (live classes / streaming) so the
   // teacher/student/parent sidebar entries stop bouncing to /dashboard.
   live: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
-  ids: [...ADMIN_ROLES, "admission_officer", "security_admin", "security_user"],
+  ids: [], // everyone authenticated — any staff member needs to verify a student/staff ID on the spot
   // Assignments: teachers create/grade, students submit. Page itself
   // branches internally on isTeacher/isStudent — was previously missing
   // from this map entirely, so canAccess() fell back to admin-only.
