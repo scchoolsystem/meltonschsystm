@@ -1,30 +1,40 @@
 name: Release Desktop App
+
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build-desktop:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
       - name: Enable pnpm
         run: corepack enable
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+
       - name: Install frontend dependencies
         run: pnpm install
+
       - name: Install Tauri CLI
         run: pnpm add -D @tauri-apps/cli
+
       - name: Build frontend (SPA)
         run: pnpm build:desktop
         env:
@@ -32,13 +42,16 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
           VITE_JAAS_APP_ID: ${{ secrets.VITE_JAAS_APP_ID }}
+
       - name: Check dist-desktop exists
         run: dir dist-desktop
         shell: cmd
+
       - name: Build Tauri app
         run: pnpm tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Rename Windows installers
         shell: bash
         run: |
@@ -46,6 +59,7 @@ jobs:
           [ -n "$NSIS" ] && mv "$NSIS" "src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe"
           MSI=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
           [ -n "$MSI" ] && mv "$MSI" "src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi"
+
       - name: Upload Windows installers to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -53,24 +67,10 @@ jobs:
           # When triggered by a tag push, github.ref_name IS the tag.
           # When triggered manually (workflow_dispatch), create/update a
           # release for the tag you specify via the "Use workflow from" input,
-          # or it will default to the commit SHA - provide a tag in that case.
+          # or it will default to the commit SHA â€” provide a tag in that case.
           fail_on_unmatched_files: true
           files: |
             src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe
             src-tauri/target/release/bundle/msi/SmartDev-ERP-Windows.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # The repo is private now, so the public marketing site can't link to
-      # github.com/.../releases/latest anymore. Publish the .exe to a public
-      # Supabase Storage bucket instead, overwriting the same stable path on
-      # every release so the landing page's download link never changes.
-      - name: Publish Windows installer to Supabase Storage
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          curl -sf -X POST \
-            "${{ secrets.VITE_SUPABASE_URL }}/storage/v1/object/releases/windows/SmartDev-ERP-Windows-Setup.exe" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Content-Type: application/octet-stream" \
-            -H "x-upsert: true" \
-            --data-binary "@src-tauri/target/release/bundle/nsis/SmartDev-ERP-Windows-Setup.exe"
