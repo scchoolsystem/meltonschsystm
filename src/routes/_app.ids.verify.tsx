@@ -13,7 +13,12 @@ import {
   Heart, AlertCircle, Search,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_app/ids/verify")({ component: Page });
+export const Route = createFileRoute("/_app/ids/verify")({
+  component: Page,
+  validateSearch: (search: Record<string, unknown>) => ({
+    code: typeof search.code === "string" ? search.code : undefined,
+  }),
+});
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -189,11 +194,22 @@ function CameraScanner({ onDetect }: { onDetect: (code: string) => void }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function Page() {
-  const [code, setCode]       = useState("");
+  const { code: codeFromUrl } = Route.useSearch();
+  const [code, setCode]       = useState(codeFromUrl ?? "");
   const [loading, setLoading] = useState(false);
   const [result, setResult]   = useState<VerifyResult | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const [tab, setTab]         = useState<"manual" | "camera">("manual");
+
+  // If the page was opened from a QR code link (?code=STU-2026-000005),
+  // auto-run the lookup immediately so the scanner sees full details
+  // right away instead of an empty search box.
+  useEffect(() => {
+    if (codeFromUrl) {
+      lookup(codeFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeFromUrl]);
 
   async function lookup(uid: string) {
     const u = uid.trim().toUpperCase();
