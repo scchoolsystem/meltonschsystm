@@ -214,3 +214,20 @@
   .print\:bg-white { background: #fff !important; }
 }
 
+/* Splash screen: indeterminate loading bar sweep */
+@keyframes splash-bar-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.splash-bar-sweep {
+  animation: splash-bar-sweep 1.4s ease-in-out infinite;
+}
+
+/* Splash screen: soft breathing glow behind the logo */
+@keyframes splash-glow {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50% { opacity: 0.65; transform: scale(1.08); }
+}
+.splash-glow {
+  animation: splash-glow 2.6s ease-in-out infinite;
+}
