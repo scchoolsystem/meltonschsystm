@@ -393,6 +393,8 @@ function InventoryPage() {
         <TabsList>
           <TabsTrigger value="items">Items</TabsTrigger>
           <TabsTrigger value="assets">Assets</TabsTrigger>
+          <TabsTrigger value="requests">Requests</TabsTrigger>
+          <TabsTrigger value="transfers">Transfers</TabsTrigger>
           <TabsTrigger value="receipts">Receipts</TabsTrigger>
           <TabsTrigger value="issues">Issues</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
@@ -404,6 +406,14 @@ function InventoryPage() {
 
         <TabsContent value="assets">
           <AssetsTab schoolId={schoolId} items={itemsQ.data ?? []} classes={classesQ.data ?? []} canEdit={canEdit} />
+        </TabsContent>
+
+        <TabsContent value="requests">
+          <RequestsTab schoolId={schoolId} items={itemsQ.data ?? []} canEdit={canEdit} />
+        </TabsContent>
+
+        <TabsContent value="transfers">
+          <TransfersTab schoolId={schoolId} items={itemsQ.data ?? []} stores={storesQ.data ?? []} canEdit={canEdit} />
         </TabsContent>
 
         <TabsContent value="receipts">
@@ -886,6 +896,473 @@ function SeatingGrid({ units, classes, schoolId, itemId, canEdit }: { units: any
         Print support: use your browser's print dialog on this view, or export via Reports once that module is added.
       </p>
     </div>
+  );
+}
+
+// ─── Requests workflow (section 7) ──────────────────────────────────────────
+const REQUEST_DEPARTMENTS = [
+  { value: "kitchen", label: "🍽️ Kitchen" },
+  { value: "library", label: "📚 Library" },
+  { value: "admin", label: "🏢 Administration" },
+  { value: "ict", label: "💻 ICT" },
+  { value: "sports", label: "⚽ Sports" },
+  { value: "boarding", label: "🛏️ Boarding" },
+  { value: "clinic", label: "🏥 Clinic" },
+  { value: "maintenance", label: "🔧 Maintenance" },
+  { value: "teachers", label: "👤 Teachers" },
+];
+const deptLabel = (v: string) => REQUEST_DEPARTMENTS.find(d => d.value === v)?.label ?? v;
+
+const REQUEST_STATUS_STYLES: Record<string, string> = {
+  pending:   "bg-amber-100 text-amber-800 border-amber-200",
+  approved:  "bg-blue-100 text-blue-800 border-blue-200",
+  rejected:  "bg-red-100 text-red-800 border-red-200",
+  issued:    "bg-indigo-100 text-indigo-800 border-indigo-200",
+  received:  "bg-emerald-100 text-emerald-800 border-emerald-200",
+  cancelled: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+function useRequests(schoolId: string | undefined) {
+  return useQuery({
+    queryKey: ["inventory-requests", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("inventory_requests" as any)
+        .select("*, inventory_items(id,name,current_qty,unit)")
+        .eq("school_id", schoolId!)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
+
+function RequestsTab({ schoolId, items, canEdit }: { schoolId: string; items: any[]; canEdit: boolean }) {
+  const requestsQ = useRequests(schoolId);
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const [statusFilter, setStatusFilter] = useState("all");
+  const requests = requestsQ.data ?? [];
+  const filtered = statusFilter === "all" ? requests : requests.filter((r: any) => r.status === statusFilter);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["inventory-requests", schoolId] });
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ id, qty }: { id: string; qty: number }) => {
+      const { error } = await supabase.from("inventory_requests" as any)
+        .update({ status: "approved", qty_approved: qty, approved_by: user?.id ?? null, approved_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Request approved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { error } = await supabase.from("inventory_requests" as any)
+        .update({ status: "rejected", rejected_reason: reason, approved_by: user?.id ?? null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Request rejected"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const issueMutation = useMutation({
+    mutationFn: async (req: any) => {
+      const item = items.find(i => i.id === req.item_id);
+      if (!item) throw new Error("Linked item not found — this request may use a free-text item description only");
+      const qty = req.qty_approved ?? req.qty_requested;
+      if (qty > item.current_qty) throw new Error(`Only ${item.current_qty} ${item.unit} in stock`);
+      const { error: itemErr } = await supabase.from("inventory_items").update({ current_qty: item.current_qty - qty }).eq("id", item.id);
+      if (itemErr) throw itemErr;
+      const { error: reqErr } = await supabase.from("inventory_requests" as any)
+        .update({ status: "issued", qty_issued: qty, issued_at: new Date().toISOString() })
+        .eq("id", req.id);
+      if (reqErr) throw reqErr;
+      await supabase.from("inventory_movements" as any).insert({
+        school_id: schoolId, item_id: item.id, event_type: "issued",
+        qty_before: item.current_qty, qty_after: item.current_qty - qty,
+        reason: `Request fulfilled — ${deptLabel(req.department)}`, performed_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => { invalidate(); qc.invalidateQueries({ queryKey: ["inventory", "inventory_items", schoolId] }); toast.success("Request issued — stock updated"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const receiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("inventory_requests" as any).update({ status: "received", received_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Marked as received"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("inventory_requests" as any).update({ status: "cancelled" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Request cancelled"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.keys(REQUEST_STATUS_STYLES).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <div className="ml-auto"><RequestDialog schoolId={schoolId} items={items} /></div>
+      </div>
+
+      <Card><CardContent className="pt-4">
+        {requestsQ.isLoading ? (
+          <div className="grid place-items-center py-16"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No requests match this filter.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Department</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Qty Requested</TableHead>
+                <TableHead>Qty Approved</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Reason</TableHead>
+                {canEdit && <TableHead>Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((r: any) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-sm">{deptLabel(r.department)}</TableCell>
+                  <TableCell className="text-sm">{r.inventory_items?.name ?? r.item_description ?? "—"}</TableCell>
+                  <TableCell>{r.qty_requested}</TableCell>
+                  <TableCell>{r.qty_approved ?? "—"}</TableCell>
+                  <TableCell><Badge variant="outline" className={REQUEST_STATUS_STYLES[r.status]}>{r.status}</Badge></TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">{r.reason || r.rejected_reason || "—"}</TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {r.status === "pending" && (
+                          <>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => approveMutation.mutate({ id: r.id, qty: r.qty_requested })}>Approve</Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600" onClick={() => { const reason = prompt("Reason for rejection?") ?? ""; rejectMutation.mutate({ id: r.id, reason }); }}>Reject</Button>
+                          </>
+                        )}
+                        {r.status === "approved" && (
+                          <Button size="sm" className="h-7 text-xs" onClick={() => issueMutation.mutate(r)} disabled={issueMutation.isPending}>Issue</Button>
+                        )}
+                        {r.status === "issued" && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => receiveMutation.mutate(r.id)}>Mark Received</Button>
+                        )}
+                        {r.status === "pending" && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => cancelMutation.mutate(r.id)}>Cancel</Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
+    </div>
+  );
+}
+
+function RequestDialog({ schoolId, items }: { schoolId: string; items: any[] }) {
+  const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ department: "", item_id: "", item_description: "", qty_requested: 1, reason: "" });
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("inventory_requests" as any).insert({
+        school_id: schoolId, requested_by: user?.id ?? null,
+        department: form.department, item_id: form.item_id || null,
+        item_description: form.item_id ? null : (form.item_description || null),
+        qty_requested: form.qty_requested, reason: form.reason || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory-requests", schoolId] });
+      toast.success("Request submitted");
+      setOpen(false);
+      setForm({ department: "", item_id: "", item_description: "", qty_requested: 1, reason: "" });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" />New Request</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Request Stock</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Department *</Label>
+            <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+              <SelectTrigger><SelectValue placeholder="Requesting department" /></SelectTrigger>
+              <SelectContent>{REQUEST_DEPARTMENTS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Item (from catalog, optional)</Label>
+            <Select value={form.item_id} onValueChange={(v) => setForm({ ...form, item_id: v })}>
+              <SelectTrigger><SelectValue placeholder="Select if it's already in inventory" /></SelectTrigger>
+              <SelectContent>{items.map(i => <SelectItem key={i.id} value={i.id}>{i.name} ({i.current_qty} {i.unit})</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {!form.item_id && (
+            <div><Label>Or describe the item</Label><Input value={form.item_description} onChange={(e) => setForm({ ...form, item_description: e.target.value })} placeholder="e.g. Whiteboard markers, assorted colors" /></div>
+          )}
+          <div><Label>Quantity *</Label><Input type="number" min={1} value={form.qty_requested} onChange={(e) => setForm({ ...form, qty_requested: Number(e.target.value) })} /></div>
+          <div><Label>Reason</Label><Textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} rows={2} placeholder="Why is this needed?" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button disabled={!form.department || (!form.item_id && !form.item_description.trim()) || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Request"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Transfers between stores (section 10) ──────────────────────────────────
+// NOTE: inventory_items.current_qty is a single global number, not tracked
+// per-store. A bulk item's "transfer" therefore moves its ENTIRE remaining
+// balance to the new store (updates store_id) rather than splitting qty
+// across two locations — true partial-quantity multi-store stock requires
+// a separate stock-by-location ledger table, which is a bigger schema change
+// not included in this pass. Individually-tracked assets (desks etc.) don't
+// have this limitation — each unit has its own store_id and transfers cleanly.
+const TRANSFER_STATUS_STYLES: Record<string, string> = {
+  requested:  "bg-amber-100 text-amber-800 border-amber-200",
+  approved:   "bg-blue-100 text-blue-800 border-blue-200",
+  in_transit: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  received:   "bg-emerald-100 text-emerald-800 border-emerald-200",
+  cancelled:  "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+function useTransfers(schoolId: string | undefined) {
+  return useQuery({
+    queryKey: ["inventory-transfers", schoolId],
+    enabled: !!schoolId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("inventory_transfers" as any)
+        .select("*, inventory_items(id,name,current_qty,unit,store_id,is_individually_tracked)")
+        .eq("school_id", schoolId!)
+        .order("requested_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
+
+function TransfersTab({ schoolId, items, stores, canEdit }: { schoolId: string; items: any[]; stores: any[]; canEdit: boolean }) {
+  const transfersQ = useTransfers(schoolId);
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const transfers = transfersQ.data ?? [];
+  const storeName = (id: string) => stores.find((s: any) => s.id === id)?.name ?? "—";
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["inventory-transfers", schoolId] });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("inventory_transfers" as any).update({ status: "approved", approved_by: user?.id ?? null }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Transfer approved"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const markInTransitMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("inventory_transfers" as any).update({ status: "in_transit" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Marked in transit"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const receiveMutation = useMutation({
+    mutationFn: async (t: any) => {
+      // Move the item (bulk) or asset unit (tracked) to its new store.
+      if (t.asset_unit_id) {
+        const { error } = await supabase.from("inventory_asset_units" as any).update({ store_id: t.to_store_id, updated_at: new Date().toISOString() }).eq("id", t.asset_unit_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("inventory_items").update({ store_id: t.to_store_id }).eq("id", t.item_id);
+        if (error) throw error;
+      }
+      const { error: tErr } = await supabase.from("inventory_transfers" as any)
+        .update({ status: "received", received_by: user?.id ?? null, received_at: new Date().toISOString() })
+        .eq("id", t.id);
+      if (tErr) throw tErr;
+    },
+    onSuccess: () => {
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["inventory", "inventory_items", schoolId] });
+      qc.invalidateQueries({ queryKey: ["inventory-asset-units", schoolId] });
+      toast.success("Transfer received — location updated");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("inventory_transfers" as any).update({ status: "cancelled" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Transfer cancelled"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (stores.length < 2) {
+    return (
+      <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
+        You need at least 2 stores set up to transfer stock between them. Add stores directly in Supabase's <code>inventory_stores</code> table for now (a dedicated Stores admin screen can be added in a later pass).
+      </CardContent></Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        {canEdit && <TransferDialog schoolId={schoolId} items={items} stores={stores} />}
+      </div>
+      <Card><CardContent className="pt-4">
+        {transfersQ.isLoading ? (
+          <div className="grid place-items-center py-16"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : transfers.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No transfers yet.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead>Status</TableHead>
+                {canEdit && <TableHead>Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {transfers.map((t: any) => (
+                <TableRow key={t.id}>
+                  <TableCell className="text-sm">{t.inventory_items?.name ?? "—"}{t.asset_unit_id ? " (unit)" : ""}</TableCell>
+                  <TableCell className="text-xs">{storeName(t.from_store_id)}</TableCell>
+                  <TableCell className="text-xs">{storeName(t.to_store_id)}</TableCell>
+                  <TableCell><Badge variant="outline" className={TRANSFER_STATUS_STYLES[t.status]}>{t.status}</Badge></TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <div className="flex gap-1 flex-wrap">
+                        {t.status === "requested" && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => approveMutation.mutate(t.id)}>Approve</Button>}
+                        {t.status === "approved" && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => markInTransitMutation.mutate(t.id)}>Mark In Transit</Button>}
+                        {t.status === "in_transit" && <Button size="sm" className="h-7 text-xs" onClick={() => receiveMutation.mutate(t)}>Receive</Button>}
+                        {(t.status === "requested" || t.status === "approved") && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => cancelMutation.mutate(t.id)}>Cancel</Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent></Card>
+    </div>
+  );
+}
+
+function TransferDialog({ schoolId, items, stores }: { schoolId: string; items: any[]; stores: any[] }) {
+  const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [itemId, setItemId] = useState("");
+  const [toStoreId, setToStoreId] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const selectedItem = items.find(i => i.id === itemId);
+  const fromStoreId = selectedItem?.store_id ?? null;
+
+  const m = useMutation({
+    mutationFn: async () => {
+      if (!selectedItem) throw new Error("Select an item");
+      if (fromStoreId === toStoreId) throw new Error("Pick a different destination store");
+      const { error } = await supabase.from("inventory_transfers" as any).insert({
+        school_id: schoolId, item_id: itemId,
+        qty: selectedItem.is_individually_tracked ? null : selectedItem.current_qty,
+        from_store_id: fromStoreId, to_store_id: toStoreId,
+        requested_by: user?.id ?? null, notes: notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory-transfers", schoolId] });
+      toast.success("Transfer requested");
+      setOpen(false); setItemId(""); setToStoreId(""); setNotes("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button size="sm" disabled={!items.length}><Plus className="w-4 h-4 mr-1" />Transfer</Button></DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Request Stock Transfer</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Item *</Label>
+            <Select value={itemId} onValueChange={setItemId}>
+              <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+              <SelectContent>{items.map(i => <SelectItem key={i.id} value={i.id}>{i.name} ({i.current_qty} {i.unit})</SelectItem>)}</SelectContent>
+            </Select>
+            {selectedItem?.is_individually_tracked && (
+              <p className="text-xs text-muted-foreground mt-1">This is an individually-tracked item — transfer a specific unit from the Assets tab instead for per-desk moves. This will move the item's catalog location only.</p>
+            )}
+          </div>
+          <div>
+            <Label>Current Store</Label>
+            <Input disabled value={stores.find((s: any) => s.id === fromStoreId)?.name ?? "Unassigned"} />
+          </div>
+          <div>
+            <Label>Transfer To *</Label>
+            <Select value={toStoreId} onValueChange={setToStoreId}>
+              <SelectTrigger><SelectValue placeholder="Destination store" /></SelectTrigger>
+              <SelectContent>{stores.filter((s: any) => s.id !== fromStoreId).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button disabled={!itemId || !toStoreId || m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Request Transfer"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
