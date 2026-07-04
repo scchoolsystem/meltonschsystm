@@ -78,43 +78,84 @@ async function stripCfChallengeScripts(response: Response): Promise<Response> {
   });
 }
 
-// Content-Security-Policy — allowlist built from the app's actual external
-// dependencies (Supabase, JaaS/8x8 video, font-awesome CDN, QR code images,
-// Unsplash/Google Storage images). M-Pesa/Africa's Talking calls happen
-// server-side only, so they don't need to appear here.
-const CSP = [
-  "default-src 'self'",
-  // TanStack Start/Vite ship inline bootstrap scripts; hashing them per-build
-  // isn't practical here, so 'unsafe-inline' is kept for script-src.
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
-  "font-src 'self' https://cdnjs.cloudflare.com data:",
-  "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://storage.googleapis.com https://api.qrserver.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.safaricom.co.ke https://sandbox.safaricom.co.ke https://api.africastalking.com https://8x8.vc",
-  "frame-src 'self' https://8x8.vc",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-  "upgrade-insecure-requests",
-].join("; ");
+// ─────────────────────────────────────────────────────────────────────────
+// Release download proxy.
+//
+// The source repo is private, so `github.com/.../releases/latest` isn't
+// reachable by anonymous visitors on the public landing page — they'd hit a
+// login wall instead of a download. Rather than mirroring binaries out to a
+// separate public bucket (Supabase or otherwise), the Worker fetches the
+// asset from GitHub server-side (using a fine-grained, read-only token that
+// only the Worker holds) and streams the bytes straight back. Visitors never
+// see github.com or any third-party storage URL — just a file download from
+// smartdev.co.ke.
+// ─────────────────────────────────────────────────────────────────────────
 
-function applySecurityHeaders(response: Response): Response {
-  const headers = new Headers(response.headers);
-  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  headers.set("Content-Security-Policy", CSP);
-  headers.set("X-Frame-Options", "SAMEORIGIN");
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set(
-    "Permissions-Policy",
-    "camera=(self), microphone=(self), geolocation=(), payment=(self), usb=(), interest-cohort=()",
+const RELEASES_GITHUB_REPO = "scchoolsystem/meltonschsystm";
+
+type GithubAsset = { name: string; url: string };
+type GithubRelease = { assets: GithubAsset[] };
+
+function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): GithubAsset | undefined {
+  if (kind === "android") {
+    return assets.find((a) => /\.apk$/i.test(a.name));
+  }
+  return (
+    assets.find((a) => /setup\.exe$/i.test(a.name)) ??
+    assets.find((a) => /\.exe$/i.test(a.name)) ??
+    assets.find((a) => /\.msi$/i.test(a.name))
   );
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
+}
+
+async function handleReleaseDownload(kind: "android" | "windows", env: Env): Promise<Response> {
+  const token = env.RELEASES_GITHUB_TOKEN;
+  if (!token) {
+    console.error("RELEASES_GITHUB_TOKEN is not configured");
+    return new Response("Download is temporarily unavailable.", { status: 503 });
+  }
+
+  const githubHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "smartdev-erp-release-proxy",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  const releaseRes = await fetch(
+    `https://api.github.com/repos/${RELEASES_GITHUB_REPO}/releases/latest`,
+    { headers: githubHeaders },
+  );
+  if (!releaseRes.ok) {
+    console.error(`GitHub releases lookup failed: ${releaseRes.status}`);
+    return new Response("Could not find the latest release.", { status: 502 });
+  }
+  const release = (await releaseRes.json()) as GithubRelease;
+  const asset = pickReleaseAsset(release.assets ?? [], kind);
+  if (!asset) {
+    return new Response("Release asset not found.", { status: 404 });
+  }
+
+  // Fetching the binary requires the assets API URL with an octet-stream
+  // Accept header — the browser_download_url only works for public repos.
+  const assetRes = await fetch(asset.url, {
+    headers: { ...githubHeaders, Accept: "application/octet-stream" },
   });
+  if (!assetRes.ok || !assetRes.body) {
+    console.error(`GitHub asset download failed: ${assetRes.status}`);
+    return new Response("Could not download the release file.", { status: 502 });
+  }
+
+  const headers = new Headers();
+  headers.set(
+    "Content-Type",
+    kind === "android" ? "application/vnd.android.package-archive" : "application/octet-stream",
+  );
+  headers.set("Content-Disposition", `attachment; filename="${asset.name}"`);
+  const contentLength = assetRes.headers.get("content-length");
+  if (contentLength) headers.set("Content-Length", contentLength);
+  headers.set("Cache-Control", "no-store");
+
+  return new Response(assetRes.body, { status: 200, headers });
 }
 
 export default {
@@ -129,15 +170,22 @@ export default {
       }
     }
 
+    const url = new URL(request.url);
+    if (url.pathname === "/dl/android") {
+      return handleReleaseDownload("android", env as Env);
+    }
+    if (url.pathname === "/dl/windows") {
+      return handleReleaseDownload("windows", env as Env);
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response);
-      const stripped = await stripCfChallengeScripts(normalized);
-      return applySecurityHeaders(stripped);
+      return await stripCfChallengeScripts(normalized);
     } catch (error) {
       console.error(error);
-      return applySecurityHeaders(brandedErrorResponse());
+      return brandedErrorResponse();
     }
   },
 };
