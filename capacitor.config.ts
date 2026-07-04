@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'ke.co.smartdev.app',
-  appName: 'SmartDev',
+  appName: 'SmartDev ERP',
   webDir: 'dist/client',
   server: {
     url: 'https://app.smartdev.co.ke',
