@@ -31,7 +31,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, Smartphone, ChevronsUpDown, Check, X, CircleDollarSign } from "lucide-react";
+import { Plus, Loader2, Smartphone, ChevronsUpDown, Check, X, CircleDollarSign, Download, History } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Pager } from "@/components/Pager";
@@ -46,6 +46,17 @@ export const Route = createFileRoute("/_app/finance/invoices")({
 });
 
 const PAGE_SIZE = 50;
+const AGGREGATE_CAP = 5000; // safety cap for totals/export queries that scan the whole filtered set, not just one page
+
+function isOverdue(r: any) {
+  if (!r.due_date || r.status === "paid") return false;
+  return new Date(`${r.due_date}T23:59:59`) < new Date();
+}
+
+function formatDate(d: string | null) {
+  if (!d) return "—";
+  return new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
 
 function Page() {
   const qc = useQueryClient();
@@ -54,6 +65,7 @@ function Page() {
 
   const [open, setOpen] = useState(false);
   const [openPay, setOpenPay] = useState<string | null>(null);
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
   // ── Filters ──
@@ -105,6 +117,92 @@ function Page() {
     setPage(0);
   };
 
+  // Build the same filter chain used everywhere else, so totals/export/select-all
+  // always match what's actually on screen.
+  const applyFilters = (q: any) => {
+    if (status !== "all") q = q.eq("status", status);
+    if (classId !== "all") q = q.eq("students.class_id", classId);
+    if (search.trim()) {
+      const term = search.trim();
+      q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,admission_no.ilike.%${term}%`, { referencedTable: "students" });
+    }
+    return q;
+  };
+
+  // ── Totals for the current filtered set (not just this page) ──
+  const { data: totalsRows } = useQuery({
+    queryKey: ["invoices-totals", search, status, classId],
+    queryFn: async () => {
+      let q = supabase.from("invoices").select("amount, paid, students!inner(class_id)");
+      q = applyFilters(q);
+      const { data, error } = await q.limit(AGGREGATE_CAP);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const totals = useMemo(() => {
+    const list = (totalsRows as any[]) ?? [];
+    const amount = list.reduce((s, r) => s + Number(r.amount), 0);
+    const paid = list.reduce((s, r) => s + Number(r.paid), 0);
+    return { amount, paid, balance: amount - paid, capped: list.length >= AGGREGATE_CAP, count: list.length };
+  }, [totalsRows]);
+
+  // ── CSV export of the current filtered set (not just this page) ──
+  const exportCsv = useMutation({
+    mutationFn: async () => {
+      let q = supabase
+        .from("invoices")
+        .select(
+          "invoice_no, due_date, amount, paid, status, description, students!inner(first_name,last_name,admission_no,class_id), fee_structures(name), class_fee_components(component)"
+        )
+        .order("created_at", { ascending: false });
+      q = applyFilters(q);
+      const { data, error } = await q.limit(AGGREGATE_CAP);
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: (data) => {
+      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const header = ["Invoice #", "Student", "Admission No", "Fee", "Due Date", "Amount", "Paid", "Balance", "Status"];
+      const lines = [header.map(esc).join(",")];
+      (data as any[]).forEach((r) => {
+        const fee =
+          r.description ||
+          r.fee_structures?.name ||
+          (r.class_fee_components?.component ? `${r.class_fee_components.component} (component)` : "");
+        const balance = Number(r.amount) - Number(r.paid);
+        lines.push(
+          [
+            r.invoice_no,
+            `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim(),
+            r.students?.admission_no ?? "",
+            fee,
+            r.due_date ?? "",
+            Number(r.amount).toFixed(2),
+            Number(r.paid).toFixed(2),
+            balance.toFixed(2),
+            r.status,
+          ]
+            .map(esc)
+            .join(",")
+        );
+      });
+      const csv = lines.join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoices-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${data.length} invoice(s) to CSV.`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // ── Bulk selection ──
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const payableRows = (rows as any[]).filter((r) => r.status !== "paid");
@@ -138,11 +236,7 @@ function Page() {
         .from("invoices")
         .select("id, status, students!inner(class_id)")
         .neq("status", "paid");
-      if (classId !== "all") q = q.eq("students.class_id", classId);
-      if (search.trim()) {
-        const term = search.trim();
-        q = q.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,admission_no.ilike.%${term}%`, { referencedTable: "students" });
-      }
+      q = applyFilters(q);
       const { data, error } = await q.limit(2000);
       if (error) throw error;
       return data ?? [];
@@ -165,6 +259,7 @@ function Page() {
       setSelected(new Set());
       setOpenBulkPay(false);
       qc.invalidateQueries({ queryKey: ["invoices"] });
+      qc.invalidateQueries({ queryKey: ["invoices-totals"] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -179,21 +274,32 @@ function Page() {
             {hasFilters ? " (filtered)" : ""}
           </p>
         </div>
-        {can && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />Issue Invoice
-              </Button>
-            </DialogTrigger>
-            <IssueDialog
-              onDone={() => {
-                setOpen(false);
-                qc.invalidateQueries({ queryKey: ["invoices"] });
-              }}
-            />
-          </Dialog>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => exportCsv.mutate()} disabled={exportCsv.isPending || totalCount === 0}>
+            {exportCsv.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            Export CSV
+          </Button>
+          {can && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />Issue Invoice
+                </Button>
+              </DialogTrigger>
+              <IssueDialog
+                onDone={() => {
+                  setOpen(false);
+                  qc.invalidateQueries({ queryKey: ["invoices"] });
+                  qc.invalidateQueries({ queryKey: ["invoices-totals"] });
+                }}
+              />
+            </Dialog>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -252,6 +358,27 @@ function Page() {
               <Button variant="ghost" size="sm" onClick={resetFilters}>
                 <X className="w-3.5 h-3.5 mr-1" />Clear filters
               </Button>
+            )}
+          </div>
+
+          {/* Totals for the current filtered set */}
+          <div className="mt-4 pt-4 border-t flex flex-wrap gap-x-8 gap-y-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">Total billed: </span>
+              <span className="font-mono font-medium">KES {totals.amount.toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Total paid: </span>
+              <span className="font-mono font-medium text-green-500">KES {totals.paid.toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Total balance: </span>
+              <span className="font-mono font-medium text-red-500">KES {totals.balance.toLocaleString()}</span>
+            </div>
+            {totals.capped && (
+              <span className="text-xs text-muted-foreground">
+                (first {AGGREGATE_CAP.toLocaleString()} matching invoices — narrow your filters for an exact total)
+              </span>
             )}
           </div>
         </CardContent>
@@ -350,6 +477,7 @@ function Page() {
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Fee</TableHead>
+                  <TableHead>Due</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead className="text-right">Paid</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -360,13 +488,14 @@ function Page() {
               <TableBody>
                 {rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={can ? 9 : 8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={can ? 10 : 9} className="text-center text-muted-foreground py-8">
                       {hasFilters ? "No invoices match these filters." : "No invoices."}
                     </TableCell>
                   </TableRow>
                 )}
                 {(rows as any[]).map((r) => {
                   const balance = Number(r.amount) - Number(r.paid);
+                  const overdue = isOverdue(r);
                   return (
                     <TableRow key={r.id} className={selected.has(r.id) ? "bg-primary/5" : undefined}>
                       {can && (
@@ -389,6 +518,14 @@ function Page() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {r.description || r.fee_structures?.name || (r.class_fee_components?.component && `${r.class_fee_components.component} (component)`) || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {formatDate(r.due_date)}
+                        {overdue && (
+                          <Badge variant="outline" className="ml-2 bg-red-500/15 text-red-500 border-red-500/30">
+                            overdue
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         KES {Number(r.amount).toLocaleString()}
@@ -413,7 +550,7 @@ function Page() {
                           {r.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="space-x-2">
+                      <TableCell className="space-x-2 whitespace-nowrap">
                         {can && r.status !== "paid" && (
                           <>
                             <Dialog
@@ -431,12 +568,25 @@ function Page() {
                                 onDone={() => {
                                   setOpenPay(null);
                                   qc.invalidateQueries({ queryKey: ["invoices"] });
+                                  qc.invalidateQueries({ queryKey: ["invoices-totals"] });
+                                  qc.invalidateQueries({ queryKey: ["invoice-payments", r.id] });
                                 }}
                               />
                             </Dialog>
                             <StkButton invoiceId={r.id} balance={balance} />
                           </>
                         )}
+                        <Dialog
+                          open={openHistory === r.id}
+                          onOpenChange={(v) => setOpenHistory(v ? r.id : null)}
+                        >
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <History className="w-3.5 h-3.5 mr-1" />History
+                            </Button>
+                          </DialogTrigger>
+                          <HistoryDialog invoiceId={r.id} invoiceNo={r.invoice_no} />
+                        </Dialog>
                       </TableCell>
                     </TableRow>
                   );
@@ -448,6 +598,46 @@ function Page() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Payment history dialog ─────────────────────────────────────
+function HistoryDialog({ invoiceId, invoiceNo }: { invoiceId: string; invoiceNo: string }) {
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: ["invoice-payments", invoiceId],
+    queryFn: async () =>
+      (await supabase.from("payments").select("*").eq("invoice_id", invoiceId).order("paid_on", { ascending: false })).data ?? [],
+  });
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Payment History — {invoiceNo}</DialogTitle>
+      </DialogHeader>
+      {isLoading ? (
+        <div className="h-24 grid place-items-center">
+          <Loader2 className="animate-spin" />
+        </div>
+      ) : (payments as any[]).length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4">No payments recorded yet.</p>
+      ) : (
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {(payments as any[]).map((p) => (
+            <div key={p.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+              <div>
+                <div className="font-medium font-mono">KES {Number(p.amount).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">
+                  {p.method}
+                  {p.reference ? ` · ${p.reference}` : ""}
+                  {p.receipt_no ? ` · ${p.receipt_no}` : ""}
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(p.paid_on)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </DialogContent>
   );
 }
 
