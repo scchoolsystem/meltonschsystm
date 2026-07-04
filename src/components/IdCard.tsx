@@ -51,7 +51,15 @@ export function IdCard({ schoolName, kind, uniqueId, fullName, subtitle, photoUr
       </div>
 
       <div className="absolute top-16 right-3 w-[78px] h-[78px] bg-white p-1 rounded-md border">
-        <QRCodeSVG value={uniqueId} size={70} level="M" />
+        <QRCodeSVG
+          value={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/ids/verify?code=${encodeURIComponent(uniqueId)}`
+              : uniqueId
+          }
+          size={70}
+          level="M"
+        />
       </div>
 
       <div className="absolute bottom-1 inset-x-3 flex items-center justify-between text-[8px] text-muted-foreground">
