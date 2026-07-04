@@ -6,12 +6,13 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 // Unlike /_app/ids/verify, this has NO auth middleware — it's meant to be
 // hit straight from a QR code by anyone's camera, no login required.
 //
-// Because of that, it deliberately returns a SMALLER set of fields than
-// the logged-in verify page: enough to confirm identity + eligibility
-// (name, photo, class/stream, admission/employee no, active status), but
-// NOT medical notes, parent contact info, home address, or staff phone/
-// email — those stay behind login since this endpoint is open to the
-// public internet.
+// This intentionally returns full identity + emergency-relevant details
+// (medical notes, guardian contact, gender/DOB for students; phone/email
+// for staff) so that if a student is lost or hurt, whoever finds them can
+// act on it immediately without needing an account. Because this is
+// reachable by anyone with the QR code, this data is effectively public —
+// that's a deliberate tradeoff for the "lost/injured child" use case, not
+// an oversight.
 
 const inputSchema = z.object({
   code: z.string().trim().min(3).max(40),
@@ -33,9 +34,17 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         admission_no,
         status,
         photo_url,
+        gender,
+        date_of_birth,
+        admitted_on,
+        medical_notes,
+        address,
+        parent_name,
+        parent_phone,
+        parent_email,
         school_id,
-        classes:class_id(name, stream),
-        schools:school_id(name, logo_url, motto)
+        classes:class_id(name, stream, level, year),
+        schools:school_id(name, logo_url, motto, phone, email, address, academic_year, current_term)
       `
       )
       .eq("unique_id", code)
@@ -44,17 +53,38 @@ export const publicVerifyId = createServerFn({ method: "GET" })
 
     if (stu) {
       const school = stu.schools as any;
+      const cls = stu.classes as any;
       return {
         kind: "student" as const,
         name: stu.full_name,
         uniqueId: stu.unique_id,
         admissionNo: stu.admission_no,
         photo: stu.photo_url ?? null,
-        className: (stu.classes as any)?.name ?? null,
-        stream: (stu.classes as any)?.stream ?? null,
+        gender: stu.gender ?? null,
+        dob: stu.date_of_birth ?? null,
+        admittedOn: stu.admitted_on ?? null,
+        status: stu.status,
+        className: cls?.name ?? null,
+        stream: cls?.stream ?? null,
+        level: cls?.level ?? null,
+        classYear: cls?.year ?? null,
         active: stu.status === "active",
+        medicalNotes: stu.medical_notes ?? null,
+        address: stu.address ?? null,
+        guardian: stu.parent_name
+          ? { name: stu.parent_name, phone: stu.parent_phone ?? null, email: stu.parent_email ?? null }
+          : null,
         school: school
-          ? { name: school.name, logo: school.logo_url ?? null, motto: school.motto ?? null }
+          ? {
+              name: school.name,
+              logo: school.logo_url ?? null,
+              motto: school.motto ?? null,
+              phone: school.phone ?? null,
+              email: school.email ?? null,
+              address: school.address ?? null,
+              academicYear: school.academic_year ?? null,
+              currentTerm: school.current_term ?? null,
+            }
           : null,
         verifiedAt,
       };
@@ -73,8 +103,12 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         photo_url,
         role,
         department,
+        phone,
+        email,
+        gender,
+        hire_date,
         school_id,
-        schools:school_id(name, logo_url, motto)
+        schools:school_id(name, logo_url, motto, phone, email, address, academic_year, current_term)
       `
       )
       .eq("unique_id", code)
@@ -89,11 +123,25 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         uniqueId: staff.unique_id,
         employeeNo: staff.employee_no,
         photo: staff.photo_url ?? null,
+        gender: staff.gender ?? null,
         role: staff.role ?? null,
         department: staff.department ?? null,
+        phone: staff.phone ?? null,
+        email: staff.email ?? null,
+        hireDate: staff.hire_date ?? null,
+        status: staff.status,
         active: staff.status === "active",
         school: school
-          ? { name: school.name, logo: school.logo_url ?? null, motto: school.motto ?? null }
+          ? {
+              name: school.name,
+              logo: school.logo_url ?? null,
+              motto: school.motto ?? null,
+              phone: school.phone ?? null,
+              email: school.email ?? null,
+              address: school.address ?? null,
+              academicYear: school.academic_year ?? null,
+              currentTerm: school.current_term ?? null,
+            }
           : null,
         verifiedAt,
       };
