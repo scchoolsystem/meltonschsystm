@@ -21,6 +21,7 @@ export const publicVerifyId = createServerFn({ method: "GET" })
   .inputValidator((input) => inputSchema.parse(input))
   .handler(async ({ data }) => {
     const code = data.code.trim().toUpperCase();
+    const verifiedAt = new Date().toISOString();
 
     // ── Try student first ──
     const { data: stu, error: stuErr } = await supabaseAdmin
@@ -32,7 +33,9 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         admission_no,
         status,
         photo_url,
-        classes:class_id(name, stream)
+        school_id,
+        classes:class_id(name, stream),
+        schools:school_id(name, logo_url, motto)
       `
       )
       .eq("unique_id", code)
@@ -40,6 +43,7 @@ export const publicVerifyId = createServerFn({ method: "GET" })
     if (stuErr) throw new Error(stuErr.message);
 
     if (stu) {
+      const school = stu.schools as any;
       return {
         kind: "student" as const,
         name: stu.full_name,
@@ -49,6 +53,10 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         className: (stu.classes as any)?.name ?? null,
         stream: (stu.classes as any)?.stream ?? null,
         active: stu.status === "active",
+        school: school
+          ? { name: school.name, logo: school.logo_url ?? null, motto: school.motto ?? null }
+          : null,
+        verifiedAt,
       };
     }
 
@@ -64,7 +72,9 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         status,
         photo_url,
         role,
-        department
+        department,
+        school_id,
+        schools:school_id(name, logo_url, motto)
       `
       )
       .eq("unique_id", code)
@@ -72,6 +82,7 @@ export const publicVerifyId = createServerFn({ method: "GET" })
     if (staffErr) throw new Error(staffErr.message);
 
     if (staff) {
+      const school = staff.schools as any;
       return {
         kind: "staff" as const,
         name: `${staff.first_name ?? ""} ${staff.last_name ?? ""}`.trim(),
@@ -81,6 +92,10 @@ export const publicVerifyId = createServerFn({ method: "GET" })
         role: staff.role ?? null,
         department: staff.department ?? null,
         active: staff.status === "active",
+        school: school
+          ? { name: school.name, logo: school.logo_url ?? null, motto: school.motto ?? null }
+          : null,
+        verifiedAt,
       };
     }
 
