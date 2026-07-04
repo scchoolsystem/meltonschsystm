@@ -31,9 +31,14 @@ export const Route = createFileRoute("/")({
   component: IndexPage,
 });
 
-const GITHUB_REPO = "scchoolsystem/meltonschsystm";
-const APK_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download/app-release.apk`;
-const WINDOWS_RELEASES_PAGE = `https://github.com/${GITHUB_REPO}/releases/latest`;
+// Binaries are downloaded through same-origin Worker routes (see
+// src/server.ts) rather than linking to github.com/.../releases or a
+// third-party storage bucket. The repo is private, so a direct GitHub link
+// would 404/redirect to a login page for anonymous visitors; the Worker
+// route fetches the latest release asset server-side and streams it back,
+// so visitors just get a file download from this domain.
+const APK_URL = "/dl/android";
+const WINDOWS_EXE_URL = "/dl/windows";
 
 // Defaults used until the editable site content loads (and as a safety net
 // if any field is left blank in the admin panel). The platform owner edits
@@ -110,30 +115,6 @@ function useGalleryPhotos(placement: string, fallback: { src: string; caption?: 
   return data && data.length > 0 ? data : fallback;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Direct Windows desktop download — resolves the real installer asset from
-// the GitHub Releases API so the button downloads the .exe immediately
-// instead of sending people to the releases page to click around.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function useWindowsDownloadUrl() {
-  const { data } = useQuery({
-    queryKey: ["github-latest-release", GITHUB_REPO],
-    queryFn: async () => {
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-      if (!res.ok) return null;
-      const json = await res.json();
-      const assets: { name: string; browser_download_url: string }[] = json?.assets ?? [];
-      const exe = assets.find((a) => /\.exe$/i.test(a.name) || /setup\.exe$/i.test(a.name));
-      const msi = assets.find((a) => /\.msi$/i.test(a.name));
-      return (exe ?? msi)?.browser_download_url ?? null;
-    },
-    staleTime: 10 * 60 * 1000,
-    retry: false,
-  });
-  return data ?? null;
-}
-
 function getOS() {
   const ua = navigator.userAgent;
   if (/android/i.test(ua)) return "android";
@@ -178,22 +159,19 @@ function IndexPage() {
 function DownloadButton({ size = "lg" }: { size?: "sm" | "lg" }) {
   const [os, setOs] = useState("other");
   useEffect(() => { setOs(getOS()); }, []);
-  const windowsDirectUrl = useWindowsDownloadUrl();
-  const windowsHref = windowsDirectUrl ?? WINDOWS_RELEASES_PAGE;
-  const windowsIsDirect = Boolean(windowsDirectUrl);
 
   if (os === "android") return (
     <a href={APK_URL}><Button size={size} className="gap-2 bg-green-600 hover:bg-green-700 text-white"><Smartphone className="w-5 h-5" /> Download for Android</Button></a>
   );
   if (os === "windows") return (
-    <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"}>
+    <a href={WINDOWS_EXE_URL}>
       <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Download for Windows</Button>
     </a>
   );
   return (
     <div className="flex flex-wrap justify-center gap-3">
       <a href={APK_URL}><Button size={size} className="gap-2 bg-green-600 hover:bg-green-700 text-white"><Smartphone className="w-5 h-5" /> Android APK</Button></a>
-      <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"}>
+      <a href={WINDOWS_EXE_URL}>
         <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Windows Desktop</Button>
       </a>
     </div>
@@ -1113,9 +1091,6 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
-  const windowsDirectUrl = useWindowsDownloadUrl();
-  const windowsHref = windowsDirectUrl ?? WINDOWS_RELEASES_PAGE;
-  const windowsIsDirect = Boolean(windowsDirectUrl);
   const dl = useLandingContent("download_page", {
     heading: "Download SmartDev",
     subheading: "Install on Android or Windows. Log in with your school credentials to get started immediately.",
@@ -1139,7 +1114,7 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
               <div className="text-sm text-muted-foreground mt-1">Android 8.0 and above</div>
             </div>
             <ul className="text-sm text-left w-full space-y-2">
-              {["Works on all Android phones & tablets","Native push notifications","Offline mode for limited internet areas","Optimised for small screens","Auto-updates from GitHub releases"].map(f => (
+              {["Works on all Android phones & tablets","Native push notifications","Offline mode for limited internet areas","Optimised for small screens","Regularly updated with new features"].map(f => (
                 <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-600 shrink-0" />{f}</li>
               ))}
             </ul>
@@ -1164,12 +1139,12 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
                 <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />{f}</li>
               ))}
             </ul>
-            <a href={windowsHref} target={windowsIsDirect ? undefined : "_blank"} rel={windowsIsDirect ? undefined : "noreferrer"} className="w-full">
+            <a href={WINDOWS_EXE_URL} className="w-full">
               <Button className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white text-base py-6">
                 <Download className="w-5 h-5" /> Download for Windows
               </Button>
             </a>
-            <p className="text-xs text-muted-foreground">{windowsIsDirect ? "Direct download — run the installer and follow the setup wizard." : "Opens the latest release — download the .exe or .msi and run it."}</p>
+            <p className="text-xs text-muted-foreground">Direct download — run the installer and follow the setup wizard.</p>
           </div>
         </div>
 
