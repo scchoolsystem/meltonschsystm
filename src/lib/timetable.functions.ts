@@ -543,7 +543,111 @@ export const generateTimetable = createServerFn({ method: "POST" })
         const groupPseudoId = `elective:${groupKey}`; // its own key in the day/period-repeat trackers
         let placedForGroup = 0;
 
-        for (let unit = 0; unit < lessonsNeeded; unit++) {
+        // Doubles inside an elective group: options don't have to agree.
+        // A "double" and a "single" option can share the exact same two
+        // consecutive periods perfectly well — the double option (e.g.
+        // Physics) gets one real double lesson (same teacher, both periods);
+        // any single-only option (e.g. CRE) just gets two of its ordinary
+        // single lessons landing back-to-back at those same two periods.
+        // Either way every option is "present" at both periods, so the
+        // class stays correctly marked busy the whole time. This only
+        // triggers if AT LEAST ONE option actually wants a double — if none
+        // do, skip straight to the per-unit single loop below.
+        const wantsDouble = optionTeachers.filter((o) => o.demand.allow_double && o.demand.lessons >= 2);
+
+        if (wantsDouble.length > 0) {
+          type GroupDoubleCandidate = { day: number; pi: number; score: number };
+          let best: GroupDoubleCandidate | null = null;
+          let bestNoRepeat: GroupDoubleCandidate | null = null;
+
+          for (const day of allDays) {
+            const dayPeriods = periodsByDay.get(day)!;
+            const todayCount = daySubjectCount.get(day)!.get(groupPseudoId) ?? 0;
+            for (let pi = 0; pi < dayPeriods.length - 1; pi++) {
+              const p1 = dayPeriods[pi], p2 = dayPeriods[pi + 1];
+              if (!isAdjacent(p1, p2)) continue;
+              const k1 = slotKey(p1.day_of_week, p1.start_time), k2 = slotKey(p2.day_of_week, p2.start_time);
+              if (!isClassFreeAt(k1) || !isClassFreeAt(k2)) continue;
+
+              // Every option's teacher — double-wanting or single-only —
+              // must be free for BOTH periods, since single-only options
+              // will teach two separate lessons back-to-back here.
+              const allTeachersFreeBoth = optionTeachers.every((o) => {
+                const t = o.teacherId!;
+                if (!isTeacherFree(t, day, p1.period_index, k1)) return false;
+                const u2check = ensureUsage(k2);
+                if (u2check.teachers.has(t) || unavailable.get(t)?.has(`${day}-${p2.period_index}`)) return false;
+                if (loadOn(t, day) + 2 > data.maxLessonsPerTeacherPerDay) return false;
+                return true;
+              });
+              if (!allTeachersFreeBoth) continue;
+
+              const u1 = ensureUsage(k1), u2 = ensureUsage(k2);
+              const freeRoomsBoth = rooms.filter((rm) => !u1.rooms.has(rm.id) && !u2.rooms.has(rm.id)).length;
+              if (freeRoomsBoth < options.length) continue;
+
+              let score = 0;
+              if (PREFERRED_DOUBLE_STARTS.has(p1.period_index)) score += 10;
+              score -= optionTeachers.reduce((sum, o) => sum + loadOn(o.teacherId!, day), 0) * 2;
+              score -= periodIndexRepeatCount(groupPseudoId, p1.period_index) * 6;
+              const usedDays = weekSubjectDays.get(groupPseudoId);
+              if (usedDays?.size) {
+                const minGap = Math.min(...Array.from(usedDays).map((ud) => Math.abs(ud - day)));
+                score += Math.min(minGap, 3) * 2;
+              }
+
+              const cand: GroupDoubleCandidate = { day, pi, score };
+              if (!best || cand.score > best.score) best = cand;
+              if (todayCount === 0 && (!bestNoRepeat || cand.score > bestNoRepeat.score)) bestNoRepeat = cand;
+            }
+          }
+
+          const chosen = bestNoRepeat ?? best;
+          if (!chosen) {
+            conflicts.push(
+              `${classNames.get(classId)}: elective group "${groupKey}" — no shared double slot for all options; ${options.filter((o) => o.allow_double).map((o) => subjectMap.get(o.subject_id)?.name ?? o.subject_id).join("/")} will be scheduled as singles instead this run.`
+            );
+          } else {
+            const dayPeriods = periodsByDay.get(chosen.day)!;
+            const p1 = dayPeriods[chosen.pi], p2 = dayPeriods[chosen.pi + 1];
+            const k1 = slotKey(p1.day_of_week, p1.start_time), k2 = slotKey(p2.day_of_week, p2.start_time);
+            const u1 = ensureUsage(k1), u2 = ensureUsage(k2);
+
+            for (const o of optionTeachers) {
+              const room1 = pickRoom(o.demand.subject_id, classId, k1, o.demand.preferred_room_id);
+              u1.teachers.add(o.teacherId!); u1.classes.add(classId); if (room1.id) u1.rooms.add(room1.id);
+              bumpLoad(o.teacherId!, chosen.day);
+              inserts.push({
+                class_id: classId, subject_id: o.demand.subject_id, teacher_id: o.teacherId,
+                day_of_week: p1.day_of_week, start_time: p1.start_time, end_time: p1.end_time,
+                room: room1.name, room_id: room1.id, period_template_id: p1.id, school_id: schoolId,
+                elective_group: groupKey,
+              });
+
+              const room2 = pickRoom(o.demand.subject_id, classId, k2, o.demand.preferred_room_id);
+              u2.teachers.add(o.teacherId!); u2.classes.add(classId); if (room2.id) u2.rooms.add(room2.id);
+              bumpLoad(o.teacherId!, chosen.day);
+              inserts.push({
+                class_id: classId, subject_id: o.demand.subject_id, teacher_id: o.teacherId,
+                day_of_week: p2.day_of_week, start_time: p2.start_time, end_time: p2.end_time,
+                room: room2.name, room_id: room2.id, period_template_id: p2.id, school_id: schoolId,
+                elective_group: groupKey,
+              });
+            }
+
+            markSubjectPeriod(chosen.day, groupPseudoId, p1.period_index);
+            markSubjectPeriod(chosen.day, groupPseudoId, p2.period_index);
+            bumpPeriodIndexUsage(groupPseudoId, p1.period_index);
+            bumpPeriodIndexUsage(groupPseudoId, p2.period_index);
+            const dc = daySubjectCount.get(chosen.day)!;
+            dc.set(groupPseudoId, (dc.get(groupPseudoId) ?? 0) + 2);
+            const wdays = weekSubjectDays.get(groupPseudoId) ?? new Set<number>();
+            wdays.add(chosen.day); weekSubjectDays.set(groupPseudoId, wdays);
+            placedForGroup += 2;
+          }
+        }
+
+        for (let unit = placedForGroup; unit < lessonsNeeded; unit++) {
           type GroupCandidate = { day: number; period: Period; score: number };
           let best: GroupCandidate | null = null;
           let bestNoRepeat: GroupCandidate | null = null;
