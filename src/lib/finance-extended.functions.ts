@@ -448,30 +448,45 @@ export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
     let updated = 0;
     let skipped = 0;
 
-    // For each invoice, add a payment equal to remaining balance and update status
-    for (const inv of invoices) {
-      const balance = Number(inv.amount) - Number(inv.paid || 0);
-      if (balance <= 0) { skipped++; continue; } // already fully paid
+    // Work out which invoices actually need a payment.
+    const eligible = invoices.filter(
+      (inv) => Number(inv.amount) - Number(inv.paid || 0) > 0
+    );
+    skipped = invoices.length - eligible.length;
 
-      // Insert payment (receipt_no set by DB trigger)
-      const { error: payErr } = await supabaseAdmin.from("payments").insert({
+    if (eligible.length > 0) {
+      // Insert all payments in ONE request instead of one-per-invoice.
+      // Looping with an individual insert + update per invoice was firing
+      // 2 subrequests per invoice from this Worker function — with enough
+      // invoices selected that blew past Cloudflare's per-invocation
+      // subrequest limit ("Too many subrequests by single Worker
+      // invocation"). Batching keeps this at a fixed, small number of
+      // subrequests no matter how many invoices are selected.
+      const paymentsRows = eligible.map((inv) => ({
         invoice_id: inv.id,
-        amount: balance,
+        amount: Number(inv.amount) - Number(inv.paid || 0),
         method,
         reference: data.reference ?? null,
         paid_on: paidOn,
-      } as any);
+      }));
+      const { error: payErr } = await supabaseAdmin.from("payments").insert(paymentsRows as any);
       if (payErr) throw new Error(payErr.message);
 
-      // Update invoice paid / status
-      const newPaid = Number(inv.paid || 0) + balance;
-      const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
+      // Update all invoices in ONE request via bulk upsert (each row's id
+      // already exists, so this always takes the DO UPDATE path — it
+      // never inserts a fresh row).
+      const invoiceRows = eligible.map((inv) => {
+        const balance = Number(inv.amount) - Number(inv.paid || 0);
+        const newPaid = Number(inv.paid || 0) + balance;
+        const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
+        return { id: inv.id, paid: newPaid, status: newStatus };
+      });
       const { error: updErr } = await supabaseAdmin
         .from("invoices")
-        .update({ paid: newPaid, status: newStatus } as any)
-        .eq("id", inv.id);
+        .upsert(invoiceRows as any, { onConflict: "id" });
       if (updErr) throw new Error(updErr.message);
-      updated++;
+
+      updated = eligible.length;
     }
 
     return { updated, skipped };
