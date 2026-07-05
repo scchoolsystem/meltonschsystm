@@ -89,11 +89,15 @@ function MyWorkspace() {
       const staffId = (staff as any)?.id ?? null;
 
       const [
-        myClasses, todayTT, weekTT, subjects, activities,
+        classTeacherOf, subjectTaughtSlots, todayTT, weekTT, subjects, activities,
         recentMarks, recentAttendance, announcements, activeExams,
       ] = await Promise.all([
         staffId
           ? supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId)
+          : Promise.resolve({ data: [] }),
+        // Classes this teacher only teaches a subject in (not the class teacher)
+        staffId
+          ? supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId)
           : Promise.resolve({ data: [] }),
         staffId
           ? supabase.from("timetable_slots")
@@ -125,7 +129,20 @@ function MyWorkspace() {
         supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }),
       ]);
 
-      const myClassesData = myClasses.data ?? [];
+      // Merge class-teacher classes with subject-taught classes (dedupe by id),
+      // tagging each so a class teacher gets the full attendance breakdown
+      // and a subject-only teacher gets a general count.
+      const classTeacherIds = new Set((classTeacherOf.data ?? []).map((c: any) => c.id));
+      const mergedClassesMap = new Map<string, any>();
+      (classTeacherOf.data ?? []).forEach((c: any) => mergedClassesMap.set(c.id, c));
+      (subjectTaughtSlots.data ?? []).forEach((s: any) => {
+        const c = s.classes;
+        if (c && !mergedClassesMap.has(c.id)) mergedClassesMap.set(c.id, c);
+      });
+      const myClassesData = Array.from(mergedClassesMap.values()).map((c: any) => ({
+        ...c,
+        isClassTeacher: classTeacherIds.has(c.id),
+      }));
       const classIds = myClassesData.map((c: any) => c.id);
       const totalStudentsCount = myClassesData.reduce((s: number, c: any) => s + (c.students?.[0]?.count ?? 0), 0);
 
@@ -138,10 +155,12 @@ function MyWorkspace() {
         return {
           classId: c.id,
           className: c.name,
+          isClassTeacher: c.isClassTeacher,
           total: c.students?.[0]?.count ?? 0,
           present: recs.filter((r: any) => r.status === "present").length,
           absent: recs.filter((r: any) => r.status === "absent").length,
           late: recs.filter((r: any) => r.status === "late").length,
+          marked: recs.length,
         };
       });
 
@@ -283,17 +302,20 @@ function MyWorkspace() {
         </TabsContent>
 
         <TabsContent value="myclasses">
-          <Card><CardHeader><CardTitle className="text-base">My classes</CardTitle></CardHeader>
+          <Card><CardHeader><CardTitle className="text-base">My classes</CardTitle><CardDescription>Classes you're the class teacher of, or teach a subject in. Click one to open its full subject and student list.</CardDescription></CardHeader>
             <CardContent className="space-y-1">
               {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
               {data?.myClasses.map((c: any) => (
-                <div key={c.id} className="flex items-center justify-between border-b py-2 text-sm">
+                <Link key={c.id} to="/classes" className="flex items-center justify-between border-b py-2 text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
                   <div>
                     <div className="font-medium">{c.name}</div>
                     <div className="text-xs text-muted-foreground">{c.level ?? "—"}{c.stream ? ` · ${c.stream}` : ""}</div>
                   </div>
-                  <Badge variant="secondary">{c.students?.[0]?.count ?? 0} students</Badge>
-                </div>
+                  <div className="flex items-center gap-2">
+                    {c.isClassTeacher && <Badge>Class teacher</Badge>}
+                    <Badge variant="secondary">{c.students?.[0]?.count ?? 0} students</Badge>
+                  </div>
+                </Link>
               ))}
             </CardContent>
           </Card>
@@ -383,18 +405,30 @@ function MyWorkspace() {
         </TabsContent>
 
         <TabsContent value="attendance">
-          <Card><CardHeader><CardTitle className="text-base">Today's attendance — my classes</CardTitle></CardHeader>
+          <Card><CardHeader><CardTitle className="text-base">Today's attendance — my classes</CardTitle>
+            <CardDescription>As class teacher you see the full breakdown; for classes where you only teach a subject you see a general count.</CardDescription>
+          </CardHeader>
             <CardContent className="space-y-1">
               {(data?.attendanceSummary ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
               {data?.attendanceSummary.map((s: any) => (
                 <div key={s.classId} className="flex items-center justify-between border-b py-2 text-sm">
-                  <div className="font-medium">{s.className}</div>
-                  <div className="flex gap-2 text-xs">
-                    <Badge variant="outline">{s.total} total</Badge>
-                    <Badge variant="default">{s.present} present</Badge>
-                    <Badge variant="destructive">{s.absent} absent</Badge>
-                    <Badge variant="secondary">{s.late} late</Badge>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{s.className}</span>
+                    {s.isClassTeacher && <Badge variant="outline" className="text-[10px]">Overall — class teacher</Badge>}
                   </div>
+                  {s.isClassTeacher ? (
+                    <div className="flex gap-2 text-xs">
+                      <Badge variant="outline">{s.total} total</Badge>
+                      <Badge variant="default">{s.present} present</Badge>
+                      <Badge variant="destructive">{s.absent} absent</Badge>
+                      <Badge variant="secondary">{s.late} late</Badge>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 text-xs">
+                      <Badge variant="outline">{s.marked}/{s.total} marked</Badge>
+                      <Badge variant="default">{s.present} present</Badge>
+                    </div>
+                  )}
                 </div>
               ))}
             </CardContent>
