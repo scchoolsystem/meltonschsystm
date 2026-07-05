@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useTenant } from "@/hooks/use-tenant";
+import { useTenant, isTauri } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,11 +13,10 @@ type SchoolRow = { id: string; slug: string; name: string; logo_url: string | nu
 
 export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }) {
   const { setSchoolSlug } = useTenant();
-  // Auto-open on Tauri desktop — user has no subdomain to resolve from
-  const isDesktop = typeof window !== "undefined" && (
-    (window as any).__TAURI__ !== undefined ||
-    (window as any).__TAURI_INTERNALS__ !== undefined
-  );
+  // Auto-open on Tauri desktop — user has no subdomain to resolve from.
+  // Uses the shared isTauri() check (also covers the tauri:// / tauri.localhost
+  // protocol fallback) so this never disagrees with IndexPage's own native check.
+  const isDesktop = isTauri();
   const [open, setOpen] = useState(isDesktop);
   const [schools, setSchools] = useState<SchoolRow[]>([]);
   const [filtered, setFiltered] = useState<SchoolRow[]>([]);
@@ -66,8 +65,18 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
 
   const pick = async (slug: string) => {
     setSelecting(slug);
-    await setSchoolSlug(slug);
-    onPicked?.(slug);
+    setDebugError(null);
+    const timedOut = new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error("Selecting this school timed out. Check your internet connection and try again.")), 20000);
+    });
+    try {
+      await Promise.race([setSchoolSlug(slug), timedOut]);
+      onPicked?.(slug);
+    } catch (e: any) {
+      setDebugError(e?.message ?? "Could not select this school. Please try again.");
+    } finally {
+      setSelecting(null);
+    }
   };
 
   return (
