@@ -96,6 +96,25 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     "discipline_admin", "hod", "guidance_admin",
   ],
 
+  // Dedicated analytics permissions (one per module — separate from the
+  // module's own access permission, per the "View X Analytics" pattern).
+  // Seeded from the exact role lists that were previously hardcoded inline
+  // in _app.analytics.tsx's ALL_TABS, so existing users see zero change.
+  // Gated behind the "analytics" key above at the route level; these control
+  // which tabs render once inside the page.
+  "analytics.academics": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user"],
+  "analytics.finance": [...ADMIN_ROLES, "bursar", "finance_admin", "finance_user"],
+  "analytics.library": [...ADMIN_ROLES, "librarian", "library_admin", "library_user"],
+  "analytics.kitchen": [...ADMIN_ROLES, "kitchen_admin", "kitchen_user"],
+  "analytics.store": [...ADMIN_ROLES, "store_admin", "store_user"],
+  "analytics.transport": [...ADMIN_ROLES, "transport_admin", "transport_officer"],
+  "analytics.clinic": [...ADMIN_ROLES, "nurse", "clinic_admin", "clinic_user", "matron"],
+  "analytics.security": [...ADMIN_ROLES, "security_admin", "security_user"],
+  "analytics.sports": [...ADMIN_ROLES, "sports_admin", "sports_user", "sports"],
+  // New in this phase — these tabs didn't exist before.
+  "analytics.discipline": [...ADMIN_ROLES, "discipline_admin", "guidance_admin", "class_teacher"],
+  "analytics.boarding": [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
+
   // Operations
   // Wave 2: parent allowed (RLS scopes to own children's invoices only).
   finance: [...ADMIN_ROLES, "bursar", "finance_admin", "finance_user", "parent"],
