@@ -122,6 +122,7 @@ function StatCard({ icon, label, value, suffix = "", rawValue, hint }: {
 // ── Main portal ───────────────────────────────────────────────────────────────
 function ParentPortal() {
   const { user, fullName } = useAuth();
+  const { tab: tabFromUrl } = Route.useSearch() as { tab?: string };
   const [children, setChildren] = useState<any[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [data, setData] = useState<any>({
@@ -131,7 +132,8 @@ function ParentPortal() {
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // Sidebar links land here as e.g. /portal/parent?tab=attendance — honor it.
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
