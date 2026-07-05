@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CalendarDays, BookOpen, ClipboardList, Megaphone, Users,
   Mail, Phone, Building2, IdCard, Loader2, CheckCircle2, AlertCircle, XCircle,
+  ArrowRight, GraduationCap, UserCircle2,
 } from "lucide-react";
 
 function PayslipsTab({ staffId }: { staffId?: string }) {
@@ -248,6 +249,44 @@ function MyWorkspace() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Multi-role merge: a staff member who is also a parent (or, rarer,
+          also a student) gets a quick-access card into that other portal
+          right here, instead of only ever seeing their staff workspace. */}
+      {(hasRole("parent") || hasRole("student")) && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {hasRole("parent") && (
+            <Link
+              to="/portal/parent"
+              className="flex items-center justify-between gap-3 rounded-xl border p-4 hover:bg-muted/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <UserCircle2 className="w-5 h-5 text-primary" />
+                <div>
+                  <div className="font-medium text-sm">Your Parent Portal</div>
+                  <div className="text-xs text-muted-foreground">Your children's fees, attendance & reports</div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          )}
+          {hasRole("student") && (
+            <Link
+              to="/portal/student"
+              className="flex items-center justify-between gap-3 rounded-xl border p-4 hover:bg-muted/40 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                <div>
+                  <div className="font-medium text-sm">Your Student Portal</div>
+                  <div className="text-xs text-muted-foreground">Your own results, timetable & fees</div>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Up next */}
       {upNext && (
