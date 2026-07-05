@@ -226,6 +226,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Night Attendance", url: "/boarding/attendance" },
       { title: "Students", url: "/students" },
       { title: "Clinic", url: "/clinic" },
+      { title: "Analytics", url: "/analytics" },
       { title: "Announcements", url: "/announcements" },
     ]},
   ],
