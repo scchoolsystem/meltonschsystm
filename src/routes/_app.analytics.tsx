@@ -13,37 +13,58 @@ import {
 import {
   TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles,
   Activity, Library, Utensils, Package, Bus, Stethoscope, ShieldCheck,
-  Trophy, BookOpen, DollarSign,
+  Trophy, BookOpen, DollarSign, ShieldAlert, Building2,
 } from "lucide-react";
 import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalyticsPanel";
 import type { AppRole } from "@/core/rbac";
+import { ANALYTICS_MODULES, getVisibleAnalyticsModules, type AnalyticsModuleKey } from "@/core/rbac/analytics";
 
 export const Route = createFileRoute("/_app/analytics")({ component: Analytics });
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
-const ALL_TABS = [
-  { key: "overview",    label: "Overview",     icon: TrendingUp,    roles: [] },          // all
-  { key: "academics",   label: "Academics",    icon: GraduationCap, roles: ["teacher","class_teacher","subject_teacher","hod","academic_master","exams_admin","exams_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "finance",     label: "Finance",      icon: DollarSign,    roles: ["bursar","finance_admin","finance_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "library",     label: "Library",      icon: Library,       roles: ["librarian","library_admin","library_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "kitchen",     label: "Kitchen",      icon: Utensils,      roles: ["kitchen_admin","kitchen_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "store",       label: "Store",        icon: Package,       roles: ["store_admin","store_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "transport",   label: "Transport",    icon: Bus,           roles: ["transport_admin","transport_officer","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "clinic",      label: "Clinic",       icon: Stethoscope,   roles: ["nurse","clinic_admin","clinic_user","matron","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "security",    label: "Security",     icon: ShieldCheck,   roles: ["security_admin","security_user","principal","deputy_principal","school_admin","super_admin"] },
-  { key: "sports",      label: "Sports",       icon: Trophy,        roles: ["sports_admin","sports_user","sports","principal","deputy_principal","school_admin","super_admin"] },
-];
+// Visibility now comes from the ANALYTICS_MODULES registry (core/rbac/analytics.ts),
+// which checks a dedicated "analytics.<module>" permission per module instead of
+// hardcoded role arrays here. Icons and rendered components still live with the
+// route since they're presentation, not access-control, concerns.
+const TAB_ICONS: Record<AnalyticsModuleKey, React.ComponentType<{ className?: string }>> = {
+  overview: TrendingUp,
+  academics: GraduationCap,
+  finance: DollarSign,
+  library: Library,
+  kitchen: Utensils,
+  store: Package,
+  transport: Bus,
+  clinic: Stethoscope,
+  security: ShieldCheck,
+  sports: Trophy,
+  discipline: ShieldAlert,
+  boarding: Building2,
+};
+
+const TAB_COMPONENTS: Record<AnalyticsModuleKey, React.ComponentType> = {
+  overview: OverviewTab,
+  academics: AcademicsTab,
+  finance: FinanceTab,
+  library: LibraryTab,
+  kitchen: KitchenTab,
+  store: StoreTab,
+  transport: TransportTab,
+  clinic: ClinicTab,
+  security: SecurityTab,
+  sports: SportsTab,
+  discipline: DisciplineTab,
+  boarding: BoardingTab,
+};
 
 function Analytics() {
   const { roles } = useAuth();
   const userRoles = (roles ?? []) as AppRole[];
 
-  const visibleTabs = ALL_TABS.filter(
-    (t) => t.roles.length === 0 || t.roles.some((r) => userRoles.includes(r as AppRole))
-  );
-  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.key ?? "overview");
+  const visibleKeys = getVisibleAnalyticsModules(userRoles);
+  const visibleTabs = ANALYTICS_MODULES.filter((m) => visibleKeys.includes(m.key));
+  const [activeTab, setActiveTab] = useState<AnalyticsModuleKey>(visibleTabs[0]?.key ?? "overview");
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -57,7 +78,7 @@ function Analytics() {
       {/* Tab bar */}
       <div className="flex gap-1 overflow-x-auto pb-1 border-b">
         {visibleTabs.map((t) => {
-          const Icon = t.icon;
+          const Icon = TAB_ICONS[t.key];
           return (
             <button
               key={t.key}
@@ -75,16 +96,10 @@ function Analytics() {
         })}
       </div>
 
-      {activeTab === "overview"  && <OverviewTab />}
-      {activeTab === "academics" && <AcademicsTab />}
-      {activeTab === "finance"   && <FinanceTab />}
-      {activeTab === "library"   && <LibraryTab />}
-      {activeTab === "kitchen"   && <KitchenTab />}
-      {activeTab === "store"     && <StoreTab />}
-      {activeTab === "transport" && <TransportTab />}
-      {activeTab === "clinic"    && <ClinicTab />}
-      {activeTab === "security"  && <SecurityTab />}
-      {activeTab === "sports"    && <SportsTab />}
+      {(() => {
+        const ActiveComponent = TAB_COMPONENTS[activeTab];
+        return <ActiveComponent />;
+      })()}
     </div>
   );
 }
@@ -640,6 +655,140 @@ function SportsTab() {
             <BarChart data={byCategory}>
               <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip />
               <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Discipline tab ───────────────────────────────────────────────────────────
+function DisciplineTab() {
+  const { data: incidents = [] } = useQuery({
+    queryKey: ["analytics-discipline-incidents"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+      const { data } = await (supabase as any)
+        .from("discipline_records")
+        .select("id, incident_date, category, severity, student_id")
+        .gte("incident_date", since);
+      return data ?? [];
+    },
+  });
+  const { data: counselling = [] } = useQuery({
+    queryKey: ["analytics-counselling-sessions"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+      const { data } = await (supabase as any)
+        .from("counselling_sessions")
+        .select("id, session_date")
+        .gte("session_date", since);
+      return data ?? [];
+    },
+  });
+
+  const byCategory = (() => {
+    const m = new Map<string, number>();
+    incidents.forEach((i: any) => { const c = i.category ?? "Uncategorized"; m.set(c, (m.get(c) ?? 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name, value }));
+  })();
+  const bySeverity = (() => {
+    const m = new Map<string, number>();
+    incidents.forEach((i: any) => { const s = i.severity ?? "Unspecified"; m.set(s, (m.get(s) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+  const repeatOffenderCount = (() => {
+    const m = new Map<string, number>();
+    incidents.forEach((i: any) => { if (i.student_id) m.set(i.student_id, (m.get(i.student_id) ?? 0) + 1); });
+    return [...m.values()].filter((n) => n > 1).length;
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<ShieldAlert className="w-4 h-4" />} label="Incidents (90 days)" value={incidents.length} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Repeat cases" value={repeatOffenderCount} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Counselling sessions" value={counselling.length} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Categories" value={byCategory.length} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Top incident categories (90 days)</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byCategory} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} /><Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">By severity (90 days)</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={bySeverity} dataKey="value" nameKey="name" outerRadius={80} label>
+                  {bySeverity.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip /><Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Boarding tab ─────────────────────────────────────────────────────────────
+function BoardingTab() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: dorms = [] } = useQuery({
+    queryKey: ["analytics-dormitories"],
+    queryFn: async () => (await (supabase as any).from("dormitories").select("id, name, gender, capacity")).data ?? [],
+  });
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["analytics-dorm-assignments"],
+    queryFn: async () => (await (supabase as any).from("dorm_assignments").select("id, dorm_id, active").eq("active", true)).data ?? [],
+  });
+  const { data: rollCall = [] } = useQuery({
+    queryKey: ["analytics-boarding-roll-call", today],
+    queryFn: async () => (await (supabase as any).from("boarding_roll_call").select("status").eq("roll_date", today)).data ?? [],
+  });
+  const { data: maintenance = [] } = useQuery({
+    queryKey: ["analytics-dorm-maintenance-open"],
+    queryFn: async () => (await (supabase as any).from("dorm_maintenance").select("id").neq("status", "resolved")).data ?? [],
+  });
+
+  const totalCapacity = dorms.reduce((s: number, d: any) => s + Number(d.capacity ?? 0), 0);
+  const occupied = assignments.length;
+  const occupancyPct = totalCapacity ? Math.round((occupied / totalCapacity) * 100) : 0;
+  const presentTonight = rollCall.filter((r: any) => r.status === "present").length;
+
+  const byDorm = (() => {
+    const counts = new Map<string, number>();
+    assignments.forEach((a: any) => { if (a.dorm_id) counts.set(a.dorm_id, (counts.get(a.dorm_id) ?? 0) + 1); });
+    return dorms.map((d: any) => ({ name: d.name, occupied: counts.get(d.id) ?? 0, capacity: Number(d.capacity ?? 0) }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<Building2 className="w-4 h-4" />} label="Dormitories" value={dorms.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Occupancy" value={`${occupancyPct}%`} sub={`${occupied} / ${totalCapacity} beds`} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Present tonight" value={presentTonight} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Open maintenance" value={maintenance.length} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Occupancy by dormitory</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <BarChart data={byDorm}>
+              <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis /><Tooltip /><Legend />
+              <Bar dataKey="occupied" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="capacity" fill="hsl(var(--muted))" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
