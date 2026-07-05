@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Loader2, Users, Pencil, Trash2, UserCheck, BookOpen, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
 
 export const Route = createFileRoute("/_app/classes")({
   component: ClassesPage,
@@ -37,18 +38,24 @@ function ClassesPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
+  const { isTeacherScoped, classIds } = useTeacherScope();
 
   const { data: classes = [], isLoading } = useQuery({
-    queryKey: ["classes-full"],
+    queryKey: ["classes-full", isTeacherScoped, classIds.join(",")],
+    enabled: !isTeacherScoped || classIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("classes")
         .select("*, students(count), class_teacher:staff!classes_class_teacher_id_fkey(id, first_name, last_name)")
         .order("level").order("name");
+      if (isTeacherScoped) q = q.in("id", classIds);
+      const { data, error } = await q;
       if (error) {
-        const fb = await supabase.from("classes").select("*, students(count)").order("level").order("name");
-        if (fb.error) throw fb.error;
-        return fb.data as any[];
+        let fb = supabase.from("classes").select("*, students(count)").order("level").order("name");
+        if (isTeacherScoped) fb = fb.in("id", classIds);
+        const fbRes = await fb;
+        if (fbRes.error) throw fbRes.error;
+        return fbRes.data as any[];
       }
       return data as any[];
     },
@@ -63,8 +70,12 @@ function ClassesPage() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Classes</h1>
-          <p className="text-sm text-muted-foreground mt-1">{classes.length} classes across primary and secondary</p>
+          <h1 className="text-3xl font-bold">{isTeacherScoped ? "My Classes" : "Classes"}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {isTeacherScoped
+              ? `${classes.length} class${classes.length === 1 ? "" : "es"} you teach or are class teacher of`
+              : `${classes.length} classes across primary and secondary`}
+          </p>
         </div>
         {isAdmin && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -77,7 +88,9 @@ function ClassesPage() {
       {isLoading ? (
         <div className="h-60 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : classes.length === 0 ? (
-        <Card><CardContent className="py-16 text-center text-muted-foreground">No classes created yet.</CardContent></Card>
+        <Card><CardContent className="py-16 text-center text-muted-foreground">
+          {isTeacherScoped ? "You aren't assigned to any class or timetable slot yet. Ask the academic master to add you." : "No classes created yet."}
+        </CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {classes.map((c) => {
