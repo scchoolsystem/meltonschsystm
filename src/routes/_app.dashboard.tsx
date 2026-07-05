@@ -168,7 +168,7 @@ function Dashboard() {
           <StudentRecentResultsWidget />
         </div>
         <QuickLinks links={[
-          { label: "My Portal", url: "/portal/student", icon: GraduationCap },
+          { label: "My Portal", url: "/portal", icon: GraduationCap },
           { label: "Results", url: "/portal/student?tab=results", icon: TrendingUp },
           { label: "Report Cards", url: "/portal/student?tab=reportcards", icon: BookOpen },
           { label: "Timetable", url: "/portal/student?tab=timetable", icon: Calendar },
@@ -189,7 +189,7 @@ function Dashboard() {
           <ParentOutstandingFeesWidget />
         </div>
         <QuickLinks links={[
-          { label: "Parent Portal", url: "/portal/parent", icon: Users },
+          { label: "Parent Portal", url: "/portal", icon: Users },
           { label: "Attendance", url: "/attendance", icon: ClipboardList },
           { label: "Fees", url: "/finance/invoices", icon: Wallet },
           { label: "Timetable", url: "/timetable", icon: Calendar },
