@@ -84,8 +84,7 @@ export const NAV_REGISTRY: NavItem[] = [
   { module: "discipline", label: "Discipline", to: "/discipline", group: "Operations" },
   { module: "announcements", label: "Announcements", to: "/announcements", group: "Communication" },
   { module: "analytics", label: "Analytics", to: "/analytics", group: "Insights" },
-  { module: "portal.student", label: "My Portal", to: "/portal/student", group: "Portal" },
-  { module: "portal.parent", label: "Parent Portal", to: "/portal/parent", group: "Portal" },
+  { module: "portal", label: "My Portal", to: "/portal", group: "Portal" },
 ];
 
 export function getNavigationFor(userRoles: AppRole[]): NavItem[] {
