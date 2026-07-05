@@ -81,7 +81,11 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     ...TEACHING_ROLES,
     "exams_admin", "academic_master",
   ],
-  attendance: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  // SECURITY: this is the teacher/admin marking screen (whole roster,
+  // editable). Students/parents must never reach it — they see attendance
+  // read-only, scoped to themselves/their own child, inside
+  // portal.student / portal.parent instead.
+  attendance: [...ADMIN_ROLES, ...TEACHING_ROLES],
   timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
   // Widened to match every role role-experience.ts gives an Analytics/Reports
   // nav link to: bursar (+ finance aliases), discipline_admin, hod, exams_admin,
