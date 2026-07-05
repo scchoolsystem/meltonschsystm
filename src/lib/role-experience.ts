@@ -138,13 +138,15 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   teacher: [
     { group: "Teaching", items: [
+      { title: "My Workspace", url: "/portal/me" },
       { title: "My Subjects", url: "/academics/subjects" },
       { title: "Attendance", url: "/attendance" },
       { title: "Mark Entry", url: "/academics/marks" },
       { title: "Assignments", url: "/assignments" },
       { title: "Exams", url: "/academics/exams" },
+      { title: "My Classes", url: "/classes" },
       { title: "Students", url: "/students" },
-      { title: "Timetable", url: "/timetable" },
+      { title: "My Timetable", url: "/portal/me?tab=timetable" },
       { title: "Classroom", url: "/classroom" },
       { title: "Live Classes", url: "/live" },
       { title: "Results", url: "/academics/results" },
@@ -154,6 +156,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   class_teacher: [
     { group: "My Class", items: [
+      { title: "My Workspace", url: "/portal/me" },
       { title: "My Class", url: "/classes" },
       { title: "Attendance", url: "/attendance" },
       { title: "Assignments", url: "/assignments" },
@@ -161,7 +164,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Performance", url: "/academics/results" },
       { title: "Report Cards", url: "/academics/report-cards" },
       { title: "Remarks", url: "/academics/remarks" },
-      { title: "Timetable", url: "/timetable" },
+      { title: "My Timetable", url: "/portal/me?tab=timetable" },
       { title: "Classroom", url: "/classroom" },
       { title: "Live Classes", url: "/live" },
       { title: "Payslips", url: "/staff/payslips" },
