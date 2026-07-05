@@ -128,10 +128,10 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
     { group: "Parent Portal", items: [
       { title: "My Portal", url: "/portal/parent" },
       { title: "Child Performance", url: "/portal/parent" },
-      { title: "Attendance", url: "/attendance" },
+      { title: "Attendance", url: "/portal/parent?tab=attendance" },
       { title: "Fees", url: "/finance/invoices" },
       { title: "Discipline", url: "/discipline" },
-      { title: "Timetable", url: "/timetable" },
+      { title: "Timetable", url: "/portal/parent?tab=timetable" },
       { title: "Live Classes", url: "/live" },
       { title: "Announcements", url: "/announcements" },
     ]},
