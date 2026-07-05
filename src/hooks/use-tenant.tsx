@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Capacitor Preferences is only available inside the Android/iOS native shell.
@@ -136,17 +136,30 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!targetSlug || targetSlug === PLATFORM_SLUG) {
         setSchool(null); setFeatures({}); setLoading(false); return;
       }
-      const { data, error: qErr } = await supabase.from("schools").select("*").eq("slug", targetSlug).maybeSingle();
-      if (qErr) throw qErr;
-      if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); }
-      else {
-        setSchool(data as School);
-        const { data: flags } = await supabase.from("school_features").select("feature_key,enabled").eq("school_id", data.id);
-        const map: Record<string, boolean> = {};
-        (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
-        setFeatures(map);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        const { data, error: qErr } = await supabase
+          .from("schools").select("*").eq("slug", targetSlug).maybeSingle()
+          .abortSignal(controller.signal);
+        if (qErr) throw qErr;
+        if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); }
+        else {
+          setSchool(data as School);
+          const { data: flags } = await supabase
+            .from("school_features").select("feature_key,enabled").eq("school_id", data.id)
+            .abortSignal(controller.signal);
+          const map: Record<string, boolean> = {};
+          (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
+          setFeatures(map);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } catch (e: any) { setError(e.message ?? "Failed to load school"); setSchool(null); }
+    } catch (e: any) {
+      setError(e?.name === "AbortError" ? "Loading the school timed out. Check your internet connection and try again." : (e.message ?? "Failed to load school"));
+      setSchool(null);
+    }
     finally { setLoading(false); }
   };
 
