@@ -1024,6 +1024,7 @@ function ParentReportView({
 // ─── Main Portal ──────────────────────────────────────────────────────────
 function StudentPortal() {
   const { user, fullName, roles } = useAuth();
+  const { tab: tabFromUrl } = Route.useSearch() as { tab?: string };
   const [student, setStudent] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
@@ -1043,7 +1044,8 @@ function StudentPortal() {
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // Sidebar links land here as e.g. /portal/student?tab=attendance — honor it.
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
   const [securityVerified, setSecurityVerified] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
   const [filterPeriod, setFilterPeriod] = useState<"all" | "term" | "month">("all");
