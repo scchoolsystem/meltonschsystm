@@ -110,7 +110,7 @@ type RoleNavContribution = { group: string; items: NavItem[] }[];
 const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   student: [
     { group: "My School", items: [
-      { title: "My Portal", url: "/portal/student" },
+      { title: "My Portal", url: "/portal" },
       { title: "Performance", url: "/portal/student?tab=analytics" },
       { title: "Results", url: "/portal/student?tab=results" },
       { title: "Report Cards", url: "/portal/student?tab=reportcards" },
@@ -126,7 +126,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   parent: [
     { group: "Parent Portal", items: [
-      { title: "My Portal", url: "/portal/parent" },
+      { title: "My Portal", url: "/portal" },
       { title: "Child Performance", url: "/portal/parent" },
       { title: "Attendance", url: "/portal/parent?tab=attendance" },
       { title: "Fees", url: "/finance/invoices" },
@@ -138,7 +138,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   teacher: [
     { group: "Teaching", items: [
-      { title: "My Workspace", url: "/portal/me" },
+      { title: "My Workspace", url: "/portal" },
       { title: "My Subjects", url: "/academics/subjects" },
       { title: "Attendance", url: "/attendance" },
       { title: "Mark Entry", url: "/academics/marks" },
@@ -156,7 +156,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   class_teacher: [
     { group: "My Class", items: [
-      { title: "My Workspace", url: "/portal/me" },
+      { title: "My Workspace", url: "/portal" },
       { title: "My Class", url: "/classes" },
       { title: "Attendance", url: "/attendance" },
       { title: "Assignments", url: "/assignments" },
