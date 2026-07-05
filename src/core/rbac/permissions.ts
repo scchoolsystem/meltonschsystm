@@ -127,7 +127,13 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // from this map entirely, so canAccess() fell back to admin-only.
   assignments: [...ADMIN_ROLES, ...TEACHING_ROLES, "student"],
 
-  // Portals (role-specific)
+  // Portals
+  // "portal" is the single universal entry point (/portal) — any authenticated
+  // user lands here and gets dispatched to the experience for their role(s).
+  // The role-specific paths below remain reachable directly (deep links from
+  // emails, notifications, and tab-scoped links like /portal/student?tab=fees)
+  // for backward compatibility.
+  portal: [], // any authenticated user
   "portal.student": ["student"],
   "portal.parent": ["parent"],
   "portal.me": [], // any authenticated user
