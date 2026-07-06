@@ -2,6 +2,7 @@
 // regardless of how many roles they hold. No repeated Dashboard links, no
 // repeated group headers. Multi-role users get the union of their accessible
 // pages, de-duplicated by URL and grouped logically.
+import { canAccess, moduleForPath, type AppRole } from "@/core/rbac";
 
 export type NavItem = { title: string; url: string; icon?: any; feature?: string };
 export type NavGroup = { label: string; items: NavItem[] };
@@ -419,4 +420,56 @@ export function buildNavigation(roles: string[]): NavGroup[] {
   }
 
   return groups;
+}
+
+// ─── Self-check: nav/permission consistency ───────────────────────────────────
+// This exact class of bug bit us three times in one audit (Analytics links
+// for matron/librarian/boarding_admin/etc., three exams_admin promotion
+// links): role-experience.ts hands a role a sidebar link, but
+// core/rbac/permissions.ts's MODULE_PERMISSIONS never granted that role
+// access to the module the link resolves to — so canAccessRoute() in
+// _app.tsx silently bounces them back to /dashboard the moment they click it.
+//
+// This check re-derives every literal role (accounting for ROLE_ALIASES) that
+// reaches each nav item, resolves the item's URL to a module via
+// moduleForPath(), and confirms canAccess() actually allows it. It runs once,
+// in dev only, and warns in the console — it does not throw or block
+// rendering, so a genuinely intentional gap (e.g. an item you're still
+// wiring up) won't break the app, but you'll see it immediately in dev.
+function auditNavPermissions(): string[] {
+  const reverseAliases: Record<string, string[]> = {};
+  for (const [literal, canonical] of Object.entries(ROLE_ALIASES)) {
+    (reverseAliases[canonical] ??= []).push(literal);
+  }
+
+  const issues: string[] = [];
+  for (const [contributionKey, groups] of Object.entries(ROLE_NAV_CONTRIBUTIONS)) {
+    const literalRoles = [contributionKey, ...(reverseAliases[contributionKey] ?? [])];
+    for (const { items } of groups) {
+      for (const item of items) {
+        const mod = moduleForPath(item.url);
+        if (!mod) continue;
+        for (const literalRole of literalRoles) {
+          if (!canAccess([literalRole as AppRole], mod)) {
+            issues.push(
+              `role "${literalRole}" (nav group for "${contributionKey}") links to "${item.title}" → ${item.url} ` +
+              `(module "${mod}"), but MODULE_PERMISSIONS["${mod}"] doesn't include "${literalRole}".`
+            );
+          }
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+if (import.meta.env.DEV) {
+  const issues = auditNavPermissions();
+  if (issues.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[role-experience] ${issues.length} nav/permission mismatch(es) — these sidebar links will bounce the user back to /dashboard:\n` +
+      issues.map((i) => `  • ${i}`).join("\n")
+    );
+  }
 }
