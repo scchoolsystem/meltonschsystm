@@ -165,21 +165,39 @@ function MyWorkspace() {
         };
       });
 
-      // Pending marks: for each (subject, exam) combo, count results entered
+      // Pending marks: for each (subject, exam) combo, count results entered.
+      // Batched into a single query instead of one round-trip per combo —
+      // with several active exams x several subjects the old N-times-M
+      // sequential loop could fire dozens of serial requests and make this
+      // whole workspace query look like it was hanging.
       const mySubjects = subjects.data ?? [];
       const exams = activeExams.data ?? [];
+      const examIds = exams.map((e: any) => e.id);
+      const subjectIds = Array.from(
+        new Set(mySubjects.map((ts: any) => ts.subject_id).filter(Boolean)),
+      );
+
+      const resultCounts = new Map<string, number>();
+      if (examIds.length && subjectIds.length) {
+        const { data: resultRows } = await supabase
+          .from("exam_results")
+          .select("exam_id, subject_id")
+          .in("exam_id", examIds)
+          .in("subject_id", subjectIds as string[]);
+        (resultRows ?? []).forEach((r: any) => {
+          const key = `${r.exam_id}::${r.subject_id}`;
+          resultCounts.set(key, (resultCounts.get(key) ?? 0) + 1);
+        });
+      }
+
       const pendingMarks: any[] = [];
       for (const exam of exams) {
         for (const ts of mySubjects) {
           const subjectId = ts.subject_id;
           if (!subjectId) continue;
-          const { count } = await supabase
-            .from("exam_results")
-            .select("id", { count: "exact", head: true })
-            .eq("exam_id", exam.id)
-            .eq("subject_id", subjectId);
+          const count = resultCounts.get(`${exam.id}::${subjectId}`) ?? 0;
           let status = "No results";
-          if ((count ?? 0) > 0) status = (count ?? 0) >= totalStudentsCount && totalStudentsCount > 0 ? "Complete" : "Partial";
+          if (count > 0) status = count >= totalStudentsCount && totalStudentsCount > 0 ? "Complete" : "Partial";
           pendingMarks.push({
             examId: exam.id, examName: exam.name, subjectId, subjectName: (ts as any).subjects?.name ?? "—", status,
           });
