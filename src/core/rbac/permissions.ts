@@ -12,7 +12,7 @@ export type AppRole =
   | "boarding_admin" | "boarding_user" | "kitchen_admin" | "kitchen_user"
   | "security_admin" | "security_user" | "library_admin" | "library_user"
   | "clinic_admin" | "clinic_user" | "sports_admin" | "sports_user"
-  | "store_admin" | "store_user" | "transport_admin" | "guidance_admin"
+  | "store_admin" | "store_user" | "transport_admin" | "guidance_admin" | "guidance_user"
   | "ict_admin" | "discipline_admin"
   | "platform_owner" | "platform_support";
 
@@ -42,7 +42,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
     "boarding", "boarding_admin", "boarding_user",
     "transport_admin", "transport_officer",
     "sports", "sports_admin", "sports_user",
-    "discipline_admin", "guidance_admin",
+    "discipline_admin", "guidance_admin", "guidance_user",
   ],
   staff: [...ADMIN_ROLES, "hod", "hr_admin", "hr"],
   // /staff/payslips specifically — broader than the staff directory itself,
@@ -51,7 +51,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "staff.payslips": [...ADMIN_ROLES, "hr_admin", "hr", "bursar", "finance_admin", ...TEACHING_ROLES, "staff"],
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   // exams_admin also gets a Subjects link in their nav group.
-  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "student", "parent"],
+  subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "exams_user", "student", "parent"],
   // SECURITY: exam ADMINISTRATION (create/edit exam windows). Students and
   // parents must never reach this — they see their own exams inside
   // portal.student / portal.parent, never this CRUD screen.
@@ -64,7 +64,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // SECURITY: the class-wide report-card PICKER/ranking admin screen
   // (/academics/report-cards, plural). Never expose to student/parent —
   // it lets you pick any class and open ANY student's report card.
-  "report-cards-admin": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "academic_master"],
+  "report-cards-admin": [...ADMIN_ROLES, ...TEACHING_ROLES, "exams_admin", "exams_user", "academic_master"],
   // A single student's own report card detail page
   // (/academics/report-card/$studentId/$examId, singular). Ownership of
   // $studentId must still be enforced by the route loader / RLS — this
@@ -73,13 +73,13 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // Exam oversight: moderation, approval, release dashboard
   "exam-oversight": [
     ...ADMIN_ROLES,
-    "exams_admin", "academic_master",
+    "exams_admin", "exams_user", "academic_master",
   ],
   // Remarks entry: subject/class teacher/principal can access (page filters by role)
   "remarks": [
     ...ADMIN_ROLES,
     ...TEACHING_ROLES,
-    "exams_admin", "academic_master",
+    "exams_admin", "exams_user", "academic_master",
   ],
   // SECURITY: this is the teacher/admin marking screen (whole roster,
   // editable). Students/parents must never reach it — they see attendance
@@ -112,8 +112,8 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "analytics.security": [...ADMIN_ROLES, "security_admin", "security_user"],
   "analytics.sports": [...ADMIN_ROLES, "sports_admin", "sports_user", "sports"],
   // New in this phase — these tabs didn't exist before.
-  "analytics.discipline": [...ADMIN_ROLES, "discipline_admin", "guidance_admin", "class_teacher"],
-  "analytics.boarding": [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
+  "analytics.discipline": [...ADMIN_ROLES, "discipline_admin", "guidance_admin", "guidance_user", "class_teacher"],
+  "analytics.boarding": [...ADMIN_ROLES, "boarding_admin", "boarding_user", "boarding", "matron"],
   // Communications: notifications_log is RLS-restricted to admins only, so
   // this permission mirrors that — a non-admin role here would just see an
   // empty/blocked query, not real data.
@@ -128,7 +128,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   finance: [...ADMIN_ROLES, "bursar", "finance_admin", "finance_user", "parent"],
   // Wave 2: student allowed (read-only catalog; RLS scopes loans).
   library: [...ADMIN_ROLES, "librarian", "library_admin", "library_user", "student"],
-  boarding: [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
+  boarding: [...ADMIN_ROLES, "boarding_admin", "boarding_user", "boarding", "matron"],
   kitchen: [...ADMIN_ROLES, "kitchen_admin", "kitchen_user"],
   // matron's nav group also links to /clinic.
   clinic: [...ADMIN_ROLES, "nurse", "clinic_admin", "clinic_user", "matron"],
@@ -139,7 +139,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   sports: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
   cocurricular: [...ADMIN_ROLES, "sports", "sports_admin", "sports_user"],
   // Wave 2: parent allowed (RLS scopes to own children's incidents only).
-  discipline: [...ADMIN_ROLES, "discipline_admin", "class_teacher", "guidance_admin", "parent"],
+  discipline: [...ADMIN_ROLES, "discipline_admin", "class_teacher", "guidance_admin", "guidance_user", "parent"],
 
   // Communication
   announcements: [], // everyone authenticated
@@ -176,7 +176,7 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.permissions": [...ADMIN_ROLES, "ict_admin"],
   "admin.activity": [...ADMIN_ROLES, "ict_admin"],
   "admin.brain": [...ADMIN_ROLES],
-  "admin.grading": [...ADMIN_ROLES, "academic_master", "exams_admin"],
+  "admin.grading": [...ADMIN_ROLES, "academic_master", "exams_admin", "exams_user"],
   // admission_officer and ict_admin both link to CSV Import.
   "admin.import": [...ADMIN_ROLES, "admission_officer", "ict_admin"],
   "admin.lifecycle": [...ADMIN_ROLES],
@@ -199,9 +199,9 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // exams_admin's nav group links to all three of these (Class Structure,
   // Promotion Settings, Year Promotion) but wasn't in any of their role
   // lists — a dead sidebar link, same bug pattern as the analytics gate above.
-  "admin.promotion": [...ADMIN_ROLES, "academic_master", "exams_admin"],
-  "admin.promotion-settings": [...ADMIN_ROLES, "exams_admin"],
-  "admin.class-structure": [...ADMIN_ROLES, "exams_admin"],
+  "admin.promotion": [...ADMIN_ROLES, "academic_master", "exams_admin", "exams_user"],
+  "admin.promotion-settings": [...ADMIN_ROLES, "exams_admin", "exams_user"],
+  "admin.class-structure": [...ADMIN_ROLES, "exams_admin", "exams_user"],
 
   // Platform
   platform: PLATFORM_ROLES,
