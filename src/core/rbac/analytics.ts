@@ -8,7 +8,8 @@ import { canAccess, type AppRole } from "./index";
 
 export type AnalyticsModuleKey =
   | "overview" | "academics" | "finance" | "library" | "kitchen" | "store"
-  | "transport" | "clinic" | "security" | "sports" | "discipline" | "boarding";
+  | "transport" | "clinic" | "security" | "sports" | "discipline" | "boarding"
+  | "communication" | "hr" | "attendance";
 
 export interface AnalyticsModuleDef {
   key: AnalyticsModuleKey;
@@ -20,6 +21,7 @@ export interface AnalyticsModuleDef {
 export const ANALYTICS_MODULES: AnalyticsModuleDef[] = [
   { key: "overview", label: "Overview", permission: null },
   { key: "academics", label: "Academics", permission: "analytics.academics" },
+  { key: "attendance", label: "Attendance", permission: "analytics.attendance" },
   { key: "finance", label: "Finance", permission: "analytics.finance" },
   { key: "library", label: "Library", permission: "analytics.library" },
   { key: "kitchen", label: "Kitchen", permission: "analytics.kitchen" },
@@ -30,6 +32,8 @@ export const ANALYTICS_MODULES: AnalyticsModuleDef[] = [
   { key: "sports", label: "Sports", permission: "analytics.sports" },
   { key: "discipline", label: "Discipline", permission: "analytics.discipline" },
   { key: "boarding", label: "Boarding", permission: "analytics.boarding" },
+  { key: "hr", label: "HR", permission: "analytics.hr" },
+  { key: "communication", label: "Communication", permission: "analytics.communication" },
 ];
 
 /** Returns the analytics module keys the given roles are allowed to see. */
