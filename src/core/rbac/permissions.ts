@@ -114,6 +114,14 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // New in this phase — these tabs didn't exist before.
   "analytics.discipline": [...ADMIN_ROLES, "discipline_admin", "guidance_admin", "class_teacher"],
   "analytics.boarding": [...ADMIN_ROLES, "boarding_admin", "boarding_user", "matron"],
+  // Communications: notifications_log is RLS-restricted to admins only, so
+  // this permission mirrors that — a non-admin role here would just see an
+  // empty/blocked query, not real data.
+  "analytics.communication": [...ADMIN_ROLES],
+  // HR: headcount/status/department breakdown from the staff table.
+  "analytics.hr": [...ADMIN_ROLES, "hr_admin", "hr"],
+  // Attendance: school-wide, deeper than the Overview tab's single trend line.
+  "analytics.attendance": [...ADMIN_ROLES, ...TEACHING_ROLES, "discipline_admin", "guidance_admin"],
 
   // Operations
   // Wave 2: parent allowed (RLS scopes to own children's invoices only).
@@ -188,15 +196,36 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   "admin.compliance": [...ADMIN_ROLES],
 
   // Promotion system
-  "admin.promotion": [...ADMIN_ROLES, "academic_master"],
-  "admin.promotion-settings": [...ADMIN_ROLES],
-  "admin.class-structure": [...ADMIN_ROLES],
+  // exams_admin's nav group links to all three of these (Class Structure,
+  // Promotion Settings, Year Promotion) but wasn't in any of their role
+  // lists — a dead sidebar link, same bug pattern as the analytics gate above.
+  "admin.promotion": [...ADMIN_ROLES, "academic_master", "exams_admin"],
+  "admin.promotion-settings": [...ADMIN_ROLES, "exams_admin"],
+  "admin.class-structure": [...ADMIN_ROLES, "exams_admin"],
 
   // Platform
   platform: PLATFORM_ROLES,
 };
 
 export type ModuleKey = keyof typeof MODULE_PERMISSIONS;
+
+// The top-level "analytics" gate (controls whether /analytics opens at all)
+// must always be a superset of every analytics.<module> permission below it —
+// otherwise a role can legitimately see a tab's content per the fine-grained
+// permission, but the route guard in _app.tsx bounces them before they ever
+// reach the page. This was a real, live bug: matron, librarian, boarding_admin,
+// kitchen_admin, store_admin, transport_admin, sports_admin, and hr_admin all
+// had an "Analytics" sidebar link (role-experience.ts) pointing at a page they
+// didn't actually have permission to open.
+//
+// Computed once here instead of hand-duplicated, so registering a future
+// analytics.<module> permission can never silently reopen this gap.
+MODULE_PERMISSIONS.analytics = Array.from(new Set([
+  ...MODULE_PERMISSIONS.analytics,
+  ...Object.keys(MODULE_PERMISSIONS)
+    .filter((k) => k.startsWith("analytics."))
+    .flatMap((k) => MODULE_PERMISSIONS[k]),
+])) as AppRole[];
 
 /** Map a route path (e.g. "/finance/fees" or "/admin/users") to a module key. */
 export function moduleForPath(pathname: string): string | null {
