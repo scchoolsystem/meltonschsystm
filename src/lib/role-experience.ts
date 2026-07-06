@@ -216,6 +216,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   nurse: [
     { group: "Clinic", items: [
       { title: "Medical Records", url: "/clinic" },
+      { title: "Analytics", url: "/analytics" },
       { title: "Announcements", url: "/announcements" },
     ]},
   ],
@@ -257,6 +258,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Gate Records", url: "/security" },
       { title: "Verify Student IDs", url: "/ids/verify" },
       { title: "Bulk IDs", url: "/ids/bulk" },
+      { title: "Analytics", url: "/analytics" },
     ]},
   ],
   sports_admin: [
