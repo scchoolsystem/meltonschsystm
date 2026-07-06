@@ -63,6 +63,41 @@ export const Route = createFileRoute("/_app/portal/me")({
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Diagnostic wrapper: the workspace query below fires ~10 Supabase calls in
+// parallel via Promise.all. If even one of them hangs (slow/recursive RLS
+// policy, dead connection, etc.) the whole Promise.all never settles and the
+// page spins forever with no console error and nothing useful in the Network
+// tab. This wraps each call so we (a) know exactly which one is slow/failing,
+// and (b) time it out instead of hanging indefinitely.
+const WORKSPACE_QUERY_TIMEOUT_MS = 15000;
+function withTag<T>(promise: PromiseLike<T>, label: string): Promise<T> {
+  const started = performance.now();
+  return Promise.race([
+    Promise.resolve(promise).then(
+      (res) => {
+        const ms = Math.round(performance.now() - started);
+        if (ms > 3000) console.warn(`[MyWorkspace] "${label}" took ${ms}ms`);
+        return res;
+      },
+      (err) => {
+        console.error(`[MyWorkspace] "${label}" rejected:`, err);
+        throw err;
+      },
+    ),
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `"${label}" timed out after ${WORKSPACE_QUERY_TIMEOUT_MS / 1000}s — likely a slow/recursive RLS policy or a hung request`,
+            ),
+          ),
+        WORKSPACE_QUERY_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+}
+
 function MyWorkspace() {
   const { user, fullName, roles, hasRole } = useAuth();
 
@@ -73,7 +108,8 @@ function MyWorkspace() {
   // was leaving /portal/me stuck on the outer spinner. The redirect is
   // computed after every hook has been called (see `redirectTo` below).
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    retry: 1, // fail fast instead of silently retrying (with backoff) for a minute+
     queryKey: ["my-workspace", user?.id],
     // Skip the workspace query for pure students/parents — they get
     // redirected below and never render this tree.
@@ -83,11 +119,14 @@ function MyWorkspace() {
       !(hasRole("parent") && !hasRole("staff") && !hasRole("teacher")),
     queryFn: async () => {
       const uid = user!.id;
-      const { data: staff } = await supabase
-        .from("staff")
-        .select("id, first_name, last_name, employee_no, unique_id, photo_url, email, phone, role, department, position_title, staff_category, admin_unit, shift, assigned_area, class_responsibility, departments(name), sub_departments(name)")
-        .eq("user_id", uid)
-        .maybeSingle();
+      const { data: staff } = await withTag(
+        supabase
+          .from("staff")
+          .select("id, first_name, last_name, employee_no, unique_id, photo_url, email, phone, role, department, position_title, staff_category, admin_unit, shift, assigned_area, class_responsibility, departments(name), sub_departments(name)")
+          .eq("user_id", uid)
+          .maybeSingle(),
+        "staff lookup",
+      );
 
       const today = new Date();
       const dow = today.getDay();
@@ -99,41 +138,71 @@ function MyWorkspace() {
         classTeacherOf, subjectTaughtSlots, todayTT, weekTT, subjects, activities,
         recentMarks, recentAttendance, announcements, activeExams,
       ] = await Promise.all([
-        staffId
-          ? supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId)
-          : Promise.resolve({ data: [] }),
+        withTag(
+          staffId
+            ? supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId)
+            : Promise.resolve({ data: [] }),
+          "classTeacherOf",
+        ),
         // Classes this teacher only teaches a subject in (not the class teacher)
-        staffId
-          ? supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId)
-          : Promise.resolve({ data: [] }),
-        staffId
-          ? supabase.from("timetable_slots")
-              .select("start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time")
-          : Promise.resolve({ data: [] }),
-        staffId
-          ? supabase.from("timetable_slots")
-              .select("day_of_week, start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).order("day_of_week").order("start_time")
-          : Promise.resolve({ data: [] }),
-        staffId
-          ? supabase.from("teacher_subjects")
-              .select("subject_id, subjects(id, name)").eq("staff_id", staffId)
-          : Promise.resolve({ data: [] }),
-        staffId
-          ? supabase.from("staff_co_curricular")
-              .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId)
-          : Promise.resolve({ data: [] }),
-        supabase.from("exam_results")
-          .select("id, score, created_at, subjects(name), exams(name)")
-          .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10),
-        supabase.from("attendance_records")
-          .select("id, date, status, students(first_name, last_name)")
-          .eq("recorded_by", uid).gte("date", todayStr).limit(20),
-        supabase.from("announcements")
-          .select("id, title, body, pinned, created_at")
-          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20),
-        supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }),
+        withTag(
+          staffId
+            ? supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId)
+            : Promise.resolve({ data: [] }),
+          "subjectTaughtSlots",
+        ),
+        withTag(
+          staffId
+            ? supabase.from("timetable_slots")
+                .select("start_time, end_time, room, classes(name), subjects(name)")
+                .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time")
+            : Promise.resolve({ data: [] }),
+          "todayTT",
+        ),
+        withTag(
+          staffId
+            ? supabase.from("timetable_slots")
+                .select("day_of_week, start_time, end_time, room, classes(name), subjects(name)")
+                .eq("teacher_id", staffId).order("day_of_week").order("start_time")
+            : Promise.resolve({ data: [] }),
+          "weekTT",
+        ),
+        withTag(
+          staffId
+            ? supabase.from("teacher_subjects")
+                .select("subject_id, subjects(id, name)").eq("staff_id", staffId)
+            : Promise.resolve({ data: [] }),
+          "subjects",
+        ),
+        withTag(
+          staffId
+            ? supabase.from("staff_co_curricular")
+                .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId)
+            : Promise.resolve({ data: [] }),
+          "activities",
+        ),
+        withTag(
+          supabase.from("exam_results")
+            .select("id, score, created_at, subjects(name), exams(name)")
+            .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10),
+          "recentMarks",
+        ),
+        withTag(
+          supabase.from("attendance_records")
+            .select("id, date, status, students(first_name, last_name)")
+            .eq("recorded_by", uid).gte("date", todayStr).limit(20),
+          "recentAttendance",
+        ),
+        withTag(
+          supabase.from("announcements")
+            .select("id, title, body, pinned, created_at")
+            .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20),
+          "announcements",
+        ),
+        withTag(
+          supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }),
+          "activeExams",
+        ),
       ]);
 
       // Merge class-teacher classes with subject-taught classes (dedupe by id),
@@ -235,6 +304,24 @@ function MyWorkspace() {
 
   if (isLoading) {
     return <div className="p-6 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 grid place-items-center text-center space-y-3">
+        <AlertCircle className="w-8 h-8 text-destructive" />
+        <p className="text-sm font-medium">Couldn't load your workspace</p>
+        <p className="text-xs text-muted-foreground max-w-md">
+          {(error as Error)?.message ?? "Unknown error"}
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="text-xs underline text-muted-foreground hover:text-foreground"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   const staff = (data?.staff as any) ?? null;
