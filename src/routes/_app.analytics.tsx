@@ -14,6 +14,7 @@ import {
   TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles,
   Activity, Library, Utensils, Package, Bus, Stethoscope, ShieldCheck,
   Trophy, BookOpen, DollarSign, ShieldAlert, Building2,
+  Briefcase, MessageSquare, CalendarCheck,
 } from "lucide-react";
 import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalyticsPanel";
 import type { AppRole } from "@/core/rbac";
@@ -31,6 +32,7 @@ const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444
 const TAB_ICONS: Record<AnalyticsModuleKey, React.ComponentType<{ className?: string }>> = {
   overview: TrendingUp,
   academics: GraduationCap,
+  attendance: CalendarCheck,
   finance: DollarSign,
   library: Library,
   kitchen: Utensils,
@@ -41,11 +43,14 @@ const TAB_ICONS: Record<AnalyticsModuleKey, React.ComponentType<{ className?: st
   sports: Trophy,
   discipline: ShieldAlert,
   boarding: Building2,
+  hr: Briefcase,
+  communication: MessageSquare,
 };
 
 const TAB_COMPONENTS: Record<AnalyticsModuleKey, React.ComponentType> = {
   overview: OverviewTab,
   academics: AcademicsTab,
+  attendance: AttendanceTab,
   finance: FinanceTab,
   library: LibraryTab,
   kitchen: KitchenTab,
@@ -56,6 +61,8 @@ const TAB_COMPONENTS: Record<AnalyticsModuleKey, React.ComponentType> = {
   sports: SportsTab,
   discipline: DisciplineTab,
   boarding: BoardingTab,
+  hr: HrTab,
+  communication: CommunicationTab,
 };
 
 function Analytics() {
@@ -793,6 +800,200 @@ function BoardingTab() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── HR tab ───────────────────────────────────────────────────────────────────
+function HrTab() {
+  const { data: staff = [] } = useQuery({
+    queryKey: ["analytics-hr-staff"],
+    queryFn: async () => (await (supabase as any).from("staff").select("id, role, status, department_id, hire_date, departments(name)")).data ?? [],
+  });
+
+  const byStatus = (() => {
+    const m = new Map<string, number>();
+    staff.forEach((s: any) => { const st = s.status ?? "active"; m.set(st, (m.get(st) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+  const byDepartment = (() => {
+    const m = new Map<string, number>();
+    staff.forEach((s: any) => { const d = s.departments?.name ?? "Unassigned"; m.set(d, (m.get(d) ?? 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
+  })();
+  const onLeave = staff.filter((s: any) => s.status === "on_leave").length;
+  const since90 = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+  const newHires90 = staff.filter((s: any) => (s.hire_date ?? "") >= since90).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<Briefcase className="w-4 h-4" />} label="Total staff" value={staff.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Active" value={staff.filter((s: any) => (s.status ?? "active") === "active").length} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-amber-500" />} label="On leave" value={onLeave} />
+        <Kpi icon={<Sparkles className="w-4 h-4" />} label="New hires (90 days)" value={newHires90} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Headcount by department</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byDepartment} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={130} tick={{ fontSize: 11 }} /><Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Employment status</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={byStatus} dataKey="value" nameKey="name" outerRadius={80} label>
+                  {byStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip /><Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Communication tab ────────────────────────────────────────────────────────
+function CommunicationTab() {
+  const { data: logs = [] } = useQuery({
+    queryKey: ["analytics-notifications-log"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString();
+      const { data } = await (supabase as any)
+        .from("notifications_log")
+        .select("id, channel, status, recipient_count, created_at")
+        .gte("created_at", since);
+      return data ?? [];
+    },
+  });
+
+  const totalRecipients = logs.reduce((s: number, l: any) => s + Number(l.recipient_count ?? 0), 0);
+  const failed = logs.filter((l: any) => l.status === "failed" || l.status === "error").length;
+  const byChannel = (() => {
+    const m = new Map<string, number>();
+    logs.forEach((l: any) => { const c = l.channel ?? "unknown"; m.set(c, (m.get(c) ?? 0) + 1); });
+    return [...m.entries()].map(([name, value]) => ({ name, value }));
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<MessageSquare className="w-4 h-4" />} label="Messages sent (30 days)" value={logs.length} />
+        <Kpi icon={<Users className="w-4 h-4" />} label="Total recipients" value={totalRecipients} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Failed" value={failed} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Channels used" value={byChannel.length} />
+      </div>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Volume by channel (30 days)</CardTitle></CardHeader>
+        <CardContent className="h-64">
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={byChannel} dataKey="value" nameKey="name" outerRadius={80} label>
+                {byChannel.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip /><Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Attendance tab ───────────────────────────────────────────────────────────
+// Deeper than the Overview tab's single 30-day trend line: per-class breakdown
+// and day-of-week pattern, school-wide.
+function AttendanceTab() {
+  const { data: records = [] } = useQuery({
+    queryKey: ["analytics-attendance-detailed"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const { data } = await (supabase as any)
+        .from("attendance_records")
+        .select("id, date, status, class_id, classes(name)")
+        .gte("date", since);
+      return data ?? [];
+    },
+  });
+
+  const total = records.length;
+  const present = records.filter((r: any) => r.status === "present").length;
+  const absent = records.filter((r: any) => r.status === "absent").length;
+  const late = records.filter((r: any) => r.status === "late").length;
+  const overallPct = total ? Math.round((present / total) * 100) : 0;
+
+  const byClass = (() => {
+    const m = new Map<string, { present: number; total: number; name: string }>();
+    records.forEach((r: any) => {
+      const key = r.class_id ?? "unknown";
+      const cur = m.get(key) ?? { present: 0, total: 0, name: r.classes?.name ?? "—" };
+      cur.total++; if (r.status === "present") cur.present++;
+      m.set(key, cur);
+    });
+    return [...m.values()]
+      .map((c) => ({ name: c.name, pct: c.total ? Math.round((c.present / c.total) * 100) : 0 }))
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, 12);
+  })();
+
+  const byDayOfWeek = (() => {
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const m = new Map<number, { present: number; total: number }>();
+    records.forEach((r: any) => {
+      if (!r.date) return;
+      const dow = new Date(r.date).getDay();
+      const cur = m.get(dow) ?? { present: 0, total: 0 };
+      cur.total++; if (r.status === "present") cur.present++;
+      m.set(dow, cur);
+    });
+    return [1, 2, 3, 4, 5].map((d) => {
+      const v = m.get(d);
+      return { name: DAYS[d], pct: v && v.total ? Math.round((v.present / v.total) * 100) : 0 };
+    });
+  })();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Kpi icon={<CalendarCheck className="w-4 h-4" />} label="Overall (30 days)" value={`${overallPct}%`} />
+        <Kpi icon={<Activity className="w-4 h-4" />} label="Present" value={present} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Absent" value={absent} />
+        <Kpi icon={<AlertTriangle className="w-4 h-4 text-amber-500" />} label="Late" value={late} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Lowest attendance by class (30 days)</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byClass} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} /><YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} /><Tooltip />
+                <Bar dataKey="pct" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">By day of week (30 days)</CardTitle></CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={byDayOfWeek}>
+                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis domain={[0, 100]} /><Tooltip />
+                <Bar dataKey="pct" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
