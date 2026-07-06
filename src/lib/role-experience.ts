@@ -245,6 +245,13 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Analytics", url: "/analytics" },
     ]},
   ],
+  hr_admin: [
+    { group: "Human Resources", items: [
+      { title: "Staff Directory", url: "/staff" },
+      { title: "Payslips", url: "/staff/payslips" },
+      { title: "Analytics", url: "/analytics" },
+    ]},
+  ],
   security_admin: [
     { group: "Security", items: [
       { title: "Gate Records", url: "/security" },
@@ -345,6 +352,7 @@ const ROLE_ALIASES: Record<string, string> = {
   exams_user: "exams_admin",
   store_user: "store_admin",
   guidance_user: "guidance_admin",
+  hr: "hr_admin",
 };
 
 export function isAdminRole(roles: string[]): boolean {
