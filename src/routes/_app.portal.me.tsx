@@ -66,15 +66,21 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function MyWorkspace() {
   const { user, fullName, roles, hasRole } = useAuth();
 
-  // Students/parents already have dedicated portals — redirect.
-  if (hasRole("student") && !hasRole("staff") && !hasRole("teacher"))
-    return <Navigate to="/portal/student" />;
-  if (hasRole("parent") && !hasRole("staff") && !hasRole("teacher"))
-    return <Navigate to="/portal/parent" />;
+  // NOTE: do NOT early-return before the hooks below. Roles arrive
+  // asynchronously from useAuth(), so any conditional return here changes
+  // the hook count between renders and triggers React's
+  // "Rendered fewer hooks than previous render" error — which is what
+  // was leaving /portal/me stuck on the outer spinner. The redirect is
+  // computed after every hook has been called (see `redirectTo` below).
 
   const { data, isLoading } = useQuery({
     queryKey: ["my-workspace", user?.id],
-    enabled: !!user?.id,
+    // Skip the workspace query for pure students/parents — they get
+    // redirected below and never render this tree.
+    enabled:
+      !!user?.id &&
+      !(hasRole("student") && !hasRole("staff") && !hasRole("teacher")) &&
+      !(hasRole("parent") && !hasRole("staff") && !hasRole("teacher")),
     queryFn: async () => {
       const uid = user!.id;
       const { data: staff } = await supabase
@@ -219,6 +225,13 @@ function MyWorkspace() {
       };
     },
   });
+
+  // Students/parents already have dedicated portals — redirect AFTER all
+  // hooks have run so hook order stays stable across renders.
+  if (hasRole("student") && !hasRole("staff") && !hasRole("teacher"))
+    return <Navigate to="/portal/student" />;
+  if (hasRole("parent") && !hasRole("staff") && !hasRole("teacher"))
+    return <Navigate to="/portal/parent" />;
 
   if (isLoading) {
     return <div className="p-6 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
