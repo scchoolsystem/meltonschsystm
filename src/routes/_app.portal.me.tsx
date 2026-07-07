@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -67,10 +68,16 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // workspace query. Without this, Promise.all never settles if even one
 // table lookup stalls (slow query, connection-pool exhaustion, etc.) and
 // /portal/me spins forever with no error surfaced anywhere.
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
+  let settled = false;
   return Promise.race([
-    Promise.resolve(promise).catch(() => fallback),
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    Promise.resolve(promise)
+      .then((v) => { settled = true; return v; })
+      .catch(() => { settled = true; return fallback; }),
+    new Promise<T>((resolve) => setTimeout(() => {
+      if (!settled) console.warn(`[portal/me] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
+      resolve(fallback);
+    }, ms)),
   ]);
 }
 
@@ -79,6 +86,19 @@ function MyWorkspace() {
   const isStudentOnly = hasRole("student") && !hasRole("staff") && !hasRole("teacher");
   const isParentOnly = hasRole("parent") && !hasRole("staff") && !hasRole("teacher");
 
+  // Failsafe #2, decoupled entirely from react-query and from withTimeout
+  // above: if this component has been sitting on the loading branch for
+  // 15s of real wall-clock time no matter *why*, offer an escape hatch.
+  // This can't get stuck even if the query itself never settles (e.g. the
+  // whole tab's JS got wedged by something unrelated and only recovers on
+  // reload), because it's driven by a plain setTimeout tied to mount, not
+  // by the query's own internal state.
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, []);
+
   // NOTE: do NOT early-return before the hooks below. Roles arrive
   // asynchronously from useAuth(), so any conditional return here changes
   // the hook count between renders and triggers React's
@@ -86,7 +106,7 @@ function MyWorkspace() {
   // was leaving /portal/me stuck on the outer spinner. The redirect is
   // computed after every hook has been called (see `redirectTo` below).
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-workspace", user?.id],
     // Skip the workspace query for pure students/parents — they get
     // their role-specific landing below and never render this tree.
@@ -103,6 +123,7 @@ function MyWorkspace() {
           .maybeSingle(),
         8000,
         { data: null, error: null } as any,
+        "staff",
       );
 
       const today = new Date();
@@ -117,40 +138,40 @@ function MyWorkspace() {
         recentMarks, recentAttendance, announcements, activeExams,
       ] = await Promise.all([
         staffId
-          ? withTimeout(supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId), 8000, EMPTY)
+          ? withTimeout(supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId), 8000, EMPTY, "classTeacherOf")
           : Promise.resolve({ data: [] }),
         // Classes this teacher only teaches a subject in (not the class teacher)
         staffId
-          ? withTimeout(supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId), 8000, EMPTY)
+          ? withTimeout(supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId), 8000, EMPTY, "subjectTaughtSlots")
           : Promise.resolve({ data: [] }),
         staffId
           ? withTimeout(supabase.from("timetable_slots")
               .select("start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time"), 8000, EMPTY)
+              .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time"), 8000, EMPTY, "todayTT")
           : Promise.resolve({ data: [] }),
         staffId
           ? withTimeout(supabase.from("timetable_slots")
               .select("day_of_week, start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).order("day_of_week").order("start_time"), 8000, EMPTY)
+              .eq("teacher_id", staffId).order("day_of_week").order("start_time"), 8000, EMPTY, "weekTT")
           : Promise.resolve({ data: [] }),
         staffId
           ? withTimeout(supabase.from("teacher_subjects")
-              .select("subject_id, subjects(id, name)").eq("staff_id", staffId), 8000, EMPTY)
+              .select("subject_id, subjects(id, name)").eq("staff_id", staffId), 8000, EMPTY, "subjects")
           : Promise.resolve({ data: [] }),
         staffId
           ? withTimeout(supabase.from("staff_co_curricular")
-              .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId), 8000, EMPTY)
+              .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId), 8000, EMPTY, "activities")
           : Promise.resolve({ data: [] }),
         withTimeout(supabase.from("exam_results")
           .select("id, score, created_at, subjects(name), exams(name)")
-          .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10), 8000, EMPTY),
+          .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10), 8000, EMPTY, "recentMarks"),
         withTimeout(supabase.from("attendance_records")
           .select("id, date, status, students(first_name, last_name)")
-          .eq("recorded_by", uid).gte("date", todayStr).limit(20), 8000, EMPTY),
+          .eq("recorded_by", uid).gte("date", todayStr).limit(20), 8000, EMPTY, "recentAttendance"),
         withTimeout(supabase.from("announcements")
           .select("id, title, body, pinned, created_at")
-          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20), 8000, EMPTY),
-        withTimeout(supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }), 8000, EMPTY),
+          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20), 8000, EMPTY, "announcements"),
+        withTimeout(supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }), 8000, EMPTY, "activeExams"),
       ]);
 
       // Merge class-teacher classes with subject-taught classes (dedupe by id),
@@ -176,6 +197,7 @@ function MyWorkspace() {
             supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr),
             8000,
             { data: [] as any[], error: null } as any,
+            "classAttendance",
           )).data ?? []
         : [];
       const attendanceSummary = myClassesData.map((c: any) => {
@@ -214,6 +236,7 @@ function MyWorkspace() {
             .in("subject_id", subjectIds as string[]),
           8000,
           { data: [] as any[], error: null } as any,
+          "resultRows",
         );
         (resultRows ?? []).forEach((r: any) => {
           const key = `${r.exam_id}::${r.subject_id}`;
@@ -251,8 +274,32 @@ function MyWorkspace() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading && !stalled) {
     return <div className="p-6 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isLoading && stalled) {
+    // We've been loading for 15s+ — something is genuinely stuck rather
+    // than just slow. Surface it instead of spinning forever, and log
+    // enough for us to diagnose from a bug report.
+    console.error("[portal/me] workspace query stalled past 15s for user", user?.id);
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <h2 className="text-lg font-semibold">This is taking longer than expected</h2>
+          <p className="text-sm text-muted-foreground">
+            Something is stuck loading your workspace. Check the browser console for which
+            request stalled, or try again below.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Do not redirect from this route. In stripped-down deployments the
