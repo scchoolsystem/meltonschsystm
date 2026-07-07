@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,6 +65,8 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function MyWorkspace() {
   const { user, fullName, roles, hasRole } = useAuth();
+  const isStudentOnly = hasRole("student") && !hasRole("staff") && !hasRole("teacher");
+  const isParentOnly = hasRole("parent") && !hasRole("staff") && !hasRole("teacher");
 
   // NOTE: do NOT early-return before the hooks below. Roles arrive
   // asynchronously from useAuth(), so any conditional return here changes
@@ -76,11 +78,8 @@ function MyWorkspace() {
   const { data, isLoading } = useQuery({
     queryKey: ["my-workspace", user?.id],
     // Skip the workspace query for pure students/parents — they get
-    // redirected below and never render this tree.
-    enabled:
-      !!user?.id &&
-      !(hasRole("student") && !hasRole("staff") && !hasRole("teacher")) &&
-      !(hasRole("parent") && !hasRole("staff") && !hasRole("teacher")),
+    // their role-specific landing below and never render this tree.
+    enabled: !!user?.id && !isStudentOnly && !isParentOnly,
     queryFn: async () => {
       const uid = user!.id;
       const { data: staff } = await supabase
@@ -226,15 +225,16 @@ function MyWorkspace() {
     },
   });
 
-  // Students/parents already have dedicated portals — redirect AFTER all
-  // hooks have run so hook order stays stable across renders.
-  if (hasRole("student") && !hasRole("staff") && !hasRole("teacher"))
-    return <Navigate to="/portal/student" />;
-  if (hasRole("parent") && !hasRole("staff") && !hasRole("teacher"))
-    return <Navigate to="/portal/parent" />;
-
   if (isLoading) {
     return <div className="p-6 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  // Do not redirect from this route. In stripped-down deployments the
+  // dedicated student/parent routes may not be registered yet, and navigating
+  // to a missing route is what can leave /portal/me looking like a blank page.
+  // Render a safe role landing here instead.
+  if (isStudentOnly || isParentOnly) {
+    return <RolePortalNotice role={isParentOnly ? "parent" : "student"} />;
   }
 
   const staff = (data?.staff as any) ?? null;
@@ -287,8 +287,8 @@ function MyWorkspace() {
       {(hasRole("parent") || hasRole("student")) && (
         <div className="grid sm:grid-cols-2 gap-3">
           {hasRole("parent") && (
-            <Link
-              to="/portal/parent"
+            <a
+              href="/portal/parent"
               className="flex items-center justify-between gap-3 rounded-xl border p-4 hover:bg-muted/40 transition-colors"
             >
               <div className="flex items-center gap-3">
@@ -299,11 +299,11 @@ function MyWorkspace() {
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            </Link>
+            </a>
           )}
           {hasRole("student") && (
-            <Link
-              to="/portal/student"
+            <a
+              href="/portal/student"
               className="flex items-center justify-between gap-3 rounded-xl border p-4 hover:bg-muted/40 transition-colors"
             >
               <div className="flex items-center gap-3">
@@ -314,7 +314,7 @@ function MyWorkspace() {
                 </div>
               </div>
               <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            </Link>
+            </a>
           )}
         </div>
       )}
@@ -376,7 +376,7 @@ function MyWorkspace() {
             <CardContent className="space-y-1">
               {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
               {data?.myClasses.map((c: any) => (
-                <Link key={c.id} to="/classes" className="flex items-center justify-between border-b py-2 text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
+                <a key={c.id} href="/classes" className="flex items-center justify-between border-b py-2 text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
                   <div>
                     <div className="font-medium">{c.name}</div>
                     <div className="text-xs text-muted-foreground">{c.level ?? "—"}{c.stream ? ` · ${c.stream}` : ""}</div>
@@ -385,7 +385,7 @@ function MyWorkspace() {
                     {c.isClassTeacher && <Badge>Class teacher</Badge>}
                     <Badge variant="secondary">{c.students?.[0]?.count ?? 0} students</Badge>
                   </div>
-                </Link>
+                </a>
               ))}
             </CardContent>
           </Card>
@@ -422,10 +422,10 @@ function MyWorkspace() {
             <CardContent>
               {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
               {data?.myClasses.map((c: any) => (
-                <Link key={c.id} to="/classes" className="flex justify-between py-2 border-b text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
+                <a key={c.id} href="/classes" className="flex justify-between py-2 border-b text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
                   <span className="font-medium">{c.name}</span>
                   <span className="text-muted-foreground">{c.students?.[0]?.count ?? 0} students</span>
-                </Link>
+                </a>
               ))}
               {staff?.class_responsibility && (
                 <p className="text-xs text-muted-foreground mt-3">Class teacher of <Badge variant="secondary">{staff.class_responsibility}</Badge></p>
@@ -550,6 +550,30 @@ function MyWorkspace() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function RolePortalNotice({ role }: { role: "parent" | "student" }) {
+  const title = role === "parent" ? "Parent portal" : "Student portal";
+  const description =
+    role === "parent"
+      ? "Your parent workspace is available from this account."
+      : "Your student workspace is available from this account.";
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Your account is ready, but this workspace has no staff tools assigned yet.
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
