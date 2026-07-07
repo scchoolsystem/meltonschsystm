@@ -63,6 +63,17 @@ export const Route = createFileRoute("/_app/portal/me")({
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Guards against a single slow/hanging Supabase call sinking the entire
+// workspace query. Without this, Promise.all never settles if even one
+// table lookup stalls (slow query, connection-pool exhaustion, etc.) and
+// /portal/me spins forever with no error surfaced anywhere.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise).catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 function MyWorkspace() {
   const { user, fullName, roles, hasRole } = useAuth();
   const isStudentOnly = hasRole("student") && !hasRole("staff") && !hasRole("teacher");
@@ -80,13 +91,19 @@ function MyWorkspace() {
     // Skip the workspace query for pure students/parents — they get
     // their role-specific landing below and never render this tree.
     enabled: !!user?.id && !isStudentOnly && !isParentOnly,
+    retry: false,
+    staleTime: 30_000,
     queryFn: async () => {
       const uid = user!.id;
-      const { data: staff } = await supabase
-        .from("staff")
-        .select("id, first_name, last_name, employee_no, unique_id, photo_url, email, phone, role, department, position_title, staff_category, admin_unit, shift, assigned_area, class_responsibility, departments(name), sub_departments(name)")
-        .eq("user_id", uid)
-        .maybeSingle();
+      const { data: staff } = await withTimeout(
+        supabase
+          .from("staff")
+          .select("id, first_name, last_name, employee_no, unique_id, photo_url, email, phone, role, department, position_title, staff_category, admin_unit, shift, assigned_area, class_responsibility, departments(name), sub_departments(name)")
+          .eq("user_id", uid)
+          .maybeSingle(),
+        8000,
+        { data: null, error: null } as any,
+      );
 
       const today = new Date();
       const dow = today.getDay();
@@ -94,45 +111,46 @@ function MyWorkspace() {
 
       const staffId = (staff as any)?.id ?? null;
 
+      const EMPTY = { data: [] as any[], error: null } as any;
       const [
         classTeacherOf, subjectTaughtSlots, todayTT, weekTT, subjects, activities,
         recentMarks, recentAttendance, announcements, activeExams,
       ] = await Promise.all([
         staffId
-          ? supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId)
+          ? withTimeout(supabase.from("classes").select("id, name, level, stream, students(count)").eq("class_teacher_id", staffId), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
         // Classes this teacher only teaches a subject in (not the class teacher)
         staffId
-          ? supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId)
+          ? withTimeout(supabase.from("timetable_slots").select("class_id, classes(id, name, level, stream, students(count))").eq("teacher_id", staffId), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
         staffId
-          ? supabase.from("timetable_slots")
+          ? withTimeout(supabase.from("timetable_slots")
               .select("start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time")
+              .eq("teacher_id", staffId).eq("day_of_week", dow).order("start_time"), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
         staffId
-          ? supabase.from("timetable_slots")
+          ? withTimeout(supabase.from("timetable_slots")
               .select("day_of_week, start_time, end_time, room, classes(name), subjects(name)")
-              .eq("teacher_id", staffId).order("day_of_week").order("start_time")
+              .eq("teacher_id", staffId).order("day_of_week").order("start_time"), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
         staffId
-          ? supabase.from("teacher_subjects")
-              .select("subject_id, subjects(id, name)").eq("staff_id", staffId)
+          ? withTimeout(supabase.from("teacher_subjects")
+              .select("subject_id, subjects(id, name)").eq("staff_id", staffId), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
         staffId
-          ? supabase.from("staff_co_curricular")
-              .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId)
+          ? withTimeout(supabase.from("staff_co_curricular")
+              .select("role, co_curricular_activities(name, category)").eq("staff_id", staffId), 8000, EMPTY)
           : Promise.resolve({ data: [] }),
-        supabase.from("exam_results")
+        withTimeout(supabase.from("exam_results")
           .select("id, score, created_at, subjects(name), exams(name)")
-          .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10),
-        supabase.from("attendance_records")
+          .eq("recorded_by", uid).order("created_at", { ascending: false }).limit(10), 8000, EMPTY),
+        withTimeout(supabase.from("attendance_records")
           .select("id, date, status, students(first_name, last_name)")
-          .eq("recorded_by", uid).gte("date", todayStr).limit(20),
-        supabase.from("announcements")
+          .eq("recorded_by", uid).gte("date", todayStr).limit(20), 8000, EMPTY),
+        withTimeout(supabase.from("announcements")
           .select("id, title, body, pinned, created_at")
-          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20),
-        supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }),
+          .order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(20), 8000, EMPTY),
+        withTimeout(supabase.from("exams").select("id, name, term, year, status").neq("status", "completed").order("start_date", { ascending: true }), 8000, EMPTY),
       ]);
 
       // Merge class-teacher classes with subject-taught classes (dedupe by id),
@@ -154,7 +172,11 @@ function MyWorkspace() {
 
       // Today's attendance summary, per class
       const classAttendance = classIds.length
-        ? (await supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr)).data ?? []
+        ? (await withTimeout(
+            supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr),
+            8000,
+            { data: [] as any[], error: null } as any,
+          )).data ?? []
         : [];
       const attendanceSummary = myClassesData.map((c: any) => {
         const recs = classAttendance.filter((r: any) => r.class_id === c.id);
@@ -184,11 +206,15 @@ function MyWorkspace() {
 
       const resultCounts = new Map<string, number>();
       if (examIds.length && subjectIds.length) {
-        const { data: resultRows } = await supabase
-          .from("exam_results")
-          .select("exam_id, subject_id")
-          .in("exam_id", examIds)
-          .in("subject_id", subjectIds as string[]);
+        const { data: resultRows } = await withTimeout(
+          supabase
+            .from("exam_results")
+            .select("exam_id, subject_id")
+            .in("exam_id", examIds)
+            .in("subject_id", subjectIds as string[]),
+          8000,
+          { data: [] as any[], error: null } as any,
+        );
         (resultRows ?? []).forEach((r: any) => {
           const key = `${r.exam_id}::${r.subject_id}`;
           resultCounts.set(key, (resultCounts.get(key) ?? 0) + 1);
