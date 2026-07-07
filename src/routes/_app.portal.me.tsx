@@ -86,13 +86,11 @@ function MyWorkspace() {
   const isStudentOnly = hasRole("student") && !hasRole("staff") && !hasRole("teacher");
   const isParentOnly = hasRole("parent") && !hasRole("staff") && !hasRole("teacher");
 
-  // Failsafe #2, decoupled entirely from react-query and from withTimeout
+  // Failsafe decoupled entirely from react-query and from withTimeout
   // above: if this component has been sitting on the loading branch for
   // 15s of real wall-clock time no matter *why*, offer an escape hatch.
-  // This can't get stuck even if the query itself never settles (e.g. the
-  // whole tab's JS got wedged by something unrelated and only recovers on
-  // reload), because it's driven by a plain setTimeout tied to mount, not
-  // by the query's own internal state.
+  // Driven by a plain setTimeout tied to mount, not by the query's own
+  // internal state, so it can't get stuck even if the query never settles.
   const [stalled, setStalled] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setStalled(true), 15000);
@@ -111,6 +109,8 @@ function MyWorkspace() {
     // Skip the workspace query for pure students/parents — they get
     // their role-specific landing below and never render this tree.
     enabled: !!user?.id && !isStudentOnly && !isParentOnly,
+    retry: false,
+    staleTime: 30_000,
     retry: false,
     staleTime: 30_000,
     queryFn: async () => {
@@ -191,10 +191,13 @@ function MyWorkspace() {
       const classIds = myClassesData.map((c: any) => c.id);
       const totalStudentsCount = myClassesData.reduce((s: number, c: any) => s + (c.students?.[0]?.count ?? 0), 0);
 
-      // Today's attendance summary, per class
+      // Today's attendance summary, per class. Capped — without a limit this
+      // fetches every attendance row for these classes on this date; if
+      // date filtering ever mismatches (timezone drift, bad data) it could
+      // silently pull the *entire* table and freeze the tab parsing it.
       const classAttendance = classIds.length
         ? (await withTimeout(
-            supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr),
+            supabase.from("attendance_records").select("class_id, status").in("class_id", classIds).eq("date", todayStr).limit(5000),
             8000,
             { data: [] as any[], error: null } as any,
             "classAttendance",
@@ -219,7 +222,17 @@ function MyWorkspace() {
       // with several active exams x several subjects the old N-times-M
       // sequential loop could fire dozens of serial requests and make this
       // whole workspace query look like it was hanging.
-      const mySubjects = (subjects.data ?? []) as any[];
+      //
+      // De-dupe teacher_subjects rows by subject_id first — duplicate rows
+      // here (known import-duplication issue) otherwise multiply straight
+      // through into the nested loop below and, at scale, into a genuine
+      // main-thread freeze rather than just a stuck spinner.
+      const seenSubjectIds = new Set<string>();
+      const mySubjects = ((subjects.data ?? []) as any[]).filter((ts: any) => {
+        if (!ts.subject_id || seenSubjectIds.has(ts.subject_id)) return false;
+        seenSubjectIds.add(ts.subject_id);
+        return true;
+      });
       const exams = (activeExams.data ?? []) as any[];
       const examIds = exams.map((e: any) => e.id);
       const subjectIds = Array.from(
@@ -233,7 +246,8 @@ function MyWorkspace() {
             .from("exam_results")
             .select("exam_id, subject_id")
             .in("exam_id", examIds)
-            .in("subject_id", subjectIds as string[]),
+            .in("subject_id", subjectIds as string[])
+            .limit(20000),
           8000,
           { data: [] as any[], error: null } as any,
           "resultRows",
@@ -244,9 +258,19 @@ function MyWorkspace() {
         });
       }
 
+      // Safety valve: exams x subjects should be a handful of combos in
+      // practice. If corrupted data ever makes this thousands x thousands,
+      // bail out of the nested loop instead of freezing the tab.
+      const MAX_PENDING_COMBOS = 2000;
       const pendingMarks: any[] = [];
+      let comboCount = 0;
+      outer:
       for (const exam of exams) {
         for (const ts of mySubjects) {
+          if (comboCount++ >= MAX_PENDING_COMBOS) {
+            console.warn(`[portal/me] pending-marks combos exceeded ${MAX_PENDING_COMBOS} — truncating (exams=${exams.length}, subjects=${mySubjects.length})`);
+            break outer;
+          }
           const subjectId = ts.subject_id;
           if (!subjectId) continue;
           const count = resultCounts.get(`${exam.id}::${subjectId}`) ?? 0;
