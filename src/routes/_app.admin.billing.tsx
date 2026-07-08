@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Wallet, Building2 } from "lucide-react";
-import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
+import { MpesaPayDialog } from "@/components/MpesaPayDialog";
 
 export const Route = createFileRoute("/_app/admin/billing")({ component: BillingPage });
 
@@ -134,7 +134,7 @@ function BillingPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {needsPayment && <PayNowButton invoice={inv} schoolId={schoolId!} />}
+                      {needsPayment && <PayNowButton invoice={inv} />}
                     </TableCell>
                   </TableRow>
                 );
@@ -147,9 +147,8 @@ function BillingPage() {
   );
 }
 
-function PayNowButton({ invoice, schoolId }: { invoice: any; schoolId: string }) {
+function PayNowButton({ invoice }: { invoice: any }) {
   const [open, setOpen] = useState(false);
-  const [mpesaOpen, setMpesaOpen] = useState(false);
   const qc = useQueryClient();
   const balance = Number(invoice.amount) - Number(invoice.paid);
 
@@ -185,28 +184,21 @@ function PayNowButton({ invoice, schoolId }: { invoice: any; schoolId: string })
               <p className="text-muted-foreground text-xs">
                 You'll get an M-Pesa prompt on your phone to enter your PIN and complete the payment.
               </p>
-              <Button className="w-full" onClick={() => setMpesaOpen(true)}>
-                <Wallet className="w-4 h-4 mr-1" /> Pay KES {balance.toLocaleString()} with M-Pesa
-              </Button>
+              <MpesaPayDialog
+                invoiceId={invoice.id}
+                outstanding={balance}
+                triggerLabel={`Pay KES ${balance.toLocaleString()} with M-Pesa`}
+                onPaid={() => {
+                  qc.invalidateQueries({ queryKey: ["school-platform-invoices"] });
+                  setOpen(false);
+                }}
+              />
             </TabsContent>
           </Tabs>
 
           <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <PlatformMpesaPayDialog
-        open={mpesaOpen}
-        onOpenChange={setMpesaOpen}
-        invoiceId={invoice.id}
-        schoolId={schoolId}
-        amountDue={balance}
-        onPaid={() => {
-          qc.invalidateQueries({ queryKey: ["school-platform-invoices"] });
-          setMpesaOpen(false);
-          setOpen(false);
-        }}
-      />
     </>
   );
 }
