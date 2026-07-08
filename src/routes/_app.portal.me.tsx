@@ -104,7 +104,7 @@ function MyWorkspace() {
   // was leaving /portal/me stuck on the outer spinner. The redirect is
   // computed after every hook has been called (see `redirectTo` below).
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["my-workspace", user?.id],
     // Skip the workspace query for pure students/parents — they get
     // their role-specific landing below and never render this tree.
@@ -324,6 +324,30 @@ function MyWorkspace() {
     );
   }
 
+  // Surface a real error state instead of silently falling through to the
+  // main render with `data` undefined — every `data?.foo` below defaults to
+  // [] safely now, but without this the person would just see an empty,
+  // confusing workspace instead of knowing something actually failed.
+  if (isError) {
+    console.error("[portal/me] workspace query failed:", error);
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <h2 className="text-lg font-semibold">Couldn't load your workspace</h2>
+          <p className="text-sm text-muted-foreground">
+            Something went wrong fetching your data. Check the browser console for details, or try again.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Do not redirect from this route. In stripped-down deployments the
   // dedicated student/parent routes may not be registered yet, and navigating
   // to a missing route is what can leave /portal/me looking like a blank page.
@@ -432,10 +456,10 @@ function MyWorkspace() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="My classes" value={data?.myClasses.length ?? 0} icon={BookOpen} />
+        <Stat label="My classes" value={(data?.myClasses ?? []).length} icon={BookOpen} />
         <Stat label="Students" value={totalStudents} icon={Users} />
-        <Stat label="Lessons today" value={data?.todayTT.length ?? 0} icon={CalendarDays} />
-        <Stat label="Marks entered (10)" value={data?.recentMarks.length ?? 0} icon={ClipboardList} />
+        <Stat label="Lessons today" value={(data?.todayTT ?? []).length} icon={CalendarDays} />
+        <Stat label="Marks entered (10)" value={(data?.recentMarks ?? []).length} icon={ClipboardList} />
       </div>
 
       <Tabs defaultValue="day">
@@ -455,7 +479,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Today's lessons</CardTitle></CardHeader>
             <CardContent className="space-y-1">
               {(data?.todayTT ?? []).length === 0 && <Empty>No lessons scheduled today.</Empty>}
-              {data?.todayTT.map((s: any, i: number) => (
+              {(data?.todayTT ?? []).map((s: any, i: number) => (
                 <div key={i} className="flex justify-between border-b py-2 text-sm">
                   <span className="font-mono text-xs text-muted-foreground w-24">{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</span>
                   <span className="flex-1 truncate">{s.subjects?.name ?? "—"} · {s.classes?.name ?? "—"}</span>
@@ -470,7 +494,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">My classes</CardTitle><CardDescription>Classes you're the class teacher of, or teach a subject in. Click one to open its full subject and student list.</CardDescription></CardHeader>
             <CardContent className="space-y-1">
               {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
-              {data?.myClasses.map((c: any) => (
+              {(data?.myClasses ?? []).map((c: any) => (
                 <a key={c.id} href="/classes" className="flex items-center justify-between border-b py-2 text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
                   <div>
                     <div className="font-medium">{c.name}</div>
@@ -516,7 +540,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Classes I teach</CardTitle></CardHeader>
             <CardContent>
               {(data?.myClasses ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
-              {data?.myClasses.map((c: any) => (
+              {(data?.myClasses ?? []).map((c: any) => (
                 <a key={c.id} href="/classes" className="flex justify-between py-2 border-b text-sm hover:bg-muted/40 -mx-2 px-2 rounded">
                   <span className="font-medium">{c.name}</span>
                   <span className="text-muted-foreground">{c.students?.[0]?.count ?? 0} students</span>
@@ -530,13 +554,13 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Subjects & activities</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {(data?.subjects ?? []).length === 0 && (data?.activities ?? []).length === 0 && <Empty>None assigned.</Empty>}
-              {data?.subjects.map((s: any, i: number) => (
+              {(data?.subjects ?? []).map((s: any, i: number) => (
                 <div key={`s-${i}`} className="text-sm flex justify-between border-b py-1">
                   <span>{s.subjects?.name ?? "—"}</span>
                   <span className="text-muted-foreground text-xs">{s.classes?.name ?? ""}</span>
                 </div>
               ))}
-              {data?.activities.map((a: any, i: number) => (
+              {(data?.activities ?? []).map((a: any, i: number) => (
                 <div key={`a-${i}`} className="text-sm flex justify-between border-b py-1">
                   <span>{a.co_curricular_activities?.name ?? "—"}</span>
                   <Badge variant="outline" className="text-[10px]">{a.role ?? a.co_curricular_activities?.category}</Badge>
@@ -550,7 +574,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Pending marks entry</CardTitle><CardDescription>Subject + exam combinations awaiting results for your subjects.</CardDescription></CardHeader>
             <CardContent className="space-y-1">
               {(data?.pendingMarks ?? []).length === 0 && <Empty>No active exams or assigned subjects.</Empty>}
-              {data?.pendingMarks.map((p: any, i: number) => (
+              {(data?.pendingMarks ?? []).map((p: any, i: number) => (
                 <div key={i} className="flex items-center justify-between border-b py-2 text-sm">
                   <div>
                     <div className="font-medium">{p.subjectName}</div>
@@ -575,7 +599,7 @@ function MyWorkspace() {
           </CardHeader>
             <CardContent className="space-y-1">
               {(data?.attendanceSummary ?? []).length === 0 && <Empty>No classes assigned.</Empty>}
-              {data?.attendanceSummary.map((s: any) => (
+              {(data?.attendanceSummary ?? []).map((s: any) => (
                 <div key={s.classId} className="flex items-center justify-between border-b py-2 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{s.className}</span>
@@ -604,7 +628,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Recent marks entered</CardTitle></CardHeader>
             <CardContent>
               {(data?.recentMarks ?? []).length === 0 && <Empty>No marks recorded yet.</Empty>}
-              {data?.recentMarks.map((m: any) => (
+              {(data?.recentMarks ?? []).map((m: any) => (
                 <div key={m.id} className="flex justify-between border-b py-1 text-sm">
                   <span>{m.subjects?.name} · {m.exams?.name}</span>
                   <span className="font-mono">{m.score}</span>
@@ -615,7 +639,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base">Attendance I marked today</CardTitle></CardHeader>
             <CardContent>
               {(data?.recentAttendance ?? []).length === 0 && <Empty>No attendance marked today.</Empty>}
-              {data?.recentAttendance.map((a: any) => (
+              {(data?.recentAttendance ?? []).map((a: any) => (
                 <div key={a.id} className="flex justify-between border-b py-1 text-sm">
                   <span>{a.students?.first_name} {a.students?.last_name}</span>
                   <Badge variant={a.status === "present" ? "default" : a.status === "absent" ? "destructive" : "secondary"}>{a.status}</Badge>
@@ -632,7 +656,7 @@ function MyWorkspace() {
           <Card><CardHeader><CardTitle className="text-base flex items-center gap-2"><Megaphone className="w-4 h-4" />Announcements</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {(data?.announcements ?? []).length === 0 && <Empty>No announcements.</Empty>}
-              {data?.announcements.map((a: any) => (
+              {(data?.announcements ?? []).map((a: any) => (
                 <div key={a.id} className="border-b pb-3">
                   <div className="flex items-center gap-2">
                     <div className="font-medium">{a.title}</div>
