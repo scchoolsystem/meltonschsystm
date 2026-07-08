@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { SchoolSplashScreen } from "@/components/SchoolSplashScreen";
-import { supabase } from "@/integrations/supabase/client";
+import { getSessionSafe } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
 
 export const Route = createFileRoute("/_app")({
@@ -19,7 +19,15 @@ export const Route = createFileRoute("/_app")({
     // session once it hydrates and shows a branded loading screen instead.
     if (typeof window === "undefined") return;
 
-    const { data, error } = await supabase.auth.getSession();
+    // This runs on EVERY navigation into any route under /_app (i.e. almost
+    // every click in the app), because beforeLoad re-runs for the whole
+    // matched route chain. See getSessionSafe() for why this must be
+    // timeout-guarded — an unguarded hang here blocks the entire route
+    // transition forever: no paint, no CPU usage, just a permanently
+    // pending navigation. That's the "click My Workspace and everything
+    // freezes" bug — it's not a render-time freeze, it's a stuck nav guard.
+    const { data, error, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to AppLayout's client-side check below
     if (error || !data.session) {
       // Save the current path so login can redirect back after auth
       throw redirect({
