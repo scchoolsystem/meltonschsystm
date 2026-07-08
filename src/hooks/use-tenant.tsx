@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Capacitor Preferences is only available inside the Android/iOS native shell.
@@ -130,7 +130,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loadSchool = async (targetSlug: string | null) => {
+  // Memoized: `refresh`/`setSchoolSlug` below close over this function, and
+  // both end up in the provider's memoized context value (see the note on
+  // AuthProvider in use-auth.tsx for why an unstable context value/closure
+  // at this level of the tree is dangerous — any consumer that puts
+  // `refresh` in a useEffect/useMemo dependency array needs it to only
+  // change when it actually needs to re-run, not on every render).
+  const loadSchool = useCallback(async (targetSlug: string | null) => {
     setLoading(true); setError(null);
     try {
       if (!targetSlug || targetSlug === PLATFORM_SLUG) {
@@ -161,7 +167,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setSchool(null);
     }
     finally { setLoading(false); }
-  };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 5000);
@@ -169,6 +175,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       .catch(() => setLoading(false))
       .finally(() => clearTimeout(timer));
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
   }, []);
 
   useEffect(() => {
@@ -178,16 +185,29 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       document.title = isPlatformHost ? "Platform Admin — SmartDev ERP" : school?.name ? `${school.name} — ERP` : "SmartDev ERP";
   }, [school, isPlatformHost]);
 
-  const setSchoolSlug = async (newSlug: string) => {
+  const setSchoolSlug = useCallback(async (newSlug: string) => {
     await storageSet(STORAGE_KEY, newSlug); setSlug(newSlug); await loadSchool(newSlug);
-  };
+  }, [loadSchool]);
 
-  const clearSchoolSlug = async () => {
+  const clearSchoolSlug = useCallback(async () => {
     await storageRemove(STORAGE_KEY); setSlug(null); setSchool(null); setFeatures({});
-  };
+  }, []);
+
+  const refresh = useCallback(() => loadSchool(slug), [loadSchool, slug]);
+
+  // Memoized deliberately — see the comment above `loadSchool`. Without this,
+  // `value` (and the `refresh` closure inside it) was a brand-new object on
+  // every render of TenantProvider, which sits near the root of the tree and
+  // re-renders on essentially every navigation. Any future consumer that put
+  // `refresh` (or the tenant object itself) in an effect's dependency array
+  // would re-run that effect on every render, not just when the school
+  // actually changes — the same bug class already fixed in AuthProvider.
+  const value = useMemo(() => ({
+    school, slug, isPlatformHost, features, loading, error, refresh, setSchoolSlug, clearSchoolSlug,
+  }), [school, slug, isPlatformHost, features, loading, error, refresh, setSchoolSlug, clearSchoolSlug]);
 
   return (
-    <TenantContext.Provider value={{ school, slug, isPlatformHost, features, loading, error, refresh: () => loadSchool(slug), setSchoolSlug, clearSchoolSlug }}>
+    <TenantContext.Provider value={value}>
       {children}
     </TenantContext.Provider>
   );
