@@ -1,7 +1,7 @@
 import React from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Printer, ShieldCheck, TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -11,7 +11,8 @@ import { useMemo } from "react";
 
 export const Route = createFileRoute("/_app/academics/report-card/$studentId/$examId")({
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
+    const { data, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: ReportCardPage,
