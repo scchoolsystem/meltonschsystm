@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, redirect, useNavigate, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe,
@@ -11,7 +11,8 @@ export const Route = createFileRoute("/platform")({
   beforeLoad: async ({ location }) => {
     // Don't guard the login page itself (avoid redirect loop)
     if (location.pathname === "/platform/login") return;
-    const { data } = await supabase.auth.getSession();
+    const { data, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to client-side check rather than bouncing to login
     if (!data.session) {
       throw redirect({ to: "/platform/login", search: { redirect: location.href } });
     }
