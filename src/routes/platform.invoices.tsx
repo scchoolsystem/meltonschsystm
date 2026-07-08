@@ -12,8 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Receipt, Smartphone } from "lucide-react";
-import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
+import { Receipt } from "lucide-react";
+import { MpesaPayDialog } from "@/components/MpesaPayDialog";
 
 export const Route = createFileRoute("/platform/invoices")({
   component: PlatformInvoices,
@@ -26,7 +26,6 @@ function PlatformInvoices() {
 
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
-  const [mpesaTarget, setMpesaTarget] = useState<{ id: string; school_id: string; due: number } | null>(null);
 
   const { data: invoices } = useQuery({
     queryKey: ["all-platform-invoices"],
@@ -165,14 +164,12 @@ function PlatformInvoices() {
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{i.notes ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     {!isOwner && i.status !== "paid" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                        onClick={() => setMpesaTarget({ id: i.id, school_id: i.school_id, due: Number(i.amount) - Number(i.paid) })}
-                      >
-                        <Smartphone className="h-3.5 w-3.5" /> Pay Now
-                      </Button>
+                      <MpesaPayDialog
+                        invoiceId={i.id}
+                        outstanding={Number(i.amount) - Number(i.paid)}
+                        triggerLabel="Pay Now"
+                        onPaid={() => qc.invalidateQueries({ queryKey: ["all-platform-invoices"] })}
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -184,20 +181,6 @@ function PlatformInvoices() {
           </Table>
         </CardContent>
       </Card>
-
-      {mpesaTarget && (
-        <PlatformMpesaPayDialog
-          open={!!mpesaTarget}
-          onOpenChange={(o) => !o && setMpesaTarget(null)}
-          invoiceId={mpesaTarget.id}
-          schoolId={mpesaTarget.school_id}
-          amountDue={mpesaTarget.due}
-          onPaid={() => {
-            qc.invalidateQueries({ queryKey: ["all-platform-invoices"] });
-            setMpesaTarget(null);
-          }}
-        />
-      )}
     </div>
   );
 }
