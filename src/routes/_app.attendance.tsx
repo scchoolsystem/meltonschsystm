@@ -96,6 +96,14 @@ function MyLessonsPanel({ staffId, date, userId }: { staffId: string; date: stri
 
   const { data: lessons = [], isLoading: lessonsLoading } = useQuery({
     queryKey: ["my-lessons", staffId, dow],
+    // A teacher's timetable for the day doesn't change minute-to-minute, so
+    // there's no reason to refetch on every window refocus (the TanStack
+    // Query default). Without this, `lessons` got a brand-new array
+    // reference from every background refetch even when the rows were
+    // identical, and the effect below (keyed on that reference) would
+    // silently reset whichever lesson the teacher had selected back to the
+    // first one — losing their place mid-way through marking attendance.
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("timetable_slots")
@@ -110,10 +118,19 @@ function MyLessonsPanel({ staffId, date, userId }: { staffId: string; date: stri
 
   const [selectedSlotId, setSelectedSlotId] = useState<string>("");
 
-  // Auto-select the first lesson whenever the day's list loads/changes.
+  // Auto-select the first lesson only when there's no valid selection yet
+  // (first load, or the day changed and the previously-selected lesson no
+  // longer exists in the new list) — not on every reference change of
+  // `lessons`. Keyed on the ids themselves (a stable string), not the array
+  // reference, so a refetch that returns the same rows doesn't reset
+  // anything the teacher already picked.
+  const lessonIdsKey = (lessons as any[]).map((l) => l.id).join(",");
   useEffect(() => {
-    setSelectedSlotId((lessons as any[])[0]?.id ?? "");
-  }, [lessons]);
+    const ids = lessonIdsKey ? lessonIdsKey.split(",") : [];
+    if (selectedSlotId && ids.includes(selectedSlotId)) return;
+    setSelectedSlotId(ids[0] ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on the id list, not selectedSlotId, to avoid re-running on every selection change
+  }, [lessonIdsKey]);
 
   const slot = useMemo(() => (lessons as any[]).find(l => l.id === selectedSlotId) ?? null, [lessons, selectedSlotId]);
 
