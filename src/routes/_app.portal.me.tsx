@@ -111,8 +111,6 @@ function MyWorkspace() {
     enabled: !!user?.id && !isStudentOnly && !isParentOnly,
     retry: false,
     staleTime: 30_000,
-    retry: false,
-    staleTime: 30_000,
     queryFn: async () => {
       const uid = user!.id;
       const { data: staff } = await withTimeout(
