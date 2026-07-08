@@ -32,6 +32,21 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | undefined>(undefined);
 
+// Guards an individual Supabase call so a slow/hanging roles or profile
+// query can't silently ride along until the unrelated blanket 6s
+// `rolesLoaded` failsafe (below) fires. Without this, the only thing
+// preventing a hang was that global timer — which meant a merely-slow (not
+// hung) query could resolve *after* the UI already moved on with an empty
+// roles array, causing a visible "pop in" of the sidebar/permissions a few
+// seconds late instead of failing fast to a known state. Mirrors the
+// `withTimeout()` pattern already used in `_app.portal.me.tsx`.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise).catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
@@ -83,18 +98,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   async function loadProfile(uid: string) {
-    try {
-      const [{ data: rolesData }, { data: prof }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", uid),
-        supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle(),
-      ]);
-      setRoles((rolesData ?? []).map((r) => r.role as AppRole));
-      setFullName(prof?.full_name ?? "");
-    } catch (err) {
-      console.error("[useAuth] loadProfile failed:", err);
-    } finally {
-      setRolesLoaded(true);
-    }
+    // Kick off both queries and let them run to completion regardless of
+    // how long they take — timing them out early would mean a merely-slow
+    // (not hung) query's real roles/name are thrown away instead of just
+    // arriving late. Each one updates state whenever it actually resolves.
+    const rolesPromise = supabase.from("user_roles").select("role").eq("user_id", uid)
+      .then(({ data }) => setRoles((data ?? []).map((r) => r.role as AppRole)))
+      .catch((err) => console.error("[useAuth] roles query failed:", err));
+    const profilePromise = supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle()
+      .then(({ data }) => setFullName(data?.full_name ?? ""))
+      .catch((err) => console.error("[useAuth] profile query failed:", err));
+
+    // But don't block the UI on them past 4s — `rolesLoaded` flips to true
+    // (with whatever roles have arrived so far, possibly still empty) so
+    // _app.tsx's splash screen doesn't sit there waiting on a slow network
+    // when the failsafe below would otherwise be the only thing unblocking
+    // it 2+ seconds later. Whichever query is still in flight keeps running
+    // in the background and updates state the moment it resolves.
+    await withTimeout(Promise.all([rolesPromise, profilePromise]), 4000, undefined);
+    setRolesLoaded(true);
   }
 
   // Memoized deliberately. Every consumer that puts hasRole (or isAdmin,
