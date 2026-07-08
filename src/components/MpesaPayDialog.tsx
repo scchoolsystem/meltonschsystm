@@ -13,9 +13,13 @@ interface Props {
   outstanding: number;
   defaultPhone?: string;
   triggerLabel?: string;
+  /** Called after the STK push is successfully initiated, so callers can
+   * refresh whatever invoice/query list they're showing. Optional so
+   * existing callers (student/parent portals) are unaffected. */
+  onPaid?: () => void;
 }
 
-export function MpesaPayDialog({ invoiceId, outstanding, defaultPhone = "", triggerLabel = "Pay" }: Props) {
+export function MpesaPayDialog({ invoiceId, outstanding, defaultPhone = "", triggerLabel = "Pay", onPaid }: Props) {
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState(defaultPhone);
   const [amount, setAmount] = useState(String(outstanding));
@@ -28,6 +32,7 @@ export function MpesaPayDialog({ invoiceId, outstanding, defaultPhone = "", trig
       const r = await initiate({ data: { invoice_id: invoiceId, phone, amount: Number(amount) } });
       toast.success(r.message ?? "STK push sent");
       setOpen(false);
+      onPaid?.();
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to initiate payment");
     } finally {
