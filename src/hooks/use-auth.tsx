@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { registerPushNotifications, unregisterPushToken } from "@/lib/push-notifications";
 import { useRouter } from "@tanstack/react-router";
 
@@ -77,7 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    // Unlike a plain `supabase.auth.getSession()`, this is immune to the
+    // supabase-js internal-lock hang documented in client.ts — it always
+    // settles within `timeoutMs` even if the underlying call never returns
+    // (worse with multiple tabs of this app open against the same
+    // storageKey). Without this guard, a stuck lock here left `session`
+    // at its initial `null` forever: `loading` still flips false via the
+    // safety timer below, but the outer /_app gate checks `!session` too,
+    // so the app would sit on the splash screen (or, if a stray
+    // `onAuthStateChange` INITIAL_SESSION event happened to populate
+    // `session` independently, leave a dangling locked promise that could
+    // then block every *other* Supabase call sharing this client for the
+    // rest of the session) — either way, zero network requests and zero
+    // console output, since nothing ever throws or times out on its own.
+    getSessionSafe().then(({ data: { session: s }, timedOut }) => {
+      if (timedOut) {
+        console.warn("[useAuth] getSession() timed out — deferring to onAuthStateChange");
+        return;
+      }
       setSession(s);
       if (s?.user) {
         loadProfile(s.user.id).finally(() => setLoading(false));
