@@ -1,138 +1,67 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { initiateMpesaPayment } from "@/lib/mpesa.functions";
 import { toast } from "sonner";
-import { Loader2, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 
-type Props = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface Props {
   invoiceId: string;
-  schoolId: string;
-  amountDue: number;
-  onPaid?: () => void;
-};
+  outstanding: number;
+  defaultPhone?: string;
+  triggerLabel?: string;
+}
 
-export function PlatformMpesaPayDialog({ open, onOpenChange, invoiceId, schoolId, amountDue, onPaid }: Props) {
-  const [phone, setPhone] = useState("");
-  const [amount, setAmount] = useState(String(amountDue));
-  const [status, setStatus] = useState<"idle" | "sending" | "waiting" | "success" | "failed">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const txnIdRef = useRef<string | null>(null);
+export function MpesaPayDialog({ invoiceId, outstanding, defaultPhone = "", triggerLabel = "Pay" }: Props) {
+  const [open, setOpen] = useState(false);
+  const [phone, setPhone] = useState(defaultPhone);
+  const [amount, setAmount] = useState(String(outstanding));
+  const [busy, setBusy] = useState(false);
+  const initiate = useServerFn(initiateMpesaPayment);
 
-  useEffect(() => {
-    if (!open) {
-      setStatus("idle");
-      setMessage(null);
-      if (pollRef.current) clearInterval(pollRef.current);
-    }
-  }, [open]);
-
-  const startPolling = (txnId: string) => {
-    txnIdRef.current = txnId;
-    pollRef.current = setInterval(async () => {
-      const { data } = await supabase
-        .from("platform_mpesa_transactions")
-        .select("status, result_desc, mpesa_receipt")
-        .eq("id", txnId)
-        .maybeSingle();
-      if (!data) return;
-      if (data.status === "success") {
-        setStatus("success");
-        setMessage(`Payment confirmed. Receipt: ${data.mpesa_receipt ?? "—"}`);
-        if (pollRef.current) clearInterval(pollRef.current);
-        toast.success("Payment received");
-        onPaid?.();
-      } else if (data.status === "failed" || data.status === "cancelled") {
-        setStatus("failed");
-        setMessage(data.result_desc ?? "Payment was not completed");
-        if (pollRef.current) clearInterval(pollRef.current);
-      }
-    }, 3000);
-
-    // Stop polling after 2 minutes regardless
-    setTimeout(() => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (status === "waiting") {
-        setStatus("failed");
-        setMessage("Timed out waiting for confirmation. Check your phone or try again.");
-      }
-    }, 120000);
-  };
-
-  const handlePay = async () => {
-    if (!phone.trim()) {
-      toast.error("Enter the M-Pesa phone number");
-      return;
-    }
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
-    setStatus("sending");
-    setMessage(null);
+  async function submit() {
+    setBusy(true);
     try {
-      const defaultApiBase = window.location.protocol === "file:" ? "https://app.smartdev.co.ke" : "";
-      const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? defaultApiBase;
-      const res = await fetch(`${apiBase}/api/public/platform-mpesa-stk`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoice_id: invoiceId, school_id: schoolId, phone, amount: amt }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Failed to send STK push");
-      setStatus("waiting");
-      setMessage("Check your phone and enter your M-Pesa PIN to complete the payment.");
-      startPolling(json.transaction_id);
+      const r = await initiate({ data: { invoice_id: invoiceId, phone, amount: Number(amount) } });
+      toast.success(r.message ?? "STK push sent");
+      setOpen(false);
     } catch (e: any) {
-      setStatus("failed");
-      setMessage(e.message ?? "Something went wrong");
+      toast.error(e?.message ?? "Failed to initiate payment");
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" disabled={outstanding <= 0}>
+          <Smartphone className="w-4 h-4 mr-1" /> {triggerLabel}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5" /> Pay with M-Pesa
-          </DialogTitle>
+          <DialogTitle>Pay with M-Pesa</DialogTitle>
+          <DialogDescription>Outstanding: KES {outstanding.toLocaleString()}</DialogDescription>
         </DialogHeader>
-
-        {status === "idle" || status === "sending" ? (
-          <div className="space-y-3">
-            <div>
-              <Label>Phone number</Label>
-              <Input placeholder="07XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div>
-              <Label>Amount (KES)</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
+        <div className="space-y-3">
+          <div>
+            <Label>Safaricom phone number</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XXXXXXXX" />
           </div>
-        ) : (
-          <div className="py-6 text-center space-y-2">
-            {status === "waiting" && <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />}
-            <p className="text-sm text-muted-foreground">{message}</p>
+          <div>
+            <Label>Amount (KES)</Label>
+            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
-        )}
-
+        </div>
         <DialogFooter>
-          {status === "idle" || status === "sending" ? (
-            <Button onClick={handlePay} disabled={status === "sending"} className="w-full">
-              {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Send M-Pesa prompt
-            </Button>
-          ) : status === "success" ? (
-            <Button onClick={() => onOpenChange(false)} className="w-full">Done</Button>
-          ) : (
-            <Button variant="outline" onClick={() => setStatus("idle")} className="w-full">Try again</Button>
-          )}
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || !phone || !Number(amount)}>
+            {busy ? "Sending…" : "Send STK push"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
