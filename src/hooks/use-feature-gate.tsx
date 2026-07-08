@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import { useTenant } from "@/hooks/use-tenant";
 
 /**
@@ -23,6 +24,9 @@ export type FeatureKey =
 
 export function useFeatureGate(): { isEnabled: (k: FeatureKey) => boolean; features: Record<string, boolean> } {
   const { features } = useTenant();
-  const isEnabled = (k: FeatureKey) => features[k] !== false; // default-on
-  return { isEnabled, features };
+  // Memoized so consumers can safely put `isEnabled` or the returned object
+  // in a useEffect/useMemo dependency array without it changing on every
+  // render (same reasoning as the AuthProvider/TenantProvider context values).
+  const isEnabled = useCallback((k: FeatureKey) => features[k] !== false, [features]); // default-on
+  return useMemo(() => ({ isEnabled, features }), [isEnabled, features]);
 }
