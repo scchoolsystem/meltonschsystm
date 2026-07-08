@@ -141,23 +141,31 @@ function ParentPortal() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data: links } = await supabase
-        .from("parent_student_links")
-        .select("student_id, relationship, students(id, first_name, last_name, admission_no, unique_id, classes(name, id))")
-        .eq("parent_user_id", user.id);
-      const kids = (links ?? []).map((l: any) => l.students).filter(Boolean);
-      setChildren(kids);
-      if (kids[0]) setActiveId(kids[0].id);
-      const { data: an } = await supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10);
-      setAnnouncements(an ?? []);
-      setLoading(false);
+      try {
+        const { data: links, error: linksErr } = await supabase
+          .from("parent_student_links")
+          .select("student_id, relationship, students(id, first_name, last_name, admission_no, unique_id, classes(name, id))")
+          .eq("parent_user_id", user.id);
+        if (linksErr) throw linksErr;
+        const kids = (links ?? []).map((l: any) => l.students).filter(Boolean);
+        setChildren(kids);
+        if (kids[0]) setActiveId(kids[0].id);
+        const { data: an } = await supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10);
+        setAnnouncements(an ?? []);
+      } catch (e: any) {
+        console.error("Parent portal failed to load:", e);
+        toast.error(e?.message ?? "Couldn't load your portal. Please refresh.");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [user]);
 
   useEffect(() => {
     if (!activeId) return;
     (async () => {
-      const stu = children.find(c => c.id === activeId);
+      try {
+        const stu = children.find(c => c.id === activeId);
       const classId = stu?.classes?.id ?? null;
       const since = new Date(Date.now() - 7 * 864e5).toISOString();
       const until = new Date(Date.now() + 14 * 864e5).toISOString();
@@ -203,6 +211,10 @@ function ParentPortal() {
         documents: docs.data ?? [],
         weekMeals: meals.data ?? [],
       });
+      } catch (e: any) {
+        console.error("Parent portal child data failed to load:", e);
+        toast.error(e?.message ?? "Some data for this child couldn't load. Please refresh.");
+      }
     })();
   }, [activeId, children]);
 
