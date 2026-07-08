@@ -1,7 +1,7 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,8 @@ import { stagger, fadeUp } from "@/components/motion-variants";
 
 export const Route = createFileRoute("/_app/academics/results")({
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
+    const { data, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: ResultsGuard,
