@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,9 +32,17 @@ export const Route = createFileRoute("/_app/portal")({
 function UniversalPortal() {
   const { hasRole, rolesLoaded } = useAuth();
   const navigate = useNavigate();
+  // Defense in depth on top of the hasRole memoization fix in use-auth.tsx:
+  // dispatch exactly once per mount instead of re-running whenever hasRole's
+  // reference changes. This is what turned a single stray re-render into an
+  // unconditional navigate()-loop before (see use-auth.tsx for the full
+  // story) — this ref makes that class of bug impossible here even if some
+  // future change makes hasRole unstable again.
+  const dispatched = useRef(false);
 
   useEffect(() => {
-    if (!rolesLoaded) return;
+    if (!rolesLoaded || dispatched.current) return;
+    dispatched.current = true;
 
     const isStaffLike = hasRole("staff") || hasRole("teacher");
     const isPureStudent = hasRole("student") && !isStaffLike;
