@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { registerPushNotifications, unregisterPushToken } from "@/lib/push-notifications";
@@ -97,21 +97,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const value: AuthCtx = {
+  // Memoized deliberately. Every consumer that puts hasRole (or isAdmin,
+  // or this whole context value) in a useEffect/useMemo dependency array is
+  // trusting it to only change when roles/session actually change. Before
+  // this fix, `value` (and hasRole inside it) was a brand-new object/
+  // function on every single AuthProvider render — including renders
+  // triggered by ordinary navigation, which re-renders the root layout.
+  // The one place that mattered: /portal's dispatcher (_app.portal.tsx)
+  // has `hasRole` in its effect deps, so on the OLD code every navigation
+  // re-ran that effect and called navigate() again, which triggered
+  // another render, another new hasRole, another navigate() — an
+  // unconditional re-render/re-navigate loop. That's the "click My
+  // Workspace and everything freezes" bug: pegged CPU, and each cycle
+  // re-firing the beforeLoad auth check hundreds of times a second.
+  const hasRole = useCallback((r: AppRole) => roles.includes(r), [roles]);
+  const isAdmin = useMemo(
+    () => roles.includes("super_admin") || roles.includes("principal") || roles.includes("platform_owner"),
+    [roles],
+  );
+  const signOut = useCallback(async () => {
+    await unregisterPushToken();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }, []);
+
+  const value: AuthCtx = useMemo(() => ({
     session,
     user: session?.user ?? null,
     roles,
     fullName,
     loading,
     rolesLoaded,
-    hasRole: (r) => roles.includes(r),
-    isAdmin: roles.includes("super_admin") || roles.includes("principal") || roles.includes("platform_owner"),
-    signOut: async () => {
-      await unregisterPushToken();
-      await supabase.auth.signOut();
-      window.location.href = "/login";
-    },
-  };
+    hasRole,
+    isAdmin,
+    signOut,
+  }), [session, roles, fullName, loading, rolesLoaded, hasRole, isAdmin, signOut]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
