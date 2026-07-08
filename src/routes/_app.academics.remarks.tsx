@@ -17,7 +17,7 @@
 
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,8 @@ import {
 
 export const Route = createFileRoute("/_app/academics/remarks")({
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
+    const { data, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: RemarksPage,
