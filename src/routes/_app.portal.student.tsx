@@ -6,7 +6,7 @@
 import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,8 @@ import {
 // ─── Route ────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/_app/portal/student")({
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getSession();
+    const { data, timedOut } = await getSessionSafe();
+    if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: StudentPortalGuard,
