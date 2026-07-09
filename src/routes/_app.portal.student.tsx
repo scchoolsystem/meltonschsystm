@@ -7,6 +7,7 @@ import { StudentPerformanceCenter } from "@/components/students/StudentPerforman
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1045,6 +1046,13 @@ function StudentPortal() {
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  // Escape hatch: if the initial load has been stuck for 15s of real
+  // wall-clock time — no matter why — offer a way out instead of spinning
+  // forever. Driven by a plain setTimeout tied to mount/retry, not by the
+  // fetch's own state, so it can't get stuck even if a query never
+  // settles. Mirrors the pattern in _app.portal.me.tsx / _app.portal.parent.tsx.
+  const [stalled, setStalled] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   // Sidebar links land here as e.g. /portal/student?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
   const [securityVerified, setSecurityVerified] = useState(false);
@@ -1060,54 +1068,74 @@ function StudentPortal() {
   };
 
   useEffect(() => {
+    setStalled(false);
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, [retryKey]);
+
+  useEffect(() => {
     if (!user) return;
+    setLoading(true);
     (async () => {
-      const { data: link, error } = await supabase
-        .from("student_user_links")
-        .select("student_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error || !link) {
-        const isStaff = roles.some((r: any) =>
-          ["super_admin", "principal", "deputy_principal", "school_admin",
-            "class_teacher", "subject_teacher", "teacher", "hod",
-            "academic_master", "exams_admin"].includes(r)
+      try {
+        const { data: link, error } = await withTimeout(
+          supabase
+            .from("student_user_links")
+            .select("student_id")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          8000,
+          { data: null, error: null } as any,
+          "student_user_links",
         );
-        if (!isStaff) { setLoading(false); return; }
-        setSecurityVerified(true);
-        setLoading(false);
-        return;
-      }
 
-      setSecurityVerified(true);
-      await loadStudentData(link.student_id);
-      setLoading(false);
+        if (error || !link) {
+          const isStaff = roles.some((r: any) =>
+            ["super_admin", "principal", "deputy_principal", "school_admin",
+              "class_teacher", "subject_teacher", "teacher", "hod",
+              "academic_master", "exams_admin"].includes(r)
+          );
+          if (!isStaff) { setLoading(false); return; }
+          setSecurityVerified(true);
+          setLoading(false);
+          return;
+        }
+
+        setSecurityVerified(true);
+        await loadStudentData(link.student_id);
+      } catch (e: any) {
+        console.error("Student portal failed to load:", e);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [user]);
+  }, [user, retryKey]);
 
   const loadStudentData = async (sid: string) => {
-    const sRes = await supabase
-      .from("students")
-      .select("*, classes(id, name, level, stream)")
-      .eq("id", sid).maybeSingle();
+    const sRes = await withTimeout(
+      supabase.from("students").select("*, classes(id, name, level, stream)").eq("id", sid).maybeSingle(),
+      8000,
+      { data: null, error: null } as any,
+      "students",
+    );
     const stu = sRes.data;
     setStudent(stu);
     const classId = stu?.classes?.id;
 
+    const EMPTY = { data: [] as any[], error: null } as any;
     const [a, r, i, l, an, tt, dr, cv, da, gp] = await Promise.all([
-      supabase.from("attendance_records").select("*").eq("student_id", sid).order("date", { ascending: false }).limit(90),
-      supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year)").eq("student_id", sid).order("created_at", { ascending: false }).limit(100),
-      supabase.from("invoices").select("*").eq("student_id", sid).order("created_at", { ascending: false }),
-      supabase.from("book_loans").select("*, books(title, author)").eq("student_id", sid).order("borrowed_on", { ascending: false }).limit(20),
-      supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10),
+      withTimeout(supabase.from("attendance_records").select("*").eq("student_id", sid).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
+      withTimeout(supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year)").eq("student_id", sid).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "exam_results"),
+      withTimeout(supabase.from("invoices").select("*").eq("student_id", sid).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
+      withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", sid).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "book_loans"),
+      withTimeout(supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10), 8000, EMPTY, "announcements"),
       classId
-        ? supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time")
+        ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable_slots")
         : Promise.resolve({ data: [] } as any),
-      supabase.from("discipline_records").select("*").eq("student_id", sid).order("incident_date", { ascending: false }).limit(20),
-      supabase.from("clinic_visits").select("*").eq("student_id", sid).order("visit_date", { ascending: false }).limit(20),
-      supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("gate_passes").select("*").eq("student_id", sid).order("exit_time", { ascending: false }).limit(20),
+      withTimeout(supabase.from("discipline_records").select("*").eq("student_id", sid).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline_records"),
+      withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", sid).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic_visits"),
+      withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "dorm_assignments"),
+      withTimeout(supabase.from("gate_passes").select("*").eq("student_id", sid).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gate_passes"),
     ]);
 
     setAttendance(a.data ?? []);
@@ -1124,50 +1152,84 @@ function StudentPortal() {
     if (classId) {
       const since = new Date(Date.now() - 7 * 864e5).toISOString();
       const until = new Date(Date.now() + 14 * 864e5).toISOString();
-      const { data: ls } = await (supabase as any)
-        .from("live_sessions")
-        .select("id, title, scheduled_start, scheduled_end, status, room_name, classes(name)")
-        .eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until)
-        .order("scheduled_start", { ascending: true });
+      const { data: ls } = await withTimeout(
+        (supabase as any)
+          .from("live_sessions")
+          .select("id, title, scheduled_start, scheduled_end, status, room_name, classes(name)")
+          .eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until)
+          .order("scheduled_start", { ascending: true }),
+        8000,
+        { data: [] as any[], error: null } as any,
+        "live_sessions",
+      );
       setLiveUpcoming(ls ?? []);
     }
 
-    const { data: la } = await (supabase as any)
-      .from("live_session_attendance")
-      .select("id, status, joined_at, left_at, duration_seconds, live_sessions(title, scheduled_start)")
-      .eq("student_id", sid).order("created_at", { ascending: false }).limit(30);
+    const { data: la } = await withTimeout(
+      (supabase as any)
+        .from("live_session_attendance")
+        .select("id, status, joined_at, left_at, duration_seconds, live_sessions(title, scheduled_start)")
+        .eq("student_id", sid).order("created_at", { ascending: false }).limit(30),
+      8000,
+      { data: [] as any[], error: null } as any,
+      "live_session_attendance",
+    );
     setLiveAttendance(la ?? []);
 
-    const { data: docs } = await (supabase as any)
-      .from("student_documents").select("*").eq("student_id", sid).order("created_at", { ascending: false });
+    const { data: docs } = await withTimeout(
+      (supabase as any).from("student_documents").select("*").eq("student_id", sid).order("created_at", { ascending: false }),
+      8000,
+      { data: [] as any[], error: null } as any,
+      "student_documents",
+    );
     setDocuments(docs ?? []);
 
-    const { data: tr } = await (supabase as any)
-      .from("transport_assignments")
-      .select("*, pickup_point, transport_routes(name, dropoff_point, driver_name, driver_phone, vehicle_reg, pickup_point)")
-      .eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle();
+    const { data: tr } = await withTimeout(
+      (supabase as any)
+        .from("transport_assignments")
+        .select("*, pickup_point, transport_routes(name, dropoff_point, driver_name, driver_phone, vehicle_reg, pickup_point)")
+        .eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
+      8000,
+      { data: null, error: null } as any,
+      "transport_assignments",
+    );
     setTransport(tr ?? null);
 
     const today0 = new Date();
     const weekStart = format(startOfWeek(today0, { weekStartsOn: 1 }), "yyyy-MM-dd");
     const weekEnd = format(endOfWeek(today0, { weekStartsOn: 1 }), "yyyy-MM-dd");
-    const { data: meals } = await supabase.from("meal_plans").select("*")
-      .gte("meal_date", weekStart).lte("meal_date", weekEnd)
-      .order("meal_date", { ascending: true }).order("meal_type", { ascending: true });
+    const { data: meals } = await withTimeout(
+      supabase.from("meal_plans").select("*")
+        .gte("meal_date", weekStart).lte("meal_date", weekEnd)
+        .order("meal_date", { ascending: true }).order("meal_type", { ascending: true }),
+      8000,
+      { data: [] as any[], error: null } as any,
+      "meal_plans",
+    );
     setWeekMeals(meals ?? []);
 
-    const { data: cc } = await (supabase as any)
-      .from("student_co_curricular")
-      .select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)")
-      .eq("student_id", sid);
+    const { data: cc } = await withTimeout(
+      (supabase as any)
+        .from("student_co_curricular")
+        .select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)")
+        .eq("student_id", sid),
+      8000,
+      { data: [] as any[], error: null } as any,
+      "student_co_curricular",
+    );
     const ccList = cc ?? [];
     const activityIds = ccList.map((c: any) => c.co_curricular_activities?.id).filter(Boolean);
     let coaches: any[] = [];
     if (activityIds.length) {
-      const { data: cd } = await (supabase as any)
-        .from("staff_co_curricular")
-        .select("activity_id, role, staff(first_name, last_name)")
-        .in("activity_id", activityIds);
+      const { data: cd } = await withTimeout(
+        (supabase as any)
+          .from("staff_co_curricular")
+          .select("activity_id, role, staff(first_name, last_name)")
+          .in("activity_id", activityIds),
+        8000,
+        { data: [] as any[], error: null } as any,
+        "staff_co_curricular",
+      );
       coaches = cd ?? [];
     }
     setCoCurricular(ccList.map((c: any) => ({
@@ -1175,9 +1237,14 @@ function StudentPortal() {
       coach: coaches.find((co: any) => co.activity_id === c.co_curricular_activities?.id),
     })));
 
-    const { data: ne } = await supabase.from("exams").select("*")
-      .gte("start_date", format(today0, "yyyy-MM-dd"))
-      .order("start_date", { ascending: true }).limit(1).maybeSingle();
+    const { data: ne } = await withTimeout(
+      supabase.from("exams").select("*")
+        .gte("start_date", format(today0, "yyyy-MM-dd"))
+        .order("start_date", { ascending: true }).limit(1).maybeSingle(),
+      8000,
+      { data: null, error: null } as any,
+      "exams",
+    );
     setNextExam(ne ?? null);
   };
 
@@ -1400,6 +1467,26 @@ function StudentPortal() {
   }, [attRate, weakestSubject, totalDue, nextExam, daysToExam, perfTrend, dismissedAlerts, attendance, present, readiness, myPercentile]);
 
   // ─── Loading ──────────────────────────────────────────────────────────
+  if (loading && stalled) {
+    console.error("[portal/student] initial load stalled past 15s for user", user?.id);
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <h2 className="text-lg font-semibold">This is taking longer than expected</h2>
+          <p className="text-sm text-muted-foreground">
+            Something is stuck loading your portal. Check the browser console for which
+            request stalled, or try again below.
+          </p>
+          <button
+            onClick={() => setRetryKey((k) => k + 1)}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
