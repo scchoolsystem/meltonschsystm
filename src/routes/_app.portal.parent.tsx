@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -132,6 +133,13 @@ function ParentPortal() {
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Escape hatch: if the initial load has been stuck for 15s of real
+  // wall-clock time — no matter why — offer a way out instead of spinning
+  // forever. Driven by a plain setTimeout tied to mount/retry, not by the
+  // fetch's own state, so it can't get stuck even if the query never
+  // settles. Mirrors the pattern in _app.portal.me.tsx.
+  const [stalled, setStalled] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   // Sidebar links land here as e.g. /portal/parent?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
 
@@ -139,18 +147,35 @@ function ParentPortal() {
   const todayStr = format(today, "yyyy-MM-dd");
 
   useEffect(() => {
+    setStalled(false);
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, [retryKey]);
+
+  useEffect(() => {
     if (!user) return;
+    setLoading(true);
     (async () => {
       try {
-        const { data: links, error: linksErr } = await supabase
-          .from("parent_student_links")
-          .select("student_id, relationship, students(id, first_name, last_name, admission_no, unique_id, classes(name, id))")
-          .eq("parent_user_id", user.id);
+        const { data: links, error: linksErr } = await withTimeout(
+          supabase
+            .from("parent_student_links")
+            .select("student_id, relationship, students(id, first_name, last_name, admission_no, unique_id, classes(name, id))")
+            .eq("parent_user_id", user.id),
+          8000,
+          { data: null, error: null } as any,
+          "parent_student_links",
+        );
         if (linksErr) throw linksErr;
         const kids = (links ?? []).map((l: any) => l.students).filter(Boolean);
         setChildren(kids);
         if (kids[0]) setActiveId(kids[0].id);
-        const { data: an } = await supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10);
+        const { data: an } = await withTimeout(
+          supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10),
+          8000,
+          { data: [] as any[], error: null } as any,
+          "announcements",
+        );
         setAnnouncements(an ?? []);
       } catch (e: any) {
         console.error("Parent portal failed to load:", e);
@@ -159,7 +184,7 @@ function ParentPortal() {
         setLoading(false);
       }
     })();
-  }, [user]);
+  }, [user, retryKey]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -172,26 +197,27 @@ function ParentPortal() {
       const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
       const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
+      const EMPTY = { data: [] as any[], error: null } as any;
       const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals] = await Promise.all([
-        supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90),
-        supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100),
-        supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }),
+        withTimeout(supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
+        withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "exam_results"),
+        withTimeout(supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
         classId
-          ? (supabase as any).from("live_sessions").select("id, title, scheduled_start, status").eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until).order("scheduled_start")
+          ? withTimeout((supabase as any).from("live_sessions").select("id, title, scheduled_start, status").eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until).order("scheduled_start"), 8000, EMPTY, "live_sessions")
           : Promise.resolve({ data: [] } as any),
-        (supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30),
-        supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20),
-        (supabase as any).from("transport_assignments").select("*, pickup_point, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, dropoff_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20),
-        supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20),
-        (supabase as any).from("student_co_curricular").select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)").eq("student_id", activeId),
+        withTimeout((supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30), 8000, EMPTY, "live_session_attendance"),
+        withTimeout(supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline_records"),
+        withTimeout((supabase as any).from("transport_assignments").select("*, pickup_point, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, dropoff_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "transport_assignments"),
+        withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic_visits"),
+        withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "dorm_assignments"),
+        withTimeout(supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gate_passes"),
+        withTimeout((supabase as any).from("student_co_curricular").select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)").eq("student_id", activeId), 8000, EMPTY, "student_co_curricular"),
         classId
-          ? supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time")
+          ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable_slots")
           : Promise.resolve({ data: [] } as any),
-        supabase.from("book_loans").select("*, books(title, author)").eq("student_id", activeId).order("borrowed_on", { ascending: false }).limit(20),
-        (supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }),
-        supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"),
+        withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", activeId).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "book_loans"),
+        withTimeout((supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "student_documents"),
+        withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "meal_plans"),
       ]);
 
       setData({
@@ -302,6 +328,26 @@ function ParentPortal() {
   const disciplineCount = (data.discipline ?? []).length;
   const majorDiscipline = (data.discipline ?? []).filter((d: any) => d.severity === "major").length;
 
+  if (loading && stalled) {
+    console.error("[portal/parent] initial load stalled past 15s for user", user?.id);
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <h2 className="text-lg font-semibold">This is taking longer than expected</h2>
+          <p className="text-sm text-muted-foreground">
+            Something is stuck loading your portal. Check the browser console for which
+            request stalled, or try again below.
+          </p>
+          <button
+            onClick={() => setRetryKey((k) => k + 1)}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (loading) return <div className="p-6 text-muted-foreground flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Loading…</div>;
   if (children.length === 0) return <LinkChildPanel onLinked={() => window.location.reload()} />;
 
