@@ -7,6 +7,7 @@ import { StudentPerformanceCenter } from "@/components/students/StudentPerforman
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,22 +54,6 @@ export const Route = createFileRoute("/_app/portal/student")({
   },
   component: StudentPortalGuard,
 });
-
-// Guards an individual Supabase call so a single slow/hanging query can't
-// sink the entire portal — see the identical helper (and full explanation)
-// in _app.portal.me.tsx and _app.portal.parent.tsx.
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
-  let settled = false;
-  return Promise.race([
-    Promise.resolve(promise)
-      .then((v) => { settled = true; return v; })
-      .catch(() => { settled = true; return fallback; }),
-    new Promise<T>((resolve) => setTimeout(() => {
-      if (!settled) console.warn(`[portal/student] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
-      resolve(fallback);
-    }, ms)),
-  ]);
-}
 
 // ─── Animation Variants ───────────────────────────────────────────────────
 const fadeUp = {
