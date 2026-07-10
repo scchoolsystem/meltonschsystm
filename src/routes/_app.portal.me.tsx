@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,23 +64,6 @@ export const Route = createFileRoute("/_app/portal/me")({
 });
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// Guards against a single slow/hanging Supabase call sinking the entire
-// workspace query. Without this, Promise.all never settles if even one
-// table lookup stalls (slow query, connection-pool exhaustion, etc.) and
-// /portal/me spins forever with no error surfaced anywhere.
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
-  let settled = false;
-  return Promise.race([
-    Promise.resolve(promise)
-      .then((v) => { settled = true; return v; })
-      .catch(() => { settled = true; return fallback; }),
-    new Promise<T>((resolve) => setTimeout(() => {
-      if (!settled) console.warn(`[portal/me] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
-      resolve(fallback);
-    }, ms)),
-  ]);
-}
 
 function MyWorkspace() {
   const { user, fullName, roles, hasRole } = useAuth();
