@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +20,7 @@ import {
   CheckCircle, CreditCard, Calendar, Video, Scale, Megaphone, GraduationCap,
   FileText, ExternalLink, Library, Utensils, Clock, User, AlertTriangle,
   TrendingUp, TrendingDown, Activity, BookOpen, Star, Flame, Brain,
-  BarChart2, PieChart as PieIcon, Zap,
+  BarChart2, PieChart as PieIcon, Zap, Loader2,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -44,6 +43,24 @@ const PIE_COLORS = [C.primary, C.green, C.yellow, C.red, C.cyan, "#8b5cf6", "#f9
 export const Route = createFileRoute("/_app/portal/parent")({
   component: ParentPortal,
 });
+
+// Guards an individual Supabase call so a single slow/hanging query can't
+// sink the entire portal — see the identical helper (and full explanation)
+// in _app.portal.me.tsx. Without this, a stuck query here has no way to
+// ever resolve, and the page just spins forever with no error, no retry,
+// and no indication anything is wrong.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
+  let settled = false;
+  return Promise.race([
+    Promise.resolve(promise)
+      .then((v) => { settled = true; return v; })
+      .catch(() => { settled = true; return fallback; }),
+    new Promise<T>((resolve) => setTimeout(() => {
+      if (!settled) console.warn(`[portal/parent] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
+      resolve(fallback);
+    }, ms)),
+  ]);
+}
 
 function gradeLabel(score: number): { grade: string; color: string } {
   if (score >= 80) return { grade: "A", color: "#22c55e" };
@@ -133,28 +150,27 @@ function ParentPortal() {
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  // Escape hatch: if the initial load has been stuck for 15s of real
-  // wall-clock time — no matter why — offer a way out instead of spinning
-  // forever. Driven by a plain setTimeout tied to mount/retry, not by the
-  // fetch's own state, so it can't get stuck even if the query never
-  // settles. Mirrors the pattern in _app.portal.me.tsx.
-  const [stalled, setStalled] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
+  const [childLoading, setChildLoading] = useState(true);
   // Sidebar links land here as e.g. /portal/parent?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
+
+  // Independent, mount-tied failsafes for each loading phase below — not
+  // driven by the queries themselves, so they fire no matter *why* a query
+  // never settles (hang, dropped connection, etc). Mirrors the identical
+  // pattern in _app.portal.me.tsx, added after that page's freeze bug;
+  // this page never got the same protection until now.
+  const [stalled, setStalled] = useState(false);
+  const [childStalled, setChildStalled] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, []);
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
 
   useEffect(() => {
-    setStalled(false);
-    const t = setTimeout(() => setStalled(true), 15000);
-    return () => clearTimeout(t);
-  }, [retryKey]);
-
-  useEffect(() => {
     if (!user) return;
-    setLoading(true);
     (async () => {
       try {
         const { data: links, error: linksErr } = await withTimeout(
@@ -163,7 +179,7 @@ function ParentPortal() {
             .select("student_id, relationship, students(id, first_name, last_name, admission_no, unique_id, classes(name, id))")
             .eq("parent_user_id", user.id),
           8000,
-          { data: null, error: null } as any,
+          { data: null, error: new Error("Loading your linked children timed out") } as any,
           "parent_student_links",
         );
         if (linksErr) throw linksErr;
@@ -184,10 +200,17 @@ function ParentPortal() {
         setLoading(false);
       }
     })();
-  }, [user, retryKey]);
+  }, [user]);
 
   useEffect(() => {
     if (!activeId) return;
+    setChildLoading(true);
+    setChildStalled(false);
+    // Independent 15s failsafe for this child's data batch, tied to this
+    // effect run (not to the queries) so it fires regardless of *why* the
+    // batch below never resolves. See withTimeout() above for the
+    // per-query 8s guard — this is the outer, belt-and-suspenders timer.
+    const stallTimer = setTimeout(() => setChildStalled(true), 15000);
     (async () => {
       try {
         const stu = children.find(c => c.id === activeId);
@@ -198,26 +221,28 @@ function ParentPortal() {
       const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
       const EMPTY = { data: [] as any[], error: null } as any;
+      const EMPTY_SINGLE = { data: null, error: null } as any;
+
       const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals] = await Promise.all([
         withTimeout(supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
-        withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "exam_results"),
+        withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
         withTimeout(supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
         classId
-          ? withTimeout((supabase as any).from("live_sessions").select("id, title, scheduled_start, status").eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until).order("scheduled_start"), 8000, EMPTY, "live_sessions")
-          : Promise.resolve({ data: [] } as any),
-        withTimeout((supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30), 8000, EMPTY, "live_session_attendance"),
-        withTimeout(supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline_records"),
-        withTimeout((supabase as any).from("transport_assignments").select("*, pickup_point, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, dropoff_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "transport_assignments"),
-        withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic_visits"),
-        withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "dorm_assignments"),
-        withTimeout(supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gate_passes"),
-        withTimeout((supabase as any).from("student_co_curricular").select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)").eq("student_id", activeId), 8000, EMPTY, "student_co_curricular"),
+          ? withTimeout((supabase as any).from("live_sessions").select("id, title, scheduled_start, status").eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until).order("scheduled_start"), 8000, EMPTY, "liveUpcoming")
+          : Promise.resolve(EMPTY),
+        withTimeout((supabase as any).from("live_session_attendance").select("id, status, duration_seconds, live_sessions(title, scheduled_start)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(30), 8000, EMPTY, "liveAttendance"),
+        withTimeout(supabase.from("discipline_records").select("*").eq("student_id", activeId).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline"),
+        withTimeout((supabase as any).from("transport_assignments").select("*, pickup_point, transport_routes(name, vehicle_reg, driver_name, driver_phone, monthly_fee, dropoff_point)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "transport"),
+        withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", activeId).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic"),
+        withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", activeId).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "dorm"),
+        withTimeout(supabase.from("gate_passes").select("*").eq("student_id", activeId).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gatePasses"),
+        withTimeout((supabase as any).from("student_co_curricular").select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)").eq("student_id", activeId), 8000, EMPTY, "coCurricular"),
         classId
-          ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable_slots")
-          : Promise.resolve({ data: [] } as any),
-        withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", activeId).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "book_loans"),
-        withTimeout((supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "student_documents"),
-        withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "meal_plans"),
+          ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable")
+          : Promise.resolve(EMPTY),
+        withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", activeId).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "loans"),
+        withTimeout((supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "documents"),
+        withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "weekMeals"),
       ]);
 
       setData({
@@ -240,8 +265,12 @@ function ParentPortal() {
       } catch (e: any) {
         console.error("Parent portal child data failed to load:", e);
         toast.error(e?.message ?? "Some data for this child couldn't load. Please refresh.");
+      } finally {
+        clearTimeout(stallTimer);
+        setChildLoading(false);
       }
     })();
+    return () => clearTimeout(stallTimer);
   }, [activeId, children]);
 
   const active = children.find(c => c.id === activeId);
@@ -328,6 +357,9 @@ function ParentPortal() {
   const disciplineCount = (data.discipline ?? []).length;
   const majorDiscipline = (data.discipline ?? []).filter((d: any) => d.severity === "major").length;
 
+  if (loading && !stalled) {
+    return <div className="p-6 text-muted-foreground flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Loading…</div>;
+  }
   if (loading && stalled) {
     console.error("[portal/parent] initial load stalled past 15s for user", user?.id);
     return (
@@ -339,7 +371,7 @@ function ParentPortal() {
             request stalled, or try again below.
           </p>
           <button
-            onClick={() => setRetryKey((k) => k + 1)}
+            onClick={() => window.location.reload()}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             Try again
@@ -348,7 +380,6 @@ function ParentPortal() {
       </div>
     );
   }
-  if (loading) return <div className="p-6 text-muted-foreground flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Loading…</div>;
   if (children.length === 0) return <LinkChildPanel onLinked={() => window.location.reload()} />;
 
   const docLabels: Record<string, string> = {
@@ -380,6 +411,30 @@ function ParentPortal() {
           </Select>
         )}
       </motion.div>
+
+      {/* Per-child data status — the header/nav above render as soon as
+          `children` resolves, but attendance/results/fees/etc. for the
+          selected child load separately (see the activeId effect above)
+          and used to fail completely silently: empty arrays, zero
+          indication anything was wrong or even still loading. Surface it. */}
+      {childLoading && !childStalled && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading {active?.first_name}'s details…
+        </div>
+      )}
+      {childLoading && childStalled && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-amber-400 bg-amber-50 dark:bg-amber-950/20 text-sm">
+          <span>
+            Some of {active?.first_name}'s details are taking longer than expected to load.
+          </span>
+          <button
+            onClick={() => window.location.reload()}
+            className="shrink-0 inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Outstanding alert */}
       {totalDue > 0 && (
