@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,24 +44,6 @@ const PIE_COLORS = [C.primary, C.green, C.yellow, C.red, C.cyan, "#8b5cf6", "#f9
 export const Route = createFileRoute("/_app/portal/parent")({
   component: ParentPortal,
 });
-
-// Guards an individual Supabase call so a single slow/hanging query can't
-// sink the entire portal — see the identical helper (and full explanation)
-// in _app.portal.me.tsx. Without this, a stuck query here has no way to
-// ever resolve, and the page just spins forever with no error, no retry,
-// and no indication anything is wrong.
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
-  let settled = false;
-  return Promise.race([
-    Promise.resolve(promise)
-      .then((v) => { settled = true; return v; })
-      .catch(() => { settled = true; return fallback; }),
-    new Promise<T>((resolve) => setTimeout(() => {
-      if (!settled) console.warn(`[portal/parent] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
-      resolve(fallback);
-    }, ms)),
-  ]);
-}
 
 function gradeLabel(score: number): { grade: string; color: string } {
   if (score >= 80) return { grade: "A", color: "#22c55e" };
