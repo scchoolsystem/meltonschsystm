@@ -7,7 +7,6 @@ import { StudentPerformanceCenter } from "@/components/students/StudentPerforman
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
-import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ import {
   FlaskConical, Atom, BookMarked, PenTool, Calculator, Globe,
   ChevronDown, X, Info, Dna, Microscope, Wand2, LineChart as LineIcon,
   BarChart2, PieChart as PieIcon, RefreshCw, Eye, Lock, Unlock,
-  GraduationCap as Cap, TrendingDown as TrendDown,
+  GraduationCap as Cap, TrendingDown as TrendDown, Loader2,
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, differenceInDays, subMonths } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
@@ -54,6 +53,22 @@ export const Route = createFileRoute("/_app/portal/student")({
   },
   component: StudentPortalGuard,
 });
+
+// Guards an individual Supabase call so a single slow/hanging query can't
+// sink the entire portal — see the identical helper (and full explanation)
+// in _app.portal.me.tsx and _app.portal.parent.tsx.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallback: T, label?: string): Promise<T> {
+  let settled = false;
+  return Promise.race([
+    Promise.resolve(promise)
+      .then((v) => { settled = true; return v; })
+      .catch(() => { settled = true; return fallback; }),
+    new Promise<T>((resolve) => setTimeout(() => {
+      if (!settled) console.warn(`[portal/student] "${label ?? "query"}" exceeded ${ms}ms — using fallback data`);
+      resolve(fallback);
+    }, ms)),
+  ]);
+}
 
 // ─── Animation Variants ───────────────────────────────────────────────────
 const fadeUp = {
@@ -1046,13 +1061,15 @@ function StudentPortal() {
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  // Escape hatch: if the initial load has been stuck for 15s of real
-  // wall-clock time — no matter why — offer a way out instead of spinning
-  // forever. Driven by a plain setTimeout tied to mount/retry, not by the
-  // fetch's own state, so it can't get stuck even if a query never
-  // settles. Mirrors the pattern in _app.portal.me.tsx / _app.portal.parent.tsx.
+  // Independent, mount-tied failsafe — fires no matter *why* loadStudentData
+  // never settles (hang, dropped connection, etc), not driven by the
+  // queries themselves. Mirrors the identical pattern in
+  // _app.portal.me.tsx and _app.portal.parent.tsx.
   const [stalled, setStalled] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, []);
   // Sidebar links land here as e.g. /portal/student?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
   const [securityVerified, setSecurityVerified] = useState(false);
@@ -1068,74 +1085,62 @@ function StudentPortal() {
   };
 
   useEffect(() => {
-    setStalled(false);
-    const t = setTimeout(() => setStalled(true), 15000);
-    return () => clearTimeout(t);
-  }, [retryKey]);
-
-  useEffect(() => {
     if (!user) return;
-    setLoading(true);
     (async () => {
-      try {
-        const { data: link, error } = await withTimeout(
-          supabase
-            .from("student_user_links")
-            .select("student_id")
-            .eq("user_id", user.id)
-            .maybeSingle(),
-          8000,
-          { data: null, error: null } as any,
-          "student_user_links",
+      const { data: link, error } = await withTimeout(
+        supabase
+          .from("student_user_links")
+          .select("student_id")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        8000,
+        { data: null, error: new Error("Loading your student link timed out") } as any,
+        "student_user_links",
+      );
+
+      if (error || !link) {
+        const isStaff = roles.some((r: any) =>
+          ["super_admin", "principal", "deputy_principal", "school_admin",
+            "class_teacher", "subject_teacher", "teacher", "hod",
+            "academic_master", "exams_admin"].includes(r)
         );
-
-        if (error || !link) {
-          const isStaff = roles.some((r: any) =>
-            ["super_admin", "principal", "deputy_principal", "school_admin",
-              "class_teacher", "subject_teacher", "teacher", "hod",
-              "academic_master", "exams_admin"].includes(r)
-          );
-          if (!isStaff) { setLoading(false); return; }
-          setSecurityVerified(true);
-          setLoading(false);
-          return;
-        }
-
+        if (!isStaff) { setLoading(false); return; }
         setSecurityVerified(true);
-        await loadStudentData(link.student_id);
-      } catch (e: any) {
-        console.error("Student portal failed to load:", e);
-      } finally {
         setLoading(false);
+        return;
       }
+
+      setSecurityVerified(true);
+      await loadStudentData(link.student_id);
+      setLoading(false);
     })();
-  }, [user, retryKey]);
+  }, [user]);
 
   const loadStudentData = async (sid: string) => {
+    const EMPTY = { data: [] as any[], error: null } as any;
+    const EMPTY_SINGLE = { data: null, error: null } as any;
+
     const sRes = await withTimeout(
       supabase.from("students").select("*, classes(id, name, level, stream)").eq("id", sid).maybeSingle(),
-      8000,
-      { data: null, error: null } as any,
-      "students",
+      8000, EMPTY_SINGLE, "student",
     );
     const stu = sRes.data;
     setStudent(stu);
     const classId = stu?.classes?.id;
 
-    const EMPTY = { data: [] as any[], error: null } as any;
     const [a, r, i, l, an, tt, dr, cv, da, gp] = await Promise.all([
       withTimeout(supabase.from("attendance_records").select("*").eq("student_id", sid).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
-      withTimeout(supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year)").eq("student_id", sid).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "exam_results"),
+      withTimeout(supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year)").eq("student_id", sid).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
       withTimeout(supabase.from("invoices").select("*").eq("student_id", sid).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
-      withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", sid).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "book_loans"),
+      withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", sid).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "loans"),
       withTimeout(supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(10), 8000, EMPTY, "announcements"),
       classId
-        ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable_slots")
-        : Promise.resolve({ data: [] } as any),
-      withTimeout(supabase.from("discipline_records").select("*").eq("student_id", sid).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline_records"),
-      withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", sid).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic_visits"),
-      withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, { data: null, error: null } as any, "dorm_assignments"),
-      withTimeout(supabase.from("gate_passes").select("*").eq("student_id", sid).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gate_passes"),
+        ? withTimeout(supabase.from("timetable_slots").select("*, subjects(name, code), staff(first_name, last_name)").eq("class_id", classId).order("day_of_week").order("start_time"), 8000, EMPTY, "timetable")
+        : Promise.resolve(EMPTY),
+      withTimeout(supabase.from("discipline_records").select("*").eq("student_id", sid).order("incident_date", { ascending: false }).limit(20), 8000, EMPTY, "discipline"),
+      withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", sid).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic"),
+      withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "dorm"),
+      withTimeout(supabase.from("gate_passes").select("*").eq("student_id", sid).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gatePasses"),
     ]);
 
     setAttendance(a.data ?? []);
@@ -1158,9 +1163,7 @@ function StudentPortal() {
           .select("id, title, scheduled_start, scheduled_end, status, room_name, classes(name)")
           .eq("class_id", classId).gte("scheduled_start", since).lte("scheduled_start", until)
           .order("scheduled_start", { ascending: true }),
-        8000,
-        { data: [] as any[], error: null } as any,
-        "live_sessions",
+        8000, EMPTY, "liveUpcoming",
       );
       setLiveUpcoming(ls ?? []);
     }
@@ -1170,17 +1173,13 @@ function StudentPortal() {
         .from("live_session_attendance")
         .select("id, status, joined_at, left_at, duration_seconds, live_sessions(title, scheduled_start)")
         .eq("student_id", sid).order("created_at", { ascending: false }).limit(30),
-      8000,
-      { data: [] as any[], error: null } as any,
-      "live_session_attendance",
+      8000, EMPTY, "liveAttendance",
     );
     setLiveAttendance(la ?? []);
 
     const { data: docs } = await withTimeout(
       (supabase as any).from("student_documents").select("*").eq("student_id", sid).order("created_at", { ascending: false }),
-      8000,
-      { data: [] as any[], error: null } as any,
-      "student_documents",
+      8000, EMPTY, "documents",
     );
     setDocuments(docs ?? []);
 
@@ -1189,9 +1188,7 @@ function StudentPortal() {
         .from("transport_assignments")
         .select("*, pickup_point, transport_routes(name, dropoff_point, driver_name, driver_phone, vehicle_reg, pickup_point)")
         .eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
-      8000,
-      { data: null, error: null } as any,
-      "transport_assignments",
+      8000, EMPTY_SINGLE, "transport",
     );
     setTransport(tr ?? null);
 
@@ -1202,9 +1199,7 @@ function StudentPortal() {
       supabase.from("meal_plans").select("*")
         .gte("meal_date", weekStart).lte("meal_date", weekEnd)
         .order("meal_date", { ascending: true }).order("meal_type", { ascending: true }),
-      8000,
-      { data: [] as any[], error: null } as any,
-      "meal_plans",
+      8000, EMPTY, "weekMeals",
     );
     setWeekMeals(meals ?? []);
 
@@ -1213,9 +1208,7 @@ function StudentPortal() {
         .from("student_co_curricular")
         .select("*, co_curricular_activities(id, name, category, schedule_day, schedule_time)")
         .eq("student_id", sid),
-      8000,
-      { data: [] as any[], error: null } as any,
-      "student_co_curricular",
+      8000, EMPTY, "coCurricular",
     );
     const ccList = cc ?? [];
     const activityIds = ccList.map((c: any) => c.co_curricular_activities?.id).filter(Boolean);
@@ -1226,9 +1219,7 @@ function StudentPortal() {
           .from("staff_co_curricular")
           .select("activity_id, role, staff(first_name, last_name)")
           .in("activity_id", activityIds),
-        8000,
-        { data: [] as any[], error: null } as any,
-        "staff_co_curricular",
+        8000, EMPTY, "coCurricularCoaches",
       );
       coaches = cd ?? [];
     }
@@ -1241,9 +1232,7 @@ function StudentPortal() {
       supabase.from("exams").select("*")
         .gte("start_date", format(today0, "yyyy-MM-dd"))
         .order("start_date", { ascending: true }).limit(1).maybeSingle(),
-      8000,
-      { data: null, error: null } as any,
-      "exams",
+      8000, EMPTY_SINGLE, "nextExam",
     );
     setNextExam(ne ?? null);
   };
@@ -1467,27 +1456,7 @@ function StudentPortal() {
   }, [attRate, weakestSubject, totalDue, nextExam, daysToExam, perfTrend, dismissedAlerts, attendance, present, readiness, myPercentile]);
 
   // ─── Loading ──────────────────────────────────────────────────────────
-  if (loading && stalled) {
-    console.error("[portal/student] initial load stalled past 15s for user", user?.id);
-    return (
-      <div className="min-h-screen grid place-items-center p-6">
-        <div className="max-w-md text-center space-y-3">
-          <h2 className="text-lg font-semibold">This is taking longer than expected</h2>
-          <p className="text-sm text-muted-foreground">
-            Something is stuck loading your portal. Check the browser console for which
-            request stalled, or try again below.
-          </p>
-          <button
-            onClick={() => setRetryKey((k) => k + 1)}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
-  if (loading) {
+  if (loading && !stalled) {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <Skeleton className="h-36" />
@@ -1497,6 +1466,27 @@ function StudentPortal() {
         <Skeleton className="h-12" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Skeleton className="h-64" /> <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && stalled) {
+    console.error("[portal/student] load stalled past 15s for user", user?.id);
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-3">
+          <h2 className="text-lg font-semibold">This is taking longer than expected</h2>
+          <p className="text-sm text-muted-foreground">
+            Something is stuck loading your portal. Check the browser console for which
+            request stalled, or try again below.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
