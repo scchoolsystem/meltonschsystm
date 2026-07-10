@@ -11,7 +11,6 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useTenant } from "@/hooks/use-tenant";
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -76,8 +75,38 @@ export const Route = createFileRoute("/_app/assignments")({
 
 function AssignmentsPage() {
   const { user, isAdmin, hasRole } = useAuth();
-  const { school } = useTenant();
   const qc = useQueryClient();
+
+  // Deliberately NOT useTenant().school here. useTenant() resolves the
+  // school from the hostname's subdomain — which is meaningless on
+  // app.smartdev.co.ke (a flat domain, explicitly excluded in
+  // getSubdomainSlug), on Tauri desktop, and on the Capacitor Android app,
+  // where there's no subdomain at all. On any of those, useTenant().school
+  // is null, so school?.id was undefined, and every assignment insert/update
+  // failed RLS — not because of bad data, but because the client was asking
+  // a hostname-based question in a platform where hostname doesn't carry
+  // that information.
+  //
+  // Ask the same question the database itself answers via
+  // current_user_school() instead: which school is *this user* actually a
+  // member of. Works identically across web (any domain), desktop, and
+  // Android, and is guaranteed to match what RLS checks server-side.
+  const { data: mySchoolId } = useQuery({
+    queryKey: ["my-school-id", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("school_members")
+        .select("school_id")
+        .eq("user_id", user!.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return data?.school_id ?? null;
+    },
+  });
+  const school = mySchoolId ? { id: mySchoolId } : null;
 
   const isTeacher =
     isAdmin ||
