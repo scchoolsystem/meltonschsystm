@@ -25,6 +25,16 @@ interface AuthCtx {
   fullName: string;
   loading: boolean;
   rolesLoaded: boolean;
+  // True only once we have a *confirmed* answer to "is there a session or
+  // not" — from getSessionSafe() actually resolving (not timing out) or
+  // onAuthStateChange firing. Deliberately NOT set by the blind `loading`
+  // safety timer below, because that timer fires on a fixed clock whether
+  // the real check is hung or just slow — and "just slow" is common with
+  // the documented supabase-js lock contention. Route guards must check
+  // this (not just `!loading`) before concluding "no session, go to
+  // /login" — otherwise a slow-but-working auth check gets misread as a
+  // logged-out user and force-redirects them away mid-check.
+  sessionChecked: boolean;
   hasRole: (r: AppRole) => boolean;
   isAdmin: boolean;
   signOut: () => Promise<void>;
@@ -53,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [rolesLoaded, setRolesLoaded] = useState(false);
   // Safety: never hang on loading state
   useEffect(() => {
@@ -63,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
+      setSessionChecked(true);
       if (s?.user) {
         setTimeout(() => {
           loadProfile(s.user.id).finally(() => setLoading(false));
@@ -96,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       setSession(s);
+      setSessionChecked(true);
       if (s?.user) {
         loadProfile(s.user.id).finally(() => setLoading(false));
       } else {
@@ -106,7 +119,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Safety: never leave loading=true forever
+    // Safety: never leave `loading` visually stuck forever — but this must
+    // NOT be treated as "we know there's no session" (see sessionChecked
+    // above). A slow-but-working auth check taking longer than 5s here is
+    // expected under lock contention, not proof of logged-out. Route
+    // guards that redirect to /login on "no session" must gate on
+    // sessionChecked, not on `!loading` alone, or they will yank a
+    // legitimately-logged-in user to /login mid-check purely because this
+    // clock ran out first — a false-positive logout, not a real one.
     const safetyTimer = setTimeout(() => setLoading(false), 5000);
     return () => {
       subscription.unsubscribe();
@@ -167,10 +187,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fullName,
     loading,
     rolesLoaded,
+    sessionChecked,
     hasRole,
     isAdmin,
     signOut,
-  }), [session, roles, fullName, loading, rolesLoaded, hasRole, isAdmin, signOut]);
+  }), [session, roles, fullName, loading, rolesLoaded, sessionChecked, hasRole, isAdmin, signOut]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
