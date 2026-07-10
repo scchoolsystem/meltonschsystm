@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -57,18 +57,51 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
-  const { loading, session, roles, rolesLoaded } = useAuth();
+  const { loading, session, roles, rolesLoaded, sessionChecked } = useAuth();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
 
   // Once auth has finished loading client-side and there is genuinely no
   // session, send the user to login (this replaces the old server-side
   // redirect, which couldn't see the real session during SSR on refresh).
+  //
+  // Gated on `sessionChecked`, not just `!loading` — `loading` can flip
+  // false purely because AuthProvider's 5s safety timer ran out, which
+  // happens on a fixed clock regardless of whether the real session check
+  // is hung or just slow (expected under the documented supabase-js lock
+  // contention). Redirecting on `!loading && !session` alone force-logs-out
+  // a legitimately-authenticated user mid-check: they get bounced to
+  // /login, and only get bounced back once the real check finally
+  // resolves seconds later — a jarring false-positive logout, not a real
+  // one. Waiting for `sessionChecked` means we only ever redirect once we
+  // have a confirmed "no session" answer, never a merely-timed-out one.
   useEffect(() => {
-    if (!loading && !session) {
+    if (!loading && !session && sessionChecked) {
       navigate({ to: "/login", search: { redirect: path }, replace: true });
     }
-  }, [loading, session, path, navigate]);
+  }, [loading, session, sessionChecked, path, navigate]);
+
+  // If we still don't have a confirmed answer after a generous grace
+  // period, don't spin forever either — offer a manual way out instead of
+  // silently waiting or (worse) guessing and redirecting incorrectly.
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (sessionChecked) { setStalled(false); return; }
+    const t = setTimeout(() => setStalled(true), 15000);
+    return () => clearTimeout(t);
+  }, [sessionChecked]);
+
+  if (stalled && !sessionChecked) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Still checking your session</h2>
+          <p className="text-sm text-muted-foreground">This is taking longer than usual. Your session may still be valid — try refreshing rather than logging in again.</p>
+          <button onClick={() => window.location.reload()} className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Refresh</button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !session || !rolesLoaded) {
     return <SchoolSplashScreen />;
