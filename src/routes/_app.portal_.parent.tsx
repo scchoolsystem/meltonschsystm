@@ -41,7 +41,7 @@ const C = {
 };
 const PIE_COLORS = [C.primary, C.green, C.yellow, C.red, C.cyan, "#8b5cf6", "#f97316"];
 
-export const Route = createFileRoute("/_app/portal/parent")({
+export const Route = createFileRoute("/_app/portal_/parent")({
   component: ParentPortal,
 });
 
