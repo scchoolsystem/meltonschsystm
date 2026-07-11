@@ -1,15 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+// /legal used to iframe /legal.html, which was fragile (iframe sizing,
+// nested requests, and it looked identical to a genuinely blank page when
+// anything went wrong). /legal.html works fine as a standalone static
+// page, so just send visitors straight there instead of wrapping it.
 export const Route = createFileRoute('/legal')({
-  component: LegalComponent,
+  beforeLoad: () => {
+    throw redirect({ href: '/legal.html' })
+  },
 })
-
-function LegalComponent() {
-  return (
-    <iframe 
-      src="/legal.html" 
-      style={{ width: '100%', height: '100vh', border: 'none' }}
-      title="Legal Document"
-    />
-  )
-}
