@@ -507,15 +507,6 @@ function useSmoothProgress(progress: any, reduceMotion: boolean) {
   return useSpring(progress, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.1 } : { stiffness: 260, damping: 38, mass: 0.6 });
 }
 
-// A full-bleed black overlay used to fade scenes through black into one
-// another (the "vignette"/cave-mouth transition from the brief), so the
-// hard cut between two sticky sections reads as a deliberate cinematic
-// transition instead of a jump cut.
-function SceneFade({ progress, edge }: { progress: any; edge: "in" | "out" }) {
-  const opacity = useTransform(progress, edge === "in" ? [0, 0.16] : [0.84, 1], edge === "in" ? [1, 0] : [0, 1]);
-  return <motion.div className="absolute inset-0 bg-black pointer-events-none z-20" style={{ opacity }} />;
-}
-
 // ── Scene 1: Hero — full-bleed photo carousel that slowly zooms and fades
 // as the next scene rises underneath it (vertical "descent" transition). ──
 function HeroScene({
@@ -592,7 +583,6 @@ function HeroScene({
           <span>Scroll</span>
           <span className="w-10 h-px bg-white/50" />
         </div>
-        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -646,8 +636,6 @@ function ModulesScene({
             </button>
           </div>
         </motion.div>
-        <SceneFade progress={progress} edge="in" />
-        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -698,8 +686,6 @@ function GalleryScene({
             </motion.div>
           ))}
         </div>
-        <SceneFade progress={progress} edge="in" />
-        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -735,8 +721,6 @@ function MissionScene({
             </Button>
           </button>
         </motion.div>
-        <SceneFade progress={progress} edge="in" />
-        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -772,7 +756,6 @@ function FinalScene({
             <DownloadButton />
           </div>
         </motion.div>
-        <SceneFade progress={progress} edge="in" />
       </div>
     </section>
   );
