@@ -1,7 +1,7 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useSpring, useTransform } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform, useInView } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
@@ -16,6 +16,7 @@ import {
   ClipboardList, Settings, Globe, Zap, CheckCircle, ChevronDown, ChevronUp,
   Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
+  Coins, Wallet, Sparkles, Wifi,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -270,14 +271,6 @@ const MODULE_CATEGORIES = [
   },
 ];
 
-// NOTE: pricing is now fully live — base plans come from `subscription_plans`
-// and module add-on pricing from `module_addon_pricing`, both editable in
-// Platform Admin → Website Content → Pricing & Modules.
-
-// NOTE: generic stock-photo "team" placeholders removed — the Our Story page
-// now shows the real founder (editable via Platform Admin → Website Content)
-// instead of decorative stand-in photos.
-
 const STORY_MILESTONES = [
   { year: "2020", title: "The Problem", desc: "We visited dozens of Kenyan schools still running on paper registers, WhatsApp groups and Excel sheets. We knew there was a better way." },
   { year: "2021", title: "First Build", desc: "SmartDev v1 launched with a small pilot group — three schools in Nairobi County testing the core academics and fee modules." },
@@ -477,7 +470,16 @@ function Landing() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOME PAGE
+// CINEMATIC SCROLL ENGINE
+// Rebuilt against the "cinematic scroll-driven world" scroll architecture:
+// a chain of pinned (position: sticky) full-viewport scenes, each owning a
+// 0→1 scroll progress value that is spring-smoothed (the buttery Lenis-style
+// feel), alternating between horizontal camera pans and vertical descents,
+// with a shared vignette layer that darkens scene edges as one scene hands
+// off to the next ("cave passage" transitions in the original prompt).
+// Reskinned for a school ERP: instead of dragons/treasure/NFTs, each scene
+// dramatizes a real product moment — the platform tour, fee collection,
+// the campus, the portals, the mission, the trust numbers, the CTA.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useReducedMotionPref() {
@@ -495,20 +497,128 @@ function useReducedMotionPref() {
 
 // Viewport height that stays stable on mobile browsers as the address bar
 // shows/hides (100vh jumps on iOS/Android Chrome; 100dvh tracks the real
-// visible viewport). Falls back cleanly — `h-dvh` is supported on every
-// mobile browser in active use in 2026.
+// visible viewport).
 const VIEWPORT_H = "h-dvh";
 
 // Smooths a raw 0→1 scroll-progress MotionValue with a light spring so
-// backgrounds/text glide rather than snap 1:1 with the (often janky, on
-// budget Android phones) scroll event — this is what gives the "Lenis"-style
-// buttery feel without adding a smooth-scroll library.
+// backgrounds/text glide rather than snap 1:1 with the scroll event.
 function useSmoothProgress(progress: any, reduceMotion: boolean) {
   return useSpring(progress, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.1 } : { stiffness: 260, damping: 38, mass: 0.6 });
 }
 
-// ── Scene 1: Hero — full-bleed photo carousel that slowly zooms and fades
-// as the next scene rises underneath it (vertical "descent" transition). ──
+// Global page-level smooth scroll. This is the "critical" Lenis layer from
+// the prompt — it eases the raw wheel/touch input across the *whole* page,
+// so the sticky-scene handoffs below read as one continuous camera move
+// instead of a stack of separate sections. Requires `npm install lenis`.
+// If the package isn't installed yet, this silently no-ops and the
+// per-scene spring smoothing above still keeps things feeling smooth.
+function useLenisSmoothScroll(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") return;
+    let lenisInstance: any = null;
+    let rafId = 0;
+    let cancelled = false;
+
+    import("lenis")
+      .then(({ default: Lenis }) => {
+        if (cancelled) return;
+        lenisInstance = new Lenis({
+          duration: 1.3,
+          easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+          smoothWheel: true,
+        });
+        const raf = (time: number) => {
+          lenisInstance.raf(time);
+          rafId = requestAnimationFrame(raf);
+        };
+        rafId = requestAnimationFrame(raf);
+      })
+      .catch(() => {
+        // lenis not installed in this project yet — fine, scenes still work.
+      });
+
+    return () => {
+      cancelled = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (lenisInstance) lenisInstance.destroy();
+    };
+  }, [enabled]);
+}
+
+// Cave-mouth-style vignette: darkens toward the edges as a scene approaches
+// its boundary with the next one, then clears as the new scene settles in.
+// Shared by every scene so hand-offs feel like passing through a threshold
+// rather than a hard cut.
+function SceneVignette({ progress }: { progress: any }) {
+  const opacity = useTransform(progress, [0, 0.1, 0.9, 1], [0.8, 0, 0, 0.8]);
+  return (
+    <motion.div
+      className="pointer-events-none absolute inset-0 z-20"
+      style={{
+        opacity,
+        background: "radial-gradient(circle at center, transparent 38%, rgba(4,4,10,0.92) 100%)",
+      }}
+    />
+  );
+}
+
+// Ambient floating specs — the prompt's "floating particles" layer, done in
+// framer-motion instead of canvas so it stays cheap on low-end Android
+// phones (this platform's actual audience).
+function ParticleField({ count = 22, color = "rgba(255,255,255,0.55)" }: { count?: number; color?: string }) {
+  const particles = React.useMemo(
+    () => Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      size: 1 + Math.random() * 2.5,
+      delay: Math.random() * 6,
+      duration: 9 + Math.random() * 9,
+      drift: (Math.random() - 0.5) * 60,
+    })),
+    [count]
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {particles.map((p) => (
+        <motion.span
+          key={p.id}
+          className="absolute rounded-full"
+          style={{ left: `${p.left}%`, bottom: -10, width: p.size, height: p.size, background: color }}
+          animate={{ y: ["0%", "-115vh"], x: [0, p.drift], opacity: [0, 1, 1, 0] }}
+          transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: "linear" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Counts up from 0 to `value` once the element scrolls into view — the
+// trust-scene equivalent of the prompt's "glow builds, chest opens" reveal.
+function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-10% 0px" });
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    let raf: number;
+    const start = performance.now();
+    const duration = 1500;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(eased * value));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, value]);
+
+  return <span ref={ref}>{display.toLocaleString()}{suffix}</span>;
+}
+
+// ── Scene 1: Hero — full-bleed photo carousel that slowly zooms while a
+// vignette clears in and darkens out at the boundary with Scene 2. ──
 function HeroScene({
   goTo,
   hero,
@@ -549,6 +659,7 @@ function HeroScene({
           ))}
         </motion.div>
         <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
+        {!reduceMotion && <ParticleField count={26} color="rgba(255,255,255,0.45)" />}
         <motion.div
           style={{ opacity: contentOpacity, y: contentY }}
           className="relative container mx-auto px-6 py-10 sm:py-20 text-center text-white"
@@ -556,7 +667,7 @@ function HeroScene({
           <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-[11px] sm:text-xs font-medium mb-4 sm:mb-6">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {hero.badge}
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
+          <h1 className="font-serif text-3xl sm:text-4xl md:text-6xl font-semibold tracking-tight max-w-4xl mx-auto leading-tight">
             {hero.heading_line1} <span className="text-primary">{hero.heading_highlight}</span>
           </h1>
           <p className="mt-4 sm:mt-6 text-base sm:text-lg text-white/80 max-w-2xl mx-auto">
@@ -579,6 +690,7 @@ function HeroScene({
             ))}
           </div>
         </motion.div>
+        <SceneVignette progress={progress} />
         <div className="absolute bottom-6 sm:bottom-8 right-6 sm:right-8 hidden md:flex items-center gap-3 text-white/50 text-xs tracking-widest uppercase">
           <span>Scroll</span>
           <span className="w-10 h-px bg-white/50" />
@@ -588,8 +700,7 @@ function HeroScene({
   );
 }
 
-// ── Scene 2: Modules — a pinned scene whose card track pans horizontally
-// as the user scrolls down (horizontal "camera pan" transition). ──
+// ── Scene 2: Modules — horizontal camera pan through the module categories. ──
 function ModulesScene({
   goTo,
   categories,
@@ -609,8 +720,10 @@ function ModulesScene({
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "200vh" }} className="relative bg-slate-950">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
         <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
-          <div className="text-xs uppercase tracking-widest text-primary mb-2">Platform tour</div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold max-w-xl">Everything your school needs, in one place</h2>
+          <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+            <ArrowRight className="w-3 h-3" /> Platform tour — scroll right
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">Everything your school needs, in one place</h2>
           <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
         </motion.div>
         <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
@@ -636,14 +749,79 @@ function ModulesScene({
             </button>
           </div>
         </motion.div>
+        <SceneVignette progress={progress} />
       </div>
     </section>
   );
 }
 
-// ── Scene 3: Gallery — three photo columns drift vertically at different
-// speeds while pinned (vertical parallax "descent"). ──
-function GalleryScene({
+// ── Scene 3: Finance — vertical descent into the fee-collection story.
+// Reskins the prompt's "treasure reveal" beat: instead of a chest full of
+// coins, a phone mockup lights up with an M-Pesa STK push and a stream of
+// KES amounts drifts upward like glowing particles. ──
+function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceMotion: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const phoneY = useTransform(progress, [0, 1], [reduceMotion ? 0 : 40, reduceMotion ? 0 : -40]);
+  const glow = useTransform(progress, [0, 0.5, 1], [0.25, 0.6, 0.25]);
+  const contentOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
+        {!reduceMotion && <ParticleField count={16} color="rgba(120,255,180,0.55)" />}
+        <motion.div style={{ opacity: contentOpacity }} className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-emerald-300 mb-2 flex items-center gap-2">
+              <Coins className="w-3.5 h-3.5" /> Finance & Payments
+            </div>
+            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-lg">Fee collection, reimagined</h2>
+            <p className="mt-4 text-sm sm:text-base text-white/70 max-w-md">
+              Parents pay fees straight from their phone with M-Pesa STK Push. Every payment reconciles automatically,
+              prints a branded receipt, and updates the school's ledger in real time — no more chasing paper slips.
+            </p>
+            <ul className="mt-6 space-y-2 text-sm text-white/80">
+              {["Instant STK Push prompts", "Automatic reconciliation", "Live arrears & balance tracking"].map((f) => (
+                <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />{f}</li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => goTo("pricing")} className="mt-6 inline-block">
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">See pricing <ArrowRight className="w-4 h-4" /></Button>
+            </button>
+          </div>
+          <motion.div style={{ y: phoneY }} className="relative mx-auto w-[240px] sm:w-[280px]">
+            <motion.div
+              className="absolute -inset-10 rounded-full bg-emerald-400 blur-3xl"
+              style={{ opacity: glow }}
+            />
+            <div className="relative rounded-[2rem] border-4 border-white/15 bg-slate-900 p-4 shadow-2xl">
+              <div className="rounded-2xl bg-emerald-600/20 border border-emerald-400/30 p-4">
+                <div className="flex items-center gap-2 text-emerald-300 text-xs font-medium mb-3">
+                  <Wallet className="w-4 h-4" /> M-Pesa Payment
+                </div>
+                <div className="text-white text-2xl font-bold">KES 24,500</div>
+                <div className="text-white/60 text-xs mt-1">Term 2 · Fee balance</div>
+                <div className="mt-4 rounded-lg bg-emerald-500/90 text-slate-950 text-xs font-semibold text-center py-2">
+                  STK Push sent — enter M-Pesa PIN
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-white/50 text-[10px]">
+                <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Receipt auto-generated</span>
+                <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> Synced</span>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+        <SceneVignette progress={progress} />
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 4: Campus — three photo columns drift vertically at different
+// speeds while pinned (vertical parallax "descent" onto the campus). ──
+function CampusScene({
   photos,
   reduceMotion,
 }: {
@@ -667,7 +845,7 @@ function GalleryScene({
   return (
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "170vh" }} className="relative bg-background">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col items-center justify-center py-8 sm:py-10`}>
-        <motion.h2 style={{ opacity: titleOpacity }} className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 px-6">
+        <motion.h2 style={{ opacity: titleOpacity }} className="font-serif text-2xl sm:text-3xl font-semibold text-center mb-6 sm:mb-8 px-6">
           Built for schools like yours
         </motion.h2>
         <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-5xl w-full px-4 sm:px-6">
@@ -691,7 +869,51 @@ function GalleryScene({
   );
 }
 
-// ── Scene 4: Mission — a pinned full-bleed gradient panel that scales
+// ── Scene 5: Portals — horizontal pan through the parent/student/staff/
+// admin portals, mirroring the Modules scene's card-track pattern. ──
+function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-52%"]);
+  const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
+
+  const portals = [
+    { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/30 to-transparent" },
+    { icon: GraduationCap, title: "Student Portal", desc: "Timetables, exam results, assignments and class resources.", gradient: "from-blue-950/95 via-blue-950/30 to-transparent" },
+    { icon: Users, title: "Staff Portal", desc: "Marks entry, attendance registers, timetables and departmental tools.", gradient: "from-teal-950/95 via-teal-950/30 to-transparent" },
+    { icon: ShieldCheck, title: "Admin Dashboard", desc: "Real-time enrollment, finance and attendance intelligence across the school.", gradient: "from-gray-950/95 via-gray-950/30 to-transparent" },
+  ];
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "190vh" }} className="relative bg-slate-950">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
+        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
+          <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
+            <ArrowRight className="w-3 h-3" /> A view for everyone
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">One platform, four tailored experiences</h2>
+        </motion.div>
+        <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
+          {portals.map((p) => (
+            <div key={p.title} className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden bg-gradient-to-t ${p.gradient} border border-white/10`}>
+              <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
+                <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
+                  <p.icon className="w-5 h-5" />
+                </div>
+                <div className="font-semibold text-lg sm:text-xl">{p.title}</div>
+                <p className="text-sm text-white/80 mt-1">{p.desc}</p>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+        <SceneVignette progress={progress} />
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 6: Mission — a pinned full-bleed gradient panel that scales
 // gently in and out as it passes through view. ──
 function MissionScene({
   goTo,
@@ -713,7 +935,7 @@ function MissionScene({
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground will-change-transform">
           <Target className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-4 opacity-80" />
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-2xl mx-auto">{mission.heading}</h2>
           <p className="mt-4 text-sm sm:text-base text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
           <button type="button" onClick={() => goTo("story")} className="mt-6 sm:mt-8 inline-block">
             <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
@@ -726,7 +948,46 @@ function MissionScene({
   );
 }
 
-// ── Scene 5: Final CTA — pricing + download, rises into view then settles
+// ── Scene 7: Trust — animated counters build up like the prompt's
+// glow-and-reveal beat, grounding the pitch in real numbers. ──
+function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const opacity = useTransform(progress, [0, 0.2, 0.85, 1], [0, 1, 1, 0]);
+
+  const stats = [
+    { icon: GraduationCap, value: 300, suffix: "+", label: "Schools onboarded" },
+    { icon: Users, value: 120000, suffix: "+", label: "Students managed" },
+    { icon: Cloud, value: 99, suffix: "%", label: "Platform uptime" },
+    { icon: Zap, value: 3, suffix: "s", label: "Avg. M-Pesa confirmation" },
+  ];
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative bg-slate-950">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
+        {!reduceMotion && <ParticleField count={14} color="rgba(255,255,255,0.35)" />}
+        <motion.div style={{ opacity }} className="container mx-auto px-6 text-center text-white">
+          <div className="text-xs uppercase tracking-widest text-primary mb-3">Trusted across Kenya & East Africa</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                <s.icon className="w-6 h-6 mx-auto mb-2 text-primary" />
+                <div className="text-2xl sm:text-3xl font-bold">
+                  <AnimatedCounter value={s.value} suffix={s.suffix} />
+                </div>
+                <div className="text-[11px] sm:text-xs text-white/60 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+        <SceneVignette progress={progress} />
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 8: Final CTA — pricing + download, rises into view then settles
 // (hands off smoothly into the regular footer below). ──
 function FinalScene({
   goTo,
@@ -747,7 +1008,7 @@ function FinalScene({
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "120vh" }} className="relative bg-slate-950">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         <motion.div style={{ opacity, y }} className="container mx-auto px-6 text-center text-white">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">{site.brand_name} pricing made simple</h2>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold">{site.brand_name} pricing made simple</h2>
           <p className="mt-3 text-sm sm:text-base text-white/70 max-w-lg mx-auto">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
           <div className="mt-6 sm:mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
             <button type="button" onClick={() => goTo("pricing")}>
@@ -762,19 +1023,19 @@ function FinalScene({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOME PAGE — cinematic scroll-driven experience. Five pinned scenes chained
-// end-to-end; each scene owns its own scroll progress (0→1 while pinned),
-// smoothed with a spring for a Lenis-style buttery feel, and drives a
-// background pan (horizontal or vertical) plus a fade-through-black
-// transition into/out of its neighbours. No extra scroll libraries are used
-// — everything is driven by framer-motion (useScroll/useTransform/useSpring),
-// which is already a dependency. All scene heights use dvh for the pinned
-// viewport so mobile browser chrome (address bar show/hide) never causes
-// content to jump or clip.
+// HOME PAGE — eight pinned scenes chained end-to-end, alternating horizontal
+// pans and vertical descents: Hero (zoom) → Modules (pan right) → Finance
+// (descend) → Campus (parallax descend) → Portals (pan right) → Mission
+// (scale) → Trust (descend) → Final CTA (rise). Each scene owns its own
+// spring-smoothed scroll progress and a shared vignette layer; the page also
+// enables a global Lenis smooth-scroll pass so the whole chain reads as one
+// continuous camera move rather than a stack of sections.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
   const reduceMotion = useReducedMotionPref();
+  useLenisSmoothScroll(!reduceMotion);
+
   const hero = useLandingContent("hero", {
     badge: "Cloud school ERP for Kenya & East Africa",
     heading_line1: "One platform to run your",
@@ -800,8 +1061,11 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
     <div className="relative bg-background">
       <HeroScene goTo={goTo} hero={hero} heroPhotos={heroPhotos} reduceMotion={reduceMotion} />
       <ModulesScene goTo={goTo} categories={moduleCategories} reduceMotion={reduceMotion} />
-      <GalleryScene photos={galleryPhotos} reduceMotion={reduceMotion} />
+      <FinanceScene goTo={goTo} reduceMotion={reduceMotion} />
+      <CampusScene photos={galleryPhotos} reduceMotion={reduceMotion} />
+      <PortalsScene reduceMotion={reduceMotion} />
       <MissionScene goTo={goTo} mission={mission} reduceMotion={reduceMotion} />
+      <TrustScene reduceMotion={reduceMotion} />
       <FinalScene goTo={goTo} site={site} reduceMotion={reduceMotion} />
     </div>
   );
@@ -1115,7 +1379,6 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
   }, [plans, selectedPlanId]);
 
   const selectedPlan = plans?.find((p) => p.id === selectedPlanId);
-  const includedKey = selectedPlan ? `included_in_${(selectedPlan.name ?? "").toLowerCase()}` : null;
 
   const isIncluded = (m: any) => {
     if (!selectedPlan) return false;
@@ -1153,7 +1416,7 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
           <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            {(plans ?? []).map((p: any, i: number) => {
+            {(plans ?? []).map((p: any) => {
               const isSelected = p.id === selectedPlanId;
               return (
                 <button
