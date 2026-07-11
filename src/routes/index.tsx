@@ -1,6 +1,7 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
@@ -479,28 +480,49 @@ function Landing() {
 // HOME PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
+function useReducedMotionPref() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+// ── Scene 1: Hero — full-bleed photo carousel that slowly zooms and fades
+// as the next scene rises underneath it (vertical "descent" transition). ──
+function HeroScene({
+  goTo,
+  hero,
+  heroPhotos,
+  reduceMotion,
+}: {
+  goTo: (p: Page) => void;
+  hero: any;
+  heroPhotos: { src: string; caption?: string }[];
+  reduceMotion: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const scale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 1.15]);
+  const overlayOpacity = useTransform(scrollYProgress, [0, 0.7, 1], [0.55, 0.75, 0.92]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.5, 0.85], [1, 1, 0]);
+  const contentY = useTransform(scrollYProgress, [0, 0.85], [0, reduceMotion ? 0 : -60]);
   const [heroImg, setHeroImg] = useState(0);
-  const hero = useLandingContent("hero", {
-    badge: "Cloud school ERP for Kenya & East Africa",
-    heading_line1: "One platform to run your",
-    heading_highlight: "entire school",
-    subheading: "From admissions to graduation — 35+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
-    stats: [{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
-  });
-  const heroPhotos = useGalleryPhotos("hero", HERO_PHOTOS.map((src) => ({ src })));
-  const galleryPhotos = useGalleryPhotos("gallery", GALLERY_PHOTOS);
 
   useEffect(() => {
-    const t = setInterval(() => setHeroImg(i => (i + 1) % heroPhotos.length), 5000);
+    const t = setInterval(() => setHeroImg((i) => (i + 1) % heroPhotos.length), 5000);
     return () => clearInterval(t);
   }, [heroPhotos.length]);
 
   return (
-    <div>
-      {/* Hero */}
-      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-        <div className="absolute inset-0">
+    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "140vh" }} className="relative">
+      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
+        <motion.div className="absolute inset-0" style={{ scale }}>
           {heroPhotos.map((p, i) => (
             <img
               key={p.src}
@@ -509,9 +531,9 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === heroImg ? "opacity-100" : "opacity-0"}`}
             />
           ))}
-          <div className="absolute inset-0 bg-black/60" />
-        </div>
-        <div className="relative container mx-auto px-6 py-20 text-center text-white">
+        </motion.div>
+        <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
+        <motion.div style={{ opacity: contentOpacity, y: contentY }} className="relative container mx-auto px-6 py-20 text-center text-white">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-xs font-medium mb-6">
             <ShieldCheck className="w-3.5 h-3.5" /> {hero.badge}
           </div>
@@ -537,94 +559,224 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
               </div>
             ))}
           </div>
+        </motion.div>
+        <div className="absolute bottom-8 right-8 hidden md:flex items-center gap-3 text-white/50 text-xs tracking-widest uppercase">
+          <span>Scroll</span>
+          <span className="w-10 h-px bg-white/50" />
         </div>
-      </section>
-
-      {/* Quick module preview */}
-      <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold">Everything your school needs</h2>
-            <p className="mt-3 text-muted-foreground max-w-xl mx-auto">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-            {[
-              { icon: GraduationCap, title: "Academics", desc: "Classes, exams, report cards & timetables", color: "text-blue-600 bg-blue-50" },
-              { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", color: "text-green-600 bg-green-50" },
-              { icon: Shield, title: "Boarding & Welfare", desc: "Dorms, clinic, kitchen & transport", color: "text-orange-600 bg-orange-50" },
-              { icon: Globe, title: "Portals", desc: "Parents, students & staff get their own view", color: "text-purple-600 bg-purple-50" },
-            ].map(f => (
-              <div key={f.title} className="rounded-xl border bg-card p-5 flex flex-col gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${f.color}`}><f.icon className="w-5 h-5" /></div>
-                <div>
-                  <div className="font-semibold">{f.title}</div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-center mt-8">
-            <button type="button" onClick={() => goTo("modules")}>
-              <Button variant="outline" className="gap-2">View all 35+ modules <ArrowRight className="w-4 h-4" /></Button>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Photo gallery */}
-      <section className="py-16">
-        <div className="container mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-10">Built for schools like yours</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-5xl mx-auto">
-            {galleryPhotos.map((p, i) => (
-              <div key={`${p.src}-${i}`} className="relative rounded-xl overflow-hidden aspect-video">
-                <img src={p.src} alt={p.caption || "Kenyan school"} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                {p.caption && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                    <span className="text-white text-xs">{p.caption}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Mission teaser */}
-      <MissionTeaser goTo={goTo} />
-
-      {/* Pricing teaser */}
-      <section className="py-16">
-        <div className="container mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold">{site.brand_name} pricing made simple</h2>
-          <p className="mt-3 text-muted-foreground">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
-          <button type="button" onClick={() => goTo("pricing")} className="mt-6 inline-block">
-            <Button className="gap-2">See all plans <ArrowRight className="w-4 h-4" /></Button>
-          </button>
-        </div>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
 
-function MissionTeaser({ goTo }: { goTo: (p: Page) => void }) {
+// ── Scene 2: Modules — a pinned scene whose card track pans horizontally
+// as the user scrolls down (horizontal "camera pan" transition). ──
+function ModulesScene({
+  goTo,
+  categories,
+  reduceMotion,
+}: {
+  goTo: (p: Page) => void;
+  categories: { icon: any; title: string; desc: string; gradient: string; img?: string }[];
+  reduceMotion: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const trackX = useTransform(scrollYProgress, [0, 1], ["0%", reduceMotion ? "0%" : "-58%"]);
+  const introOpacity = useTransform(scrollYProgress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "220vh" }} className="relative bg-slate-950">
+      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
+        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-8 text-white">
+          <div className="text-xs uppercase tracking-widest text-primary mb-2">Platform tour</div>
+          <h2 className="text-3xl md:text-4xl font-bold max-w-xl">Everything your school needs, in one place</h2>
+          <p className="mt-3 text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
+        </motion.div>
+        <motion.div style={{ x: trackX }} className="flex gap-6 pl-6 md:pl-24 pr-24 w-max">
+          {categories.map((c) => (
+            <div key={c.title} className="relative shrink-0 w-[78vw] sm:w-[420px] h-[360px] rounded-2xl overflow-hidden">
+              {c.img && <img src={c.img} alt={c.title} className="absolute inset-0 w-full h-full object-cover" />}
+              <div className={`absolute inset-0 bg-gradient-to-t ${c.gradient}`} />
+              <div className="relative h-full flex flex-col justify-end p-6 text-white">
+                <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
+                  <c.icon className="w-5 h-5" />
+                </div>
+                <div className="font-semibold text-xl">{c.title}</div>
+                <p className="text-sm text-white/80 mt-1">{c.desc}</p>
+              </div>
+            </div>
+          ))}
+          <div className="shrink-0 w-[78vw] sm:w-[360px] h-[360px] rounded-2xl border border-white/15 flex flex-col items-center justify-center text-center p-8">
+            <div className="text-white font-semibold mb-4">See all 35+ modules</div>
+            <button type="button" onClick={() => goTo("modules")}>
+              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent gap-2">
+                View all modules <ArrowRight className="w-4 h-4" />
+              </Button>
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 3: Gallery — three photo columns drift vertically at different
+// speeds while pinned (vertical parallax "descent"). ──
+function GalleryScene({
+  photos,
+  reduceMotion,
+}: {
+  photos: { src: string; caption?: string }[];
+  reduceMotion: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const y1 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -90]);
+  const y2 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 90]);
+  const y3 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -60]);
+  const titleOpacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+
+  const columns = [
+    { photos: photos.filter((_, i) => i % 3 === 0), y: y1 },
+    { photos: photos.filter((_, i) => i % 3 === 1), y: y2 },
+    { photos: photos.filter((_, i) => i % 3 === 2), y: y3 },
+  ];
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "180vh" }} className="relative bg-background">
+      <div className="sticky top-0 h-screen overflow-hidden flex flex-col items-center justify-center py-10">
+        <motion.h2 style={{ opacity: titleOpacity }} className="text-3xl font-bold text-center mb-8">
+          Built for schools like yours
+        </motion.h2>
+        <div className="grid grid-cols-3 gap-3 max-w-5xl w-full px-6">
+          {columns.map((col, ci) => (
+            <motion.div key={ci} style={{ y: col.y }} className="flex flex-col gap-3">
+              {col.photos.map((p, i) => (
+                <div key={`${p.src}-${i}`} className="relative rounded-xl overflow-hidden aspect-[4/3]">
+                  <img src={p.src} alt={p.caption || "Kenyan school"} className="w-full h-full object-cover" />
+                  {p.caption && (
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                      <span className="text-white text-xs">{p.caption}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 4: Mission — a pinned full-bleed gradient panel that scales
+// gently in and out as it passes through view. ──
+function MissionScene({
+  goTo,
+  mission,
+  reduceMotion,
+}: {
+  goTo: (p: Page) => void;
+  mission: any;
+  reduceMotion: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [reduceMotion ? 1 : 0.92, 1, reduceMotion ? 1 : 0.92]);
+  const opacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "120vh" }} className="relative bg-gradient-to-br from-primary via-primary to-primary/80">
+      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
+        <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground">
+          <Target className="w-10 h-10 mx-auto mb-4 opacity-80" />
+          <h2 className="text-3xl md:text-4xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
+          <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
+          <button type="button" onClick={() => goTo("story")} className="mt-8 inline-block">
+            <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
+              Read our story <ArrowRight className="w-4 h-4" />
+            </Button>
+          </button>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ── Scene 5: Final CTA — pricing + download, rises into view then settles
+// (hands off smoothly into the regular footer below). ──
+function FinalScene({
+  goTo,
+  site,
+  reduceMotion,
+}: {
+  goTo: (p: Page) => void;
+  site: typeof SITE_DEFAULTS;
+  reduceMotion: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const opacity = useTransform(scrollYProgress, [0, 0.25, 1], [0, 1, 1]);
+  const y = useTransform(scrollYProgress, [0, 0.25], [reduceMotion ? 0 : 50, 0]);
+
+  return (
+    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "130vh" }} className="relative bg-slate-950">
+      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
+        <motion.div style={{ opacity, y }} className="container mx-auto px-6 text-center text-white">
+          <h2 className="text-3xl md:text-4xl font-bold">{site.brand_name} pricing made simple</h2>
+          <p className="mt-3 text-white/70 max-w-lg mx-auto">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <button type="button" onClick={() => goTo("pricing")}>
+              <Button size="lg" className="gap-2">See all plans <ArrowRight className="w-4 h-4" /></Button>
+            </button>
+            <DownloadButton />
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME PAGE — cinematic scroll-driven experience. Five pinned scenes chained
+// end-to-end; each scene owns its own scroll progress (0→1 while pinned) and
+// drives a background pan (horizontal or vertical) plus a text reveal off of
+// it. No extra scroll libraries are used — everything is driven by
+// framer-motion's useScroll/useTransform, which is already a dependency.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
+  const reduceMotion = useReducedMotionPref();
+  const hero = useLandingContent("hero", {
+    badge: "Cloud school ERP for Kenya & East Africa",
+    heading_line1: "One platform to run your",
+    heading_highlight: "entire school",
+    subheading: "From admissions to graduation — 35+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
+    stats: [{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
+  });
   const mission = useLandingContent("mission_teaser", {
     heading: "Our mission: make every Kenyan school paperless by 2030",
     body: "We believe schools should spend less time on administration and more time on education. SmartDev exists to make that possible for every school — regardless of size or budget.",
   });
+  const heroPhotos = useGalleryPhotos("hero", HERO_PHOTOS.map((src) => ({ src })));
+  const galleryPhotos = useGalleryPhotos("gallery", GALLERY_PHOTOS);
+
+  const moduleCategories = [
+    { icon: GraduationCap, title: "Academics", desc: "Classes, exams, report cards & timetables", gradient: "from-blue-950/95 via-blue-950/30 to-transparent", img: heroPhotos[0]?.src },
+    { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", gradient: "from-emerald-950/95 via-emerald-950/30 to-transparent", img: galleryPhotos[1]?.src ?? heroPhotos[1]?.src },
+    { icon: Shield, title: "Boarding & Welfare", desc: "Dorms, clinic, kitchen & transport", gradient: "from-orange-950/95 via-orange-950/30 to-transparent", img: galleryPhotos[5]?.src ?? heroPhotos[2]?.src },
+    { icon: Globe, title: "Portals", desc: "Parents, students & staff get their own view", gradient: "from-purple-950/95 via-purple-950/30 to-transparent", img: galleryPhotos[2]?.src ?? heroPhotos[0]?.src },
+  ];
+
   return (
-    <section className="py-16 bg-primary text-primary-foreground">
-      <div className="container mx-auto px-6 text-center">
-        <Target className="w-10 h-10 mx-auto mb-4 opacity-80" />
-        <h2 className="text-3xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
-        <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
-        <button type="button" onClick={() => goTo("story")} className="mt-8 inline-block">
-          <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
-            Read our story <ArrowRight className="w-4 h-4" />
-          </Button>
-        </button>
-      </div>
-    </section>
+    <div className="relative bg-background">
+      <HeroScene goTo={goTo} hero={hero} heroPhotos={heroPhotos} reduceMotion={reduceMotion} />
+      <ModulesScene goTo={goTo} categories={moduleCategories} reduceMotion={reduceMotion} />
+      <GalleryScene photos={galleryPhotos} reduceMotion={reduceMotion} />
+      <MissionScene goTo={goTo} mission={mission} reduceMotion={reduceMotion} />
+      <FinalScene goTo={goTo} site={site} reduceMotion={reduceMotion} />
+    </div>
   );
 }
 
