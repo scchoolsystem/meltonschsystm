@@ -1,7 +1,7 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
@@ -493,6 +493,29 @@ function useReducedMotionPref() {
   return reduced;
 }
 
+// Viewport height that stays stable on mobile browsers as the address bar
+// shows/hides (100vh jumps on iOS/Android Chrome; 100dvh tracks the real
+// visible viewport). Falls back cleanly — `h-dvh` is supported on every
+// mobile browser in active use in 2026.
+const VIEWPORT_H = "h-dvh";
+
+// Smooths a raw 0→1 scroll-progress MotionValue with a light spring so
+// backgrounds/text glide rather than snap 1:1 with the (often janky, on
+// budget Android phones) scroll event — this is what gives the "Lenis"-style
+// buttery feel without adding a smooth-scroll library.
+function useSmoothProgress(progress: any, reduceMotion: boolean) {
+  return useSpring(progress, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.1 } : { stiffness: 260, damping: 38, mass: 0.6 });
+}
+
+// A full-bleed black overlay used to fade scenes through black into one
+// another (the "vignette"/cave-mouth transition from the brief), so the
+// hard cut between two sticky sections reads as a deliberate cinematic
+// transition instead of a jump cut.
+function SceneFade({ progress, edge }: { progress: any; edge: "in" | "out" }) {
+  const opacity = useTransform(progress, edge === "in" ? [0, 0.16] : [0.84, 1], edge === "in" ? [1, 0] : [0, 1]);
+  return <motion.div className="absolute inset-0 bg-black pointer-events-none z-20" style={{ opacity }} />;
+}
+
 // ── Scene 1: Hero — full-bleed photo carousel that slowly zooms and fades
 // as the next scene rises underneath it (vertical "descent" transition). ──
 function HeroScene({
@@ -507,11 +530,12 @@ function HeroScene({
   reduceMotion: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const scale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 1.15]);
-  const overlayOpacity = useTransform(scrollYProgress, [0, 0.7, 1], [0.55, 0.75, 0.92]);
-  const contentOpacity = useTransform(scrollYProgress, [0, 0.5, 0.85], [1, 1, 0]);
-  const contentY = useTransform(scrollYProgress, [0, 0.85], [0, reduceMotion ? 0 : -60]);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const scale = useTransform(progress, [0, 1], [1, reduceMotion ? 1 : 1.15]);
+  const overlayOpacity = useTransform(progress, [0, 0.7, 1], [0.55, 0.75, 0.92]);
+  const contentOpacity = useTransform(progress, [0, 0.5, 0.85], [1, 1, 0]);
+  const contentY = useTransform(progress, [0, 0.85], [0, reduceMotion ? 0 : -60]);
   const [heroImg, setHeroImg] = useState(0);
 
   useEffect(() => {
@@ -520,30 +544,34 @@ function HeroScene({
   }, [heroPhotos.length]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "140vh" }} className="relative">
-      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
-        <motion.div className="absolute inset-0" style={{ scale }}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "140vh" }} className="relative">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
+        <motion.div className="absolute inset-0 will-change-transform" style={{ scale }}>
           {heroPhotos.map((p, i) => (
             <img
               key={p.src}
               src={p.src}
               alt={p.caption || "Kenyan school"}
+              loading={i === 0 ? "eager" : "lazy"}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === heroImg ? "opacity-100" : "opacity-0"}`}
             />
           ))}
         </motion.div>
         <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
-        <motion.div style={{ opacity: contentOpacity, y: contentY }} className="relative container mx-auto px-6 py-20 text-center text-white">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-xs font-medium mb-6">
-            <ShieldCheck className="w-3.5 h-3.5" /> {hero.badge}
+        <motion.div
+          style={{ opacity: contentOpacity, y: contentY }}
+          className="relative container mx-auto px-6 py-10 sm:py-20 text-center text-white"
+        >
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-[11px] sm:text-xs font-medium mb-4 sm:mb-6">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {hero.badge}
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
             {hero.heading_line1} <span className="text-primary">{hero.heading_highlight}</span>
           </h1>
-          <p className="mt-6 text-lg text-white/80 max-w-2xl mx-auto">
+          <p className="mt-4 sm:mt-6 text-base sm:text-lg text-white/80 max-w-2xl mx-auto">
             {hero.subheading}
           </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <div className="mt-6 sm:mt-10 flex flex-wrap justify-center gap-3 sm:gap-4">
             <DownloadButton />
             <button type="button" onClick={() => goTo("modules")}>
               <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 bg-transparent gap-2">
@@ -551,19 +579,20 @@ function HeroScene({
               </Button>
             </button>
           </div>
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+          <div className="mt-8 sm:mt-16 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-3xl mx-auto">
             {hero.stats.map((s: any) => (
-              <div key={s.label} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur p-4 text-center">
-                <div className="text-2xl font-bold text-primary">{s.value}</div>
-                <div className="text-xs text-white/70 mt-1">{s.label}</div>
+              <div key={s.label} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur p-3 sm:p-4 text-center">
+                <div className="text-xl sm:text-2xl font-bold text-primary">{s.value}</div>
+                <div className="text-[11px] sm:text-xs text-white/70 mt-1">{s.label}</div>
               </div>
             ))}
           </div>
         </motion.div>
-        <div className="absolute bottom-8 right-8 hidden md:flex items-center gap-3 text-white/50 text-xs tracking-widest uppercase">
+        <div className="absolute bottom-6 sm:bottom-8 right-6 sm:right-8 hidden md:flex items-center gap-3 text-white/50 text-xs tracking-widest uppercase">
           <span>Scroll</span>
           <span className="w-10 h-px bg-white/50" />
         </div>
+        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -581,33 +610,34 @@ function ModulesScene({
   reduceMotion: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const trackX = useTransform(scrollYProgress, [0, 1], ["0%", reduceMotion ? "0%" : "-58%"]);
-  const introOpacity = useTransform(scrollYProgress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-58%"]);
+  const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "220vh" }} className="relative bg-slate-950">
-      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
-        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-8 text-white">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "200vh" }} className="relative bg-slate-950">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
+        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-2">Platform tour</div>
-          <h2 className="text-3xl md:text-4xl font-bold max-w-xl">Everything your school needs, in one place</h2>
-          <p className="mt-3 text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold max-w-xl">Everything your school needs, in one place</h2>
+          <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
         </motion.div>
-        <motion.div style={{ x: trackX }} className="flex gap-6 pl-6 md:pl-24 pr-24 w-max">
+        <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
           {categories.map((c) => (
-            <div key={c.title} className="relative shrink-0 w-[78vw] sm:w-[420px] h-[360px] rounded-2xl overflow-hidden">
-              {c.img && <img src={c.img} alt={c.title} className="absolute inset-0 w-full h-full object-cover" />}
+            <div key={c.title} className="relative shrink-0 w-[78vw] sm:w-[420px] h-[300px] sm:h-[360px] rounded-2xl overflow-hidden">
+              {c.img && <img src={c.img} alt={c.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
               <div className={`absolute inset-0 bg-gradient-to-t ${c.gradient}`} />
-              <div className="relative h-full flex flex-col justify-end p-6 text-white">
-                <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
+              <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-3 sm:mb-4">
                   <c.icon className="w-5 h-5" />
                 </div>
-                <div className="font-semibold text-xl">{c.title}</div>
+                <div className="font-semibold text-lg sm:text-xl">{c.title}</div>
                 <p className="text-sm text-white/80 mt-1">{c.desc}</p>
               </div>
             </div>
           ))}
-          <div className="shrink-0 w-[78vw] sm:w-[360px] h-[360px] rounded-2xl border border-white/15 flex flex-col items-center justify-center text-center p-8">
+          <div className="shrink-0 w-[78vw] sm:w-[360px] h-[300px] sm:h-[360px] rounded-2xl border border-white/15 flex flex-col items-center justify-center text-center p-8">
             <div className="text-white font-semibold mb-4">See all 35+ modules</div>
             <button type="button" onClick={() => goTo("modules")}>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent gap-2">
@@ -616,6 +646,8 @@ function ModulesScene({
             </button>
           </div>
         </motion.div>
+        <SceneFade progress={progress} edge="in" />
+        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -631,11 +663,12 @@ function GalleryScene({
   reduceMotion: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const y1 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -90]);
-  const y2 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 90]);
-  const y3 = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -60]);
-  const titleOpacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const y1 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : -90]);
+  const y2 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : 90]);
+  const y3 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : -60]);
+  const titleOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
 
   const columns = [
     { photos: photos.filter((_, i) => i % 3 === 0), y: y1 },
@@ -644,19 +677,19 @@ function GalleryScene({
   ];
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "180vh" }} className="relative bg-background">
-      <div className="sticky top-0 h-screen overflow-hidden flex flex-col items-center justify-center py-10">
-        <motion.h2 style={{ opacity: titleOpacity }} className="text-3xl font-bold text-center mb-8">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "170vh" }} className="relative bg-background">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col items-center justify-center py-8 sm:py-10`}>
+        <motion.h2 style={{ opacity: titleOpacity }} className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8 px-6">
           Built for schools like yours
         </motion.h2>
-        <div className="grid grid-cols-3 gap-3 max-w-5xl w-full px-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-5xl w-full px-4 sm:px-6">
           {columns.map((col, ci) => (
-            <motion.div key={ci} style={{ y: col.y }} className="flex flex-col gap-3">
+            <motion.div key={ci} style={{ y: col.y }} className="flex flex-col gap-2 sm:gap-3 will-change-transform">
               {col.photos.map((p, i) => (
                 <div key={`${p.src}-${i}`} className="relative rounded-xl overflow-hidden aspect-[4/3]">
-                  <img src={p.src} alt={p.caption || "Kenyan school"} className="w-full h-full object-cover" />
+                  <img src={p.src} alt={p.caption || "Kenyan school"} loading="lazy" className="w-full h-full object-cover" />
                   {p.caption && (
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 hidden sm:block">
                       <span className="text-white text-xs">{p.caption}</span>
                     </div>
                   )}
@@ -665,6 +698,8 @@ function GalleryScene({
             </motion.div>
           ))}
         </div>
+        <SceneFade progress={progress} edge="in" />
+        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -682,23 +717,26 @@ function MissionScene({
   reduceMotion: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [reduceMotion ? 1 : 0.92, 1, reduceMotion ? 1 : 0.92]);
-  const opacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const scale = useTransform(progress, [0, 0.5, 1], [reduceMotion ? 1 : 0.92, 1, reduceMotion ? 1 : 0.92]);
+  const opacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "120vh" }} className="relative bg-gradient-to-br from-primary via-primary to-primary/80">
-      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
-        <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground">
-          <Target className="w-10 h-10 mx-auto mb-4 opacity-80" />
-          <h2 className="text-3xl md:text-4xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
-          <p className="mt-4 text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
-          <button type="button" onClick={() => goTo("story")} className="mt-8 inline-block">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative bg-gradient-to-br from-primary via-primary to-primary/80">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
+        <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground will-change-transform">
+          <Target className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-4 opacity-80" />
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold max-w-2xl mx-auto">{mission.heading}</h2>
+          <p className="mt-4 text-sm sm:text-base text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
+          <button type="button" onClick={() => goTo("story")} className="mt-6 sm:mt-8 inline-block">
             <Button variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent gap-2">
               Read our story <ArrowRight className="w-4 h-4" />
             </Button>
           </button>
         </motion.div>
+        <SceneFade progress={progress} edge="in" />
+        <SceneFade progress={progress} edge="out" />
       </div>
     </section>
   );
@@ -716,23 +754,25 @@ function FinalScene({
   reduceMotion: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const opacity = useTransform(scrollYProgress, [0, 0.25, 1], [0, 1, 1]);
-  const y = useTransform(scrollYProgress, [0, 0.25], [reduceMotion ? 0 : 50, 0]);
+  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const progress = useSmoothProgress(rawProgress, reduceMotion);
+  const opacity = useTransform(progress, [0, 0.25, 1], [0, 1, 1]);
+  const y = useTransform(progress, [0, 0.25], [reduceMotion ? 0 : 50, 0]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100vh" : "130vh" }} className="relative bg-slate-950">
-      <div className="sticky top-0 h-screen overflow-hidden flex items-center justify-center">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "120vh" }} className="relative bg-slate-950">
+      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         <motion.div style={{ opacity, y }} className="container mx-auto px-6 text-center text-white">
-          <h2 className="text-3xl md:text-4xl font-bold">{site.brand_name} pricing made simple</h2>
-          <p className="mt-3 text-white/70 max-w-lg mx-auto">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">{site.brand_name} pricing made simple</h2>
+          <p className="mt-3 text-sm sm:text-base text-white/70 max-w-lg mx-auto">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
+          <div className="mt-6 sm:mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
             <button type="button" onClick={() => goTo("pricing")}>
               <Button size="lg" className="gap-2">See all plans <ArrowRight className="w-4 h-4" /></Button>
             </button>
             <DownloadButton />
           </div>
         </motion.div>
+        <SceneFade progress={progress} edge="in" />
       </div>
     </section>
   );
@@ -740,10 +780,14 @@ function FinalScene({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOME PAGE — cinematic scroll-driven experience. Five pinned scenes chained
-// end-to-end; each scene owns its own scroll progress (0→1 while pinned) and
-// drives a background pan (horizontal or vertical) plus a text reveal off of
-// it. No extra scroll libraries are used — everything is driven by
-// framer-motion's useScroll/useTransform, which is already a dependency.
+// end-to-end; each scene owns its own scroll progress (0→1 while pinned),
+// smoothed with a spring for a Lenis-style buttery feel, and drives a
+// background pan (horizontal or vertical) plus a fade-through-black
+// transition into/out of its neighbours. No extra scroll libraries are used
+// — everything is driven by framer-motion (useScroll/useTransform/useSpring),
+// which is already a dependency. All scene heights use dvh for the pinned
+// viewport so mobile browser chrome (address bar show/hide) never causes
+// content to jump or clip.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
