@@ -59,7 +59,7 @@ function PayslipsTab({ staffId }: { staffId?: string }) {
   );
 }
 
-export const Route = createFileRoute("/_app/portal/me")({
+export const Route = createFileRoute("/_app/portal_/me")({
   component: MyWorkspace,
 });
 
