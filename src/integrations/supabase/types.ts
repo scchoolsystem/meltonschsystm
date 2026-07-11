@@ -4338,9 +4338,839 @@ export type Database = {
             referencedColumns: ["school_id"]
           },
         ]
+      },
+      transport_daily_log: {
+        Row: {
+          id: string
+          school_id: string | null
+          route_id: string
+          log_date: string
+          boarded_count: number
+          notes: string | null
+          logged_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          route_id: string
+          log_date?: string
+          boarded_count?: number
+          notes?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          route_id?: string
+          log_date?: string
+          boarded_count?: number
+          notes?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      boarding_roll_call: {
+        Row: {
+          id: string
+          school_id: string | null
+          student_id: string
+          dorm_id: string
+          roll_date: string
+          status: string
+          notes: string | null
+          recorded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          student_id: string
+          dorm_id: string
+          roll_date?: string
+          status?: string
+          notes?: string | null
+          recorded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          student_id?: string
+          dorm_id?: string
+          roll_date?: string
+          status?: string
+          notes?: string | null
+          recorded_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      dorm_maintenance: {
+        Row: {
+          id: string
+          school_id: string | null
+          dorm_id: string
+          reported_by: string | null
+          description: string
+          priority: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          dorm_id: string
+          reported_by?: string | null
+          description: string
+          priority?: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          dorm_id?: string
+          reported_by?: string | null
+          description?: string
+          priority?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      },
+      visitor_log: {
+        Row: {
+          id: string
+          school_id: string | null
+          visitor_name: string
+          id_number: string | null
+          visiting: string | null
+          purpose: string | null
+          time_in: string
+          time_out: string | null
+          logged_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          visitor_name: string
+          id_number?: string | null
+          visiting?: string | null
+          purpose?: string | null
+          time_in?: string
+          time_out?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          visitor_name?: string
+          id_number?: string | null
+          visiting?: string | null
+          purpose?: string | null
+          time_in?: string
+          time_out?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      vehicle_log: {
+        Row: {
+          id: string
+          school_id: string | null
+          vehicle_reg: string
+          driver_name: string | null
+          purpose: string | null
+          time_in: string
+          time_out: string | null
+          logged_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          vehicle_reg: string
+          driver_name?: string | null
+          purpose?: string | null
+          time_in?: string
+          time_out?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          vehicle_reg?: string
+          driver_name?: string | null
+          purpose?: string | null
+          time_in?: string
+          time_out?: string | null
+          logged_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      counselling_sessions: {
+        Row: {
+          id: string
+          school_id: string | null
+          student_id: string
+          counsellor_id: string | null
+          session_date: string
+          notes: string | null
+          follow_up_date: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          student_id: string
+          counsellor_id?: string | null
+          session_date?: string
+          notes?: string | null
+          follow_up_date?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          student_id?: string
+          counsellor_id?: string | null
+          session_date?: string
+          notes?: string | null
+          follow_up_date?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      sports_fixtures: {
+        Row: {
+          id: string
+          school_id: string | null
+          activity_id: string
+          opponent: string
+          fixture_date: string
+          venue: string | null
+          result: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          activity_id: string
+          opponent: string
+          fixture_date: string
+          venue?: string | null
+          result?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          activity_id?: string
+          opponent?: string
+          fixture_date?: string
+          venue?: string | null
+          result?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      sports_achievements: {
+        Row: {
+          id: string
+          school_id: string | null
+          student_id: string
+          activity_id: string | null
+          description: string
+          award_level: string
+          achievement_date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          student_id: string
+          activity_id?: string | null
+          description: string
+          award_level?: string
+          achievement_date?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          student_id?: string
+          activity_id?: string | null
+          description?: string
+          award_level?: string
+          achievement_date?: string
+          created_at?: string
+        }
+        Relationships: []
+      },
+      department_members: {
+        Row: {
+          id: string
+          department_id: string
+          staff_id: string
+          role: string
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          staff_id: string
+          role?: string
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          department_id?: string
+          staff_id?: string
+          role?: string
+          joined_at?: string
+        }
+        Relationships: []
+      },
+      department_communications: {
+        Row: {
+          id: string
+          department_id: string
+          sender_id: string
+          title: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          sender_id: string
+          title: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          department_id?: string
+          sender_id?: string
+          title?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: []
+      },
+      inventory_suppliers: {
+        Row: {
+          id: string
+          school_id: string
+          name: string
+          contact: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          name: string
+          contact?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          name?: string
+          contact?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      },
+      inventory_items: {
+        Row: {
+          id: string
+          school_id: string
+          sku: string | null
+          name: string
+          unit: string | null
+          reorder_level: number | null
+          current_qty: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          sku?: string | null
+          name: string
+          unit?: string | null
+          reorder_level?: number | null
+          current_qty?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          sku?: string | null
+          name?: string
+          unit?: string | null
+          reorder_level?: number | null
+          current_qty?: number
+          created_at?: string
+        }
+        Relationships: []
+      },
+      inventory_receipts: {
+        Row: {
+          id: string
+          school_id: string
+          item_id: string
+          supplier_id: string | null
+          qty: number
+          unit_cost: number | null
+          received_at: string
+          received_by: string | null
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          item_id: string
+          supplier_id?: string | null
+          qty: number
+          unit_cost?: number | null
+          received_at?: string
+          received_by?: string | null
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          item_id?: string
+          supplier_id?: string | null
+          qty?: number
+          unit_cost?: number | null
+          received_at?: string
+          received_by?: string | null
+        }
+        Relationships: []
+      },
+      inventory_issues: {
+        Row: {
+          id: string
+          school_id: string
+          item_id: string
+          qty: number
+          issued_to: string | null
+          issued_at: string
+          issued_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          item_id: string
+          qty: number
+          issued_to?: string | null
+          issued_at?: string
+          issued_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          item_id?: string
+          qty?: number
+          issued_to?: string | null
+          issued_at?: string
+          issued_by?: string | null
+          notes?: string | null
+        }
+        Relationships: []
+      },
+      landing_content: {
+        Row: {
+          id: string
+          section: string
+          content: Json
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          section: string
+          content?: Json
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          section?: string
+          content?: Json
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      landing_gallery: {
+        Row: {
+          id: string
+          placement: string
+          image_url: string | null
+          caption: string | null
+          alt_text: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          placement: string
+          image_url?: string | null
+          caption?: string | null
+          alt_text?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          placement?: string
+          image_url?: string | null
+          caption?: string | null
+          alt_text?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      module_addon_pricing: {
+        Row: {
+          id: string
+          feature_key: string
+          display_name: string
+          category: string
+          monthly_price: number
+          included_in_starter: boolean
+          included_in_standard: boolean
+          included_in_enterprise: boolean
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          feature_key: string
+          display_name: string
+          category?: string
+          monthly_price?: number
+          included_in_starter?: boolean
+          included_in_standard?: boolean
+          included_in_enterprise?: boolean
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          feature_key?: string
+          display_name?: string
+          category?: string
+          monthly_price?: number
+          included_in_starter?: boolean
+          included_in_standard?: boolean
+          included_in_enterprise?: boolean
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      school_subscription_addons: {
+        Row: {
+          id: string
+          school_id: string
+          feature_key: string
+          monthly_price_at_purchase: number
+          added_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          feature_key: string
+          monthly_price_at_purchase?: number
+          added_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          feature_key?: string
+          monthly_price_at_purchase?: number
+          added_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      platform_mpesa_config: {
+        Row: {
+          id: string
+          shortcode: string
+          consumer_secret: string
+          passkey: string
+          callback_token: string
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          shortcode: string
+          consumer_secret: string
+          passkey: string
+          callback_token: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          shortcode?: string
+          consumer_secret?: string
+          passkey?: string
+          callback_token?: string
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      platform_mpesa_transactions: {
+        Row: {
+          id: string
+          invoice_id: string
+          school_id: string
+          initiated_by: string | null
+          phone: string
+          amount: number
+          merchant_request_id: string | null
+          status: string
+          result_code: string | null
+          result_desc: string | null
+          mpesa_receipt: string | null
+          raw_callback: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          invoice_id: string
+          school_id: string
+          initiated_by?: string | null
+          phone: string
+          amount: number
+          merchant_request_id?: string | null
+          status?: string
+          result_code?: string | null
+          result_desc?: string | null
+          mpesa_receipt?: string | null
+          raw_callback?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          invoice_id?: string
+          school_id?: string
+          initiated_by?: string | null
+          phone?: string
+          amount?: number
+          merchant_request_id?: string | null
+          status?: string
+          result_code?: string | null
+          result_desc?: string | null
+          mpesa_receipt?: string | null
+          raw_callback?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      school_mpesa_config: {
+        Row: {
+          id: string
+          school_id: string
+          shortcode: string
+          enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          shortcode: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          shortcode?: string
+          enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      },
+      report_card_settings: {
+        Row: {
+          id: string
+          school_id: string
+          total_method: string
+          max_score_per_subject: number
+          show_position: boolean
+          show_subject_position: boolean
+          overall_scale_id: string | null
+          principal_name: string | null
+          principal_title: string
+          footer_note: string | null
+          grade_remarks: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          school_id: string
+          total_method?: string
+          max_score_per_subject?: number
+          show_position?: boolean
+          show_subject_position?: boolean
+          overall_scale_id?: string | null
+          principal_name?: string | null
+          principal_title?: string
+          footer_note?: string | null
+          grade_remarks?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string
+          total_method?: string
+          max_score_per_subject?: number
+          show_position?: boolean
+          show_subject_position?: boolean
+          overall_scale_id?: string | null
+          principal_name?: string | null
+          principal_title?: string
+          footer_note?: string | null
+          grade_remarks?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_card_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_card_settings_overall_scale_id_fkey"
+            columns: ["overall_scale_id"]
+            isOneToOne: false
+            referencedRelation: "grading_scales"
+            referencedColumns: ["id"]
+          },
+        ]
+      },
+      class_subjects: {
+        Row: {
+          id: string
+          class_id: string
+          subject_id: string
+          lessons_per_week: number | null
+          requires_double_lesson: boolean
+          elective_group: string | null
+          preferred_room_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          class_id: string
+          subject_id: string
+          lessons_per_week?: number | null
+          requires_double_lesson?: boolean
+          elective_group?: string | null
+          preferred_room_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          class_id?: string
+          subject_id?: string
+          lessons_per_week?: number | null
+          requires_double_lesson?: boolean
+          elective_group?: string | null
+          preferred_room_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_subjects_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_subjects_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_subjects_preferred_room_id_fkey"
+            columns: ["preferred_room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
+
     }
     Views: {
+      v_student_risk: {
+        Row: {
+          student_id: string | null
+          first_name: string | null
+          last_name: string | null
+          admission_no: string | null
+          school_id: string | null
+          risk_score: number | null
+          risk_reason: string | null
+        }
+        Relationships: []
+      }
       v_attendance_daily: {
         Row: {
           absent: number | null
@@ -4506,6 +5336,15 @@ export type Database = {
       }
     }
     Functions: {
+      list_active_schools: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          slug: string
+          name: string
+          logo_url: string | null
+        }[]
+      }
       assign_class_fees:
         | { Args: { _student: string }; Returns: undefined }
         | {
