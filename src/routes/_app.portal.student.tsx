@@ -4,9 +4,9 @@
 // NO features removed. All existing analytics, tabs, and data flows intact.
 
 import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
-import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,11 +47,17 @@ import {
 
 // ─── Route ────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/_app/portal/student")({
-  beforeLoad: async () => {
-    const { data, timedOut } = await getSessionSafe();
-    if (timedOut) return; // defer to AppLayout's own client-side session check
-    if (!data.session) throw redirect({ to: "/login" });
-  },
+  // No beforeLoad here on purpose. This route used to have its own copy of
+  // the session check, but — unlike the parent _app.tsx's beforeLoad — it
+  // was missing the `typeof window === "undefined"` guard, so it tried to
+  // call getSessionSafe() (which reads the browser's localStorage-backed
+  // Supabase session) during server-side rendering too, where localStorage
+  // doesn't exist. That broke SSR for this route specifically: the shell
+  // (sidebar/header) rendered fine via the parent route, but this route's
+  // own component never got a chance to render correctly. The parent
+  // `/_app` route's beforeLoad already redirects to /login when there's
+  // genuinely no session (with correct server/client handling), so this
+  // route doesn't need its own duplicate, buggier copy of that check.
   component: StudentPortalGuard,
 });
 
