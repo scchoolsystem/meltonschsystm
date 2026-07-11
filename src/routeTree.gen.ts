@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyRouteImport } from './routes/verify'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlatformRouteImport } from './routes/platform'
@@ -17,12 +18,12 @@ import { Route as LegalRouteImport } from './routes/legal'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
-import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformWebsiteRouteImport } from './routes/platform.website'
 import { Route as PlatformSupportRouteImport } from './routes/platform.support'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 import { Route as PlatformPlansRouteImport } from './routes/platform.plans'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
+import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as ApiJaasTokenRouteImport } from './routes/api/jaas-token'
@@ -31,6 +32,7 @@ import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
 import { Route as AppStaffRouteImport } from './routes/_app.staff'
 import { Route as AppSecurityRouteImport } from './routes/_app.security'
+import { Route as AppPortalRouteImport } from './routes/_app.portal'
 import { Route as AppLiveRouteImport } from './routes/_app.live'
 import { Route as AppLibraryRouteImport } from './routes/_app.library'
 import { Route as AppKitchenRouteImport } from './routes/_app.kitchen'
@@ -44,6 +46,7 @@ import { Route as AppClassroomRouteImport } from './routes/_app.classroom'
 import { Route as AppClassesRouteImport } from './routes/_app.classes'
 import { Route as AppBoardingRouteImport } from './routes/_app.boarding'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
+import { Route as AppAssignmentsRouteImport } from './routes/_app.assignments'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools.$id'
@@ -53,10 +56,11 @@ import { Route as ApiPublicPlatformMpesaCallbackRouteImport } from './routes/api
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppStudentsIdRouteImport } from './routes/_app.students_.$id'
+import { Route as AppStaffPayslipsRouteImport } from './routes/_app.staff_.payslips'
 import { Route as AppStaffIdRouteImport } from './routes/_app.staff_.$id'
-import { Route as AppPortalStudentRouteImport } from './routes/_app.portal.student'
-import { Route as AppPortalParentRouteImport } from './routes/_app.portal.parent'
-import { Route as AppPortalMeRouteImport } from './routes/_app.portal.me'
+import { Route as AppPortalStudentRouteImport } from './routes/_app.portal_.student'
+import { Route as AppPortalParentRouteImport } from './routes/_app.portal_.parent'
+import { Route as AppPortalMeRouteImport } from './routes/_app.portal_.me'
 import { Route as AppLiveSessionIdRouteImport } from './routes/_app.live.$sessionId'
 import { Route as AppIdsVerifyRouteImport } from './routes/_app.ids.verify'
 import { Route as AppIdsBulkRouteImport } from './routes/_app.ids.bulk'
@@ -64,16 +68,18 @@ import { Route as AppFinancePaymentsRouteImport } from './routes/_app.finance.pa
 import { Route as AppFinanceInvoicesRouteImport } from './routes/_app.finance.invoices'
 import { Route as AppFinanceGenerateRouteImport } from './routes/_app.finance.generate'
 import { Route as AppFinanceFeesRouteImport } from './routes/_app.finance.fees'
+import { Route as AppFinanceExpensesRouteImport } from './routes/_app.finance.expenses'
+import { Route as AppFinanceBudgetRouteImport } from './routes/_app.finance.budget'
+import { Route as AppFinanceAnalyticsRouteImport } from './routes/_app.finance.analytics'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSupportRouteImport } from './routes/_app.admin.support'
 import { Route as AppAdminStudentDocumentsRouteImport } from './routes/_app.admin.student-documents'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app.admin.settings'
-import { Route as AppAdminPromotionSettingsRouteImport } from './routes/_app.admin.promotion-settings'
-import { Route as AppAdminPromotionRouteImport } from './routes/_app.admin.promotion'
-import { Route as AppAdminClassStructureRouteImport } from './routes/_app.admin.class-structure'
 import { Route as AppAdminSchoolsRouteImport } from './routes/_app.admin.schools'
 import { Route as AppAdminRoomsRouteImport } from './routes/_app.admin.rooms'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
+import { Route as AppAdminPromotionSettingsRouteImport } from './routes/_app.admin.promotion-settings'
+import { Route as AppAdminPromotionRouteImport } from './routes/_app.admin.promotion'
 import { Route as AppAdminPermissionsRouteImport } from './routes/_app.admin.permissions'
 import { Route as AppAdminPeriodsRouteImport } from './routes/_app.admin.periods'
 import { Route as AppAdminOverridesRouteImport } from './routes/_app.admin.overrides'
@@ -87,13 +93,17 @@ import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminFeaturesRouteImport } from './routes/_app.admin.features'
 import { Route as AppAdminDepartmentsRouteImport } from './routes/_app.admin.departments'
+import { Route as AppAdminComplianceRouteImport } from './routes/_app.admin.compliance'
 import { Route as AppAdminCommunicationsRouteImport } from './routes/_app.admin.communications'
+import { Route as AppAdminClassStructureRouteImport } from './routes/_app.admin.class-structure'
 import { Route as AppAdminBrainRouteImport } from './routes/_app.admin.brain'
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminActivityRouteImport } from './routes/_app.admin.activity'
 import { Route as AppAcademicsSubjectsRouteImport } from './routes/_app.academics.subjects'
 import { Route as AppAcademicsResultsRouteImport } from './routes/_app.academics.results'
 import { Route as AppAcademicsReportCardsRouteImport } from './routes/_app.academics.report-cards'
+import { Route as AppAcademicsRemarksRouteImport } from './routes/_app.academics.remarks'
+import { Route as AppAcademicsOversightRouteImport } from './routes/_app.academics.oversight'
 import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
@@ -103,14 +113,14 @@ import { Route as AppLiveSessionIdAttendanceRouteImport } from './routes/_app.li
 import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$id'
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
-import { Route as AppFinanceAnalyticsRouteImport } from './routes/_app.finance.analytics'
-import { Route as AppFinanceBudgetRouteImport } from './routes/_app.finance.budget'
-import { Route as AppFinanceExpensesRouteImport } from './routes/_app.finance.expenses'
-import { Route as AppAcademicsRemarksRouteImport } from './routes/_app.academics.remarks'
-import { Route as AppAcademicsOversightRouteImport } from './routes/_app.academics.oversight'
 import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
+const VerifyRoute = VerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UnsubscribeRoute = UnsubscribeRouteImport.update({
   id: '/unsubscribe',
   path: '/unsubscribe',
@@ -150,11 +160,6 @@ const SysControlRoomRoute = SysControlRoomRouteImport.update({
   path: '/sys/control-room',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PlatformInvoicesRoute = PlatformInvoicesRouteImport.update({
-  id: '/invoices',
-  path: '/invoices',
-  getParentRoute: () => PlatformRoute,
-} as any)
 const PlatformWebsiteRoute = PlatformWebsiteRouteImport.update({
   id: '/website',
   path: '/website',
@@ -178,6 +183,11 @@ const PlatformPlansRoute = PlatformPlansRouteImport.update({
 const PlatformLoginRoute = PlatformLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => PlatformRoute,
+} as any)
+const PlatformInvoicesRoute = PlatformInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
   getParentRoute: () => PlatformRoute,
 } as any)
 const PlatformDashboardRoute = PlatformDashboardRouteImport.update({
@@ -218,6 +228,11 @@ const AppStaffRoute = AppStaffRouteImport.update({
 const AppSecurityRoute = AppSecurityRouteImport.update({
   id: '/security',
   path: '/security',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPortalRoute = AppPortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
   getParentRoute: () => AppRoute,
 } as any)
 const AppLiveRoute = AppLiveRouteImport.update({
@@ -285,6 +300,11 @@ const AppAttendanceRoute = AppAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAssignmentsRoute = AppAssignmentsRouteImport.update({
+  id: '/assignments',
+  path: '/assignments',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAnnouncementsRoute = AppAnnouncementsRouteImport.update({
   id: '/announcements',
   path: '/announcements',
@@ -332,23 +352,28 @@ const AppStudentsIdRoute = AppStudentsIdRouteImport.update({
   path: '/students/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStaffPayslipsRoute = AppStaffPayslipsRouteImport.update({
+  id: '/staff_/payslips',
+  path: '/staff/payslips',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppStaffIdRoute = AppStaffIdRouteImport.update({
   id: '/staff_/$id',
   path: '/staff/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPortalStudentRoute = AppPortalStudentRouteImport.update({
-  id: '/portal/student',
+  id: '/portal_/student',
   path: '/portal/student',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPortalParentRoute = AppPortalParentRouteImport.update({
-  id: '/portal/parent',
+  id: '/portal_/parent',
   path: '/portal/parent',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPortalMeRoute = AppPortalMeRouteImport.update({
-  id: '/portal/me',
+  id: '/portal_/me',
   path: '/portal/me',
   getParentRoute: () => AppRoute,
 } as any)
@@ -387,6 +412,21 @@ const AppFinanceFeesRoute = AppFinanceFeesRouteImport.update({
   path: '/finance/fees',
   getParentRoute: () => AppRoute,
 } as any)
+const AppFinanceExpensesRoute = AppFinanceExpensesRouteImport.update({
+  id: '/finance/expenses',
+  path: '/finance/expenses',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceBudgetRoute = AppFinanceBudgetRouteImport.update({
+  id: '/finance/budget',
+  path: '/finance/budget',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFinanceAnalyticsRoute = AppFinanceAnalyticsRouteImport.update({
+  id: '/finance/analytics',
+  path: '/finance/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -408,21 +448,6 @@ const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAdminPromotionSettingsRoute = AppAdminPromotionSettingsRouteImport.update({
-  id: '/admin/promotion-settings',
-  path: '/admin/promotion-settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAdminPromotionRoute = AppAdminPromotionRouteImport.update({
-  id: '/admin/promotion',
-  path: '/admin/promotion',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAdminClassStructureRoute = AppAdminClassStructureRouteImport.update({
-  id: '/admin/class-structure',
-  path: '/admin/class-structure',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAdminSchoolsRoute = AppAdminSchoolsRouteImport.update({
   id: '/admin/schools',
   path: '/admin/schools',
@@ -436,6 +461,17 @@ const AppAdminRoomsRoute = AppAdminRoomsRouteImport.update({
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   id: '/admin/roles',
   path: '/admin/roles',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminPromotionSettingsRoute =
+  AppAdminPromotionSettingsRouteImport.update({
+    id: '/admin/promotion-settings',
+    path: '/admin/promotion-settings',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppAdminPromotionRoute = AppAdminPromotionRouteImport.update({
+  id: '/admin/promotion',
+  path: '/admin/promotion',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminPermissionsRoute = AppAdminPermissionsRouteImport.update({
@@ -504,9 +540,19 @@ const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
   path: '/admin/departments',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminComplianceRoute = AppAdminComplianceRouteImport.update({
+  id: '/admin/compliance',
+  path: '/admin/compliance',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminCommunicationsRoute = AppAdminCommunicationsRouteImport.update({
   id: '/admin/communications',
   path: '/admin/communications',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminClassStructureRoute = AppAdminClassStructureRouteImport.update({
+  id: '/admin/class-structure',
+  path: '/admin/class-structure',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminBrainRoute = AppAdminBrainRouteImport.update({
@@ -537,6 +583,16 @@ const AppAcademicsResultsRoute = AppAcademicsResultsRouteImport.update({
 const AppAcademicsReportCardsRoute = AppAcademicsReportCardsRouteImport.update({
   id: '/academics/report-cards',
   path: '/academics/report-cards',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsRemarksRoute = AppAcademicsRemarksRouteImport.update({
+  id: '/academics/remarks',
+  path: '/academics/remarks',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAcademicsOversightRoute = AppAcademicsOversightRouteImport.update({
+  id: '/academics/oversight',
+  path: '/academics/oversight',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAcademicsMarksRoute = AppAcademicsMarksRouteImport.update({
@@ -588,31 +644,6 @@ const AppFinanceReceiptIdRoute = AppFinanceReceiptIdRouteImport.update({
   path: '/finance/receipt/$id',
   getParentRoute: () => AppRoute,
 } as any)
-const AppFinanceAnalyticsRoute = AppFinanceAnalyticsRouteImport.update({
-  id: '/finance/analytics',
-  path: '/finance/analytics',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFinanceBudgetRoute = AppFinanceBudgetRouteImport.update({
-  id: '/finance/budget',
-  path: '/finance/budget',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFinanceExpensesRoute = AppFinanceExpensesRouteImport.update({
-  id: '/finance/expenses',
-  path: '/finance/expenses',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAcademicsRemarksRoute = AppAcademicsRemarksRouteImport.update({
-  id: '/academics/remarks',
-  path: '/academics/remarks',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAcademicsOversightRoute = AppAcademicsOversightRouteImport.update({
-  id: '/academics/oversight',
-  path: '/academics/oversight',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAdminLeavingCertificateIdRoute =
   AppAdminLeavingCertificateIdRouteImport.update({
     id: '/admin/leaving-certificate/$id',
@@ -633,8 +664,10 @@ export interface FileRoutesByFullPath {
   '/platform': typeof PlatformRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/unsubscribe': typeof UnsubscribeRoute
+  '/verify': typeof VerifyRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
+  '/assignments': typeof AppAssignmentsRoute
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
@@ -648,6 +681,7 @@ export interface FileRoutesByFullPath {
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
   '/live': typeof AppLiveRouteWithChildren
+  '/portal': typeof AppPortalRoute
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
@@ -656,22 +690,26 @@ export interface FileRoutesByFullPath {
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
-  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
+  '/academics/oversight': typeof AppAcademicsOversightRoute
+  '/academics/remarks': typeof AppAcademicsRemarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/compliance': typeof AppAdminComplianceRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
@@ -685,25 +723,22 @@ export interface FileRoutesByFullPath {
   '/admin/overrides': typeof AppAdminOverridesRoute
   '/admin/periods': typeof AppAdminPeriodsRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
+  '/admin/promotion': typeof AppAdminPromotionRoute
+  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
-  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
-  '/admin/promotion': typeof AppAdminPromotionRoute
-  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/finance/budget': typeof AppFinanceBudgetRoute
+  '/finance/expenses': typeof AppFinanceExpensesRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
-  '/finance/analytics': typeof AppFinanceAnalyticsRoute
-  '/finance/budget': typeof AppFinanceBudgetRoute
-  '/finance/expenses': typeof AppFinanceExpensesRoute
-  '/academics/remarks': typeof AppAcademicsRemarksRoute
-  '/academics/oversight': typeof AppAcademicsOversightRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -711,6 +746,7 @@ export interface FileRoutesByFullPath {
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
   '/staff/$id': typeof AppStaffIdRoute
+  '/staff/payslips': typeof AppStaffPayslipsRoute
   '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
@@ -735,8 +771,10 @@ export interface FileRoutesByTo {
   '/platform': typeof PlatformRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/unsubscribe': typeof UnsubscribeRoute
+  '/verify': typeof VerifyRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
+  '/assignments': typeof AppAssignmentsRoute
   '/attendance': typeof AppAttendanceRoute
   '/boarding': typeof AppBoardingRoute
   '/classes': typeof AppClassesRoute
@@ -750,6 +788,7 @@ export interface FileRoutesByTo {
   '/kitchen': typeof AppKitchenRoute
   '/library': typeof AppLibraryRoute
   '/live': typeof AppLiveRouteWithChildren
+  '/portal': typeof AppPortalRoute
   '/security': typeof AppSecurityRoute
   '/staff': typeof AppStaffRoute
   '/students': typeof AppStudentsRoute
@@ -758,22 +797,26 @@ export interface FileRoutesByTo {
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
-  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
+  '/academics/oversight': typeof AppAcademicsOversightRoute
+  '/academics/remarks': typeof AppAcademicsRemarksRoute
   '/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/academics/results': typeof AppAcademicsResultsRoute
   '/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/billing': typeof AppAdminBillingRoute
   '/admin/brain': typeof AppAdminBrainRoute
+  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
+  '/admin/compliance': typeof AppAdminComplianceRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
@@ -787,25 +830,22 @@ export interface FileRoutesByTo {
   '/admin/overrides': typeof AppAdminOverridesRoute
   '/admin/periods': typeof AppAdminPeriodsRoute
   '/admin/permissions': typeof AppAdminPermissionsRoute
+  '/admin/promotion': typeof AppAdminPromotionRoute
+  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
   '/admin/roles': typeof AppAdminRolesRoute
   '/admin/rooms': typeof AppAdminRoomsRoute
   '/admin/schools': typeof AppAdminSchoolsRoute
   '/admin/settings': typeof AppAdminSettingsRoute
-  '/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
-  '/admin/promotion': typeof AppAdminPromotionRoute
-  '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/admin/support': typeof AppAdminSupportRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/finance/budget': typeof AppFinanceBudgetRoute
+  '/finance/expenses': typeof AppFinanceExpensesRoute
   '/finance/fees': typeof AppFinanceFeesRoute
   '/finance/generate': typeof AppFinanceGenerateRoute
   '/finance/invoices': typeof AppFinanceInvoicesRoute
   '/finance/payments': typeof AppFinancePaymentsRoute
-  '/finance/analytics': typeof AppFinanceAnalyticsRoute
-  '/finance/budget': typeof AppFinanceBudgetRoute
-  '/finance/expenses': typeof AppFinanceExpensesRoute
-  '/academics/remarks': typeof AppAcademicsRemarksRoute
-  '/academics/oversight': typeof AppAcademicsOversightRoute
   '/ids/bulk': typeof AppIdsBulkRoute
   '/ids/verify': typeof AppIdsVerifyRoute
   '/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
@@ -813,6 +853,7 @@ export interface FileRoutesByTo {
   '/portal/parent': typeof AppPortalParentRoute
   '/portal/student': typeof AppPortalStudentRoute
   '/staff/$id': typeof AppStaffIdRoute
+  '/staff/payslips': typeof AppStaffPayslipsRoute
   '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
@@ -839,8 +880,10 @@ export interface FileRoutesById {
   '/platform': typeof PlatformRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/unsubscribe': typeof UnsubscribeRoute
+  '/verify': typeof VerifyRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
+  '/_app/assignments': typeof AppAssignmentsRoute
   '/_app/attendance': typeof AppAttendanceRoute
   '/_app/boarding': typeof AppBoardingRoute
   '/_app/classes': typeof AppClassesRoute
@@ -854,6 +897,7 @@ export interface FileRoutesById {
   '/_app/kitchen': typeof AppKitchenRoute
   '/_app/library': typeof AppLibraryRoute
   '/_app/live': typeof AppLiveRouteWithChildren
+  '/_app/portal': typeof AppPortalRoute
   '/_app/security': typeof AppSecurityRoute
   '/_app/staff': typeof AppStaffRoute
   '/_app/students': typeof AppStudentsRoute
@@ -862,22 +906,26 @@ export interface FileRoutesById {
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
+  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
-  '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
+  '/_app/academics/oversight': typeof AppAcademicsOversightRoute
+  '/_app/academics/remarks': typeof AppAcademicsRemarksRoute
   '/_app/academics/report-cards': typeof AppAcademicsReportCardsRoute
   '/_app/academics/results': typeof AppAcademicsResultsRoute
   '/_app/academics/subjects': typeof AppAcademicsSubjectsRoute
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/billing': typeof AppAdminBillingRoute
   '/_app/admin/brain': typeof AppAdminBrainRoute
+  '/_app/admin/class-structure': typeof AppAdminClassStructureRoute
   '/_app/admin/communications': typeof AppAdminCommunicationsRoute
+  '/_app/admin/compliance': typeof AppAdminComplianceRoute
   '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/features': typeof AppAdminFeaturesRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
@@ -891,32 +939,30 @@ export interface FileRoutesById {
   '/_app/admin/overrides': typeof AppAdminOverridesRoute
   '/_app/admin/periods': typeof AppAdminPeriodsRoute
   '/_app/admin/permissions': typeof AppAdminPermissionsRoute
+  '/_app/admin/promotion': typeof AppAdminPromotionRoute
+  '/_app/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/rooms': typeof AppAdminRoomsRoute
   '/_app/admin/schools': typeof AppAdminSchoolsRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
-  '/_app/admin/promotion-settings': typeof AppAdminPromotionSettingsRoute
-  '/_app/admin/promotion': typeof AppAdminPromotionRoute
-  '/_app/admin/class-structure': typeof AppAdminClassStructureRoute
   '/_app/admin/student-documents': typeof AppAdminStudentDocumentsRoute
   '/_app/admin/support': typeof AppAdminSupportRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/finance/analytics': typeof AppFinanceAnalyticsRoute
+  '/_app/finance/budget': typeof AppFinanceBudgetRoute
+  '/_app/finance/expenses': typeof AppFinanceExpensesRoute
   '/_app/finance/fees': typeof AppFinanceFeesRoute
   '/_app/finance/generate': typeof AppFinanceGenerateRoute
   '/_app/finance/invoices': typeof AppFinanceInvoicesRoute
   '/_app/finance/payments': typeof AppFinancePaymentsRoute
-  '/_app/finance/analytics': typeof AppFinanceAnalyticsRoute
-  '/_app/finance/budget': typeof AppFinanceBudgetRoute
-  '/_app/finance/expenses': typeof AppFinanceExpensesRoute
-  '/_app/academics/remarks': typeof AppAcademicsRemarksRoute
-  '/_app/academics/oversight': typeof AppAcademicsOversightRoute
   '/_app/ids/bulk': typeof AppIdsBulkRoute
   '/_app/ids/verify': typeof AppIdsVerifyRoute
   '/_app/live/$sessionId': typeof AppLiveSessionIdRouteWithChildren
-  '/_app/portal/me': typeof AppPortalMeRoute
-  '/_app/portal/parent': typeof AppPortalParentRoute
-  '/_app/portal/student': typeof AppPortalStudentRoute
+  '/_app/portal_/me': typeof AppPortalMeRoute
+  '/_app/portal_/parent': typeof AppPortalParentRoute
+  '/_app/portal_/student': typeof AppPortalStudentRoute
   '/_app/staff_/$id': typeof AppStaffIdRoute
+  '/_app/staff_/payslips': typeof AppStaffPayslipsRoute
   '/_app/students_/$id': typeof AppStudentsIdRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
@@ -943,8 +989,10 @@ export interface FileRouteTypes {
     | '/platform'
     | '/reset-password'
     | '/unsubscribe'
+    | '/verify'
     | '/analytics'
     | '/announcements'
+    | '/assignments'
     | '/attendance'
     | '/boarding'
     | '/classes'
@@ -958,6 +1006,7 @@ export interface FileRouteTypes {
     | '/kitchen'
     | '/library'
     | '/live'
+    | '/portal'
     | '/security'
     | '/staff'
     | '/students'
@@ -966,22 +1015,26 @@ export interface FileRouteTypes {
     | '/api/jaas-token'
     | '/email/unsubscribe'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
-    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
+    | '/academics/oversight'
+    | '/academics/remarks'
     | '/academics/report-cards'
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
     | '/admin/billing'
     | '/admin/brain'
+    | '/admin/class-structure'
     | '/admin/communications'
+    | '/admin/compliance'
     | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
@@ -995,25 +1048,22 @@ export interface FileRouteTypes {
     | '/admin/overrides'
     | '/admin/periods'
     | '/admin/permissions'
+    | '/admin/promotion'
+    | '/admin/promotion-settings'
     | '/admin/roles'
     | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
-    | '/admin/promotion-settings'
-    | '/admin/promotion'
-    | '/admin/class-structure'
     | '/admin/student-documents'
     | '/admin/support'
     | '/admin/users'
+    | '/finance/analytics'
+    | '/finance/budget'
+    | '/finance/expenses'
     | '/finance/fees'
     | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
-    | '/finance/analytics'
-    | '/finance/budget'
-    | '/finance/expenses'
-    | '/academics/remarks'
-    | '/academics/oversight'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1021,6 +1071,7 @@ export interface FileRouteTypes {
     | '/portal/parent'
     | '/portal/student'
     | '/staff/$id'
+    | '/staff/payslips'
     | '/students/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
@@ -1045,8 +1096,10 @@ export interface FileRouteTypes {
     | '/platform'
     | '/reset-password'
     | '/unsubscribe'
+    | '/verify'
     | '/analytics'
     | '/announcements'
+    | '/assignments'
     | '/attendance'
     | '/boarding'
     | '/classes'
@@ -1060,6 +1113,7 @@ export interface FileRouteTypes {
     | '/kitchen'
     | '/library'
     | '/live'
+    | '/portal'
     | '/security'
     | '/staff'
     | '/students'
@@ -1068,22 +1122,26 @@ export interface FileRouteTypes {
     | '/api/jaas-token'
     | '/email/unsubscribe'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
-    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/academics/exams'
     | '/academics/marks'
+    | '/academics/oversight'
+    | '/academics/remarks'
     | '/academics/report-cards'
     | '/academics/results'
     | '/academics/subjects'
     | '/admin/activity'
     | '/admin/billing'
     | '/admin/brain'
+    | '/admin/class-structure'
     | '/admin/communications'
+    | '/admin/compliance'
     | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
@@ -1097,25 +1155,22 @@ export interface FileRouteTypes {
     | '/admin/overrides'
     | '/admin/periods'
     | '/admin/permissions'
+    | '/admin/promotion'
+    | '/admin/promotion-settings'
     | '/admin/roles'
     | '/admin/rooms'
     | '/admin/schools'
     | '/admin/settings'
-    | '/admin/promotion-settings'
-    | '/admin/promotion'
-    | '/admin/class-structure'
     | '/admin/student-documents'
     | '/admin/support'
     | '/admin/users'
+    | '/finance/analytics'
+    | '/finance/budget'
+    | '/finance/expenses'
     | '/finance/fees'
     | '/finance/generate'
     | '/finance/invoices'
     | '/finance/payments'
-    | '/finance/analytics'
-    | '/finance/budget'
-    | '/finance/expenses'
-    | '/academics/remarks'
-    | '/academics/oversight'
     | '/ids/bulk'
     | '/ids/verify'
     | '/live/$sessionId'
@@ -1123,6 +1178,7 @@ export interface FileRouteTypes {
     | '/portal/parent'
     | '/portal/student'
     | '/staff/$id'
+    | '/staff/payslips'
     | '/students/$id'
     | '/timetable/generate'
     | '/api/public/mpesa-callback'
@@ -1148,8 +1204,10 @@ export interface FileRouteTypes {
     | '/platform'
     | '/reset-password'
     | '/unsubscribe'
+    | '/verify'
     | '/_app/analytics'
     | '/_app/announcements'
+    | '/_app/assignments'
     | '/_app/attendance'
     | '/_app/boarding'
     | '/_app/classes'
@@ -1163,6 +1221,7 @@ export interface FileRouteTypes {
     | '/_app/kitchen'
     | '/_app/library'
     | '/_app/live'
+    | '/_app/portal'
     | '/_app/security'
     | '/_app/staff'
     | '/_app/students'
@@ -1171,22 +1230,26 @@ export interface FileRouteTypes {
     | '/api/jaas-token'
     | '/email/unsubscribe'
     | '/platform/dashboard'
+    | '/platform/invoices'
     | '/platform/login'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
-    | '/platform/invoices'
     | '/platform/website'
     | '/sys/control-room'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
+    | '/_app/academics/oversight'
+    | '/_app/academics/remarks'
     | '/_app/academics/report-cards'
     | '/_app/academics/results'
     | '/_app/academics/subjects'
     | '/_app/admin/activity'
     | '/_app/admin/billing'
     | '/_app/admin/brain'
+    | '/_app/admin/class-structure'
     | '/_app/admin/communications'
+    | '/_app/admin/compliance'
     | '/_app/admin/departments'
     | '/_app/admin/features'
     | '/_app/admin/field-edits'
@@ -1200,32 +1263,30 @@ export interface FileRouteTypes {
     | '/_app/admin/overrides'
     | '/_app/admin/periods'
     | '/_app/admin/permissions'
+    | '/_app/admin/promotion'
+    | '/_app/admin/promotion-settings'
     | '/_app/admin/roles'
     | '/_app/admin/rooms'
     | '/_app/admin/schools'
     | '/_app/admin/settings'
-    | '/_app/admin/promotion-settings'
-    | '/_app/admin/promotion'
-    | '/_app/admin/class-structure'
     | '/_app/admin/student-documents'
     | '/_app/admin/support'
     | '/_app/admin/users'
+    | '/_app/finance/analytics'
+    | '/_app/finance/budget'
+    | '/_app/finance/expenses'
     | '/_app/finance/fees'
     | '/_app/finance/generate'
     | '/_app/finance/invoices'
     | '/_app/finance/payments'
-    | '/_app/finance/analytics'
-    | '/_app/finance/budget'
-    | '/_app/finance/expenses'
-    | '/_app/academics/remarks'
-    | '/_app/academics/oversight'
     | '/_app/ids/bulk'
     | '/_app/ids/verify'
     | '/_app/live/$sessionId'
-    | '/_app/portal/me'
-    | '/_app/portal/parent'
-    | '/_app/portal/student'
+    | '/_app/portal_/me'
+    | '/_app/portal_/parent'
+    | '/_app/portal_/student'
     | '/_app/staff_/$id'
+    | '/_app/staff_/payslips'
     | '/_app/students_/$id'
     | '/_app/timetable/generate'
     | '/api/public/mpesa-callback'
@@ -1252,6 +1313,7 @@ export interface RootRouteChildren {
   PlatformRoute: typeof PlatformRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
+  VerifyRoute: typeof VerifyRoute
   ApiJaasTokenRoute: typeof ApiJaasTokenRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
@@ -1266,6 +1328,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unsubscribe': {
       id: '/unsubscribe'
       path: '/unsubscribe'
@@ -1322,13 +1391,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SysControlRoomRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/platform/invoices': {
-      id: '/platform/invoices'
-      path: '/invoices'
-      fullPath: '/platform/invoices'
-      preLoaderRoute: typeof PlatformInvoicesRouteImport
-      parentRoute: typeof PlatformRoute
-    }
     '/platform/website': {
       id: '/platform/website'
       path: '/website'
@@ -1362,6 +1424,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/platform/login'
       preLoaderRoute: typeof PlatformLoginRouteImport
+      parentRoute: typeof PlatformRoute
+    }
+    '/platform/invoices': {
+      id: '/platform/invoices'
+      path: '/invoices'
+      fullPath: '/platform/invoices'
+      preLoaderRoute: typeof PlatformInvoicesRouteImport
       parentRoute: typeof PlatformRoute
     }
     '/platform/dashboard': {
@@ -1418,6 +1487,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security'
       preLoaderRoute: typeof AppSecurityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/portal': {
+      id: '/_app/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof AppPortalRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/live': {
@@ -1511,6 +1587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAttendanceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/assignments': {
+      id: '/_app/assignments'
+      path: '/assignments'
+      fullPath: '/assignments'
+      preLoaderRoute: typeof AppAssignmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/announcements': {
       id: '/_app/announcements'
       path: '/announcements'
@@ -1574,6 +1657,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStudentsIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/staff_/payslips': {
+      id: '/_app/staff_/payslips'
+      path: '/staff/payslips'
+      fullPath: '/staff/payslips'
+      preLoaderRoute: typeof AppStaffPayslipsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/staff_/$id': {
       id: '/_app/staff_/$id'
       path: '/staff/$id'
@@ -1581,22 +1671,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStaffIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/portal/student': {
-      id: '/_app/portal/student'
+    '/_app/portal_/student': {
+      id: '/_app/portal_/student'
       path: '/portal/student'
       fullPath: '/portal/student'
       preLoaderRoute: typeof AppPortalStudentRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/portal/parent': {
-      id: '/_app/portal/parent'
+    '/_app/portal_/parent': {
+      id: '/_app/portal_/parent'
       path: '/portal/parent'
       fullPath: '/portal/parent'
       preLoaderRoute: typeof AppPortalParentRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/portal/me': {
-      id: '/_app/portal/me'
+    '/_app/portal_/me': {
+      id: '/_app/portal_/me'
       path: '/portal/me'
       fullPath: '/portal/me'
       preLoaderRoute: typeof AppPortalMeRouteImport
@@ -1651,11 +1741,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceFeesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/finance/analytics': {
-      id: '/_app/finance/analytics'
-      path: '/finance/analytics'
-      fullPath: '/finance/analytics'
-      preLoaderRoute: typeof AppFinanceAnalyticsRouteImport
+    '/_app/finance/expenses': {
+      id: '/_app/finance/expenses'
+      path: '/finance/expenses'
+      fullPath: '/finance/expenses'
+      preLoaderRoute: typeof AppFinanceExpensesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/finance/budget': {
@@ -1665,25 +1755,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceBudgetRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/finance/expenses': {
-      id: '/_app/finance/expenses'
-      path: '/finance/expenses'
-      fullPath: '/finance/expenses'
-      preLoaderRoute: typeof AppFinanceExpensesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/academics/remarks': {
-      id: '/_app/academics/remarks'
-      path: '/academics/remarks'
-      fullPath: '/academics/remarks'
-      preLoaderRoute: typeof AppAcademicsRemarksRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/academics/oversight': {
-      id: '/_app/academics/oversight'
-      path: '/academics/oversight'
-      fullPath: '/academics/oversight'
-      preLoaderRoute: typeof AppAcademicsOversightRouteImport
+    '/_app/finance/analytics': {
+      id: '/_app/finance/analytics'
+      path: '/finance/analytics'
+      fullPath: '/finance/analytics'
+      preLoaderRoute: typeof AppFinanceAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/users': {
@@ -1698,27 +1774,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AppAdminSupportRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/admin/promotion-settings': {
-      id: '/_app/admin/promotion-settings'
-      path: '/admin/promotion-settings'
-      fullPath: '/admin/promotion-settings'
-      preLoaderRoute: typeof AppAdminPromotionSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/admin/promotion': {
-      id: '/_app/admin/promotion'
-      path: '/admin/promotion'
-      fullPath: '/admin/promotion'
-      preLoaderRoute: typeof AppAdminPromotionRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/admin/class-structure': {
-      id: '/_app/admin/class-structure'
-      path: '/admin/class-structure'
-      fullPath: '/admin/class-structure'
-      preLoaderRoute: typeof AppAdminClassStructureRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/student-documents': {
@@ -1754,6 +1809,20 @@ declare module '@tanstack/react-router' {
       path: '/admin/roles'
       fullPath: '/admin/roles'
       preLoaderRoute: typeof AppAdminRolesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/promotion-settings': {
+      id: '/_app/admin/promotion-settings'
+      path: '/admin/promotion-settings'
+      fullPath: '/admin/promotion-settings'
+      preLoaderRoute: typeof AppAdminPromotionSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/promotion': {
+      id: '/_app/admin/promotion'
+      path: '/admin/promotion'
+      fullPath: '/admin/promotion'
+      preLoaderRoute: typeof AppAdminPromotionRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/permissions': {
@@ -1847,11 +1916,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminDepartmentsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/compliance': {
+      id: '/_app/admin/compliance'
+      path: '/admin/compliance'
+      fullPath: '/admin/compliance'
+      preLoaderRoute: typeof AppAdminComplianceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/communications': {
       id: '/_app/admin/communications'
       path: '/admin/communications'
       fullPath: '/admin/communications'
       preLoaderRoute: typeof AppAdminCommunicationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/class-structure': {
+      id: '/_app/admin/class-structure'
+      path: '/admin/class-structure'
+      fullPath: '/admin/class-structure'
+      preLoaderRoute: typeof AppAdminClassStructureRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/brain': {
@@ -1894,6 +1977,20 @@ declare module '@tanstack/react-router' {
       path: '/academics/report-cards'
       fullPath: '/academics/report-cards'
       preLoaderRoute: typeof AppAcademicsReportCardsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/remarks': {
+      id: '/_app/academics/remarks'
+      path: '/academics/remarks'
+      fullPath: '/academics/remarks'
+      preLoaderRoute: typeof AppAcademicsRemarksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/oversight': {
+      id: '/_app/academics/oversight'
+      path: '/academics/oversight'
+      fullPath: '/academics/oversight'
+      preLoaderRoute: typeof AppAcademicsOversightRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/academics/marks': {
@@ -2013,6 +2110,7 @@ const AppTimetableRouteWithChildren = AppTimetableRoute._addFileChildren(
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAnnouncementsRoute: typeof AppAnnouncementsRoute
+  AppAssignmentsRoute: typeof AppAssignmentsRoute
   AppAttendanceRoute: typeof AppAttendanceRoute
   AppBoardingRoute: typeof AppBoardingRoute
   AppClassesRoute: typeof AppClassesRoute
@@ -2026,6 +2124,7 @@ interface AppRouteChildren {
   AppKitchenRoute: typeof AppKitchenRoute
   AppLibraryRoute: typeof AppLibraryRoute
   AppLiveRoute: typeof AppLiveRouteWithChildren
+  AppPortalRoute: typeof AppPortalRoute
   AppSecurityRoute: typeof AppSecurityRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStudentsRoute: typeof AppStudentsRoute
@@ -2033,13 +2132,17 @@ interface AppRouteChildren {
   AppTransportRoute: typeof AppTransportRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
   AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
+  AppAcademicsOversightRoute: typeof AppAcademicsOversightRoute
+  AppAcademicsRemarksRoute: typeof AppAcademicsRemarksRoute
   AppAcademicsReportCardsRoute: typeof AppAcademicsReportCardsRoute
   AppAcademicsResultsRoute: typeof AppAcademicsResultsRoute
   AppAcademicsSubjectsRoute: typeof AppAcademicsSubjectsRoute
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminBillingRoute: typeof AppAdminBillingRoute
   AppAdminBrainRoute: typeof AppAdminBrainRoute
+  AppAdminClassStructureRoute: typeof AppAdminClassStructureRoute
   AppAdminCommunicationsRoute: typeof AppAdminCommunicationsRoute
+  AppAdminComplianceRoute: typeof AppAdminComplianceRoute
   AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminFeaturesRoute: typeof AppAdminFeaturesRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
@@ -2053,31 +2156,29 @@ interface AppRouteChildren {
   AppAdminOverridesRoute: typeof AppAdminOverridesRoute
   AppAdminPeriodsRoute: typeof AppAdminPeriodsRoute
   AppAdminPermissionsRoute: typeof AppAdminPermissionsRoute
+  AppAdminPromotionRoute: typeof AppAdminPromotionRoute
+  AppAdminPromotionSettingsRoute: typeof AppAdminPromotionSettingsRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminRoomsRoute: typeof AppAdminRoomsRoute
   AppAdminSchoolsRoute: typeof AppAdminSchoolsRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
-  AppAdminPromotionSettingsRoute: typeof AppAdminPromotionSettingsRoute
-  AppAdminPromotionRoute: typeof AppAdminPromotionRoute
-  AppAdminClassStructureRoute: typeof AppAdminClassStructureRoute
   AppAdminStudentDocumentsRoute: typeof AppAdminStudentDocumentsRoute
   AppAdminSupportRoute: typeof AppAdminSupportRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppFinanceAnalyticsRoute: typeof AppFinanceAnalyticsRoute
+  AppFinanceBudgetRoute: typeof AppFinanceBudgetRoute
+  AppFinanceExpensesRoute: typeof AppFinanceExpensesRoute
   AppFinanceFeesRoute: typeof AppFinanceFeesRoute
   AppFinanceGenerateRoute: typeof AppFinanceGenerateRoute
   AppFinanceInvoicesRoute: typeof AppFinanceInvoicesRoute
   AppFinancePaymentsRoute: typeof AppFinancePaymentsRoute
-  AppFinanceAnalyticsRoute: typeof AppFinanceAnalyticsRoute
-  AppFinanceBudgetRoute: typeof AppFinanceBudgetRoute
-  AppFinanceExpensesRoute: typeof AppFinanceExpensesRoute
-  AppAcademicsRemarksRoute: typeof AppAcademicsRemarksRoute
-  AppAcademicsOversightRoute: typeof AppAcademicsOversightRoute
   AppIdsBulkRoute: typeof AppIdsBulkRoute
   AppIdsVerifyRoute: typeof AppIdsVerifyRoute
   AppPortalMeRoute: typeof AppPortalMeRoute
   AppPortalParentRoute: typeof AppPortalParentRoute
   AppPortalStudentRoute: typeof AppPortalStudentRoute
   AppStaffIdRoute: typeof AppStaffIdRoute
+  AppStaffPayslipsRoute: typeof AppStaffPayslipsRoute
   AppStudentsIdRoute: typeof AppStudentsIdRoute
   AppAdminLeavingCertificateIdRoute: typeof AppAdminLeavingCertificateIdRoute
   AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
@@ -2089,6 +2190,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppAnnouncementsRoute: AppAnnouncementsRoute,
+  AppAssignmentsRoute: AppAssignmentsRoute,
   AppAttendanceRoute: AppAttendanceRoute,
   AppBoardingRoute: AppBoardingRoute,
   AppClassesRoute: AppClassesRoute,
@@ -2102,6 +2204,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKitchenRoute: AppKitchenRoute,
   AppLibraryRoute: AppLibraryRoute,
   AppLiveRoute: AppLiveRouteWithChildren,
+  AppPortalRoute: AppPortalRoute,
   AppSecurityRoute: AppSecurityRoute,
   AppStaffRoute: AppStaffRoute,
   AppStudentsRoute: AppStudentsRoute,
@@ -2109,13 +2212,17 @@ const AppRouteChildren: AppRouteChildren = {
   AppTransportRoute: AppTransportRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
   AppAcademicsMarksRoute: AppAcademicsMarksRoute,
+  AppAcademicsOversightRoute: AppAcademicsOversightRoute,
+  AppAcademicsRemarksRoute: AppAcademicsRemarksRoute,
   AppAcademicsReportCardsRoute: AppAcademicsReportCardsRoute,
   AppAcademicsResultsRoute: AppAcademicsResultsRoute,
   AppAcademicsSubjectsRoute: AppAcademicsSubjectsRoute,
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminBillingRoute: AppAdminBillingRoute,
   AppAdminBrainRoute: AppAdminBrainRoute,
+  AppAdminClassStructureRoute: AppAdminClassStructureRoute,
   AppAdminCommunicationsRoute: AppAdminCommunicationsRoute,
+  AppAdminComplianceRoute: AppAdminComplianceRoute,
   AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminFeaturesRoute: AppAdminFeaturesRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
@@ -2129,31 +2236,29 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminOverridesRoute: AppAdminOverridesRoute,
   AppAdminPeriodsRoute: AppAdminPeriodsRoute,
   AppAdminPermissionsRoute: AppAdminPermissionsRoute,
+  AppAdminPromotionRoute: AppAdminPromotionRoute,
+  AppAdminPromotionSettingsRoute: AppAdminPromotionSettingsRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminRoomsRoute: AppAdminRoomsRoute,
   AppAdminSchoolsRoute: AppAdminSchoolsRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
-  AppAdminPromotionSettingsRoute: AppAdminPromotionSettingsRoute,
-  AppAdminPromotionRoute: AppAdminPromotionRoute,
-  AppAdminClassStructureRoute: AppAdminClassStructureRoute,
   AppAdminStudentDocumentsRoute: AppAdminStudentDocumentsRoute,
   AppAdminSupportRoute: AppAdminSupportRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
+  AppFinanceAnalyticsRoute: AppFinanceAnalyticsRoute,
+  AppFinanceBudgetRoute: AppFinanceBudgetRoute,
+  AppFinanceExpensesRoute: AppFinanceExpensesRoute,
   AppFinanceFeesRoute: AppFinanceFeesRoute,
   AppFinanceGenerateRoute: AppFinanceGenerateRoute,
   AppFinanceInvoicesRoute: AppFinanceInvoicesRoute,
   AppFinancePaymentsRoute: AppFinancePaymentsRoute,
-  AppFinanceAnalyticsRoute: AppFinanceAnalyticsRoute,
-  AppFinanceBudgetRoute: AppFinanceBudgetRoute,
-  AppFinanceExpensesRoute: AppFinanceExpensesRoute,
-  AppAcademicsRemarksRoute: AppAcademicsRemarksRoute,
-  AppAcademicsOversightRoute: AppAcademicsOversightRoute,
   AppIdsBulkRoute: AppIdsBulkRoute,
   AppIdsVerifyRoute: AppIdsVerifyRoute,
   AppPortalMeRoute: AppPortalMeRoute,
   AppPortalParentRoute: AppPortalParentRoute,
   AppPortalStudentRoute: AppPortalStudentRoute,
   AppStaffIdRoute: AppStaffIdRoute,
+  AppStaffPayslipsRoute: AppStaffPayslipsRoute,
   AppStudentsIdRoute: AppStudentsIdRoute,
   AppAdminLeavingCertificateIdRoute: AppAdminLeavingCertificateIdRoute,
   AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
@@ -2209,6 +2314,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlatformRoute: PlatformRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   UnsubscribeRoute: UnsubscribeRoute,
+  VerifyRoute: VerifyRoute,
   ApiJaasTokenRoute: ApiJaasTokenRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   SysControlRoomRoute: SysControlRoomRoute,
