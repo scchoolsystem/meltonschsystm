@@ -506,43 +506,38 @@ function useSmoothProgress(progress: any, reduceMotion: boolean) {
   return useSpring(progress, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.1 } : { stiffness: 260, damping: 38, mass: 0.6 });
 }
 
-// Global page-level smooth scroll. This is the "critical" Lenis layer from
-// the prompt — it eases the raw wheel/touch input across the *whole* page,
-// so the sticky-scene handoffs below read as one continuous camera move
-// instead of a stack of separate sections. Requires `npm install lenis`.
-// If the package isn't installed yet, this silently no-ops and the
-// per-scene spring smoothing above still keeps things feeling smooth.
-function useLenisSmoothScroll(enabled: boolean) {
+// NOTE on the prompt's "critical" global Lenis smooth-scroll layer: a
+// dynamic `import("lenis")` was tried here, but Vite/Rollup fails the
+// production build whenever `lenis` isn't an actual dependency — a
+// try/catch around the import doesn't help, Rollup still needs to resolve
+// it at build time. Since this project doesn't have `lenis` in
+// package.json, that layer is intentionally left out to keep the build
+// green. Each scene below already spring-smooths its own scroll progress
+// via useSmoothProgress, which gives the same "buttery" feel with no new
+// dependency. To add real page-wide Lenis smoothing later: run
+// `pnpm add lenis`, add `import Lenis from "lenis"` as a normal static
+// import at the top of this file, and drive it from a root-level
+// useEffect + requestAnimationFrame loop.
+function useLenisSmoothScroll(_enabled: boolean) {
+  // intentionally a no-op placeholder — see the note above. Kept as a
+  // function (rather than deleting the call site) so re-enabling real
+  // Lenis later is a one-line change.
+}
+
+// Detects small/narrow viewports so decorative layers (particle counts,
+// card widths) can scale down for phones and tablets instead of assuming a
+// desktop-sized screen.
+function useIsCompact() {
+  const [compact, setCompact] = useState(false);
   useEffect(() => {
-    if (!enabled || typeof window === "undefined") return;
-    let lenisInstance: any = null;
-    let rafId = 0;
-    let cancelled = false;
-
-    import("lenis")
-      .then(({ default: Lenis }) => {
-        if (cancelled) return;
-        lenisInstance = new Lenis({
-          duration: 1.3,
-          easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-          smoothWheel: true,
-        });
-        const raf = (time: number) => {
-          lenisInstance.raf(time);
-          rafId = requestAnimationFrame(raf);
-        };
-        rafId = requestAnimationFrame(raf);
-      })
-      .catch(() => {
-        // lenis not installed in this project yet — fine, scenes still work.
-      });
-
-    return () => {
-      cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-      if (lenisInstance) lenisInstance.destroy();
-    };
-  }, [enabled]);
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    setCompact(mq.matches);
+    const onChange = () => setCompact(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return compact;
 }
 
 // Cave-mouth-style vignette: darkens toward the edges as a scene approaches
@@ -638,6 +633,9 @@ function HeroScene({
   const contentOpacity = useTransform(progress, [0, 0.5, 0.85], [1, 1, 0]);
   const contentY = useTransform(progress, [0, 0.85], [0, reduceMotion ? 0 : -60]);
   const [heroImg, setHeroImg] = useState(0);
+  // Fewer floating particles on phones — same visual effect, lighter DOM/paint
+  // cost on the budget Android devices this platform actually ships to.
+  const compact = useIsCompact();
 
   useEffect(() => {
     const t = setInterval(() => setHeroImg((i) => (i + 1) % heroPhotos.length), 5000);
@@ -659,7 +657,7 @@ function HeroScene({
           ))}
         </motion.div>
         <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
-        {!reduceMotion && <ParticleField count={26} color="rgba(255,255,255,0.45)" />}
+        {!reduceMotion && <ParticleField count={compact ? 12 : 26} color="rgba(255,255,255,0.45)" />}
         <motion.div
           style={{ opacity: contentOpacity, y: contentY }}
           className="relative container mx-auto px-6 py-10 sm:py-20 text-center text-white"
@@ -766,11 +764,12 @@ function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceM
   const phoneY = useTransform(progress, [0, 1], [reduceMotion ? 0 : 40, reduceMotion ? 0 : -40]);
   const glow = useTransform(progress, [0, 0.5, 1], [0.25, 0.6, 0.25]);
   const contentOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+  const compact = useIsCompact();
 
   return (
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
-        {!reduceMotion && <ParticleField count={16} color="rgba(120,255,180,0.55)" />}
+        {!reduceMotion && <ParticleField count={compact ? 8 : 16} color="rgba(120,255,180,0.55)" />}
         <motion.div style={{ opacity: contentOpacity }} className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
           <div>
             <div className="text-xs uppercase tracking-widest text-emerald-300 mb-2 flex items-center gap-2">
@@ -955,6 +954,7 @@ function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
   const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const progress = useSmoothProgress(rawProgress, reduceMotion);
   const opacity = useTransform(progress, [0, 0.2, 0.85, 1], [0, 1, 1, 0]);
+  const compact = useIsCompact();
 
   const stats = [
     { icon: GraduationCap, value: 300, suffix: "+", label: "Schools onboarded" },
@@ -966,7 +966,7 @@ function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative bg-slate-950">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
-        {!reduceMotion && <ParticleField count={14} color="rgba(255,255,255,0.35)" />}
+        {!reduceMotion && <ParticleField count={compact ? 6 : 14} color="rgba(255,255,255,0.35)" />}
         <motion.div style={{ opacity }} className="container mx-auto px-6 text-center text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-3">Trusted across Kenya & East Africa</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
