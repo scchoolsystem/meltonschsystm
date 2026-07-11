@@ -72,6 +72,7 @@
     "framer-motion": "^12.42.0",
     "htmlparser2": "9.1.0",
     "input-otp": "^1.4.2",
+    "lenis": "^1.1.13",
     "lucide-react": "^0.575.0",
     "parse5": "7.1.2",
     "qrcode.react": "^4.2.0",
