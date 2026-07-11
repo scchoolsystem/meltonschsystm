@@ -11,6 +11,8 @@ w["routes"] = [
 # /assets/* (hashed JS/CSS bundles) stay excluded so Cloudflare's Asset
 # Worker keeps serving them directly — routing them through the Worker
 # 404s them, since server.ts only knows how to call the SSR handler.
-w.setdefault("assets", {})["run_worker_first"] = ["/*", "!/assets/*"]
+# /legal.html is also excluded — it's a static page with no matching
+# app route, so routing it through the Worker/SSR handler 404s it too.
+w.setdefault("assets", {})["run_worker_first"] = ["/*", "!/assets/*", "!/legal.html"]
 json.dump(w, open(f, "w"), indent=2)
 print("Done: wrangler.json routes + assets.run_worker_first patched")
