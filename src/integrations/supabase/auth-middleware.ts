@@ -5,8 +5,14 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
-  // accept request from the middleware args; use `any` if types don't match your version
-  async ({ next, request }: any) => {
+  // IMPORTANT: do NOT type this destructured param as `: any`. Doing so makes
+  // `next` itself `any`, which erases the return-type inference TanStack Start
+  // needs to propagate `context: { supabase, userId, claims }` to every
+  // downstream `.middleware([requireSupabaseAuth])` handler — that's what was
+  // causing "context is possibly undefined" across the server functions.
+  // Leave the param untyped (TanStack infers it from createMiddleware) and
+  // only cast the one field whose shape genuinely varies by version.
+  async ({ next, request }) => {
     const g = globalThis as any;
     const SUPABASE_URL = process.env.SUPABASE_URL ?? g.__env__?.SUPABASE_URL;
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? g.__env__?.SUPABASE_PUBLISHABLE_KEY;
