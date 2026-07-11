@@ -42,10 +42,20 @@ import { withTimeout } from "@/lib/with-timeout";
  * a separate post-mount client navigation that can race and silently stall.
  */
 export const Route = createFileRoute("/_app/portal")({
-  beforeLoad: async ({ search }) => {
+  beforeLoad: async ({ search, location }) => {
     // No window on the server — defer entirely to the client-side fallback
     // below (mirrors the identical guard in _app.tsx's beforeLoad).
     if (typeof window === "undefined") return;
+
+    // Defense-in-depth: /portal/student, /portal/parent, /portal/me are no
+    // longer nested under this route (see the trailing-underscore filenames
+    // — _app.portal_.student.tsx etc. — which keep the same URLs but make
+    // them siblings of /portal under /_app instead of children of it).
+    // That's what actually stops the redirect loop this route used to
+    // cause: this beforeLoad no longer re-runs on every navigation to a
+    // child. This check just makes sure that stays true even if someone
+    // re-nests a future route under here without realizing why it matters.
+    if (location.pathname !== "/portal") return;
 
     const { data, timedOut } = await getSessionSafe();
     if (timedOut || !data.session?.user) {
