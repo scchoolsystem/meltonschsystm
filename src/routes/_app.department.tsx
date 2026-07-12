@@ -331,15 +331,26 @@ function Page() {
     return m;
   }, [teacherSubjects]);
 
-  const deptSubjects = useMemo(() => {
-    const seen = new Map<string, any>();
-    (teacherSubjects as any[]).forEach((ts) => {
-      if (ts.subjects && !seen.has(ts.subjects.id)) seen.set(ts.subjects.id, ts.subjects);
-    });
-    return Array.from(seen.values());
-  }, [teacherSubjects]);
+  // ── Department's own subject(s) ───────────────────────────────────────────────
+  // Explicit link via department_subjects, NOT derived from teacher_subjects.
+  // Deriving from teacher_subjects was the bug: a teacher assigned to this
+  // department who also teaches an unrelated second subject elsewhere made
+  // that unrelated subject show up here too (e.g. Agriculture teacher who
+  // also teaches Biology made Biology appear under Agriculture).
+  const { data: deptSubjects = [] } = useQuery({
+    queryKey: ["dept-subjects", activeDeptId],
+    enabled: !!activeDeptId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("department_subjects")
+        .select("subjects(id,name,code)")
+        .eq("department_id", activeDeptId!);
+      if (error) throw error;
+      return (data ?? []).map((r: any) => r.subjects).filter(Boolean);
+    },
+  });
 
-  const subjectIds = useMemo(() => deptSubjects.map((s) => s.id), [deptSubjects]);
+  const subjectIds = useMemo(() => deptSubjects.map((s: any) => s.id), [deptSubjects]);
 
   // ── Exam Results ─────────────────────────────────────────────────────────────
   const { data: examResults = [], isLoading: resultsLoading } = useQuery({
