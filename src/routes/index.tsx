@@ -1,7 +1,7 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { motion, useScroll, useSpring, useTransform, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
@@ -18,6 +18,11 @@ import {
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
   Coins,
 } from "lucide-react";
+import mpesaShot from "@/assets/portals/mpesa.png";
+import parentShot from "@/assets/portals/parent.png";
+import studentShot from "@/assets/portals/student.png";
+import teacherShot from "@/assets/portals/teacher.png";
+import financeShot from "@/assets/portals/finance.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -495,131 +500,37 @@ function useReducedMotionPref() {
   return reduced;
 }
 
-// Viewport height that stays stable on mobile browsers as the address bar
-// shows/hides (100vh jumps on iOS/Android Chrome; 100dvh tracks the real
-// visible viewport).
-const VIEWPORT_H = "h-dvh";
-
-// Smooths a raw 0→1 scroll-progress MotionValue with a light spring so
-// backgrounds/text glide rather than snap 1:1 with the scroll event.
-function useSmoothProgress(progress: any, reduceMotion: boolean) {
-  return useSpring(progress, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.1 } : { stiffness: 260, damping: 38, mass: 0.6 });
-}
-
-// NOTE on the prompt's "critical" global Lenis smooth-scroll layer: a
-// dynamic `import("lenis")` was tried here, but Vite/Rollup fails the
-// production build whenever `lenis` isn't an actual dependency — a
-// try/catch around the import doesn't help, Rollup still needs to resolve
-// it at build time. Since this project doesn't have `lenis` in
-// package.json, that layer is intentionally left out to keep the build
-// green. Each scene below already spring-smooths its own scroll progress
-// via useSmoothProgress, which gives the same "buttery" feel with no new
-// dependency. To add real page-wide Lenis smoothing later: run
-// `pnpm add lenis`, add `import Lenis from "lenis"` as a normal static
-// import at the top of this file, and drive it from a root-level
-// useEffect + requestAnimationFrame loop.
-function useLenisSmoothScroll(_enabled: boolean) {
-  // intentionally a no-op placeholder — see the note above. Kept as a
-  // function (rather than deleting the call site) so re-enabling real
-  // Lenis later is a one-line change.
-}
-
-// Detects small/narrow viewports so decorative layers (particle counts,
-// card widths) can scale down for phones and tablets instead of assuming a
-// desktop-sized screen.
-// Applied to every scene's pinned wrapper. As a scene's local scroll progress
-// enters (0 → 0.15) or leaves (0.85 → 1) it gently scales and blurs, like a
-// camera racking focus between shots, instead of hard-cutting to the next
-// section. Combined with GlobalSceneBackdrop (which morphs the color behind
-// everything) this is what makes scroll feel like one continuous take
-// rather than a stack of separate blocks.
-function useSceneMorph(progress: any, reduceMotion: boolean) {
-  const scale = useTransform(progress, [0, 0.15, 0.85, 1], reduceMotion ? [1, 1, 1, 1] : [0.94, 1, 1, 1.045]);
-  const blurPx = useTransform(progress, [0, 0.15, 0.85, 1], reduceMotion ? [0, 0, 0, 0] : [10, 0, 0, 7]);
-  const filter = useTransform(blurPx, (v: number) => `blur(${v}px)`);
-  return { scale, filter };
-}
-
-// Cross-fades a single fixed backdrop color through every scene's palette so
-// the space *behind* the pinned scenes morphs continuously instead of
-// jump-cutting (e.g. slate-950 → emerald-950 → background → slate-950 …).
-// Breakpoints are fractions of the combined scroll height of the 7 home
-// scenes (140+200+150+170+190+110+120 = 1080vh); short "blend zones" are
-// inserted right after a scene starts when it flips light/dark so crossing
-// the boundary feels like a wash rather than a cut.
-const BACKDROP_STOPS = [0, 0.1296, 0.3148, 0.3843, 0.4537, 0.5, 0.6111, 0.6481, 0.787, 0.8148, 0.8889, 0.9074, 1];
-const BACKDROP_COLORS = ["#fafafa", "#020617", "#0a2420", "#0d2b26", "#020617", "#fafafa", "#fafafa", "#020617", "#020617", "#111e33", "#111e33", "#020617", "#020617"];
-
-function GlobalSceneBackdrop({ progress, reduceMotion }: { progress: any; reduceMotion: boolean }) {
-  const backgroundColor = useTransform(progress, BACKDROP_STOPS, BACKDROP_COLORS);
-  if (reduceMotion) {
-    return <div className="fixed inset-0 z-0 bg-background" aria-hidden="true" />;
-  }
-  return <motion.div className="fixed inset-0 z-0" style={{ backgroundColor }} aria-hidden="true" />;
-}
-
-function useIsCompact() {
-  const [compact, setCompact] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 767px)");
-    setCompact(mq.matches);
-    const onChange = () => setCompact(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return compact;
-}
-
-// Cave-mouth-style vignette: darkens toward the edges as a scene approaches
-// its boundary with the next one, then clears as the new scene settles in.
-// Shared by every scene so hand-offs feel like passing through a threshold
-// rather than a hard cut.
-function SceneVignette({ progress }: { progress: any }) {
-  const opacity = useTransform(progress, [0, 0.1, 0.9, 1], [0.8, 0, 0, 0.8]);
+// Standard, battle-tested "fade up once it scrolls into view" reveal.
+// Deliberately NOT scroll-scrubbed (no useScroll/useTransform tied to pin
+// height) — that approach kept breaking (washed-out text, broken images,
+// re-tuned breakpoints every time a section changed) and is expensive on
+// the budget Android devices this platform actually ships to. This is
+// cheaper, cannot desync, and still feels smooth and premium.
+function Reveal({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const reduceMotion = useReducedMotionPref();
+  if (reduceMotion) return <div className={className}>{children}</div>;
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 z-20"
-      style={{
-        opacity,
-        background: "radial-gradient(circle at center, transparent 38%, rgba(4,4,10,0.92) 100%)",
-      }}
-    />
+      className={className}
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.6, delay, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
-// Ambient floating specs — the prompt's "floating particles" layer, done in
-// framer-motion instead of canvas so it stays cheap on low-end Android
-// phones (this platform's actual audience).
-function ParticleField({ count = 22, color = "rgba(255,255,255,0.55)" }: { count?: number; color?: string }) {
-  const particles = React.useMemo(
-    () => Array.from({ length: count }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      size: 1 + Math.random() * 2.5,
-      delay: Math.random() * 6,
-      duration: 9 + Math.random() * 9,
-      drift: (Math.random() - 0.5) * 60,
-    })),
-    [count]
-  );
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {particles.map((p) => (
-        <motion.span
-          key={p.id}
-          className="absolute rounded-full"
-          style={{ left: `${p.left}%`, bottom: -10, width: p.size, height: p.size, background: color }}
-          animate={{ y: ["0%", "-115vh"], x: [0, p.drift], opacity: [0, 1, 1, 0] }}
-          transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: "linear" }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Counts up from 0 to `value` once the element scrolls into view — the
-// trust-scene equivalent of the prompt's "glow builds, chest opens" reveal.
+// Counts up from 0 to `value` once the element scrolls into view.
 function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-10% 0px" });
@@ -629,7 +540,7 @@ function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: strin
     if (!inView) return;
     let raf: number;
     const start = performance.now();
-    const duration = 1500;
+    const duration = 1200;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / duration);
       const eased = 1 - Math.pow(1 - p, 3);
@@ -643,30 +554,32 @@ function AnimatedCounter({ value, suffix = "" }: { value: number; suffix?: strin
   return <span ref={ref}>{display.toLocaleString()}{suffix}</span>;
 }
 
-// ── Scene 1: Hero — full-bleed photo carousel that slowly zooms while a
-// vignette clears in and darkens out at the boundary with Scene 2. ──
+// A simple browser-window frame around a real screenshot — used for the
+// M-Pesa dashboard image. No motion, no pinning, just a clean static card.
+function BrowserFrame({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-white/15 bg-slate-900 shadow-2xl overflow-hidden ${className}`}>
+      <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 border-b border-white/10">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+      </div>
+      <img src={src} alt={alt} loading="lazy" className="w-full h-auto" />
+    </div>
+  );
+}
+
+// ── Section 1: Hero ──────────────────────────────────────────────────────
 function HeroScene({
   goTo,
   hero,
   heroPhotos,
-  reduceMotion,
 }: {
   goTo: (p: Page) => void;
   hero: any;
   heroPhotos: { src: string; caption?: string }[];
-  reduceMotion: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const scale = useTransform(progress, [0, 1], [1, reduceMotion ? 1 : 1.15]);
-  const overlayOpacity = useTransform(progress, [0, 0.7, 1], [0.55, 0.75, 0.92]);
-  const contentOpacity = useTransform(progress, [0, 0.5, 0.85], [1, 1, 0]);
-  const contentY = useTransform(progress, [0, 0.85], [0, reduceMotion ? 0 : -60]);
   const [heroImg, setHeroImg] = useState(0);
-  // Fewer floating particles on phones — same visual effect, lighter DOM/paint
-  // cost on the budget Android devices this platform actually ships to.
-  const compact = useIsCompact();
 
   useEffect(() => {
     const t = setInterval(() => setHeroImg((i) => (i + 1) % heroPhotos.length), 5000);
@@ -674,25 +587,21 @@ function HeroScene({
   }, [heroPhotos.length]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "140vh" }} className="relative">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
-        <motion.div className="absolute inset-0 will-change-transform" style={{ scale }}>
-          {heroPhotos.map((p, i) => (
-            <img
-              key={p.src}
-              src={p.src}
-              alt={p.caption || "Kenyan school"}
-              loading={i === 0 ? "eager" : "lazy"}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === heroImg ? "opacity-100" : "opacity-0"}`}
-            />
-          ))}
-        </motion.div>
-        <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
-        {!reduceMotion && <ParticleField count={compact ? 6 : 14} color="rgba(255,255,255,0.3)" />}
-        <motion.div
-          style={{ opacity: contentOpacity, y: contentY }}
-          className="relative container mx-auto px-6 py-10 sm:py-20 text-center text-white"
-        >
+    <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-slate-950">
+      <div className="absolute inset-0">
+        {heroPhotos.map((p, i) => (
+          <img
+            key={p.src}
+            src={p.src}
+            alt={p.caption || "Kenyan school"}
+            loading={i === 0 ? "eager" : "lazy"}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === heroImg ? "opacity-100" : "opacity-0"}`}
+          />
+        ))}
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
+      <div className="relative container mx-auto px-6 py-16 sm:py-24 text-center text-white">
+        <Reveal>
           <div className="inline-flex items-center gap-2 rounded-full bg-white/20 backdrop-blur px-4 py-1.5 text-[11px] sm:text-xs font-medium mb-4 sm:mb-6">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {hero.badge}
           </div>
@@ -718,263 +627,181 @@ function HeroScene({
               </div>
             ))}
           </div>
-        </motion.div>
-        <SceneVignette progress={progress} />
-        <div className="absolute bottom-6 sm:bottom-8 right-6 sm:right-8 hidden md:flex items-center gap-3 text-white/50 text-xs tracking-widest uppercase">
-          <span>Scroll</span>
-          <span className="w-10 h-px bg-white/50" />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+// ── Section 2: Modules ───────────────────────────────────────────────────
+function ModulesScene({ goTo, categories }: { goTo: (p: Page) => void; categories: any[] }) {
+  return (
+    <section className="relative bg-slate-950 py-20 sm:py-28">
+      <div className="container mx-auto px-6">
+        <Reveal className="mb-10 sm:mb-12 text-white">
+          <div className="text-xs uppercase tracking-widest text-primary mb-2">Platform tour</div>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">Everything your school needs, in one place</h2>
+          <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
+        </Reveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {categories.map((c, i) => (
+            <Reveal key={c.title} delay={i * 0.08}>
+              <div className="group relative h-[280px] sm:h-[320px] rounded-2xl overflow-hidden border border-white/10 transition-transform duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                {c.img && (
+                  <img
+                    src={c.img}
+                    alt={c.title}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                )}
+                <div className={`absolute inset-0 bg-gradient-to-t ${c.gradient}`} />
+                <div className="relative h-full flex flex-col justify-end p-5 text-white">
+                  <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-3">
+                    <c.icon className="w-5 h-5" />
+                  </div>
+                  <div className="font-semibold text-lg">{c.title}</div>
+                  <p className="text-sm text-white/80 mt-1">{c.desc}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+          <Reveal delay={categories.length * 0.08}>
+            <button
+              type="button"
+              onClick={() => goTo("modules")}
+              className="h-[280px] sm:h-[320px] w-full rounded-2xl border border-white/15 flex flex-col items-center justify-center gap-4 text-white hover:bg-white/5 transition-colors"
+            >
+              <div className="text-lg font-semibold">See all 35+ modules</div>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm">
+                View all modules <ArrowRight className="w-4 h-4" />
+              </span>
+            </button>
+          </Reveal>
         </div>
       </div>
     </section>
   );
 }
 
-// ── Scene 2: Modules — horizontal camera pan through the module categories. ──
-function ModulesScene({
-  goTo,
-  categories,
-  reduceMotion,
-}: {
-  goTo: (p: Page) => void;
-  categories: { icon: any; title: string; desc: string; gradient: string; img?: string }[];
-  reduceMotion: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-58%"]);
-  const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
-  const morph = useSceneMorph(progress, reduceMotion);
-
+// ── Section 3: Finance & M-Pesa ──────────────────────────────────────────
+function FinanceScene({ goTo }: { goTo: (p: Page) => void }) {
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "200vh" }} className="relative">
-      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
-        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
-          <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
-            <ArrowRight className="w-3 h-3" /> Platform tour — scroll right
+    <section className="relative bg-gradient-to-b from-emerald-950 via-emerald-950 to-slate-950 py-20 sm:py-28 overflow-hidden">
+      <div className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
+        <Reveal>
+          <div className="text-xs uppercase tracking-widest text-emerald-300 mb-2 flex items-center gap-2">
+            <Coins className="w-3.5 h-3.5" /> Finance & Payments
           </div>
-          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">Everything your school needs, in one place</h2>
-          <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
-        </motion.div>
-        <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
-          {categories.map((c) => (
-            <div key={c.title} className="relative shrink-0 w-[78vw] sm:w-[420px] h-[300px] sm:h-[360px] rounded-2xl overflow-hidden">
-              {c.img && <img src={c.img} alt={c.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover object-top" />}
-              <div className={`absolute inset-0 bg-gradient-to-t ${c.gradient}`} />
-              <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-3 sm:mb-4">
-                  <c.icon className="w-5 h-5" />
-                </div>
-                <div className="font-semibold text-lg sm:text-xl">{c.title}</div>
-                <p className="text-sm text-white/80 mt-1">{c.desc}</p>
-              </div>
-            </div>
-          ))}
-          <div className="shrink-0 w-[78vw] sm:w-[360px] h-[300px] sm:h-[360px] rounded-2xl border border-white/15 flex flex-col items-center justify-center text-center p-8">
-            <div className="text-white font-semibold mb-4">See all 35+ modules</div>
-            <button type="button" onClick={() => goTo("modules")}>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent gap-2">
-                View all modules <ArrowRight className="w-4 h-4" />
-              </Button>
-            </button>
-          </div>
-        </motion.div>
-        <SceneVignette progress={progress} />
-      </motion.div>
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-lg">Fee collection, reimagined</h2>
+          <p className="mt-4 text-sm sm:text-base text-white/70 max-w-md">
+            Parents pay fees straight from their phone with M-Pesa STK Push. Every payment reconciles automatically,
+            prints a branded receipt, and updates the school's ledger in real time — no more chasing paper slips.
+          </p>
+          <ul className="mt-6 space-y-2 text-sm text-white/80">
+            {["Instant STK Push prompts", "Automatic reconciliation", "Live arrears & balance tracking"].map((f) => (
+              <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />{f}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => goTo("pricing")} className="mt-6 inline-block">
+            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">See pricing <ArrowRight className="w-4 h-4" /></Button>
+          </button>
+        </Reveal>
+        <Reveal delay={0.15}>
+          <BrowserFrame
+            src={mpesaShot}
+            alt="SmartDev ERP M-Pesa dashboard showing today's collections, transaction status, and recent M-Pesa payments"
+            className="max-w-md mx-auto"
+          />
+        </Reveal>
+      </div>
     </section>
   );
 }
 
-// ── Scene 3: Finance — vertical descent into the fee-collection story.
-// Reskins the prompt's "treasure reveal" beat: instead of a chest full of
-// coins, a phone mockup lights up with an M-Pesa STK push and a stream of
-// KES amounts drifts upward like glowing particles. ──
-function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceMotion: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const phoneY = useTransform(progress, [0, 1], [reduceMotion ? 0 : 40, reduceMotion ? 0 : -40]);
-  const glow = useTransform(progress, [0, 0.5, 1], [0.25, 0.6, 0.25]);
-  const contentOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
-  const compact = useIsCompact();
-  const morph = useSceneMorph(progress, reduceMotion);
-
+// ── Section 4: Campus life ───────────────────────────────────────────────
+function CampusScene({ photos }: { photos: { src: string; caption?: string }[] }) {
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative">
-      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
-        {!reduceMotion && <ParticleField count={compact ? 4 : 10} color="rgba(120,255,180,0.35)" />}
-        <motion.div style={{ opacity: contentOpacity }} className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-emerald-300 mb-2 flex items-center gap-2">
-              <Coins className="w-3.5 h-3.5" /> Finance & Payments
-            </div>
-            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-lg">Fee collection, reimagined</h2>
-            <p className="mt-4 text-sm sm:text-base text-white/70 max-w-md">
-              Parents pay fees straight from their phone with M-Pesa STK Push. Every payment reconciles automatically,
-              prints a branded receipt, and updates the school's ledger in real time — no more chasing paper slips.
-            </p>
-            <ul className="mt-6 space-y-2 text-sm text-white/80">
-              {["Instant STK Push prompts", "Automatic reconciliation", "Live arrears & balance tracking"].map((f) => (
-                <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />{f}</li>
-              ))}
-            </ul>
-            <button type="button" onClick={() => goTo("pricing")} className="mt-6 inline-block">
-              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">See pricing <ArrowRight className="w-4 h-4" /></Button>
-            </button>
-          </div>
-          <motion.div style={{ y: phoneY }} className="relative mx-auto w-full max-w-md">
-            <motion.div
-              className="absolute -inset-10 rounded-full bg-emerald-400 blur-3xl"
-              style={{ opacity: glow }}
-            />
-            <div className="relative rounded-2xl border border-white/15 bg-slate-900 shadow-2xl overflow-hidden">
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 border-b border-white/10">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+    <section className="relative bg-background py-20 sm:py-28">
+      <div className="container mx-auto px-6">
+        <Reveal className="mb-10 sm:mb-12 text-center">
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold">Built for schools like yours</h2>
+        </Reveal>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
+          {photos.map((p, i) => (
+            <Reveal key={p.src} delay={i * 0.06} className={i === 0 ? "col-span-2 sm:col-span-1" : ""}>
+              <div className="group relative rounded-2xl overflow-hidden aspect-[4/3]">
+                <img
+                  src={p.src}
+                  alt={p.caption || "SmartDev ERP in a Kenyan school"}
+                  loading="lazy"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                {p.caption && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                    <span className="text-white text-xs sm:text-sm font-medium">{p.caption}</span>
+                  </div>
+                )}
               </div>
-              <img
-                src="/images/portals/mpesa.png"
-                alt="SmartDev ERP M-Pesa dashboard showing today's collections, transaction status, and recent M-Pesa payments"
-                loading="lazy"
-                className="relative w-full h-auto"
-              />
-            </div>
-          </motion.div>
-        </motion.div>
-        <SceneVignette progress={progress} />
-      </motion.div>
-    </section>
-  );
-}
-
-// ── Scene 4: Campus — three photo columns drift vertically at different
-// speeds while pinned (vertical parallax "descent" onto the campus). ──
-function CampusScene({
-  photos,
-  reduceMotion,
-}: {
-  photos: { src: string; caption?: string }[];
-  reduceMotion: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const y1 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : -90]);
-  const y2 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : 90]);
-  const y3 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : -60]);
-  const titleOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
-  const morph = useSceneMorph(progress, reduceMotion);
-
-  const columns = [
-    { photos: photos.filter((_, i) => i % 3 === 0), y: y1 },
-    { photos: photos.filter((_, i) => i % 3 === 1), y: y2 },
-    { photos: photos.filter((_, i) => i % 3 === 2), y: y3 },
-  ];
-
-  return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "170vh" }} className="relative">
-      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col items-center justify-center py-8 sm:py-10`}>
-        <motion.h2 style={{ opacity: titleOpacity }} className="font-serif text-2xl sm:text-3xl font-semibold text-center mb-6 sm:mb-8 px-6">
-          Built for schools like yours
-        </motion.h2>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 max-w-5xl w-full px-4 sm:px-6">
-          {columns.map((col, ci) => (
-            <motion.div key={ci} style={{ y: col.y }} className="flex flex-col gap-2 sm:gap-3 will-change-transform">
-              {col.photos.map((p, i) => (
-                <div key={`${p.src}-${i}`} className="relative rounded-xl overflow-hidden aspect-[4/3]">
-                  <img src={p.src} alt={p.caption || "Kenyan school"} loading="lazy" className="w-full h-full object-cover" />
-                  {p.caption && (
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 hidden sm:block">
-                      <span className="text-white text-xs">{p.caption}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </motion.div>
+            </Reveal>
           ))}
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }
 
-// ── Scene 5: Portals — horizontal pan through the parent/student/staff/
-// admin portals, mirroring the Modules scene's card-track pattern. ──
-function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-52%"]);
-  const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
-  const morph = useSceneMorph(progress, reduceMotion);
-
+// ── Section 5: Portals ───────────────────────────────────────────────────
+function PortalsScene() {
   const portals = [
-    { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/50 to-purple-950/10", img: "/images/portals/parent.png" },
-    { icon: GraduationCap, title: "Student Portal", desc: "Timetables, exam results, assignments and class resources.", gradient: "from-blue-950/95 via-blue-950/50 to-blue-950/10", img: "/images/portals/student.png" },
-    { icon: Users, title: "Staff Portal", desc: "Marks entry, attendance registers, timetables and departmental tools.", gradient: "from-teal-950/95 via-teal-950/50 to-teal-950/10", img: "/images/portals/teacher.png" },
-    { icon: ShieldCheck, title: "Admin Dashboard", desc: "Real-time enrollment, finance and attendance intelligence across the school.", gradient: "from-gray-950/95 via-gray-950/50 to-gray-950/10", img: "/images/portals/finance.png" },
+    { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/50 to-purple-950/10", img: parentShot },
+    { icon: GraduationCap, title: "Student Portal", desc: "Timetables, exam results, assignments and class resources.", gradient: "from-blue-950/95 via-blue-950/50 to-blue-950/10", img: studentShot },
+    { icon: Users, title: "Staff Portal", desc: "Marks entry, attendance registers, timetables and departmental tools.", gradient: "from-teal-950/95 via-teal-950/50 to-teal-950/10", img: teacherShot },
+    { icon: ShieldCheck, title: "Admin Dashboard", desc: "Real-time enrollment, finance and attendance intelligence across the school.", gradient: "from-gray-950/95 via-gray-950/50 to-gray-950/10", img: financeShot },
   ];
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "190vh" }} className="relative">
-      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
-        <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
+    <section className="relative bg-slate-950 py-20 sm:py-28">
+      <div className="container mx-auto px-6">
+        <Reveal className="mb-10 sm:mb-12 text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
             <ArrowRight className="w-3 h-3" /> A view for everyone
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">One platform, four tailored experiences</h2>
-        </motion.div>
-        <motion.div style={{ x: trackX }} className="relative flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
+        </Reveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {portals.map((p, i) => (
-            <div
-              key={p.title}
-              className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden border border-white/10 ${!reduceMotion ? (i % 2 === 1 ? "sm:-translate-y-6" : "sm:translate-y-6") : ""}`}
-            >
-              <img
-                src={p.img}
-                alt={`${p.title} in SmartDev ERP`}
-                loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover object-top"
-              />
-              <div className={`absolute inset-0 bg-gradient-to-t ${p.gradient}`} />
-              <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
-                <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
-                  <p.icon className="w-5 h-5" />
+            <Reveal key={p.title} delay={i * 0.08}>
+              <div className="group relative h-[300px] sm:h-[340px] rounded-2xl overflow-hidden border border-white/10 transition-transform duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                <img
+                  src={p.img}
+                  alt={`${p.title} in SmartDev ERP`}
+                  loading="lazy"
+                  className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className={`absolute inset-0 bg-gradient-to-t ${p.gradient}`} />
+                <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
+                  <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
+                    <p.icon className="w-5 h-5" />
+                  </div>
+                  <div className="font-semibold text-lg sm:text-xl">{p.title}</div>
+                  <p className="text-sm text-white/80 mt-1">{p.desc}</p>
                 </div>
-                <div className="font-semibold text-lg sm:text-xl">{p.title}</div>
-                <p className="text-sm text-white/80 mt-1">{p.desc}</p>
               </div>
-            </div>
+            </Reveal>
           ))}
-        </motion.div>
-        <SceneVignette progress={progress} />
-      </motion.div>
+        </div>
+      </div>
     </section>
   );
 }
 
-// ── Scene 6: Mission — a pinned full-bleed gradient panel that scales
-// gently in and out as it passes through view. ──
-function MissionScene({
-  goTo,
-  mission,
-  reduceMotion,
-}: {
-  goTo: (p: Page) => void;
-  mission: any;
-  reduceMotion: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const scale = useTransform(progress, [0, 0.5, 1], [reduceMotion ? 1 : 0.92, 1, reduceMotion ? 1 : 0.92]);
-  const opacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
-
+// ── Section 6: Mission ───────────────────────────────────────────────────
+function MissionScene({ goTo, mission }: { goTo: (p: Page) => void; mission: any }) {
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
-        <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground will-change-transform">
+    <section className="relative bg-[#0f1c30] py-20 sm:py-28">
+      <div className="container mx-auto px-6 text-center text-primary-foreground">
+        <Reveal>
           <Target className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-4 opacity-80" />
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-2xl mx-auto">{mission.heading}</h2>
           <p className="mt-4 text-sm sm:text-base text-primary-foreground/80 max-w-xl mx-auto">{mission.body}</p>
@@ -999,64 +826,35 @@ function MissionScene({
               </div>
             ))}
           </div>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );
 }
 
-// ── Scene 7: Final CTA — pricing + download, rises into view then settles
-// (hands off smoothly into the regular footer below). ──
-function FinalScene({
-  goTo,
-  site,
-  reduceMotion,
-}: {
-  goTo: (p: Page) => void;
-  site: typeof SITE_DEFAULTS;
-  reduceMotion: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const opacity = useTransform(progress, [0, 0.25, 1], [0, 1, 1]);
-  const y = useTransform(progress, [0, 0.25], [reduceMotion ? 0 : 50, 0]);
-
+// ── Section 7: Final CTA ─────────────────────────────────────────────────
+function FinalScene({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "120vh" }} className="relative">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
-        <motion.div style={{ opacity, y }} className="container mx-auto px-6 text-center text-white">
+    <section className="relative bg-slate-950 py-20 sm:py-28">
+      <div className="container mx-auto px-6 text-center text-white">
+        <Reveal>
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold">{site.brand_name} pricing made simple</h2>
-          <p className="mt-3 text-sm sm:text-base text-white/70 max-w-lg mx-auto">Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.</p>
-          <div className="mt-6 sm:mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
+          <p className="mt-3 text-sm sm:text-base text-white/70 max-w-lg mx-auto">
+            Transparent pricing, no hidden fees. Android app, Windows desktop and free setup included.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3 sm:gap-4">
             <button type="button" onClick={() => goTo("pricing")}>
               <Button size="lg" className="gap-2">See all plans <ArrowRight className="w-4 h-4" /></Button>
             </button>
             <DownloadButton />
           </div>
-        </motion.div>
+        </Reveal>
       </div>
     </section>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HOME PAGE — eight pinned scenes chained end-to-end, alternating horizontal
-// pans and vertical descents: Hero (zoom) → Modules (pan right) → Finance
-// (descend) → Campus (parallax descend) → Portals (pan right) → Mission
-// (scale) → Trust (descend) → Final CTA (rise). Each scene owns its own
-// spring-smoothed scroll progress and a shared vignette layer; the page also
-// enables a global Lenis smooth-scroll pass so the whole chain reads as one
-// continuous camera move rather than a stack of sections.
-// ─────────────────────────────────────────────────────────────────────────────
-
 function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
-  const reduceMotion = useReducedMotionPref();
-  useLenisSmoothScroll(!reduceMotion);
-  const scenesRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawPageProgress } = useScroll({ target: scenesRef, offset: ["start start", "end end"] });
-  const pageProgress = useSmoothProgress(rawPageProgress, reduceMotion);
-
   const hero = useLandingContent("hero", {
     badge: "Cloud school ERP for Kenya & East Africa",
     heading_line1: "One platform to run your",
@@ -1073,21 +871,20 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
 
   const moduleCategories = [
     { icon: GraduationCap, title: "Academics", desc: "Classes, exams, report cards & timetables", gradient: "from-blue-950/95 via-blue-950/30 to-transparent", img: heroPhotos[0]?.src },
-    { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", gradient: "from-emerald-950/95 via-emerald-950/40 to-emerald-950/10", img: "/images/portals/finance.png" },
+    { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", gradient: "from-emerald-950/95 via-emerald-950/40 to-emerald-950/10", img: financeShot },
     { icon: Shield, title: "Boarding & Welfare", desc: "Dorms, clinic, kitchen & transport", gradient: "from-orange-950/95 via-orange-950/30 to-transparent", img: galleryPhotos[5]?.src ?? heroPhotos[2]?.src },
     { icon: Globe, title: "Portals", desc: "Parents, students & staff get their own view", gradient: "from-purple-950/95 via-purple-950/30 to-transparent", img: galleryPhotos[2]?.src ?? heroPhotos[0]?.src },
   ];
 
   return (
-    <div ref={scenesRef} className="relative">
-      <GlobalSceneBackdrop progress={pageProgress} reduceMotion={reduceMotion} />
-      <HeroScene goTo={goTo} hero={hero} heroPhotos={heroPhotos} reduceMotion={reduceMotion} />
-      <ModulesScene goTo={goTo} categories={moduleCategories} reduceMotion={reduceMotion} />
-      <FinanceScene goTo={goTo} reduceMotion={reduceMotion} />
-      <CampusScene photos={galleryPhotos} reduceMotion={reduceMotion} />
-      <PortalsScene reduceMotion={reduceMotion} />
-      <MissionScene goTo={goTo} mission={mission} reduceMotion={reduceMotion} />
-      <FinalScene goTo={goTo} site={site} reduceMotion={reduceMotion} />
+    <div className="relative">
+      <HeroScene goTo={goTo} hero={hero} heroPhotos={heroPhotos} />
+      <ModulesScene goTo={goTo} categories={moduleCategories} />
+      <FinanceScene goTo={goTo} />
+      <CampusScene photos={galleryPhotos} />
+      <PortalsScene />
+      <MissionScene goTo={goTo} mission={mission} />
+      <FinalScene goTo={goTo} site={site} />
     </div>
   );
 }
