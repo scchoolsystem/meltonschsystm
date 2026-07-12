@@ -1,6 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { issueLeavingCertificate } from "@/lib/leaving-certs.functions";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -45,7 +47,7 @@ import {
   Loader2, GraduationCap, TrendingUp, RefreshCw,
   AlertTriangle, CheckCircle2, Edit2, Clock, History,
   ArrowRight, Shield, Search, ChevronDown, ChevronUp,
-  FileText, Users,
+  FileText, Users, Award, X,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -133,6 +135,8 @@ function PromotionPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sortField, setSortField] = useState<"name" | "class" | "avg" | "decision">("class");
   const [sortAsc, setSortAsc] = useState(true);
+  const [certSummary, setCertSummary] = useState<{ issued: number; alreadyHad: number; failed: number } | null>(null);
+  const [certIssuing, setCertIssuing] = useState(false);
 
   // School context
   const { data: schoolId } = useQuery({
@@ -218,6 +222,8 @@ function PromotionPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const issueCert = useServerFn(issueLeavingCertificate);
+
   // Run promotion
   const runMutation = useMutation({
     mutationFn: async () => {
@@ -236,17 +242,70 @@ function PromotionPage() {
       if (error) throw error;
       return data as { processed: number; errors: number; error_list: any[] };
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setConfirmOpen(false);
       if (result.errors > 0) {
         toast.warning(`Promotion completed with ${result.errors} errors. ${result.processed} students processed.`);
       } else {
         toast.success(`Promotion complete! ${result.processed} students processed.`);
       }
+
+      // Auto-issue leaving certificates for everyone who graduated in this
+      // run — no need to open Leaving Certificates and add each one by
+      // hand. Skips anyone who already has a "completion" certificate
+      // (e.g. this run gets re-triggered), and manual issuing from the
+      // Leaving Certificates page still works exactly as before for
+      // transfers/withdrawals/expulsions or one-off corrections.
+      const graduateIds = rows.filter((r) => r.decision === "graduate").map((r) => r.student_id);
+      if (graduateIds.length > 0 && schoolId) {
+        setCertIssuing(true);
+        try {
+          const { data: existing } = await supabase
+            .from("leaving_certificates")
+            .select("student_id")
+            .eq("school_id", schoolId)
+            .eq("reason", "completion")
+            .in("student_id", graduateIds);
+          const alreadyHad = new Set((existing ?? []).map((c: any) => c.student_id));
+          const toIssue = graduateIds.filter((id) => !alreadyHad.has(id));
+
+          let issued = 0, failed = 0;
+          for (const student_id of toIssue) {
+            try {
+              await issueCert({
+                data: {
+                  student_id,
+                  leaving_date: new Date().toISOString().slice(0, 10),
+                  reason: "completion",
+                  conduct: "good",
+                  achievements: `Completed studies — ${selectedYear} promotion run.`,
+                },
+              });
+              issued++;
+            } catch {
+              failed++;
+            }
+          }
+
+          setCertSummary({ issued, alreadyHad: alreadyHad.size, failed });
+          if (issued > 0) {
+            toast.success(
+              `${issued} leaving certificate${issued === 1 ? "" : "s"} auto-issued for graduating students.`
+            );
+          }
+          if (failed > 0) {
+            toast.warning(`${failed} leaving certificate${failed === 1 ? "" : "s"} could not be auto-issued — issue them manually from Leaving Certificates.`);
+          }
+        } finally {
+          setCertIssuing(false);
+        }
+      }
+
       setRows([]);
       setLoaded(false);
       qc.invalidateQueries({ queryKey: ["promotion-history"] });
       qc.invalidateQueries({ queryKey: ["students"] });
+      qc.invalidateQueries({ queryKey: ["leaving-certs"] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -350,6 +409,38 @@ function PromotionPage() {
           Preview, adjust, and finalise student promotion decisions at the end of an academic year.
         </p>
       </div>
+
+      {certSummary && (
+        <Alert className="border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 relative">
+          <Award className="w-4 h-4 text-emerald-600" />
+          <AlertTitle className="text-emerald-800 dark:text-emerald-400">Leaving certificates for graduates</AlertTitle>
+          <AlertDescription className="text-emerald-700 dark:text-emerald-500">
+            <span>
+              {certSummary.issued} auto-issued
+              {certSummary.alreadyHad > 0 && `, ${certSummary.alreadyHad} already had one`}
+              {certSummary.failed > 0 && `, ${certSummary.failed} failed — issue those manually`}.
+            </span>
+            <Button size="sm" variant="outline" className="ml-3 h-7 text-xs gap-1.5 bg-white" asChild>
+              <Link to="/admin/leaving-certificates">
+                <FileText className="w-3 h-3" /> View & print
+              </Link>
+            </Button>
+          </AlertDescription>
+          <button
+            className="absolute top-3 right-3 text-emerald-600/60 hover:text-emerald-800"
+            onClick={() => setCertSummary(null)}
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </Alert>
+      )}
+      {certIssuing && !certSummary && (
+        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+          <AlertTitle className="text-blue-800 dark:text-blue-400">Issuing leaving certificates for graduates…</AlertTitle>
+        </Alert>
+      )}
 
       <Tabs defaultValue="run">
         <TabsList>
