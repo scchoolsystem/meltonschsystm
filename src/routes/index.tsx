@@ -553,9 +553,9 @@ const BACKDROP_COLORS = ["#fafafa", "#020617", "#022c22", "#064e3b", "#020617", 
 function GlobalSceneBackdrop({ progress, reduceMotion }: { progress: any; reduceMotion: boolean }) {
   const backgroundColor = useTransform(progress, BACKDROP_STOPS, BACKDROP_COLORS);
   if (reduceMotion) {
-    return <div className="fixed inset-0 -z-10 bg-background" aria-hidden="true" />;
+    return <div className="fixed inset-0 z-0 bg-background" aria-hidden="true" />;
   }
-  return <motion.div className="fixed inset-0 -z-10" style={{ backgroundColor }} aria-hidden="true" />;
+  return <motion.div className="fixed inset-0 z-0" style={{ backgroundColor }} aria-hidden="true" />;
 }
 
 function useIsCompact() {
