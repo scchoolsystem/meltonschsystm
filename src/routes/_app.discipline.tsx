@@ -30,6 +30,12 @@ function Page() {
   const { isAdmin, hasRole } = useAuth();
   const can = isAdmin || hasRole("teacher") || hasRole("deputy_principal") || hasRole("discipline_admin") || hasRole("guidance_admin");
   const canCounsel = isAdmin || hasRole("guidance_admin");
+  // Parents get a read-only, child-scoped view — not the staff dashboard
+  // (bulk parent notifications, repeat-offender leaderboard, school-wide
+  // analytics). RLS already restricts `records`/`sessions` to their own
+  // child (see "parent child view discipline" policy), this just matches
+  // the UI to that.
+  const isParentOnly = hasRole("parent") && !can;
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["discipline"],
@@ -110,6 +116,61 @@ function Page() {
   const notifiedCount = (records as any[]).filter(r => r.parent_notified).length;
   const unnotifiedCount = (records as any[]).length - notifiedCount;
   const highSeverity = (records as any[]).filter(r => r.severity === "high").length;
+
+  if (isParentOnly) {
+    return (
+      <div className="p-6 space-y-6 max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-3xl font-bold">Discipline</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {(records as any[]).length === 0 ? "No incidents logged for your child." : `${(records as any[]).length} incident${(records as any[]).length === 1 ? "" : "s"} on record`}
+          </p>
+        </div>
+        <Card><CardHeader /><CardContent>
+          {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Date</TableHead><TableHead>Incident</TableHead>
+                <TableHead>Severity</TableHead><TableHead>Action Taken</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {(records as any[]).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No incidents logged.</TableCell></TableRow>}
+                {(records as any[]).map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-xs">{r.incident_date}</TableCell>
+                    <TableCell className="max-w-[280px]">{r.description}</TableCell>
+                    <TableCell><Badge variant={r.severity === "high" ? "destructive" : r.severity === "medium" ? "secondary" : "outline"}>{r.severity ?? "—"}</Badge></TableCell>
+                    <TableCell className="max-w-[220px] text-sm">{r.action_taken ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent></Card>
+
+        {(sessions as any[]).length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Counselling Sessions</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Counsellor</TableHead><TableHead>Notes</TableHead><TableHead>Follow-up</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {(sessions as any[]).map((s: any) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-xs">{s.session_date}</TableCell>
+                      <TableCell>{s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : "—"}</TableCell>
+                      <TableCell className="max-w-[220px] text-sm">{s.notes ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.follow_up_date ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
