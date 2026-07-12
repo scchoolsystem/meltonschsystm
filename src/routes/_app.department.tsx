@@ -66,6 +66,7 @@ import {
   getDepartmentCommunications,
   upsertDepartmentMember,
   removeDepartmentMember,
+  createDepartment,
   type Department,
   type DepartmentMember,
   type DeptRole,
@@ -195,6 +196,69 @@ function HodCard({ hod }: { hod: DepartmentMember | null }) {
   );
 }
 
+// ── New Department dialog ────────────────────────────────────────────────────
+
+const DEPT_KINDS = [
+  { value: "academics", label: "Academics" },
+  { value: "administration", label: "Administration" },
+  { value: "co_curricular", label: "Co-curricular" },
+  { value: "support", label: "Support" },
+] as const;
+
+function NewDepartmentDialog({
+  open, onOpenChange, name, setName, kind, setKind, onSubmit, pending,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  name: string;
+  setName: (v: string) => void;
+  kind: "academics" | "administration" | "co_curricular" | "support";
+  setKind: (v: "academics" | "administration" | "co_curricular" | "support") => void;
+  onSubmit: () => void;
+  pending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Department</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label>Name</Label>
+            <Input
+              placeholder="e.g. Mathematics"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              If this is a single-subject academic department, matching it exactly to the
+              subject name (e.g. "Mathematics") lets it auto-link on the Subjects tab.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Kind</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DEPT_KINDS.map((k) => (
+                  <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={onSubmit} disabled={!name.trim() || pending}>
+            {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Role badge helper ──────────────────────────────────────────────────────────
 
 function RoleBadgeIndicator({ isAdminTier, isHOD }: { isAdminTier: boolean; isHOD: boolean }) {
@@ -236,6 +300,24 @@ function Page() {
   const [memberMgmtOpen, setMemberMgmtOpen] = useState(false);
   const [addMemberStaffId, setAddMemberStaffId] = useState("");
   const [addMemberRole, setAddMemberRole] = useState<DeptRole>("member");
+
+  // New department dialog (admin tier only)
+  const [newDeptOpen, setNewDeptOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newDeptKind, setNewDeptKind] = useState<"academics" | "administration" | "co_curricular" | "support">("academics");
+
+  const createDeptMutation = useMutation({
+    mutationFn: () => createDepartment(newDeptName, newDeptKind),
+    onSuccess: (dept) => {
+      toast.success(`${dept.name} department created`);
+      qc.invalidateQueries({ queryKey: ["my-departments"] });
+      setSelectedDeptId(dept.id);
+      setNewDeptOpen(false);
+      setNewDeptName("");
+      setNewDeptKind("academics");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to create department"),
+  });
 
   // ── My departments (scoped by role) ─────────────────────────────────────────
   const { data: departments = [], isLoading: deptsLoading } = useQuery({
@@ -537,11 +619,23 @@ function Page() {
             <h2 className="font-semibold text-lg">No Department Assigned</h2>
             <p className="text-sm text-muted-foreground">
               {isAdminTier
-                ? "No departments have been created yet. Set them up in Admin → Departments."
+                ? "No departments have been created yet."
                 : "Ask your administrator to assign you to a department."}
             </p>
+            {isAdminTier && (
+              <Button size="sm" className="gap-1.5" onClick={() => setNewDeptOpen(true)}>
+                <Plus className="w-3.5 h-3.5" /> Add Department
+              </Button>
+            )}
           </CardContent>
         </Card>
+        <NewDepartmentDialog
+          open={newDeptOpen} onOpenChange={setNewDeptOpen}
+          name={newDeptName} setName={setNewDeptName}
+          kind={newDeptKind} setKind={setNewDeptKind}
+          onSubmit={() => createDeptMutation.mutate()}
+          pending={createDeptMutation.isPending}
+        />
       </div>
     );
   }
@@ -574,22 +668,37 @@ function Page() {
         </div>
 
         {/* Dept switcher — only for admin tier or users with multiple depts */}
-        {departments.length > 1 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            <Select value={activeDeptId ?? ""} onValueChange={(v) => { setSelectedDeptId(v); setActiveTab("overview"); }}>
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {departments.length > 1 && (
+            <>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <Select value={activeDeptId ?? ""} onValueChange={(v) => { setSelectedDeptId(v); setActiveTab("overview"); }}>
+                <SelectTrigger className="w-52">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          {isAdminTier && (
+            <Button size="sm" variant="outline" className="gap-1.5 h-9" onClick={() => setNewDeptOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> Add Department
+            </Button>
+          )}
+        </div>
       </div>
+
+      <NewDepartmentDialog
+        open={newDeptOpen} onOpenChange={setNewDeptOpen}
+        name={newDeptName} setName={setNewDeptName}
+        kind={newDeptKind} setKind={setNewDeptKind}
+        onSubmit={() => createDeptMutation.mutate()}
+        pending={createDeptMutation.isPending}
+      />
 
       {/* Sub-departments strip */}
       {(activeDept?.sub_departments?.length ?? 0) > 0 && (
