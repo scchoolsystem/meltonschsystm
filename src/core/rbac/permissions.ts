@@ -87,6 +87,12 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // portal.student / portal.parent instead.
   attendance: [...ADMIN_ROLES, ...TEACHING_ROLES],
   timetable: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "student", "parent"],
+  // /department — was missing from this map entirely, so canAccess() fell
+  // back to admin-only and silently 403'd every HOD and regular teacher
+  // (staff.department_id-scoped view). TEACHING_ROLES already includes
+  // "hod"; "staff" covers non-teaching department members (e.g. bursar in
+  // Finance).
+  department: [...ADMIN_ROLES, ...TEACHING_ROLES, "staff"],
   // Widened to match every role role-experience.ts gives an Analytics/Reports
   // nav link to: bursar (+ finance aliases), discipline_admin, hod, exams_admin,
   // guidance_admin.
