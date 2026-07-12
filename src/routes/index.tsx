@@ -1476,6 +1476,35 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
       )}`
     : `mailto:${site.email_sales}`;
 
+  // Gmail's web compose window, opened in a new tab. This is the reliable
+  // path: a plain mailto: link only opens something if the visitor's
+  // browser/OS has a default mail app registered, which many desktop Chrome
+  // users and phones don't have set up — the click just silently does
+  // nothing. Opening Gmail's compose UI directly always works in-browser,
+  // regardless of what (if anything) is configured as the system mail app.
+  const salesGmailCompose = planSelection
+    ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(site.email_sales)}&su=${encodeURIComponent(
+        `New school sign-up — ${planSelection.planName} plan`
+      )}&body=${encodeURIComponent(
+        `Hi SmartDev team,\n\nI'd like to get started with the following plan:\n\n${selectionSummaryText}\n\nSchool name:\nLocation:\nApprox. student count:\n\nThanks!`
+      )}`
+    : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(site.email_sales)}`;
+
+  const [selectionCopied, setSelectionCopied] = useState(false);
+  const copySelectionDetails = async () => {
+    if (!planSelection) return;
+    try {
+      await navigator.clipboard.writeText(
+        `Hi SmartDev team,\n\nI'd like to get started with the following plan:\n\n${selectionSummaryText}\n\nSchool name:\nLocation:\nApprox. student count:\n\nThanks!`
+      );
+      setSelectionCopied(true);
+      setTimeout(() => setSelectionCopied(false), 2500);
+    } catch {
+      // Clipboard API can fail in odd embedded/older browsers — the Gmail
+      // and mailto options above remain as working paths either way.
+    }
+  };
+
   const CONTACTS = [
     { icon: Mail, label: "General Enquiries", value: site.email_hello, href: `mailto:${site.email_hello}`, color: "bg-blue-100 text-blue-700" },
     { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: salesMailto, color: "bg-green-100 text-green-700" },
@@ -1502,10 +1531,18 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
               </div>
               <div className="font-semibold text-primary">Estimated total: KES {planSelection.total.toLocaleString()}/mo</div>
             </div>
-            <a href={salesMailto} className="inline-block mt-4">
-              <Button className="gap-2">Email us this selection <ArrowRight className="w-4 h-4" /></Button>
-            </a>
-            <p className="text-xs text-muted-foreground mt-2">This pre-fills an email to our sales team with your plan and modules, so nothing gets lost — just add your school details and hit send.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <a href={salesGmailCompose} target="_blank" rel="noopener noreferrer">
+                <Button className="gap-2">Email us this selection <ArrowRight className="w-4 h-4" /></Button>
+              </a>
+              <a href={salesMailto} className="text-xs text-muted-foreground hover:text-primary underline">
+                Use my default mail app instead
+              </a>
+              <button type="button" onClick={copySelectionDetails} className="text-xs text-muted-foreground hover:text-primary underline">
+                {selectionCopied ? "Copied ✓" : "Or copy the details"}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Opens a pre-filled Gmail draft to our sales team with your plan and modules, so nothing gets lost — just add your school details and hit send. No Gmail? Use the mail-app link or copy the details instead.</p>
           </div>
         )}
 
