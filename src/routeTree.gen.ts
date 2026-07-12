@@ -106,6 +106,7 @@ import { Route as AppAcademicsRemarksRouteImport } from './routes/_app.academics
 import { Route as AppAcademicsOversightRouteImport } from './routes/_app.academics.oversight'
 import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
+import { Route as AppAcademicsEntryRouteImport } from './routes/_app.academics.entry'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -605,6 +606,11 @@ const AppAcademicsExamsRoute = AppAcademicsExamsRouteImport.update({
   path: '/academics/exams',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsEntryRoute = AppAcademicsEntryRouteImport.update({
+  id: '/academics/entry',
+  path: '/academics/entry',
+  getParentRoute: () => AppRoute,
+} as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
     id: '/lovable/email/transactional/send',
@@ -697,6 +703,7 @@ export interface FileRoutesByFullPath {
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/academics/entry': typeof AppAcademicsEntryRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/oversight': typeof AppAcademicsOversightRoute
@@ -804,6 +811,7 @@ export interface FileRoutesByTo {
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/academics/entry': typeof AppAcademicsEntryRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
   '/academics/oversight': typeof AppAcademicsOversightRoute
@@ -913,6 +921,7 @@ export interface FileRoutesById {
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/_app/academics/entry': typeof AppAcademicsEntryRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
   '/_app/academics/oversight': typeof AppAcademicsOversightRoute
@@ -1022,6 +1031,7 @@ export interface FileRouteTypes {
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/academics/entry'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/oversight'
@@ -1129,6 +1139,7 @@ export interface FileRouteTypes {
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/academics/entry'
     | '/academics/exams'
     | '/academics/marks'
     | '/academics/oversight'
@@ -1237,6 +1248,7 @@ export interface FileRouteTypes {
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/_app/academics/entry'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
     | '/_app/academics/oversight'
@@ -2007,6 +2019,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAcademicsExamsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/entry': {
+      id: '/_app/academics/entry'
+      path: '/academics/entry'
+      fullPath: '/academics/entry'
+      preLoaderRoute: typeof AppAcademicsEntryRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
       path: '/lovable/email/transactional/send'
@@ -2130,6 +2149,7 @@ interface AppRouteChildren {
   AppStudentsRoute: typeof AppStudentsRoute
   AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
+  AppAcademicsEntryRoute: typeof AppAcademicsEntryRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
   AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
   AppAcademicsOversightRoute: typeof AppAcademicsOversightRoute
@@ -2210,6 +2230,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppStudentsRoute: AppStudentsRoute,
   AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
+  AppAcademicsEntryRoute: AppAcademicsEntryRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
   AppAcademicsMarksRoute: AppAcademicsMarksRoute,
   AppAcademicsOversightRoute: AppAcademicsOversightRoute,
