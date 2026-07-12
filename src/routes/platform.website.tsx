@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import {
   Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
-  Upload, Loader2, Save, GripVertical,
+  Upload, Loader2, Save, GripVertical, ShoppingBag,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/website")({
@@ -146,6 +146,7 @@ function WebsiteEditor() {
           <TabsTrigger value="story">Our Story</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
           <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
+          <TabsTrigger value="merch">Merch</TabsTrigger>
           <TabsTrigger value="pricing">Pricing &amp; Modules</TabsTrigger>
         </TabsList>
 
@@ -155,6 +156,7 @@ function WebsiteEditor() {
         <TabsContent value="story" className="mt-4"><StoryEditor /></TabsContent>
         <TabsContent value="milestones" className="mt-4"><MilestonesEditor /></TabsContent>
         <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
+        <TabsContent value="merch" className="mt-4"><MerchEditor /></TabsContent>
         <TabsContent value="pricing" className="mt-4"><PricingEditor /></TabsContent>
       </Tabs>
     </div>
@@ -516,6 +518,98 @@ function GalleryEditor() {
       <GalleryPlacementEditor placement="story_hero" title="Our Story hero image" description="Large banner image at the top of the Our Story page." folder="story" />
       <GalleryPlacementEditor placement="contact" title="Contact page image" description="Banner image at the bottom of the Contact page." folder="contact" />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Merch — SmartDev-branded products, plus partner products (e.g. Stawear)
+// that hand off to an external store on click.
+// ---------------------------------------------------------------------------
+
+type MerchItem = {
+  name: string;
+  photo_url: string | null;
+  price_label: string;
+  description: string;
+  is_external: boolean;   // false = "Enquire to buy" (mailto), true = links out to a partner store
+  link_url: string;       // only used when is_external is true
+  partner_name: string;   // optional badge, e.g. "Stawear"
+};
+
+const MERCH_BLANK: MerchItem = {
+  name: "", photo_url: null, price_label: "", description: "",
+  is_external: false, link_url: "", partner_name: "",
+};
+
+function MerchEditor() {
+  const fallback = { items: [] as MerchItem[] };
+  const { data, isLoading, save } = useLandingSection("merch_items", fallback);
+  const [items, setItems] = useState<MerchItem[]>([]);
+  useEffect(() => { if (!isLoading) setItems(data.items ?? []); }, [isLoading, data]);
+
+  const updateItem = (i: number, patch: Partial<MerchItem>) => {
+    const n = [...items];
+    n[i] = { ...n[i], ...patch };
+    setItems(n);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><ShoppingBag className="w-5 h-5" /> Merchandise</CardTitle>
+        <CardDescription>
+          Water bottles, bags, notebooks, pens and any other branded merchandise, shown on the Merch page.
+          Leave "External store link" off for your own products — visitors will get an "Enquire to buy" button that emails your sales inbox.
+          Turn it on for a partner's products (e.g. Stawear) — clicking the card sends visitors straight to that partner's site to complete the purchase there.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground">No merch added yet. Click "Add product" below to create the first slot.</p>
+            )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {items.map((m, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
+                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove product">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <ImagePicker label="Photo" value={m.photo_url} onChange={(url) => updateItem(i, { photo_url: url })} folder="merch" />
+                  <div><Label>Product name</Label><Input value={m.name} placeholder="e.g. SmartDev Water Bottle" onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
+                  <div><Label>Price (display text)</Label><Input value={m.price_label} placeholder="e.g. KES 800" onChange={(e) => updateItem(i, { price_label: e.target.value })} /></div>
+                  <div><Label>Description</Label><Textarea rows={2} value={m.description} onChange={(e) => updateItem(i, { description: e.target.value })} /></div>
+
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <div>
+                      <Label className="cursor-pointer">External store link</Label>
+                      <p className="text-xs text-muted-foreground">On = partner product, hands off to their site.</p>
+                    </div>
+                    <Switch checked={m.is_external} onCheckedChange={(v) => updateItem(i, { is_external: v })} />
+                  </div>
+
+                  {m.is_external ? (
+                    <>
+                      <div><Label>Store link (e.g. https://stawear.netlify.app)</Label><Input value={m.link_url} placeholder="https://stawear.netlify.app" onChange={(e) => updateItem(i, { link_url: e.target.value })} /></div>
+                      <div><Label>Partner name (optional badge, e.g. "Stawear")</Label><Input value={m.partner_name} onChange={(e) => updateItem(i, { partner_name: e.target.value })} /></div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Visitors will see an "Enquire to buy" button that opens a pre-filled email to your sales inbox.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MERCH_BLANK }])}>
+              <Plus className="w-3.5 h-3.5" /> Add product
+            </Button>
+            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
