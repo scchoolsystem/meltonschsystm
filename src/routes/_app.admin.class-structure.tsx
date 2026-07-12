@@ -136,7 +136,13 @@ function ClassStructurePage() {
         if (error) throw error;
       }
 
-      // Upsert remaining rows
+      // Upsert remaining rows. Always upsert on the natural
+      // (school_id, class_name) key rather than branching on whether the
+      // row happens to carry a local `id` — template re-apply (and any
+      // other path that rebuilds `rows` from scratch) produces rows with
+      // no `id` even when that class name already exists in the DB for
+      // this school, which previously caused a raw INSERT to collide with
+      // the school_class_structure_school_id_class_name_key constraint.
       for (let i = 0; i < active.length; i++) {
         const r = active[i];
         const payload = {
@@ -145,18 +151,10 @@ function ClassStructurePage() {
           sort_order: i + 1,
           is_terminal: i === active.length - 1 ? true : r.is_terminal,
         };
-        if (r.id && !r._new) {
-          const { error } = await supabase
-            .from("school_class_structure")
-            .update(payload)
-            .eq("id", r.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from("school_class_structure")
-            .insert(payload);
-          if (error) throw error;
-        }
+        const { error } = await supabase
+          .from("school_class_structure")
+          .upsert(payload, { onConflict: "school_id,class_name" });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
