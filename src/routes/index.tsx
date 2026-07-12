@@ -303,6 +303,15 @@ const GALLERY_PHOTOS = [
 
 type Page = "home" | "modules" | "story" | "pricing" | "download" | "contact" | "legal";
 
+// A confirmed plan + add-on selection, carried from the pricing page to the
+// contact page so a customer's picks aren't lost when they hit "Get started".
+type PlanSelection = {
+  planName: string;
+  baseFee: number;
+  modules: { name: string; price: number }[];
+  total: number;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN LANDING COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -313,6 +322,7 @@ function Landing() {
   const navigate = useNavigate();
   const [page, setPage] = useState<Page>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [planSelection, setPlanSelection] = useState<PlanSelection | null>(null);
   const site = useSiteMeta();
 
   useEffect(() => {
@@ -406,9 +416,9 @@ function Landing() {
         {page === "home" && <HomePage goTo={goTo} site={site} />}
         {page === "modules" && <ModulesPage />}
         {page === "story" && <StoryPage />}
-        {page === "pricing" && <PricingPage goTo={goTo} site={site} />}
+        {page === "pricing" && <PricingPage goTo={goTo} site={site} onProceed={setPlanSelection} />}
         {page === "download" && <DownloadPage site={site} />}
-        {page === "contact" && <ContactPage site={site} />}
+        {page === "contact" && <ContactPage site={site} planSelection={planSelection} />}
         {page === "legal" && <LegalPage site={site} />}
       </main>
 
@@ -1162,7 +1172,7 @@ function StoryPage() {
 // PRICING PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
+function PricingPage({ goTo, site, onProceed }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS; onProceed: (selection: PlanSelection) => void }) {
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ["public-plans"],
     queryFn: async () => {
@@ -1189,6 +1199,18 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
     },
   });
 
+  // Which modules are free-included on which plan. This is the exact same
+  // table the admin edits in Platform Admin -> Website -> Pricing & Modules,
+  // so the two pages can never drift out of sync again.
+  const { data: inclusionRows, isLoading: inclusionLoading } = useQuery({
+    queryKey: ["public-plan-module-inclusion"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("plan_module_inclusion").select("*");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [extraModules, setExtraModules] = useState<Set<string>>(new Set());
 
@@ -1200,10 +1222,9 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
 
   const isIncluded = (m: any) => {
     if (!selectedPlan) return false;
-    const name = (selectedPlan.name ?? "").toLowerCase();
-    if (name.includes("starter")) return Boolean(m.included_in_starter);
-    if (name.includes("standard")) return Boolean(m.included_in_standard);
-    return Boolean(m.included_in_enterprise);
+    return (inclusionRows ?? []).some(
+      (r: any) => r.plan_id === selectedPlan.id && r.feature_key === m.feature_key && r.included
+    );
   };
 
   const toggleModule = (key: string) => {
@@ -1214,9 +1235,8 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
     });
   };
 
-  const addonTotal = (modules ?? [])
-    .filter((m) => extraModules.has(m.feature_key) && !isIncluded(m))
-    .reduce((sum, m) => sum + Number(m.monthly_price ?? 0), 0);
+  const pickedAddonModules = (modules ?? []).filter((m) => extraModules.has(m.feature_key) && !isIncluded(m));
+  const addonTotal = pickedAddonModules.reduce((sum, m) => sum + Number(m.monthly_price ?? 0), 0);
 
   const baseFee = Number(selectedPlan?.monthly_fee ?? 0);
   const total = baseFee + addonTotal;
@@ -1269,7 +1289,7 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-6">Modules already included in the {selectedPlan.name} plan are free. Tick any extra module to add it and see the price update live.</p>
-            {modulesLoading ? (
+            {modulesLoading || inclusionLoading ? (
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1308,7 +1328,18 @@ function PricingPage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SIT
               <div className="text-sm text-muted-foreground">
                 Base ({selectedPlan.name}): KES {baseFee.toLocaleString()}/mo &nbsp;+&nbsp; Add-ons: KES {addonTotal.toLocaleString()}/mo
               </div>
-              <button type="button" onClick={() => goTo("contact")}>
+              <button
+                type="button"
+                onClick={() => {
+                  onProceed({
+                    planName: selectedPlan.name,
+                    baseFee,
+                    modules: pickedAddonModules.map((m) => ({ name: m.display_name, price: Number(m.monthly_price ?? 0) })),
+                    total,
+                  });
+                  goTo("contact");
+                }}
+              >
                 <Button size="lg" className="gap-2">Get started with this plan <ArrowRight className="w-4 h-4" /></Button>
               </button>
             </div>
@@ -1420,7 +1451,7 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
 // CONTACT PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ContactPage({ site }: { site: typeof SITE_DEFAULTS }) {
+function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; planSelection: PlanSelection | null }) {
   const content = useLandingContent("contact_page", {
     heading: "Get in touch",
     subheading: "We would love to set up SmartDev for your school. Reach out and we will get back to you same day.",
@@ -1429,9 +1460,25 @@ function ContactPage({ site }: { site: typeof SITE_DEFAULTS }) {
   });
   const contactPhotos = useGalleryPhotos("contact", [{ src: content.office_image_url || "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&h=300&fit=crop" }]);
 
+  const selectionSummaryText = planSelection
+    ? [
+        `Plan: ${planSelection.planName} (KES ${planSelection.baseFee.toLocaleString()}/mo base)`,
+        planSelection.modules.length
+          ? `Add-on modules: ${planSelection.modules.map((m) => `${m.name} (+KES ${m.price.toLocaleString()}/mo)`).join(", ")}`
+          : "Add-on modules: none — base plan modules only",
+        `Estimated total: KES ${planSelection.total.toLocaleString()}/mo`,
+      ].join("\n")
+    : "";
+
+  const salesMailto = planSelection
+    ? `mailto:${site.email_sales}?subject=${encodeURIComponent(`New school sign-up — ${planSelection.planName} plan`)}&body=${encodeURIComponent(
+        `Hi SmartDev team,\n\nI'd like to get started with the following plan:\n\n${selectionSummaryText}\n\nSchool name:\nLocation:\nApprox. student count:\n\nThanks!`
+      )}`
+    : `mailto:${site.email_sales}`;
+
   const CONTACTS = [
     { icon: Mail, label: "General Enquiries", value: site.email_hello, href: `mailto:${site.email_hello}`, color: "bg-blue-100 text-blue-700" },
-    { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: `mailto:${site.email_sales}`, color: "bg-green-100 text-green-700" },
+    { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: salesMailto, color: "bg-green-100 text-green-700" },
     { icon: Mail, label: "Technical Support", value: site.email_support, href: `mailto:${site.email_support}`, color: "bg-orange-100 text-orange-700" },
     { icon: Mail, label: "Admin & Legal", value: site.email_admin, href: `mailto:${site.email_admin}`, color: "bg-purple-100 text-purple-700" },
     { icon: Phone, label: "Call or WhatsApp", value: site.phone_primary, href: `tel:${site.phone_primary.replace(/\s/g,"")}`, color: "bg-teal-100 text-teal-700" },
@@ -1444,6 +1491,23 @@ function ContactPage({ site }: { site: typeof SITE_DEFAULTS }) {
           <h1 className="text-4xl font-bold">{content.heading}</h1>
           <p className="mt-3 text-muted-foreground max-w-xl mx-auto">{content.subheading}</p>
         </div>
+
+        {planSelection && (
+          <div className="rounded-2xl border-2 border-primary bg-primary/5 p-6 mb-10 max-w-2xl mx-auto">
+            <div className="flex items-center gap-2 font-bold text-lg mb-3"><CheckCircle className="w-5 h-5 text-primary" /> Your selection</div>
+            <div className="text-sm space-y-1.5">
+              <div><span className="text-muted-foreground">Plan:</span> <span className="font-medium">{planSelection.planName}</span> <span className="text-muted-foreground">— KES {planSelection.baseFee.toLocaleString()}/mo base</span></div>
+              <div className="text-muted-foreground">
+                Add-ons: {planSelection.modules.length ? planSelection.modules.map((m) => m.name).join(", ") : "none — base plan modules only"}
+              </div>
+              <div className="font-semibold text-primary">Estimated total: KES {planSelection.total.toLocaleString()}/mo</div>
+            </div>
+            <a href={salesMailto} className="inline-block mt-4">
+              <Button className="gap-2">Email us this selection <ArrowRight className="w-4 h-4" /></Button>
+            </a>
+            <p className="text-xs text-muted-foreground mt-2">This pre-fills an email to our sales team with your plan and modules, so nothing gets lost — just add your school details and hit send.</p>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           <div>
