@@ -36,9 +36,18 @@ export const setStudentLifecycle = createServerFn({ method: "POST" })
     const { data: callerSchool } = await context.supabase.rpc("my_school_id");
     if (!callerSchool) throw new Error("No school context for current user");
     const { data: cur } = await supabaseAdmin
-      .from("students").select("id, lifecycle_status, school_id")
+      .from("students").select("id, lifecycle_status, school_id, class_id, classes(name)")
       .eq("id", data.student_id).eq("school_id", callerSchool).maybeSingle();
     if (!cur) throw new Error("Student not found in your school");
+
+    // Expelled / transferred / archived students leave the active roster
+    // entirely — clear class_id so they free up their seat and don't sit
+    // in the same class as next year's cohort that reuses the same class
+    // name. Suspended students are still enrolled, just paused, so their
+    // class assignment is left alone.
+    const LEAVES_CLASS = ["expelled", "transferred", "archived"];
+    const shouldClearClass = LEAVES_CLASS.includes(data.to_status) && !!cur.class_id;
+
     const { error } = await supabaseAdmin.from("students").update({
       lifecycle_status: data.to_status,
       lifecycle_reason: data.reason,
@@ -46,6 +55,10 @@ export const setStudentLifecycle = createServerFn({ method: "POST" })
       lifecycle_changed_at: new Date().toISOString(),
       transferred_to: data.to_status === "transferred" ? (data.transferred_to ?? null) : null,
       status: data.to_status === "archived" ? "archived" : "active",
+      ...(shouldClearClass ? {
+        class_id: null,
+        last_class_name: (cur as any).classes?.name ?? null,
+      } : {}),
     }).eq("id", data.student_id).eq("school_id", callerSchool);
     if (error) throw new Error(error.message);
 
