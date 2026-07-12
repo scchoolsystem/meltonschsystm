@@ -16,7 +16,7 @@ import {
   ClipboardList, Settings, Globe, Zap, CheckCircle, ChevronDown, ChevronUp,
   Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
-  Coins, Wallet, Sparkles, Wifi,
+  Coins,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -527,6 +527,37 @@ function useLenisSmoothScroll(_enabled: boolean) {
 // Detects small/narrow viewports so decorative layers (particle counts,
 // card widths) can scale down for phones and tablets instead of assuming a
 // desktop-sized screen.
+// Applied to every scene's pinned wrapper. As a scene's local scroll progress
+// enters (0 → 0.15) or leaves (0.85 → 1) it gently scales and blurs, like a
+// camera racking focus between shots, instead of hard-cutting to the next
+// section. Combined with GlobalSceneBackdrop (which morphs the color behind
+// everything) this is what makes scroll feel like one continuous take
+// rather than a stack of separate blocks.
+function useSceneMorph(progress: any, reduceMotion: boolean) {
+  const scale = useTransform(progress, [0, 0.15, 0.85, 1], reduceMotion ? [1, 1, 1, 1] : [0.94, 1, 1, 1.045]);
+  const blurPx = useTransform(progress, [0, 0.15, 0.85, 1], reduceMotion ? [0, 0, 0, 0] : [10, 0, 0, 7]);
+  const filter = useTransform(blurPx, (v: number) => `blur(${v}px)`);
+  return { scale, filter };
+}
+
+// Cross-fades a single fixed backdrop color through every scene's palette so
+// the space *behind* the pinned scenes morphs continuously instead of
+// jump-cutting (e.g. slate-950 → emerald-950 → background → slate-950 …).
+// Breakpoints are fractions of the combined scroll height of all 8 home
+// scenes (140+200+150+170+190+110+110+120 = 1180vh); short "blend zones"
+// are inserted right after a scene starts when it flips light/dark so
+// crossing the boundary feels like a wash rather than a cut.
+const BACKDROP_STOPS = [0, 0.1186, 0.2881, 0.3517, 0.4153, 0.4576, 0.5593, 0.5932, 0.7203, 0.7458, 0.8136, 0.8305, 1];
+const BACKDROP_COLORS = ["#fafafa", "#020617", "#022c22", "#064e3b", "#020617", "#fafafa", "#fafafa", "#020617", "#020617", "#1d3557", "#1d3557", "#020617", "#020617"];
+
+function GlobalSceneBackdrop({ progress, reduceMotion }: { progress: any; reduceMotion: boolean }) {
+  const backgroundColor = useTransform(progress, BACKDROP_STOPS, BACKDROP_COLORS);
+  if (reduceMotion) {
+    return <div className="fixed inset-0 -z-10 bg-background" aria-hidden="true" />;
+  }
+  return <motion.div className="fixed inset-0 -z-10" style={{ backgroundColor }} aria-hidden="true" />;
+}
+
 function useIsCompact() {
   const [compact, setCompact] = useState(false);
   useEffect(() => {
@@ -713,10 +744,11 @@ function ModulesScene({
   const progress = useSmoothProgress(rawProgress, reduceMotion);
   const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-58%"]);
   const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
+  const morph = useSceneMorph(progress, reduceMotion);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "200vh" }} className="relative bg-slate-950">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "200vh" }} className="relative">
+      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
         <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
             <ArrowRight className="w-3 h-3" /> Platform tour — scroll right
@@ -748,7 +780,7 @@ function ModulesScene({
           </div>
         </motion.div>
         <SceneVignette progress={progress} />
-      </div>
+      </motion.div>
     </section>
   );
 }
@@ -765,10 +797,11 @@ function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceM
   const glow = useTransform(progress, [0, 0.5, 1], [0.25, 0.6, 0.25]);
   const contentOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
   const compact = useIsCompact();
+  const morph = useSceneMorph(progress, reduceMotion);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative">
+      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
         {!reduceMotion && <ParticleField count={compact ? 8 : 16} color="rgba(120,255,180,0.55)" />}
         <motion.div style={{ opacity: contentOpacity }} className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
           <div>
@@ -789,31 +822,21 @@ function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceM
               <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">See pricing <ArrowRight className="w-4 h-4" /></Button>
             </button>
           </div>
-          <motion.div style={{ y: phoneY }} className="relative mx-auto w-[240px] sm:w-[280px]">
+          <motion.div style={{ y: phoneY }} className="relative mx-auto w-[200px] sm:w-[240px]">
             <motion.div
               className="absolute -inset-10 rounded-full bg-emerald-400 blur-3xl"
               style={{ opacity: glow }}
             />
-            <div className="relative rounded-[2rem] border-4 border-white/15 bg-slate-900 p-4 shadow-2xl">
-              <div className="rounded-2xl bg-emerald-600/20 border border-emerald-400/30 p-4">
-                <div className="flex items-center gap-2 text-emerald-300 text-xs font-medium mb-3">
-                  <Wallet className="w-4 h-4" /> M-Pesa Payment
-                </div>
-                <div className="text-white text-2xl font-bold">KES 24,500</div>
-                <div className="text-white/60 text-xs mt-1">Term 2 · Fee balance</div>
-                <div className="mt-4 rounded-lg bg-emerald-500/90 text-slate-950 text-xs font-semibold text-center py-2">
-                  STK Push sent — enter M-Pesa PIN
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-white/50 text-[10px]">
-                <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Receipt auto-generated</span>
-                <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> Synced</span>
-              </div>
-            </div>
+            <img
+              src="/images/mpesa-payment-screenshot.svg"
+              alt="Phone screen showing an M-Pesa STK push prompt to pay a KES 24,500 school fee balance"
+              loading="lazy"
+              className="relative w-full h-auto drop-shadow-2xl"
+            />
           </motion.div>
         </motion.div>
         <SceneVignette progress={progress} />
-      </div>
+      </motion.div>
     </section>
   );
 }
@@ -834,6 +857,7 @@ function CampusScene({
   const y2 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : 90]);
   const y3 = useTransform(progress, [0, 1], [0, reduceMotion ? 0 : -60]);
   const titleOpacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
+  const morph = useSceneMorph(progress, reduceMotion);
 
   const columns = [
     { photos: photos.filter((_, i) => i % 3 === 0), y: y1 },
@@ -842,8 +866,8 @@ function CampusScene({
   ];
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "170vh" }} className="relative bg-background">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col items-center justify-center py-8 sm:py-10`}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "170vh" }} className="relative">
+      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col items-center justify-center py-8 sm:py-10`}>
         <motion.h2 style={{ opacity: titleOpacity }} className="font-serif text-2xl sm:text-3xl font-semibold text-center mb-6 sm:mb-8 px-6">
           Built for schools like yours
         </motion.h2>
@@ -863,7 +887,7 @@ function CampusScene({
             </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }
@@ -876,6 +900,7 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
   const progress = useSmoothProgress(rawProgress, reduceMotion);
   const trackX = useTransform(progress, [0, 1], ["0%", reduceMotion ? "0%" : "-52%"]);
   const introOpacity = useTransform(progress, [0, 0.12, 0.92, 1], [0, 1, 1, 0]);
+  const morph = useSceneMorph(progress, reduceMotion);
 
   const portals = [
     { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/30 to-transparent" },
@@ -885,8 +910,8 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
   ];
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "190vh" }} className="relative bg-slate-950">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "190vh" }} className="relative">
+      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex flex-col justify-center`}>
         <motion.div style={{ opacity: introOpacity }} className="container mx-auto px-6 mb-6 sm:mb-8 text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
             <ArrowRight className="w-3 h-3" /> A view for everyone
@@ -907,7 +932,7 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
           ))}
         </motion.div>
         <SceneVignette progress={progress} />
-      </div>
+      </motion.div>
     </section>
   );
 }
@@ -930,7 +955,7 @@ function MissionScene({
   const opacity = useTransform(progress, [0, 0.15, 0.85, 1], [0, 1, 1, 0]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative bg-gradient-to-br from-primary via-primary to-primary/80">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         <motion.div style={{ opacity, scale }} className="container mx-auto px-6 text-center text-primary-foreground will-change-transform">
           <Target className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-4 opacity-80" />
@@ -955,6 +980,7 @@ function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
   const progress = useSmoothProgress(rawProgress, reduceMotion);
   const opacity = useTransform(progress, [0, 0.2, 0.85, 1], [0, 1, 1, 0]);
   const compact = useIsCompact();
+  const morph = useSceneMorph(progress, reduceMotion);
 
   const stats = [
     { icon: GraduationCap, value: 300, suffix: "+", label: "Schools onboarded" },
@@ -964,8 +990,8 @@ function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
   ];
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative bg-slate-950">
-      <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative">
+      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         {!reduceMotion && <ParticleField count={compact ? 6 : 14} color="rgba(255,255,255,0.35)" />}
         <motion.div style={{ opacity }} className="container mx-auto px-6 text-center text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-3">Trusted across Kenya & East Africa</div>
@@ -982,7 +1008,7 @@ function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
           </div>
         </motion.div>
         <SceneVignette progress={progress} />
-      </div>
+      </motion.div>
     </section>
   );
 }
@@ -1005,7 +1031,7 @@ function FinalScene({
   const y = useTransform(progress, [0, 0.25], [reduceMotion ? 0 : 50, 0]);
 
   return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "120vh" }} className="relative bg-slate-950">
+    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "120vh" }} className="relative">
       <div className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
         <motion.div style={{ opacity, y }} className="container mx-auto px-6 text-center text-white">
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold">{site.brand_name} pricing made simple</h2>
@@ -1035,6 +1061,9 @@ function FinalScene({
 function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_DEFAULTS }) {
   const reduceMotion = useReducedMotionPref();
   useLenisSmoothScroll(!reduceMotion);
+  const scenesRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: rawPageProgress } = useScroll({ target: scenesRef, offset: ["start start", "end end"] });
+  const pageProgress = useSmoothProgress(rawPageProgress, reduceMotion);
 
   const hero = useLandingContent("hero", {
     badge: "Cloud school ERP for Kenya & East Africa",
@@ -1058,7 +1087,8 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
   ];
 
   return (
-    <div className="relative bg-background">
+    <div ref={scenesRef} className="relative">
+      <GlobalSceneBackdrop progress={pageProgress} reduceMotion={reduceMotion} />
       <HeroScene goTo={goTo} hero={hero} heroPhotos={heroPhotos} reduceMotion={reduceMotion} />
       <ModulesScene goTo={goTo} categories={moduleCategories} reduceMotion={reduceMotion} />
       <FinanceScene goTo={goTo} reduceMotion={reduceMotion} />
