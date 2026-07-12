@@ -68,7 +68,7 @@ const ADMIN_NAV: NavGroup[] = [
   ]},
   { label: "Administration", items: [
     // People & Access
-    { title: "Departments", url: "/admin/departments" },
+    { title: "Departments", url: "/department" },
     { title: "Users & Credentials", url: "/admin/users" },
     { title: "User Roles", url: "/admin/roles" },
     { title: "Field Permissions", url: "/admin/permissions" },
@@ -174,10 +174,11 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   ],
   hod: [
     { group: "Department", items: [
-      { title: "My Department", url: "/admin/departments" },
+      { title: "My Department", url: "/department" },
       { title: "Subjects", url: "/academics/subjects" },
       { title: "Staff", url: "/staff" },
-      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Marks & Remarks", url: "/academics/entry" },
+      { title: "Results Log", url: "/academics/marks" },
       { title: "Assignments", url: "/assignments" },
       { title: "Results", url: "/academics/results" },
       { title: "Report Cards", url: "/academics/report-cards" },
@@ -190,7 +191,8 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   exams_admin: [
     { group: "Examinations", items: [
       { title: "Exams", url: "/academics/exams" },
-      { title: "Mark Entry", url: "/academics/marks" },
+      { title: "Marks & Remarks", url: "/academics/entry" },
+      { title: "Results Log", url: "/academics/marks" },
       { title: "Results", url: "/academics/results" },
       { title: "Report Cards", url: "/academics/report-cards" },
       { title: "Exam Oversight", url: "/academics/oversight" },
