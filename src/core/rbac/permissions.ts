@@ -238,6 +238,10 @@ export function moduleForPath(pathname: string): string | null {
   if (seg[0] === "academics" && seg[1]) {
     if (seg[1] === "exams") return "exams";
     if (seg[1] === "marks") return "marks";
+    // /academics/entry — unified score+grade+remark grid ("Marks & Remarks"
+    // in nav). Same audience as the old markbook, so it shares the "marks"
+    // permission set rather than duplicating the role list.
+    if (seg[1] === "entry") return "marks";
     if (seg[1] === "results") return "results";
     // /academics/report-card/$studentId/$examId — own report card detail.
     if (seg[1] === "report-card") return "report-card-view";
