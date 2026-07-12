@@ -1036,12 +1036,14 @@ function StoryPage() {
   });
   const milestonesData = useLandingContent("story_milestones", { items: STORY_MILESTONES });
   const milestoneItems: { year: string; title: string; desc: string }[] = milestonesData.items?.length ? milestonesData.items : STORY_MILESTONES;
-  const founder = useLandingContent("founder", {
+  const legacyFounder = useLandingContent("founder", {
     name: "Melton Konchella",
     role: "Founder & Developer",
     photo_url: null as string | null,
     bio: "Melton Konchella founded and personally built SmartDev ERP — designing, developing and maintaining every module of the platform, from the academic and finance systems to the Android and Windows apps.",
   });
+  const foundersData = useLandingContent("founders", { items: [] as { name: string; role: string; photo_url: string | null; bio: string }[] });
+  const founders = foundersData.items?.length ? foundersData.items : [legacyFounder];
   const storyHeroPhotos = useGalleryPhotos("story_hero", [{ src: intro.hero_image_url || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=450&fit=crop" }]);
 
   return (
@@ -1130,22 +1132,26 @@ function StoryPage() {
           </div>
         </div>
 
-        {/* Founder */}
+        {/* Founder(s) */}
         <div className="mb-16">
-          <h2 className="text-2xl font-bold text-center mb-8">Meet the founder</h2>
-          <div className="max-w-md mx-auto rounded-xl border bg-card overflow-hidden">
-            <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
-              {founder.photo_url ? (
-                <img src={founder.photo_url} alt={founder.name} className="w-full h-full object-cover" />
-              ) : (
-                <GraduationCap className="w-16 h-16 text-muted-foreground/40" />
-              )}
-            </div>
-            <div className="p-5 text-center">
-              <div className="font-bold text-lg">{founder.name}</div>
-              <div className="text-sm text-primary mb-2">{founder.role}</div>
-              <p className="text-sm text-muted-foreground">{founder.bio}</p>
-            </div>
+          <h2 className="text-2xl font-bold text-center mb-8">{founders.length > 1 ? "Meet the team" : "Meet the founder"}</h2>
+          <div className={`grid gap-6 mx-auto ${founders.length > 1 ? "sm:grid-cols-2 md:grid-cols-3 max-w-4xl" : "max-w-md"}`}>
+            {founders.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="rounded-xl border bg-card overflow-hidden">
+                <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                  {f.photo_url ? (
+                    <img src={f.photo_url} alt={f.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <GraduationCap className="w-16 h-16 text-muted-foreground/40" />
+                  )}
+                </div>
+                <div className="p-5 text-center">
+                  <div className="font-bold text-lg">{f.name}</div>
+                  <div className="text-sm text-primary mb-2">{f.role}</div>
+                  <p className="text-sm text-muted-foreground">{f.bio}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
