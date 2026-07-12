@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Loader2, Download, FileText, UserCheck, Eye } from "lucide-react";
+import { Plus, Search, Loader2, Download, FileText, UserCheck, Eye, GraduationCap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrackedDelete } from "@/hooks/useTrackedDelete";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
@@ -64,6 +64,11 @@ function StudentsPage() {
       let req = supabase
         .from("students")
         .select("id, admission_no, unique_id, first_name, last_name, gender, class_id, status, lifecycle_status, lifecycle_reason, transferred_to, admitted_on, parent_phone, classes(name)", { count: "exact" })
+        // Alumni (graduated / expelled / transferred / archived) live on
+        // the separate Alumni page — this list is currently-enrolled
+        // students only. Suspended students are still enrolled (just
+        // paused), so they stay here.
+        .in("lifecycle_status", ["active", "suspended"])
         .order("admission_no", { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
       const t = q.trim();
@@ -147,6 +152,9 @@ function StudentsPage() {
           <p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} total enrolled</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/alumni"><GraduationCap className="w-4 h-4 mr-2" />Alumni</Link>
+          </Button>
           <Button variant="outline" onClick={exportCsv}><Download className="w-4 h-4 mr-2" />Export</Button>
           {canEdit && (
             <Dialog open={open} onOpenChange={setOpen}>
@@ -158,6 +166,11 @@ function StudentsPage() {
           )}
         </div>
       </div>
+
+      <p className="text-xs text-muted-foreground -mt-4">
+        Showing currently-enrolled students only. Graduated, expelled, transferred, and archived students have moved to{" "}
+        <Link to="/alumni" className="underline underline-offset-2">Alumni</Link>.
+      </p>
 
       {isAdmissionOfficer ? (
         <Tabs defaultValue="all">
