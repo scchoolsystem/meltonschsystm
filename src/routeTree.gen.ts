@@ -92,7 +92,6 @@ import { Route as AppAdminIctRouteImport } from './routes/_app.admin.ict'
 import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminFeaturesRouteImport } from './routes/_app.admin.features'
-import { Route as AppAdminDepartmentsRouteImport } from './routes/_app.admin.departments'
 import { Route as AppAdminComplianceRouteImport } from './routes/_app.admin.compliance'
 import { Route as AppAdminCommunicationsRouteImport } from './routes/_app.admin.communications'
 import { Route as AppAdminClassStructureRouteImport } from './routes/_app.admin.class-structure'
@@ -536,11 +535,6 @@ const AppAdminFeaturesRoute = AppAdminFeaturesRouteImport.update({
   path: '/admin/features',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
-  id: '/admin/departments',
-  path: '/admin/departments',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAdminComplianceRoute = AppAdminComplianceRouteImport.update({
   id: '/admin/compliance',
   path: '/admin/compliance',
@@ -717,7 +711,6 @@ export interface FileRoutesByFullPath {
   '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
   '/admin/compliance': typeof AppAdminComplianceRoute
-  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -825,7 +818,6 @@ export interface FileRoutesByTo {
   '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
   '/admin/compliance': typeof AppAdminComplianceRoute
-  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -935,7 +927,6 @@ export interface FileRoutesById {
   '/_app/admin/class-structure': typeof AppAdminClassStructureRoute
   '/_app/admin/communications': typeof AppAdminCommunicationsRoute
   '/_app/admin/compliance': typeof AppAdminComplianceRoute
-  '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/features': typeof AppAdminFeaturesRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/grading': typeof AppAdminGradingRoute
@@ -1045,7 +1036,6 @@ export interface FileRouteTypes {
     | '/admin/class-structure'
     | '/admin/communications'
     | '/admin/compliance'
-    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -1153,7 +1143,6 @@ export interface FileRouteTypes {
     | '/admin/class-structure'
     | '/admin/communications'
     | '/admin/compliance'
-    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -1262,7 +1251,6 @@ export interface FileRouteTypes {
     | '/_app/admin/class-structure'
     | '/_app/admin/communications'
     | '/_app/admin/compliance'
-    | '/_app/admin/departments'
     | '/_app/admin/features'
     | '/_app/admin/field-edits'
     | '/_app/admin/grading'
@@ -1921,13 +1909,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminFeaturesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/admin/departments': {
-      id: '/_app/admin/departments'
-      path: '/admin/departments'
-      fullPath: '/admin/departments'
-      preLoaderRoute: typeof AppAdminDepartmentsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/admin/compliance': {
       id: '/_app/admin/compliance'
       path: '/admin/compliance'
@@ -2163,7 +2144,6 @@ interface AppRouteChildren {
   AppAdminClassStructureRoute: typeof AppAdminClassStructureRoute
   AppAdminCommunicationsRoute: typeof AppAdminCommunicationsRoute
   AppAdminComplianceRoute: typeof AppAdminComplianceRoute
-  AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminFeaturesRoute: typeof AppAdminFeaturesRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminGradingRoute: typeof AppAdminGradingRoute
@@ -2244,7 +2224,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminClassStructureRoute: AppAdminClassStructureRoute,
   AppAdminCommunicationsRoute: AppAdminCommunicationsRoute,
   AppAdminComplianceRoute: AppAdminComplianceRoute,
-  AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminFeaturesRoute: AppAdminFeaturesRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminGradingRoute: AppAdminGradingRoute,
