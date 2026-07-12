@@ -32,7 +32,7 @@ export const issueLeavingCertificate = createServerFn({ method: "POST" })
     if (!schoolId) throw new Error("No school context for this user");
     const { data: stu } = await supabase
       .from("students")
-      .select("id")
+      .select("id, class_id, classes(name)")
       .eq("id", data.student_id)
       .eq("school_id", schoolId)
       .maybeSingle();
@@ -63,7 +63,10 @@ export const issueLeavingCertificate = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    // Mark student lifecycle if appropriate
+    // Mark student lifecycle if appropriate. Also clear class_id (freeing
+    // their seat and preventing overlap with next year's cohort in the
+    // same-named class) — snapshot the class name first since it's about
+    // to be nulled, so the Alumni page can still display where they left from.
     if (data.reason === "completion" || data.reason === "transfer") {
       await supabase
         .from("students")
@@ -72,6 +75,8 @@ export const issueLeavingCertificate = createServerFn({ method: "POST" })
           lifecycle_reason: `Leaving certificate ${serial}`,
           lifecycle_changed_by: userId,
           lifecycle_changed_at: new Date().toISOString(),
+          class_id: null,
+          last_class_name: (stu as any).classes?.name ?? null,
         })
         .eq("id", data.student_id);
     }
