@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import {
   Loader2, Search, ClipboardList, LayoutDashboard, FileText,
-  GraduationCap, ChevronRight,
+  GraduationCap, ChevronRight, Printer,
 } from "lucide-react";
 
 // ─── Route ──────────────────────────────────────────────────────────────────
@@ -199,6 +199,25 @@ function ReportCardsPicker() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk print — appears once a class + exam are both picked */}
+      {classId && examId && (
+        <Card className="animate-in fade-in slide-in-from-bottom-1 duration-300 delay-100 border-primary/20 bg-primary/5">
+          <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-sm">Bulk print this class</p>
+              <p className="text-xs text-muted-foreground">
+                Print every student's report card for the selected exam in one A4 PDF.
+              </p>
+            </div>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/academics/report-cards/bulk" search={{ classId, examId }}>
+                <Printer className="w-3.5 h-3.5" /> Bulk Print Class
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Student list */}
       {!classId ? (
