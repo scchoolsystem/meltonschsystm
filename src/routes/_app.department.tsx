@@ -67,6 +67,7 @@ import {
   upsertDepartmentMember,
   removeDepartmentMember,
   createDepartment,
+  deleteDepartment,
   type Department,
   type DepartmentMember,
   type DeptRole,
@@ -259,6 +260,44 @@ function NewDepartmentDialog({
   );
 }
 
+function DeleteDepartmentDialog({
+  open, onOpenChange, department, onConfirm, pending,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  department: Department | null;
+  onConfirm: () => void;
+  pending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <Trash2 className="w-4 h-4" /> Delete Department
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2 text-sm">
+          <p>
+            Are you sure you want to permanently delete{" "}
+            <span className="font-semibold">{department?.name ?? "this department"}</span>?
+          </p>
+          <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            This will remove its sub-departments, members, and announcements, and
+            unassign any staff currently linked to it. This cannot be undone.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={pending}>
+            {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Department"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Role badge helper ──────────────────────────────────────────────────────────
 
 function RoleBadgeIndicator({ isAdminTier, isHOD }: { isAdminTier: boolean; isHOD: boolean }) {
@@ -317,6 +356,19 @@ function Page() {
       setNewDeptKind("academics");
     },
     onError: (e: any) => toast.error(e.message ?? "Failed to create department"),
+  });
+
+  // Delete department (admin tier only)
+  const [deleteDeptOpen, setDeleteDeptOpen] = useState(false);
+  const deleteDeptMutation = useMutation({
+    mutationFn: (departmentId: string) => deleteDepartment(departmentId),
+    onSuccess: () => {
+      toast.success("Department deleted");
+      qc.invalidateQueries({ queryKey: ["my-departments"] });
+      setSelectedDeptId(null);
+      setDeleteDeptOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to delete department"),
   });
 
   // ── My departments (scoped by role) ─────────────────────────────────────────
@@ -664,6 +716,16 @@ function Page() {
                 <Settings className="w-3 h-3" /> Manage Members
               </Button>
             )}
+            {isAdminTier && activeDept && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                onClick={() => setDeleteDeptOpen(true)}
+              >
+                <Trash2 className="w-3 h-3" /> Delete Department
+              </Button>
+            )}
           </div>
         </div>
 
@@ -698,6 +760,13 @@ function Page() {
         kind={newDeptKind} setKind={setNewDeptKind}
         onSubmit={() => createDeptMutation.mutate()}
         pending={createDeptMutation.isPending}
+      />
+
+      <DeleteDepartmentDialog
+        open={deleteDeptOpen} onOpenChange={setDeleteDeptOpen}
+        department={activeDept}
+        onConfirm={() => activeDeptId && deleteDeptMutation.mutate(activeDeptId)}
+        pending={deleteDeptMutation.isPending}
       />
 
       {/* Sub-departments strip */}
