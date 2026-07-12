@@ -210,21 +210,90 @@ function Page() {
 
             {/* School header */}
             <div className="text-center pb-5 mb-6" style={{ borderBottom: `1px solid ${accentLine}` }}>
-              {school?.logo_url ? (
-                <img
-                  src={school.logo_url}
-                  alt="School logo"
-                  className="h-20 w-20 mx-auto mb-3 object-contain rounded-full ring-4 print:h-16 print:w-16"
-                  style={{ boxShadow: `0 0 0 4px ${accentSoft}`, ["--tw-ring-color" as any]: accentSoft }}
-                />
-              ) : (
+              {/* Crest: logo medallion with laurel flanks and a foil ring */}
+              <div className="relative inline-block mx-auto mb-4 print:mb-3">
+                {/* soft glow behind the crest */}
                 <div
-                  className="h-20 w-20 mx-auto mb-3 rounded-full grid place-items-center print:h-16 print:w-16"
-                  style={{ backgroundColor: accentSoft, color: accent }}
+                  className="pointer-events-none absolute inset-0 rounded-full print:hidden"
+                  style={{ boxShadow: `0 0 0 10px ${accentSofter}, 0 0 30px 6px ${accentSoft}` }}
+                />
+
+                {/* laurel flanking the crest */}
+                <svg
+                  viewBox="0 0 220 140"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[140px] print:w-[190px] print:h-[120px] pointer-events-none"
+                  aria-hidden="true"
                 >
-                  <ShieldCheck className="w-9 h-9" />
+                  {[-1, 1].map((side) => (
+                    <g key={side} transform={side === 1 ? "translate(220,0) scale(-1,1)" : undefined}>
+                      {Array.from({ length: 6 }).map((_, i) => {
+                        const t = i / 5;
+                        const x = 6 + t * 40;
+                        const y = 70 - Math.sin(t * Math.PI) * 46;
+                        return (
+                          <ellipse
+                            key={i}
+                            cx={x}
+                            cy={y}
+                            rx="7"
+                            ry="3.2"
+                            fill={accent}
+                            opacity={0.35 + t * 0.35}
+                            transform={`rotate(${-40 + t * 70} ${x} ${y})`}
+                          />
+                        );
+                      })}
+                      <path
+                        d="M6 70 Q28 30 60 14"
+                        fill="none"
+                        stroke={accent}
+                        strokeWidth="1.5"
+                        opacity="0.4"
+                      />
+                    </g>
+                  ))}
+                </svg>
+
+                {/* the medallion itself */}
+                <div
+                  className="relative h-28 w-28 print:h-20 print:w-20 rounded-full grid place-items-center"
+                  style={{
+                    background: `linear-gradient(145deg, ${accent}, ${hexToRgba(accent, 0.65)})`,
+                    padding: 3,
+                    boxShadow: `0 6px 16px ${hexToRgba(accent, 0.35)}`,
+                  }}
+                >
+                  <div
+                    className="h-full w-full rounded-full grid place-items-center bg-white"
+                    style={{ boxShadow: `inset 0 0 0 1.5px #D4AF37` }}
+                  >
+                    <div className="h-[82%] w-[82%] rounded-full grid place-items-center overflow-hidden bg-white">
+                      {school?.logo_url ? (
+                        <img
+                          src={school.logo_url}
+                          alt="School logo"
+                          className="h-full w-full object-contain p-1"
+                        />
+                      ) : (
+                        <ShieldCheck className="w-9 h-9" style={{ color: accent }} />
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* certified badge, overlapping bottom-right of the medallion */}
+                <div
+                  className="absolute bottom-0 right-0 w-7 h-7 rounded-full grid place-items-center print:w-6 print:h-6"
+                  style={{
+                    backgroundColor: "#D4AF37",
+                    border: "2px solid white",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+
               <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: accent }}>
                 {school?.name ?? "School"}
               </h1>
