@@ -1,0 +1,90 @@
+<svg viewBox="0 0 320 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mpesaTitle">
+  <title id="mpesaTitle">Phone screen showing an M-Pesa STK push fee payment prompt</title>
+  <defs>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b2430"/>
+      <stop offset="100%" stop-color="#0a0f16"/>
+    </linearGradient>
+    <linearGradient id="screenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1f18"/>
+      <stop offset="45%" stop-color="#0a1712"/>
+      <stop offset="100%" stop-color="#07110d"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#123a2c"/>
+      <stop offset="100%" stop-color="#0d2b21"/>
+    </linearGradient>
+    <linearGradient id="btnGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <clipPath id="screenClip">
+      <rect x="16" y="16" width="288" height="608" rx="34"/>
+    </clipPath>
+  </defs>
+
+  <!-- Phone body -->
+  <rect x="0" y="0" width="320" height="640" rx="46" fill="url(#bodyGrad)" filter="url(#softShadow)"/>
+  <rect x="6" y="6" width="308" height="628" rx="40" fill="#000"/>
+
+  <!-- Screen -->
+  <g clip-path="url(#screenClip)">
+    <rect x="16" y="16" width="288" height="608" fill="url(#screenGrad)"/>
+
+    <!-- Status bar -->
+    <text x="34" y="46" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#ffffff" font-weight="600">9:41</text>
+    <g fill="#ffffff">
+      <rect x="240" y="35" width="3" height="8" rx="1"/>
+      <rect x="246" y="32" width="3" height="11" rx="1"/>
+      <rect x="252" y="29" width="3" height="14" rx="1"/>
+      <rect x="258" y="26" width="3" height="17" rx="1"/>
+      <path d="M272 30 a9 9 0 0 1 12 0 l-2 2 a6 6 0 0 0 -8 0 z" opacity="0.95"/>
+      <rect x="288" y="30" width="20" height="10" rx="3" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+      <rect x="290" y="32" width="14" height="6" rx="1.5" fill="#22c55e"/>
+    </g>
+
+    <!-- App header -->
+    <g transform="translate(34,72)">
+      <circle cx="11" cy="11" r="11" fill="#16a34a"/>
+      <text x="30" y="16" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#e6fbf1" font-weight="700">M-PESA</text>
+      <text x="200" y="16" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#9ae6b4" text-anchor="end">Safaricom</text>
+    </g>
+
+    <!-- Payment card -->
+    <g transform="translate(34,120)">
+      <rect x="0" y="0" width="252" height="240" rx="20" fill="url(#cardGrad)" stroke="#1f5a42" stroke-width="1"/>
+      <text x="20" y="34" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7fe0ab" letter-spacing="1.5">CONFIRM PAYMENT</text>
+
+      <text x="20" y="76" font-family="Helvetica, Arial, sans-serif" font-size="30" fill="#ffffff" font-weight="700">KES 24,500</text>
+      <text x="20" y="98" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#a7d9c4">Term 2 &#183; Fee balance</text>
+
+      <line x1="20" y1="116" x2="232" y2="116" stroke="#1f5a42" stroke-width="1"/>
+
+      <text x="20" y="140" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7fbf9f">Account</text>
+      <text x="232" y="140" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#e6fbf1" text-anchor="end">GREENFIELD ACAD.</text>
+
+      <text x="20" y="162" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#7fbf9f">Reference</text>
+      <text x="232" y="162" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#e6fbf1" text-anchor="end">ADM-2291</text>
+
+      <rect x="20" y="182" width="212" height="42" rx="10" fill="#16a34a"/>
+      <text x="126" y="208" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#04150c" font-weight="700" text-anchor="middle">Enter M-PESA PIN to pay</text>
+    </g>
+
+    <!-- Receipt / synced chips -->
+    <g transform="translate(34,378)" font-family="Helvetica, Arial, sans-serif" font-size="10.5" fill="#8fd8b3">
+      <circle cx="4" cy="-3" r="3" fill="#22c55e"/>
+      <text x="12" y="0">Receipt auto-generated</text>
+      <circle cx="190" cy="-3" r="3" fill="#22c55e"/>
+      <text x="198" y="0">Synced</text>
+    </g>
+
+    <!-- Home indicator -->
+    <rect x="120" y="600" width="80" height="5" rx="2.5" fill="#3a4b44"/>
+  </g>
+
+  <!-- Bezel highlight -->
+  <rect x="16" y="16" width="288" height="608" rx="34" fill="none" stroke="#2a3a33" stroke-width="2"/>
+</svg>
