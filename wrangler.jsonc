@@ -5,7 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
   "assets": {
-    "run_worker_first": ["/*", "!/assets/*", "!/legal.html"],
+    "run_worker_first": ["/*", "!/assets/*", "!/images/*", "!/legal.html"],
     "html_handling": "none"
   },
   "routes": [
