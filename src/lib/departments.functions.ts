@@ -57,6 +57,20 @@ export async function getDepartments(): Promise<Department[]> {
   return data ?? [];
 }
 
+/** Create a new department. school_id defaults server-side via current_user_school(). */
+export async function createDepartment(
+  name: string,
+  kind: "academics" | "administration" | "co_curricular" | "support"
+): Promise<Department> {
+  const { data, error } = await supabase
+    .from("departments")
+    .insert({ name: name.trim(), kind })
+    .select("*, sub_departments(id, name, department_id)")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 /**
  * Departments scoped to the current user:
  *  - Admin/owner tier → all departments (passed in via `isAdminTier` flag)
