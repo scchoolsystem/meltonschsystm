@@ -548,7 +548,7 @@ function useSceneMorph(progress: any, reduceMotion: boolean) {
 // inserted right after a scene starts when it flips light/dark so crossing
 // the boundary feels like a wash rather than a cut.
 const BACKDROP_STOPS = [0, 0.1296, 0.3148, 0.3843, 0.4537, 0.5, 0.6111, 0.6481, 0.787, 0.8148, 0.8889, 0.9074, 1];
-const BACKDROP_COLORS = ["#fafafa", "#020617", "#022c22", "#064e3b", "#020617", "#fafafa", "#fafafa", "#020617", "#020617", "#1d3557", "#1d3557", "#020617", "#020617"];
+const BACKDROP_COLORS = ["#fafafa", "#020617", "#0a2420", "#0d2b26", "#020617", "#fafafa", "#fafafa", "#020617", "#020617", "#111e33", "#111e33", "#020617", "#020617"];
 
 function GlobalSceneBackdrop({ progress, reduceMotion }: { progress: any; reduceMotion: boolean }) {
   const backgroundColor = useTransform(progress, BACKDROP_STOPS, BACKDROP_COLORS);
@@ -688,7 +688,7 @@ function HeroScene({
           ))}
         </motion.div>
         <motion.div className="absolute inset-0 bg-black" style={{ opacity: overlayOpacity }} />
-        {!reduceMotion && <ParticleField count={compact ? 12 : 26} color="rgba(255,255,255,0.45)" />}
+        {!reduceMotion && <ParticleField count={compact ? 6 : 14} color="rgba(255,255,255,0.3)" />}
         <motion.div
           style={{ opacity: contentOpacity, y: contentY }}
           className="relative container mx-auto px-6 py-10 sm:py-20 text-center text-white"
@@ -802,7 +802,7 @@ function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceM
   return (
     <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "150vh" }} className="relative">
       <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center`}>
-        {!reduceMotion && <ParticleField count={compact ? 8 : 16} color="rgba(120,255,180,0.55)" />}
+        {!reduceMotion && <ParticleField count={compact ? 4 : 10} color="rgba(120,255,180,0.35)" />}
         <motion.div style={{ opacity: contentOpacity }} className="container mx-auto px-6 grid md:grid-cols-2 gap-10 items-center text-white">
           <div>
             <div className="text-xs uppercase tracking-widest text-emerald-300 mb-2 flex items-center gap-2">
@@ -926,12 +926,6 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">One platform, four tailored experiences</h2>
         </motion.div>
         <motion.div style={{ x: trackX }} className="relative flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
-          {!reduceMotion && (
-            <>
-              <div className="pointer-events-none absolute -top-16 left-1/3 w-72 h-72 rounded-full bg-purple-500/20 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
-              <div className="pointer-events-none absolute -bottom-20 right-1/4 w-80 h-80 rounded-full bg-teal-400/15 blur-3xl animate-pulse" style={{ animationDuration: "8s" }} />
-            </>
-          )}
           {portals.map((p, i) => (
             <div
               key={p.title}
