@@ -759,7 +759,7 @@ function ModulesScene({
         <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
           {categories.map((c) => (
             <div key={c.title} className="relative shrink-0 w-[78vw] sm:w-[420px] h-[300px] sm:h-[360px] rounded-2xl overflow-hidden">
-              {c.img && <img src={c.img} alt={c.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />}
+              {c.img && <img src={c.img} alt={c.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover object-top" />}
               <div className={`absolute inset-0 bg-gradient-to-t ${c.gradient}`} />
               <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
                 <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-3 sm:mb-4">
@@ -822,17 +822,24 @@ function FinanceScene({ goTo, reduceMotion }: { goTo: (p: Page) => void; reduceM
               <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">See pricing <ArrowRight className="w-4 h-4" /></Button>
             </button>
           </div>
-          <motion.div style={{ y: phoneY }} className="relative mx-auto w-[200px] sm:w-[240px]">
+          <motion.div style={{ y: phoneY }} className="relative mx-auto w-full max-w-md">
             <motion.div
               className="absolute -inset-10 rounded-full bg-emerald-400 blur-3xl"
               style={{ opacity: glow }}
             />
-            <img
-              src="/images/mpesa-payment-screenshot.svg"
-              alt="Phone screen showing an M-Pesa STK push prompt to pay a KES 24,500 school fee balance"
-              loading="lazy"
-              className="relative w-full h-auto drop-shadow-2xl"
-            />
+            <div className="relative rounded-2xl border border-white/15 bg-slate-900 shadow-2xl overflow-hidden">
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 border-b border-white/10">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+              </div>
+              <img
+                src="/images/portals/mpesa.png"
+                alt="SmartDev ERP M-Pesa dashboard showing today's collections, transaction status, and recent M-Pesa payments"
+                loading="lazy"
+                className="relative w-full h-auto"
+              />
+            </div>
           </motion.div>
         </motion.div>
         <SceneVignette progress={progress} />
@@ -903,10 +910,10 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
   const morph = useSceneMorph(progress, reduceMotion);
 
   const portals = [
-    { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/30 to-transparent" },
-    { icon: GraduationCap, title: "Student Portal", desc: "Timetables, exam results, assignments and class resources.", gradient: "from-blue-950/95 via-blue-950/30 to-transparent" },
-    { icon: Users, title: "Staff Portal", desc: "Marks entry, attendance registers, timetables and departmental tools.", gradient: "from-teal-950/95 via-teal-950/30 to-transparent" },
-    { icon: ShieldCheck, title: "Admin Dashboard", desc: "Real-time enrollment, finance and attendance intelligence across the school.", gradient: "from-gray-950/95 via-gray-950/30 to-transparent" },
+    { icon: Globe, title: "Parent Portal", desc: "Fee balances, results, attendance and direct messaging with teachers.", gradient: "from-purple-950/95 via-purple-950/50 to-purple-950/10", img: "/images/portals/parent.png" },
+    { icon: GraduationCap, title: "Student Portal", desc: "Timetables, exam results, assignments and class resources.", gradient: "from-blue-950/95 via-blue-950/50 to-blue-950/10", img: "/images/portals/student.png" },
+    { icon: Users, title: "Staff Portal", desc: "Marks entry, attendance registers, timetables and departmental tools.", gradient: "from-teal-950/95 via-teal-950/50 to-teal-950/10", img: "/images/portals/teacher.png" },
+    { icon: ShieldCheck, title: "Admin Dashboard", desc: "Real-time enrollment, finance and attendance intelligence across the school.", gradient: "from-gray-950/95 via-gray-950/50 to-gray-950/10", img: "/images/portals/finance.png" },
   ];
 
   return (
@@ -928,8 +935,15 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
           {portals.map((p, i) => (
             <div
               key={p.title}
-              className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden bg-gradient-to-t ${p.gradient} border border-white/10 backdrop-blur-sm ${!reduceMotion ? (i % 2 === 1 ? "sm:-translate-y-6" : "sm:translate-y-6") : ""}`}
+              className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden border border-white/10 ${!reduceMotion ? (i % 2 === 1 ? "sm:-translate-y-6" : "sm:translate-y-6") : ""}`}
             >
+              <img
+                src={p.img}
+                alt={`${p.title} in SmartDev ERP`}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover object-top"
+              />
+              <div className={`absolute inset-0 bg-gradient-to-t ${p.gradient}`} />
               <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
                 <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
                   <p.icon className="w-5 h-5" />
@@ -1065,7 +1079,7 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
 
   const moduleCategories = [
     { icon: GraduationCap, title: "Academics", desc: "Classes, exams, report cards & timetables", gradient: "from-blue-950/95 via-blue-950/30 to-transparent", img: heroPhotos[0]?.src },
-    { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", gradient: "from-emerald-950/95 via-emerald-950/30 to-transparent", img: galleryPhotos[1]?.src ?? heroPhotos[1]?.src },
+    { icon: CreditCard, title: "Finance", desc: "Fees, M-Pesa, invoices & receipts", gradient: "from-emerald-950/95 via-emerald-950/40 to-emerald-950/10", img: "/images/portals/finance.png" },
     { icon: Shield, title: "Boarding & Welfare", desc: "Dorms, clinic, kitchen & transport", gradient: "from-orange-950/95 via-orange-950/30 to-transparent", img: galleryPhotos[5]?.src ?? heroPhotos[2]?.src },
     { icon: Globe, title: "Portals", desc: "Parents, students & staff get their own view", gradient: "from-purple-950/95 via-purple-950/30 to-transparent", img: galleryPhotos[2]?.src ?? heroPhotos[0]?.src },
   ];
