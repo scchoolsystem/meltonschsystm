@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { fadeUp, stagger } from "@/components/motion-variants";
 import { AnimatedNumber } from "@/components/portal-shared";
@@ -109,6 +110,7 @@ function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
   const can = isAdmin || hasRole("academic_master") || hasRole("exams_admin");
+  const { isTeacherScoped, allSubjectIds } = useTeacherScope();
 
   const [view, setView]           = useState<"cards" | "table">("cards");
   const [search, setSearch]       = useState("");
@@ -130,9 +132,12 @@ function Page() {
   // ── Queries ────────────────────────────────────────────────────────────────
 
   const { data: subjects = [], isLoading } = useQuery({
-    queryKey: ["subjects"],
+    queryKey: ["subjects", isTeacherScoped, allSubjectIds.join(",")],
+    enabled: !isTeacherScoped || allSubjectIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("subjects").select("*").order("code");
+      let q = supabase.from("subjects").select("*").order("code");
+      if (isTeacherScoped) q = q.in("id", allSubjectIds);
+      const { data, error } = await q;
       if (error) throw error;
       return data as Subject[];
     },
@@ -247,9 +252,18 @@ function Page() {
   }, [subjects, search, levelFilter]);
 
   // KPIs
-  const totalTeacherLinks = Object.values(teacherMap).reduce((a, v) => a + v.length, 0);
-  const subjectsWithTeacher = Object.keys(teacherMap).filter((id) => teacherMap[id].length > 0).length;
-  const totalSlots = Object.values(slotMap).reduce((a, v) => a + v, 0);
+  // When teacher-scoped, `subjects` is already restricted to the teacher's own
+  // subjects — but teacherMap/slotMap are built from unfiltered school-wide
+  // queries, so KPIs must be re-restricted to this teacher's subject ids or
+  // they'll silently show whole-school totals inside "My Subjects".
+  const scopedSubjectIds = isTeacherScoped ? new Set(subjects.map((s) => s.id)) : null;
+  const inScope = (id: string) => !scopedSubjectIds || scopedSubjectIds.has(id);
+  const totalTeacherLinks = Object.entries(teacherMap)
+    .filter(([id]) => inScope(id)).reduce((a, [, v]) => a + v.length, 0);
+  const subjectsWithTeacher = Object.entries(teacherMap)
+    .filter(([id, v]) => inScope(id) && v.length > 0).length;
+  const totalSlots = Object.entries(slotMap)
+    .filter(([id]) => inScope(id)).reduce((a, [, v]) => a + v, 0);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -549,8 +563,12 @@ function Page() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Subjects</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{subjects.length} subjects defined</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{isTeacherScoped ? "My Subjects" : "Subjects"}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isTeacherScoped
+              ? `${subjects.length} subject${subjects.length === 1 ? "" : "s"} you teach`
+              : `${subjects.length} subjects defined`}
+          </p>
         </div>
         {can && (
           <Button onClick={() => setAddOpen(true)} className="gap-2 shrink-0">
@@ -616,7 +634,11 @@ function Page() {
           <CardContent className="py-16 text-center">
             <BookOpen className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
             <p className="text-sm text-muted-foreground">
-              {subjects.length === 0 ? "No subjects yet." : "No subjects match your search."}
+              {subjects.length === 0
+                ? (isTeacherScoped
+                    ? "You aren't assigned to any subject or timetable slot yet. Ask the academic master to add you."
+                    : "No subjects yet.")
+                : "No subjects match your search."}
             </p>
           </CardContent>
         </Card>
