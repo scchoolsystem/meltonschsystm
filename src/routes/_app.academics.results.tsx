@@ -316,6 +316,7 @@ function Page() {
 
   const [open, setOpen]       = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [bulkVerifyOpen, setBulkVerifyOpen] = useState(false);
   const [filterExam, setFilterExam]         = useState<string>("all");
   const [filterSubject, setFilterSubject]   = useState<string>("all");
   const [filterClass, setFilterClass]       = useState<string>("all");
@@ -428,6 +429,33 @@ function Page() {
   );
 
   const pendingCount = useMemo(() => filtered.length - verifiedCount, [filtered, verifiedCount]);
+
+  // IDs of currently-filtered results that are still unverified — this is
+  // what "Verify All" acts on, so scoping by Subject (or Exam/Class) in the
+  // filter bar makes the bulk action per-subject automatically.
+  const pendingFilteredIds = useMemo(
+    () => filtered.filter((r: any) => !r.verified).map((r: any) => r.id as string),
+    [filtered]
+  );
+
+  const bulkVerifyMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Chunk to stay well under any statement/URL size limits on large batches.
+      const CHUNK = 200;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const { error } = await supabase.from("exam_results").update({ verified: true }).in("id", slice);
+        if (error) throw error;
+      }
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["exam_results"] });
+      toast.success(`${count} result${count === 1 ? "" : "s"} verified`);
+      setBulkVerifyOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Bulk verification failed"),
+  });
 
   const schoolMeanGrade = useMemo(() => {
     if (!filtered.length) return "—";
@@ -708,6 +736,16 @@ function Page() {
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={exportCsv}>
             <Download className="w-3.5 h-3.5" /> Export CSV
           </Button>
+          {can && pendingFilteredIds.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+              onClick={() => setBulkVerifyOpen(true)}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> Verify All Pending ({pendingFilteredIds.length})
+            </Button>
+          )}
           {can && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
@@ -789,6 +827,43 @@ function Page() {
           )}
         </div>
       </div>
+
+      {/* ── Bulk Verify confirmation dialog ─────────────────────────────── */}
+      <Dialog open={bulkVerifyOpen} onOpenChange={setBulkVerifyOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Verify All Pending Results
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm">
+            <p>
+              This will mark <span className="font-semibold">{pendingFilteredIds.length}</span> unverified
+              result{pendingFilteredIds.length === 1 ? "" : "s"} as verified, scoped to your current filters:
+            </p>
+            <ul className="text-xs text-muted-foreground space-y-1 bg-muted/50 rounded-lg px-3 py-2">
+              <li>Exam: <span className="font-medium">{filterExam === "all" ? "All exams" : (exams as any[]).find((e: any) => e.id === filterExam)?.name ?? "—"}</span></li>
+              <li>Subject: <span className="font-medium">{filterSubject === "all" ? "All subjects" : (subjects as any[]).find((s: any) => s.id === filterSubject)?.name ?? "—"}</span></li>
+              <li>Class: <span className="font-medium">{filterClass === "all" ? "All classes" : (() => { const c = (classes as any[]).find((c: any) => c.id === filterClass); return c ? `${c.name}${c.stream ? " " + c.stream : ""}` : "—"; })()}</span></li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              To verify a single subject only, set the Subject filter above before running this.
+              This cannot be undone in bulk — you'd need to un-verify results one at a time.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkVerifyOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => bulkVerifyMutation.mutate(pendingFilteredIds)}
+              disabled={bulkVerifyMutation.isPending || pendingFilteredIds.length === 0}
+            >
+              {bulkVerifyMutation.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Verify {pendingFilteredIds.length} Result{pendingFilteredIds.length === 1 ? "" : "s"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── KPI Cards ────────────────────────────────────────────────────── */}
       <motion.div
@@ -1286,12 +1361,22 @@ function Page() {
             <motion.div variants={fadeUp} initial="hidden" animate="show">
               <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40">
                 <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold text-sm text-amber-800 dark:text-amber-400">{pendingCount} Results Pending Verification</p>
                   <p className="text-xs text-amber-700 dark:text-amber-500 mt-0.5">
-                    These results have not been verified yet. Use the Results Table tab to review and mark them as verified.
+                    These results have not been verified yet. Narrow by Subject in the Results Table tab
+                    filters, then use Verify All to clear a whole subject at once.
                   </p>
                 </div>
+                {can && (
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 shrink-0"
+                    onClick={() => setBulkVerifyOpen(true)}
+                  >
+                    <CheckCircle2 className="w-3 h-3" /> Verify All ({pendingFilteredIds.length})
+                  </Button>
+                )}
               </div>
             </motion.div>
           )}
