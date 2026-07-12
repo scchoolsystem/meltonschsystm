@@ -16,7 +16,7 @@ import {
   ClipboardList, Settings, Globe, Zap, CheckCircle, ChevronDown, ChevronUp,
   Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
-  Coins,
+  Coins, ShoppingBag, ExternalLink,
 } from "lucide-react";
 import mpesaShot from "@/assets/portals/mpesa.png";
 import parentShot from "@/assets/portals/parent.png";
@@ -301,7 +301,7 @@ const GALLERY_PHOTOS = [
   { src: "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=600&h=400&fit=crop", caption: "Sports and co-curricular" },
 ];
 
-type Page = "home" | "modules" | "story" | "pricing" | "download" | "contact" | "legal";
+type Page = "home" | "modules" | "story" | "pricing" | "download" | "merch" | "contact" | "legal";
 
 // A confirmed plan + add-on selection, carried from the pricing page to the
 // contact page so a customer's picks aren't lost when they hit "Get started".
@@ -333,7 +333,7 @@ function Landing() {
   // Handle hash-based routing for deep links
   useEffect(() => {
     const hash = window.location.hash.replace("#", "") as Page;
-    if (hash && ["home","modules","story","pricing","download","contact","legal"].includes(hash)) {
+    if (hash && ["home","modules","story","pricing","download","merch","contact","legal"].includes(hash)) {
       setPage(hash);
     }
   }, []);
@@ -351,6 +351,7 @@ function Landing() {
     { label: "Our Story", page: "story" },
     { label: "Pricing", page: "pricing" },
     { label: "Download", page: "download" },
+    { label: "Merch", page: "merch" },
     { label: "Contact", page: "contact" },
     { label: "Legal", page: "legal" },
   ];
@@ -418,6 +419,7 @@ function Landing() {
         {page === "story" && <StoryPage />}
         {page === "pricing" && <PricingPage goTo={goTo} site={site} onProceed={setPlanSelection} />}
         {page === "download" && <DownloadPage site={site} />}
+        {page === "merch" && <MerchPage site={site} />}
         {page === "contact" && <ContactPage site={site} planSelection={planSelection} />}
         {page === "legal" && <LegalPage site={site} />}
       </main>
@@ -446,7 +448,7 @@ function Landing() {
             <div>
               <div className="font-semibold text-sm mb-3">Platform</div>
               <div className="flex flex-col gap-2">
-                {(["home","modules","pricing","download"] as Page[]).map(p => (
+                {(["home","modules","pricing","download","merch"] as Page[]).map(p => (
                   <button key={p} type="button" onClick={() => goTo(p)} className="text-xs text-muted-foreground hover:text-foreground text-left capitalize">{p}</button>
                 ))}
               </div>
@@ -1448,6 +1450,86 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
         <div className="rounded-2xl border bg-muted/30 p-6 text-center">
           <p className="text-sm text-muted-foreground">Need help with installation? Call <a href={`tel:${site.phone_support.replace(/\s/g,"")}`} className="text-primary hover:underline font-medium">{site.phone_support}</a> or email <a href={`mailto:${site.email_support}`} className="text-primary hover:underline">{site.email_support}</a></p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MERCH PAGE — SmartDev-branded products, plus partner products (e.g.
+// Stawear) that hand off to an external store when clicked.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type MerchItemPublic = {
+  name: string;
+  photo_url: string | null;
+  price_label: string;
+  description: string;
+  is_external: boolean;
+  link_url: string;
+  partner_name: string;
+};
+
+function MerchPage({ site }: { site: typeof SITE_DEFAULTS }) {
+  const merch = useLandingContent("merch_items", { items: [] as MerchItemPublic[] });
+  const items = merch.items ?? [];
+
+  return (
+    <div className="py-12">
+      <div className="container mx-auto px-6 max-w-5xl">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs font-medium mb-4">
+            <ShoppingBag className="w-3.5 h-3.5" /> Merch
+          </div>
+          <h1 className="text-4xl font-bold">SmartDev merchandise</h1>
+          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-lg">
+            Water bottles, bags, notebooks, pens and more — branded SmartDev gear, plus products from partner brands we work with.
+          </p>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+            Merch is coming soon — check back shortly, or email <a href={`mailto:${site.email_sales}`} className="text-primary hover:underline">{site.email_sales}</a> to ask about branded items.
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {items.map((m, i) => {
+              const enquireHref = `mailto:${site.email_sales}?subject=${encodeURIComponent(`Merch enquiry — ${m.name}`)}&body=${encodeURIComponent(`Hi, I'd like to order:\n\n${m.name}${m.price_label ? ` (${m.price_label})` : ""}\n\nPlease let me know how to complete the purchase.`)}`;
+              const href = m.is_external && m.link_url ? m.link_url : enquireHref;
+              const external = m.is_external && !!m.link_url;
+              return (
+                <a
+                  key={`${m.name}-${i}`}
+                  href={href}
+                  target={external ? "_blank" : undefined}
+                  rel={external ? "noopener noreferrer" : undefined}
+                  className="rounded-xl border bg-card overflow-hidden flex flex-col hover:border-primary/50 hover:shadow-md transition-all"
+                >
+                  <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                    {m.photo_url ? (
+                      <img src={m.photo_url} alt={m.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <ShoppingBag className="w-12 h-12 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="p-5 flex-1 flex flex-col">
+                    {m.partner_name && (
+                      <span className="inline-block w-fit text-[10px] font-medium uppercase tracking-wide bg-primary/10 text-primary rounded-full px-2 py-0.5 mb-2">
+                        Sold via {m.partner_name}
+                      </span>
+                    )}
+                    <div className="font-bold">{m.name}</div>
+                    {m.price_label && <div className="text-sm text-primary font-medium mt-0.5">{m.price_label}</div>}
+                    {m.description && <p className="text-sm text-muted-foreground mt-2 flex-1">{m.description}</p>}
+                    <div className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                      {external ? <>Visit store <ExternalLink className="w-3.5 h-3.5" /></> : <>Enquire to buy <ArrowRight className="w-3.5 h-3.5" /></>}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
