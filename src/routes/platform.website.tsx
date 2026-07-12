@@ -142,7 +142,7 @@ function WebsiteEditor() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="site">Site &amp; Contact</TabsTrigger>
           <TabsTrigger value="hero">Hero</TabsTrigger>
-          <TabsTrigger value="founder">Founder</TabsTrigger>
+          <TabsTrigger value="founder">Founders</TabsTrigger>
           <TabsTrigger value="story">Our Story</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
           <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
@@ -151,7 +151,7 @@ function WebsiteEditor() {
 
         <TabsContent value="site" className="mt-4"><SiteMetaEditor /></TabsContent>
         <TabsContent value="hero" className="mt-4"><HeroEditor /></TabsContent>
-        <TabsContent value="founder" className="mt-4"><FounderEditor /></TabsContent>
+        <TabsContent value="founder" className="mt-4"><FoundersEditor /></TabsContent>
         <TabsContent value="story" className="mt-4"><StoryEditor /></TabsContent>
         <TabsContent value="milestones" className="mt-4"><MilestonesEditor /></TabsContent>
         <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
@@ -256,31 +256,94 @@ function HeroEditor() {
 }
 
 // ---------------------------------------------------------------------------
-// Founder section (replaces the old generic team-card placeholders)
+// Founders section (supports one or many — add, edit, remove, reorder)
 // ---------------------------------------------------------------------------
 
-function FounderEditor() {
-  const fallback = { name: "Melton Konchella", role: "Founder & Developer", photo_url: null as string | null, bio: "" };
-  const { data, isLoading, save } = useLandingSection("founder", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
+type FounderItem = { name: string; role: string; photo_url: string | null; bio: string };
+
+const FOUNDER_BLANK: FounderItem = { name: "", role: "", photo_url: null, bio: "" };
+
+const LEGACY_FOUNDER_FALLBACK: FounderItem = {
+  name: "Melton Konchella",
+  role: "Founder & Developer",
+  photo_url: null,
+  bio: "",
+};
+
+function FoundersEditor() {
+  // Legacy single-founder record (from before this module supported multiple people).
+  // Used only to seed the new list the first time it's opened, so nothing is lost.
+  const { data: legacy, isLoading: legacyLoading } = useLandingSection("founder", LEGACY_FOUNDER_FALLBACK);
+
+  const fallback = { items: [] as FounderItem[] };
+  const { data, isLoading, save } = useLandingSection("founders", fallback);
+  const [items, setItems] = useState<FounderItem[]>([]);
+  const [seeded, setSeeded] = useState(false);
+
+  useEffect(() => {
+    if (isLoading || legacyLoading || seeded) return;
+    if (data.items?.length) {
+      setItems(data.items);
+    } else if (legacy?.name) {
+      // First time opening this editor — carry the existing founder over as slot 1.
+      setItems([{ ...LEGACY_FOUNDER_FALLBACK, ...legacy }]);
+    } else {
+      setItems([]);
+    }
+    setSeeded(true);
+  }, [isLoading, legacyLoading, seeded, data, legacy]);
+
+  const updateItem = (i: number, patch: Partial<FounderItem>) => {
+    const n = [...items];
+    n[i] = { ...n[i], ...patch };
+    setItems(n);
+  };
+
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const n = [...items];
+    [n[i], n[j]] = [n[j], n[i]];
+    setItems(n);
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Founder</CardTitle>
-        <CardDescription>Shown on the Our Story page. Leave the photo empty to show a placeholder icon instead of a real photo until you're ready to add one.</CardDescription>
+        <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Founders / team</CardTitle>
+        <CardDescription>Shown on the Our Story page. Add a slot for each founder or team member — leave a photo empty to show a placeholder icon until you're ready to add one.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+        {isLoading || legacyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
           <>
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground">No founders added yet. Click "Add founder" below to create the first slot.</p>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><Label>Role / title</Label><Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></div>
+              {items.map((f, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
+                    <div className="flex items-center gap-1">
+                      <Button type="button" variant="ghost" size="icon" disabled={i === 0} onClick={() => move(i, -1)} title="Move up">
+                        <GripVertical className="w-4 h-4 rotate-90" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove founder">
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  <ImagePicker label="Photo (optional)" value={f.photo_url} onChange={(url) => updateItem(i, { photo_url: url })} folder="founder" />
+                  <div><Label>Name</Label><Input value={f.name} onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
+                  <div><Label>Role / title</Label><Input value={f.role} onChange={(e) => updateItem(i, { role: e.target.value })} /></div>
+                  <div><Label>Bio</Label><Textarea rows={3} value={f.bio} onChange={(e) => updateItem(i, { bio: e.target.value })} /></div>
+                </div>
+              ))}
             </div>
-            <ImagePicker label="Photo (optional)" value={form.photo_url} onChange={(url) => setForm({ ...form, photo_url: url })} folder="founder" />
-            <div><Label>Bio</Label><Textarea rows={4} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} /></div>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...FOUNDER_BLANK }])}>
+              <Plus className="w-3.5 h-3.5" /> Add founder
+            </Button>
+            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
           </>
         )}
       </CardContent>
