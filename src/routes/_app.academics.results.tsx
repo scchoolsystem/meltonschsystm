@@ -311,7 +311,7 @@ function ResultsGuard() {
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
-  const { isTeacherScoped, classIds, allSubjectIds } = useTeacherScope();
+  const { isTeacherScoped, classIds, allSubjectIds, subjectIdsByClass } = useTeacherScope();
   const can = isAdmin || hasRole("teacher") || hasRole("exams_admin") || hasRole("academic_master");
 
   const [open, setOpen]       = useState(false);
@@ -376,7 +376,7 @@ function Page() {
   const { data: students = [] } = useQuery({
     queryKey: ["students-lite"],
     queryFn: async () => {
-      let q = supabase.from("students").select("id,first_name,last_name,admission_no");
+      let q = supabase.from("students").select("id,first_name,last_name,admission_no,class_id");
       if (isTeacherScoped && scopedStudentIds.length > 0)
         q = q.in("id", scopedStudentIds);
       return (await q.limit(300)).data ?? [];
@@ -592,6 +592,18 @@ function Page() {
     score: "", remarks: "", verified: false,
   });
 
+  // Subjects a scoped teacher may actually pick for the currently-selected
+  // student, mirroring the DB's teaches_subject_in_class() check exactly —
+  // so the dropdown can never offer a combination the new RLS would reject.
+  // Admins/exams_admin (not teacher-scoped) keep the full unfiltered list.
+  const subjectOptionsForForm = useMemo(() => {
+    if (!isTeacherScoped) return subjects;
+    const student = (students as any[]).find((s) => s.id === form.student_id);
+    if (!student?.class_id) return []; // pick a student first
+    const allowedIds = new Set(subjectIdsByClass[student.class_id] ?? []);
+    return (subjects as any[]).filter((s) => allowedIds.has(s.id));
+  }, [isTeacherScoped, subjects, students, form.student_id, subjectIdsByClass]);
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const score = Number(form.score);
@@ -712,12 +724,35 @@ function Page() {
                   {[
                     { label: "Student", field: "student_id", items: students, labelFn: (s: any) => `${s.first_name} ${s.last_name} (${s.admission_no})` },
                     { label: "Exam",    field: "exam_id",    items: exams,    labelFn: (e: any) => `${e.name} — ${e.term} ${e.year}` },
-                    { label: "Subject", field: "subject_id", items: subjects, labelFn: (s: any) => `${s.name}${s.code ? " (" + s.code + ")" : ""}` },
+                    { label: "Subject", field: "subject_id", items: subjectOptionsForForm, labelFn: (s: any) => `${s.name}${s.code ? " (" + s.code + ")" : ""}` },
                   ].map(({ label, field, items, labelFn }) => (
                     <div key={field} className="space-y-1">
                       <Label>{label}</Label>
-                      <Select value={(form as any)[field]} onValueChange={(v) => setForm((f) => ({ ...f, [field]: v }))}>
-                        <SelectTrigger><SelectValue placeholder={`Select ${label}`} /></SelectTrigger>
+                      <Select
+                        value={(form as any)[field]}
+                        onValueChange={(v) =>
+                          setForm((f) => ({
+                            ...f,
+                            [field]: v,
+                            // Changing the student invalidates any previously
+                            // picked subject for scoped teachers — clear it so
+                            // the form can't submit a stale, now-disallowed pair.
+                            ...(field === "student_id" && isTeacherScoped ? { subject_id: "" } : {}),
+                          }))
+                        }
+                        disabled={field === "subject_id" && isTeacherScoped && !form.student_id}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              field === "subject_id" && isTeacherScoped && !form.student_id
+                                ? "Pick a student first"
+                                : field === "subject_id" && isTeacherScoped && items.length === 0
+                                ? "You don't teach this student any subject"
+                                : `Select ${label}`
+                            }
+                          />
+                        </SelectTrigger>
                         <SelectContent>
                           {(items as any[]).map((it) => (
                             <SelectItem key={it.id} value={it.id}>{labelFn(it)}</SelectItem>
