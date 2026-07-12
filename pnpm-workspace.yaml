@@ -8,3 +8,4 @@ allowBuilds:
 
 overrides:
   '@tanstack/react-router': 1.168.25
+  
