@@ -543,11 +543,11 @@ function useSceneMorph(progress: any, reduceMotion: boolean) {
 // Cross-fades a single fixed backdrop color through every scene's palette so
 // the space *behind* the pinned scenes morphs continuously instead of
 // jump-cutting (e.g. slate-950 → emerald-950 → background → slate-950 …).
-// Breakpoints are fractions of the combined scroll height of all 8 home
-// scenes (140+200+150+170+190+110+110+120 = 1180vh); short "blend zones"
-// are inserted right after a scene starts when it flips light/dark so
-// crossing the boundary feels like a wash rather than a cut.
-const BACKDROP_STOPS = [0, 0.1186, 0.2881, 0.3517, 0.4153, 0.4576, 0.5593, 0.5932, 0.7203, 0.7458, 0.8136, 0.8305, 1];
+// Breakpoints are fractions of the combined scroll height of the 7 home
+// scenes (140+200+150+170+190+110+120 = 1080vh); short "blend zones" are
+// inserted right after a scene starts when it flips light/dark so crossing
+// the boundary feels like a wash rather than a cut.
+const BACKDROP_STOPS = [0, 0.1296, 0.3148, 0.3843, 0.4537, 0.5, 0.6111, 0.6481, 0.787, 0.8148, 0.8889, 0.9074, 1];
 const BACKDROP_COLORS = ["#fafafa", "#020617", "#022c22", "#064e3b", "#020617", "#fafafa", "#fafafa", "#020617", "#020617", "#1d3557", "#1d3557", "#020617", "#020617"];
 
 function GlobalSceneBackdrop({ progress, reduceMotion }: { progress: any; reduceMotion: boolean }) {
@@ -918,9 +918,18 @@ function PortalsScene({ reduceMotion }: { reduceMotion: boolean }) {
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">One platform, four tailored experiences</h2>
         </motion.div>
-        <motion.div style={{ x: trackX }} className="flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
-          {portals.map((p) => (
-            <div key={p.title} className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden bg-gradient-to-t ${p.gradient} border border-white/10`}>
+        <motion.div style={{ x: trackX }} className="relative flex gap-4 sm:gap-6 pl-6 md:pl-24 pr-24 w-max will-change-transform">
+          {!reduceMotion && (
+            <>
+              <div className="pointer-events-none absolute -top-16 left-1/3 w-72 h-72 rounded-full bg-purple-500/20 blur-3xl animate-pulse" style={{ animationDuration: "6s" }} />
+              <div className="pointer-events-none absolute -bottom-20 right-1/4 w-80 h-80 rounded-full bg-teal-400/15 blur-3xl animate-pulse" style={{ animationDuration: "8s" }} />
+            </>
+          )}
+          {portals.map((p, i) => (
+            <div
+              key={p.title}
+              className={`relative shrink-0 w-[78vw] sm:w-[380px] h-[280px] sm:h-[340px] rounded-2xl overflow-hidden bg-gradient-to-t ${p.gradient} border border-white/10 backdrop-blur-sm ${!reduceMotion ? (i % 2 === 1 ? "sm:-translate-y-6" : "sm:translate-y-6") : ""}`}
+            >
               <div className="relative h-full flex flex-col justify-end p-5 sm:p-6 text-white">
                 <div className="w-11 h-11 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
                   <p.icon className="w-5 h-5" />
@@ -966,54 +975,29 @@ function MissionScene({
               Read our story <ArrowRight className="w-4 h-4" />
             </Button>
           </button>
+          <div className="mt-10 sm:mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-2xl mx-auto">
+            {[
+              { icon: GraduationCap, value: 300, suffix: "+", label: "Schools onboarded" },
+              { icon: Users, value: 120000, suffix: "+", label: "Students managed" },
+              { icon: Cloud, value: 99, suffix: "%", label: "Platform uptime" },
+              { icon: Zap, value: 3, suffix: "s", label: "Avg. M-Pesa confirmation" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl border border-primary-foreground/15 bg-primary-foreground/10 backdrop-blur-md p-4">
+                <s.icon className="w-5 h-5 mx-auto mb-1.5 text-primary-foreground/90" />
+                <div className="text-xl sm:text-2xl font-bold">
+                  <AnimatedCounter value={s.value} suffix={s.suffix} />
+                </div>
+                <div className="text-[10px] sm:text-xs text-primary-foreground/70 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </motion.div>
       </div>
     </section>
   );
 }
 
-// ── Scene 7: Trust — animated counters build up like the prompt's
-// glow-and-reveal beat, grounding the pitch in real numbers. ──
-function TrustScene({ reduceMotion }: { reduceMotion: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress: rawProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const progress = useSmoothProgress(rawProgress, reduceMotion);
-  const opacity = useTransform(progress, [0, 0.2, 0.85, 1], [0, 1, 1, 0]);
-  const compact = useIsCompact();
-  const morph = useSceneMorph(progress, reduceMotion);
-
-  const stats = [
-    { icon: GraduationCap, value: 300, suffix: "+", label: "Schools onboarded" },
-    { icon: Users, value: 120000, suffix: "+", label: "Students managed" },
-    { icon: Cloud, value: 99, suffix: "%", label: "Platform uptime" },
-    { icon: Zap, value: 3, suffix: "s", label: "Avg. M-Pesa confirmation" },
-  ];
-
-  return (
-    <section ref={ref} style={{ height: reduceMotion ? "100dvh" : "110vh" }} className="relative">
-      <motion.div style={{ scale: morph.scale, filter: morph.filter }} className={`sticky top-0 ${VIEWPORT_H} overflow-hidden flex items-center justify-center`}>
-        {!reduceMotion && <ParticleField count={compact ? 6 : 14} color="rgba(255,255,255,0.35)" />}
-        <motion.div style={{ opacity }} className="container mx-auto px-6 text-center text-white">
-          <div className="text-xs uppercase tracking-widest text-primary mb-3">Trusted across Kenya & East Africa</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <s.icon className="w-6 h-6 mx-auto mb-2 text-primary" />
-                <div className="text-2xl sm:text-3xl font-bold">
-                  <AnimatedCounter value={s.value} suffix={s.suffix} />
-                </div>
-                <div className="text-[11px] sm:text-xs text-white/60 mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-        <SceneVignette progress={progress} />
-      </motion.div>
-    </section>
-  );
-}
-
-// ── Scene 8: Final CTA — pricing + download, rises into view then settles
+// ── Scene 7: Final CTA — pricing + download, rises into view then settles
 // (hands off smoothly into the regular footer below). ──
 function FinalScene({
   goTo,
@@ -1095,7 +1079,6 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
       <CampusScene photos={galleryPhotos} reduceMotion={reduceMotion} />
       <PortalsScene reduceMotion={reduceMotion} />
       <MissionScene goTo={goTo} mission={mission} reduceMotion={reduceMotion} />
-      <TrustScene reduceMotion={reduceMotion} />
       <FinalScene goTo={goTo} site={site} reduceMotion={reduceMotion} />
     </div>
   );
