@@ -481,6 +481,23 @@ function PricingEditor() {
     },
   });
 
+  // Which modules are free-included on which plan -- the single source of
+  // truth shared with the public pricing page (public-plans / public-module-pricing
+  // queries in routes/index.tsx). Keyed as "planId:featureKey".
+  const { data: inclusionRows, isLoading: inclusionLoading } = useQuery({
+    queryKey: ["plan-module-inclusion"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("plan_module_inclusion").select("*");
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+  const inclusionMap = new Map(
+    (inclusionRows ?? []).map((r: any) => [r.plan_id + ":" + r.feature_key, Boolean(r.included)])
+  );
+  const isPlanModuleIncluded = (planId: string, featureKey: string) =>
+    inclusionMap.get(planId + ":" + featureKey) ?? false;
+
   const updatePlan = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
       const { error } = await supabase.from("subscription_plans").update(patch).eq("id", id);
@@ -497,6 +514,39 @@ function PricingEditor() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }),
     onError: (e: any) => toast.error(e.message),
+  });
+
+  // Toggling a plan/module cell upserts the join row that both this editor
+  // and the public pricing page read — the two can no longer drift apart.
+  const setPlanModuleIncluded = useMutation({
+    mutationFn: async (vars: { planId: string; featureKey: string; included: boolean }) => {
+      const { error } = await (supabase as any)
+        .from("plan_module_inclusion")
+        .upsert(
+          { plan_id: vars.planId, feature_key: vars.featureKey, included: vars.included },
+          { onConflict: "plan_id,feature_key" }
+        );
+      if (error) throw error;
+    },
+    onMutate: async (vars: { planId: string; featureKey: string; included: boolean }) => {
+      await qc.cancelQueries({ queryKey: ["plan-module-inclusion"] });
+      const previous = qc.getQueryData<any[]>(["plan-module-inclusion"]);
+      qc.setQueryData<any[]>(["plan-module-inclusion"], (old = []) => {
+        const exists = old.some((r) => r.plan_id === vars.planId && r.feature_key === vars.featureKey);
+        if (exists) {
+          return old.map((r) =>
+            r.plan_id === vars.planId && r.feature_key === vars.featureKey ? { ...r, included: vars.included } : r
+          );
+        }
+        return [...old, { plan_id: vars.planId, feature_key: vars.featureKey, included: vars.included }];
+      });
+      return { previous };
+    },
+    onError: (e: any, _vars, ctx) => {
+      toast.error(e.message);
+      if (ctx?.previous) qc.setQueryData(["plan-module-inclusion"], ctx.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["plan-module-inclusion"] }),
   });
 
   return (
@@ -544,44 +594,57 @@ function PricingEditor() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5" /> Module add-on pricing</CardTitle>
-          <CardDescription>Tick which plans already include each module for free, and set the monthly add-on price charged when a school on a plan that doesn't include it wants it anyway.</CardDescription>
+          <CardDescription>
+            Tick which plans already include each module for free, and set the monthly add-on price charged when a school on a plan that doesn't include it wants it anyway.
+            This table has one column per plan above, so it always matches exactly what shows on the public pricing page.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {modulesLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Module</TableHead>
-                  <TableHead>Starter</TableHead>
-                  <TableHead>Standard</TableHead>
-                  <TableHead>Enterprise</TableHead>
-                  <TableHead>Add-on price /mo (KES)</TableHead>
-                  <TableHead>Active</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(modules ?? []).map((m: any) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="font-medium">
-                      {m.display_name}
-                      <div className="text-xs text-muted-foreground">{m.category}</div>
-                    </TableCell>
-                    <TableCell><Switch checked={m.included_in_starter} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { included_in_starter: v } })} /></TableCell>
-                    <TableCell><Switch checked={m.included_in_standard} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { included_in_standard: v } })} /></TableCell>
-                    <TableCell><Switch checked={m.included_in_enterprise} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { included_in_enterprise: v } })} /></TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        className="w-28"
-                        defaultValue={m.monthly_price}
-                        onBlur={(e) => Number(e.target.value) !== Number(m.monthly_price) && updateModule.mutate({ id: m.id, patch: { monthly_price: Number(e.target.value) || 0 } })}
-                      />
-                    </TableCell>
-                    <TableCell><Switch checked={m.is_active} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { is_active: v } })} /></TableCell>
+          {modulesLoading || plansLoading || inclusionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="sticky left-0 bg-card">Module</TableHead>
+                    {(plans ?? []).map((p: any) => (
+                      <TableHead key={p.id} className="text-center whitespace-nowrap">
+                        {p.name}
+                        {!p.is_active && <span className="block text-[10px] font-normal text-muted-foreground">(inactive)</span>}
+                      </TableHead>
+                    ))}
+                    <TableHead>Add-on price /mo (KES)</TableHead>
+                    <TableHead>Active</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {(modules ?? []).map((m: any) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium sticky left-0 bg-card">
+                        {m.display_name}
+                        <div className="text-xs text-muted-foreground">{m.category}</div>
+                      </TableCell>
+                      {(plans ?? []).map((p: any) => (
+                        <TableCell key={p.id} className="text-center">
+                          <Switch
+                            checked={isPlanModuleIncluded(p.id, m.feature_key)}
+                            onCheckedChange={(v) => setPlanModuleIncluded.mutate({ planId: p.id, featureKey: m.feature_key, included: v })}
+                          />
+                        </TableCell>
+                      ))}
+                      <TableCell>
+                        <Input
+                          type="number"
+                          className="w-28"
+                          defaultValue={m.monthly_price}
+                          onBlur={(e) => Number(e.target.value) !== Number(m.monthly_price) && updateModule.mutate({ id: m.id, patch: { monthly_price: Number(e.target.value) || 0 } })}
+                        />
+                      </TableCell>
+                      <TableCell><Switch checked={m.is_active} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { is_active: v } })} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
