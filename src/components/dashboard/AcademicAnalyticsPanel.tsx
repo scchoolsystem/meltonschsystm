@@ -51,7 +51,7 @@ export function AcademicAnalyticsPanel({ studentIds, subjectIds, scoped = false 
         .select(
           "score,grade,student_id,subject_id,exam_id," +
           "subjects(name,code)," +
-          "students(first_name,last_name,class_id,classes(name,stream))," +
+          "students(first_name,last_name,gender,class_id,classes(name,stream))," +
           "exams(name,term,year)"
         )
         .order("created_at", { ascending: false })
