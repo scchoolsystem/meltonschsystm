@@ -159,3 +159,17 @@ export async function removeDepartmentMember(memberId: string): Promise<void> {
   const { error } = await supabase.from("department_members").delete().eq("id", memberId);
   if (error) throw error;
 }
+
+/**
+ * Delete a department entirely. Admin tier only (enforced by RLS
+ * `departments_write` policy — is_member_of(school_id) AND is_admin()).
+ *
+ * Cascades at the DB level:
+ *  - sub_departments, department_members, department_communications,
+ *    department_subjects → ON DELETE CASCADE (wiped with the department)
+ *  - staff.department_id → ON DELETE SET NULL (staff are unassigned, not deleted)
+ */
+export async function deleteDepartment(departmentId: string): Promise<void> {
+  const { error } = await supabase.from("departments").delete().eq("id", departmentId);
+  if (error) throw error;
+}
