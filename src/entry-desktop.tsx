@@ -5,10 +5,21 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
+import { Skeleton } from "@/components/ui/skeleton";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 const history = createHashHistory();
+
+function DefaultPending() {
+  return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-1/3" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
 
 const router = createRouter({
   routeTree,
@@ -16,6 +27,10 @@ const router = createRouter({
   context: { queryClient },
   scrollRestoration: true,
   defaultPreloadStaleTime: 0,
+  defaultPreload: "intent",
+  defaultPendingMs: 150,
+  defaultPendingMinMs: 200,
+  defaultPendingComponent: DefaultPending,
 });
 
 createRoot(document.getElementById("root")!).render(
