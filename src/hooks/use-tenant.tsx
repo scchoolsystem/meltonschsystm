@@ -72,6 +72,25 @@ async function storageRemove(key: string): Promise<void> {
   }
 }
 
+// Diagnostic helper: races `promise` against a per-step timeout so we can
+// tell the caller exactly *which* step got stuck, instead of one generic
+// "timed out" message covering several sequential operations. This is a
+// temporary instrumentation aid — see SchoolPicker.tsx for where the
+// resulting stage/error text gets shown to the user.
+function stageTimeout<T>(label: string, promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => {
+        const err: any = new Error(`Stuck at: ${label} (exceeded ${Math.round(ms / 1000)}s)`);
+        err.name = "StageTimeout";
+        err.stage = label;
+        reject(err);
+      }, ms)
+    ),
+  ]);
+}
+
 type TenantState = {
   school: School | null;
   slug: string | null;
@@ -80,7 +99,7 @@ type TenantState = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  setSchoolSlug: (slug: string) => Promise<void>;
+  setSchoolSlug: (slug: string, onStage?: (stage: string) => void) => Promise<void>;
   clearSchoolSlug: () => Promise<void>;
 };
 
@@ -136,7 +155,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // at this level of the tree is dangerous — any consumer that puts
   // `refresh` in a useEffect/useMemo dependency array needs it to only
   // change when it actually needs to re-run, not on every render).
-  const loadSchool = useCallback(async (targetSlug: string | null) => {
+  const loadSchool = useCallback(async (targetSlug: string | null, onStage?: (stage: string) => void) => {
     setLoading(true); setError(null);
     try {
       if (!targetSlug || targetSlug === PLATFORM_SLUG) {
@@ -145,35 +164,35 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       try {
-        const HARD_TIMEOUT = Symbol("loadSchool-hard-timeout");
-        const fetchSchool = (async () => {
-          const { data, error: qErr } = await supabase
-            .from("schools").select("*").eq("slug", targetSlug).maybeSingle()
-            .abortSignal(controller.signal);
-          if (qErr) throw qErr;
-          if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); return; }
-          setSchool(data as School);
-          const { data: flags } = await supabase
-            .from("school_features").select("feature_key,enabled").eq("school_id", data.id)
-            .abortSignal(controller.signal);
-          const map: Record<string, boolean> = {};
-          (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
-          setFeatures(map);
-        })();
-        const hardTimeout = new Promise<typeof HARD_TIMEOUT>((resolve) =>
-          setTimeout(() => resolve(HARD_TIMEOUT), 18000)
+        onStage?.("Looking up your school...");
+        const { data, error: qErr } = await stageTimeout(
+          "looking up your school (schools table)",
+          supabase.from("schools").select("*").eq("slug", targetSlug).maybeSingle().abortSignal(controller.signal),
+          18000
         );
-        const result = await Promise.race([fetchSchool, hardTimeout]);
-        if (result === HARD_TIMEOUT) {
-          const err: any = new Error("Loading the school timed out. Check your internet connection and try again.");
-          err.name = "AbortError";
-          throw err;
-        }
+        if (qErr) throw qErr;
+        if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); return; }
+        setSchool(data as School);
+
+        onStage?.("Loading school settings...");
+        const { data: flags } = await stageTimeout(
+          "loading school settings (school_features table)",
+          supabase.from("school_features").select("feature_key,enabled").eq("school_id", data.id).abortSignal(controller.signal),
+          18000
+        );
+        const map: Record<string, boolean> = {};
+        (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
+        setFeatures(map);
+        onStage?.("Done");
       } finally {
         clearTimeout(timeoutId);
       }
     } catch (e: any) {
-      setError(e?.name === "AbortError" ? "Loading the school timed out. Check your internet connection and try again." : (e.message ?? "Failed to load school"));
+      if (e?.name === "StageTimeout") {
+        setError(`${e.stage.charAt(0).toUpperCase() + e.stage.slice(1)} timed out. Check your internet connection and try again.`);
+      } else {
+        setError(e?.name === "AbortError" ? "Loading the school timed out. Check your internet connection and try again." : (e.message ?? "Failed to load school"));
+      }
       setSchool(null);
     }
     finally { setLoading(false); }
@@ -195,8 +214,24 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       document.title = isPlatformHost ? "Platform Admin — SmartDev ERP" : school?.name ? `${school.name} — ERP` : "SmartDev ERP";
   }, [school, isPlatformHost]);
 
-  const setSchoolSlug = useCallback(async (newSlug: string) => {
-    await storageSet(STORAGE_KEY, newSlug); setSlug(newSlug); await loadSchool(newSlug);
+  const setSchoolSlug = useCallback(async (newSlug: string, onStage?: (stage: string) => void) => {
+    onStage?.("Saving your selection...");
+    // Previously this awaited storageSet() before ever starting loadSchool().
+    // Supabase logs confirmed zero requests to `schools`/`school_features`
+    // during a failed selection — meaning if the native Preferences bridge
+    // call hangs, the school query never even fires. Fix: run the storage
+    // write and the school lookup in PARALLEL. storageSet keeps its own
+    // timeout so a hang there is logged and swallowed instead of blocking
+    // anything or crashing the app.
+    const savePromise = stageTimeout(
+      "saving your selection to device storage",
+      storageSet(STORAGE_KEY, newSlug),
+      8000
+    ).catch((e) => {
+      console.warn("[setSchoolSlug] storageSet failed or timed out:", e?.message ?? e);
+    });
+    setSlug(newSlug);
+    await Promise.all([savePromise, loadSchool(newSlug, onStage)]);
   }, [loadSchool]);
 
   const clearSchoolSlug = useCallback(async () => {
