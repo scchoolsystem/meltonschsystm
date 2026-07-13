@@ -145,12 +145,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       try {
-        const { data, error: qErr } = await supabase
-          .from("schools").select("*").eq("slug", targetSlug).maybeSingle()
-          .abortSignal(controller.signal);
-        if (qErr) throw qErr;
-        if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); }
-        else {
+        const HARD_TIMEOUT = Symbol("loadSchool-hard-timeout");
+        const fetchSchool = (async () => {
+          const { data, error: qErr } = await supabase
+            .from("schools").select("*").eq("slug", targetSlug).maybeSingle()
+            .abortSignal(controller.signal);
+          if (qErr) throw qErr;
+          if (!data) { setError(`School "${targetSlug}" not found`); setSchool(null); return; }
           setSchool(data as School);
           const { data: flags } = await supabase
             .from("school_features").select("feature_key,enabled").eq("school_id", data.id)
@@ -158,6 +159,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           const map: Record<string, boolean> = {};
           (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
           setFeatures(map);
+        })();
+        const hardTimeout = new Promise<typeof HARD_TIMEOUT>((resolve) =>
+          setTimeout(() => resolve(HARD_TIMEOUT), 18000)
+        );
+        const result = await Promise.race([fetchSchool, hardTimeout]);
+        if (result === HARD_TIMEOUT) {
+          const err: any = new Error("Loading the school timed out. Check your internet connection and try again.");
+          err.name = "AbortError";
+          throw err;
         }
       } finally {
         clearTimeout(timeoutId);
