@@ -33,10 +33,33 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
     setDebugError(null);
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    // IMPORTANT: `.abortSignal()` only cancels the actual HTTP fetch. Every
+    // supabase-js call (rpc/from/storage, not just auth.*) first calls its
+    // internal _getAccessToken() -> auth.getSession(). If another getSession()
+    // call is already in flight on this page, supabase-js queues this one
+    // behind it in-process (no timeout on that queue — only the cross-tab
+    // navigator.locks step has a default 5s timeout). If that earlier call
+    // never settles, this one waits behind it forever: no fetch is ever
+    // dispatched, so the abortSignal above has nothing to cancel, no request
+    // ever reaches Supabase (confirmed via API logs showing zero entries),
+    // and this await hangs indefinitely. This outer race is a hard ceiling
+    // that fires regardless of *where* upstream we're stuck.
+    const OUTER_TIMEOUT_MS = 15000;
+    const outerTimedOut = new Promise<never>((_, reject) => {
+      window.setTimeout(
+        () => reject(Object.assign(new Error(
+          "Timed out waiting for the school list. This can happen if a previous " +
+          "session lock on this device never released — try fully closing and " +
+          "reopening the app."
+        ), { name: "OuterTimeout" })),
+        OUTER_TIMEOUT_MS
+      );
+    });
     try {
-      const { data, error } = await supabase
-        .rpc("list_active_schools")
-        .abortSignal(controller.signal);
+      const { data, error } = await Promise.race([
+        supabase.rpc("list_active_schools").abortSignal(controller.signal),
+        outerTimedOut,
+      ]);
       if (error) {
         setDebugError(`RPC error: ${error.message} (code: ${error.code})`);
       } else {
