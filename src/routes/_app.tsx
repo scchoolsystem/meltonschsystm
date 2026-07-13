@@ -9,6 +9,20 @@ import { SchoolSplashScreen } from "@/components/SchoolSplashScreen";
 import { getSessionSafe } from "@/integrations/supabase/client";
 import { canAccessRoute, type AppRole } from "@/core/rbac";
 
+// beforeLoad re-runs on EVERY navigation under /_app (every tab click:
+// timetable -> analytics -> finance...), and previously did a full awaited
+// getSessionSafe() call each time before the router would swap the UI —
+// the URL updates instantly, but the new page sits frozen until this
+// resolves. AuthProvider (use-auth.tsx) already tracks the session
+// reactively via onAuthStateChange and calls router.invalidate() the
+// moment a user signs out, so re-verifying from scratch on every click is
+// redundant. Cache a "verified recently" flag with a short TTL: first
+// load / hard refresh still does the real check, but rapid tab switching
+// within that window skips straight through instead of re-awaiting
+// Supabase each time.
+const SESSION_CACHE_MS = 60_000;
+let lastVerifiedAt = 0;
+
 export const Route = createFileRoute("/_app")({
   beforeLoad: async ({ location }) => {
     // Sessions live in localStorage, which only exists in the browser.
@@ -19,13 +33,18 @@ export const Route = createFileRoute("/_app")({
     // session once it hydrates and shows a branded loading screen instead.
     if (typeof window === "undefined") return;
 
-    // This runs on EVERY navigation into any route under /_app (i.e. almost
-    // every click in the app), because beforeLoad re-runs for the whole
-    // matched route chain. See getSessionSafe() for why this must be
-    // timeout-guarded — an unguarded hang here blocks the entire route
-    // transition forever: no paint, no CPU usage, just a permanently
-    // pending navigation. That's the "click My Workspace and everything
-    // freezes" bug — it's not a render-time freeze, it's a stuck nav guard.
+    // Within the cache window, trust the last confirmed check instead of
+    // re-awaiting Supabase on every nav. A genuine sign-out is still caught
+    // immediately because AuthProvider's onAuthStateChange handler calls
+    // router.invalidate() on logout, which re-runs beforeLoad regardless of
+    // this cache.
+    if (Date.now() - lastVerifiedAt < SESSION_CACHE_MS) return;
+
+    // See getSessionSafe() for why this must be timeout-guarded — an
+    // unguarded hang here blocks the entire route transition forever: no
+    // paint, no CPU usage, just a permanently pending navigation. That's
+    // the "click My Workspace and everything freezes" bug — it's not a
+    // render-time freeze, it's a stuck nav guard.
     const { data, error, timedOut } = await getSessionSafe();
     if (timedOut) return; // defer to AppLayout's client-side check below
     if (error || !data.session) {
@@ -35,6 +54,7 @@ export const Route = createFileRoute("/_app")({
         search: { redirect: location.pathname },
       });
     }
+    lastVerifiedAt = Date.now();
   },
   component: AppLayout,
   errorComponent: ({ error, reset }) => (
