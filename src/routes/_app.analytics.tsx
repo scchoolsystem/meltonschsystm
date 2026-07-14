@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, useInView, animate } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  LineChart, Line, PieChart, Pie, Cell, Legend,
+  LineChart, Line, PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
 import {
   TrendingUp, AlertTriangle, Users, Wallet, GraduationCap, Sparkles,
   Activity, Library, Utensils, Package, Bus, Stethoscope, ShieldCheck,
   Trophy, BookOpen, DollarSign, ShieldAlert, Building2,
-  Briefcase, MessageSquare, CalendarCheck,
+  Briefcase, MessageSquare, CalendarCheck, UserPlus,
 } from "lucide-react";
 import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalyticsPanel";
 import type { AppRole } from "@/core/rbac";
