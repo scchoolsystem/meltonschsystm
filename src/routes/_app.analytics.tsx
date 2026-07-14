@@ -112,24 +112,141 @@ function Analytics() {
 }
 
 // ─── Overview tab ─────────────────────────────────────────────────────────────
+// ─── Animated number (count-up on scroll into view) ───────────────────────────
+function AnimatedNumber({ value, format }: { value: number; format?: (n: number) => string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-10% 0px" });
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    const controls = animate(0, value, {
+      duration: 0.9,
+      ease: "easeOut",
+      onUpdate: (v) => setDisplay(v),
+    });
+    return () => controls.stop();
+  }, [inView, value]);
+
+  return <span ref={ref}>{format ? format(display) : Math.round(display).toLocaleString()}</span>;
+}
+
+// ─── Animated KPI card ──────────────────────────────────────────────────────
+function AnimatedKpi({
+  icon, label, value, format, sub, tone, delay = 0,
+}: {
+  icon: React.ReactNode; label: string; value: number; format?: (n: number) => string;
+  sub?: string; tone?: "default" | "good" | "warn" | "bad"; delay?: number;
+}) {
+  const toneClass = tone === "good" ? "text-emerald-600 dark:text-emerald-400"
+    : tone === "warn" ? "text-amber-600 dark:text-amber-400"
+    : tone === "bad" ? "text-destructive" : "";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      whileHover={{ y: -2 }}
+    >
+      <Card className="overflow-hidden">
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
+          <div className={`text-2xl font-bold mt-1 ${toneClass}`}>
+            <AnimatedNumber value={value} format={format} />
+          </div>
+          {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+// ─── Chart card wrapper (fade + slide in once visible) ─────────────────────────
+function ChartCard({ title, icon, children, delay = 0, className = "" }: {
+  title: string; icon?: React.ReactNode; children: React.ReactNode; delay?: number; className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-10% 0px" }}
+      transition={{ duration: 0.45, delay, ease: "easeOut" }}
+      className={className}
+    >
+      <Card className="h-full">
+        <CardHeader><CardTitle className="text-base flex items-center gap-2">{icon}{title}</CardTitle></CardHeader>
+        <CardContent className="h-64">{children}</CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+// ─── Overview tab ─────────────────────────────────────────────────────────────
 function OverviewTab() {
   const { data: kpis } = useQuery({
     queryKey: ["analytics-kpis"],
     queryFn: async () => {
-      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-      const [students, staff, finance, attendance] = await Promise.all([
-        supabase.from("students").select("id,gender", { count: "exact" }),
-        supabase.from("staff").select("id", { count: "exact", head: true }),
+      const since30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const [students, staff, finance, attendance, newAdm, todayAtt, leavers] = await Promise.all([
+        supabase.from("students").select("id,gender,class_id", { count: "exact" }).eq("lifecycle_status", "active"),
+        supabase.from("staff").select("id", { count: "exact", head: true }).eq("lifecycle_status", "active"),
         (supabase as any).from("v_finance_summary").select("total_invoiced,total_paid,defaulters,collection_pct").maybeSingle(),
-        (supabase as any).from("v_attendance_daily").select("date,present,absent").gte("date", since).order("date", { ascending: true }),
+        (supabase as any).from("v_attendance_daily").select("date,present,absent,late,total").gte("date", since30).order("date", { ascending: true }),
+        supabase.from("students").select("id", { count: "exact", head: true }).eq("lifecycle_status", "active").gte("admission_date", since30),
+        supabase.from("attendance_records").select("status", { count: "exact", head: true }).eq("date", today).eq("status", "present"),
+        (supabase as any).from("lifecycle_events").select("to_status", { count: "exact", head: true }).in("to_status", ["graduated", "expelled", "transferred", "archived"]).gte("created_at", since30),
       ]);
       const f = (finance.data ?? {}) as any;
+      const attRows = (attendance.data ?? []) as any[];
+      const todayRow = attRows.find((r) => r.date === today);
+      const attRateToday = todayRow && todayRow.total > 0 ? Math.round((todayRow.present / todayRow.total) * 100) : null;
       return {
         students: students.count ?? 0, staff: staff.count ?? 0,
         totalInvoiced: Number(f.total_invoiced ?? 0), totalPaid: Number(f.total_paid ?? 0),
         collection: Number(f.collection_pct ?? 0), defaulters: Number(f.defaulters ?? 0),
-        attendance: attendance.data ?? [], genders: students.data ?? [],
+        attendance: attRows, genders: students.data ?? [],
+        newAdmissions: newAdm.count ?? 0, leaversRecent: leavers.count ?? 0,
+        attRateToday,
       };
+    },
+  });
+
+  // Students per class — replaces the old gender-only pie with something a
+  // principal can actually act on (which classes are over/under capacity).
+  const { data: classDist = [] } = useQuery({
+    queryKey: ["analytics-class-dist"],
+    queryFn: async () => {
+      const { data } = await supabase.from("students").select("class_id, classes(name, capacity)").eq("lifecycle_status", "active");
+      const map = new Map<string, { name: string; count: number; capacity: number }>();
+      (data ?? []).forEach((r: any) => {
+        const name = r.classes?.name ?? "Unassigned";
+        const cur = map.get(name) ?? { name, count: 0, capacity: r.classes?.capacity ?? 0 };
+        cur.count++;
+        map.set(name, cur);
+      });
+      return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 12);
+    },
+  });
+
+  // Admissions trend — last 6 months, shows real growth/shrinkage instead of
+  // a single point-in-time count.
+  const { data: admissionTrend = [] } = useQuery({
+    queryKey: ["analytics-admission-trend"],
+    queryFn: async () => {
+      const since = new Date(); since.setMonth(since.getMonth() - 5); since.setDate(1);
+      const { data } = await supabase.from("students").select("admission_date").gte("admission_date", since.toISOString().slice(0, 10));
+      const buckets = new Map<string, number>();
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(since); d.setMonth(d.getMonth() + i);
+        buckets.set(d.toLocaleString("en", { month: "short" }), 0);
+      }
+      (data ?? []).forEach((r: any) => {
+        if (!r.admission_date) return;
+        const key = new Date(r.admission_date).toLocaleString("en", { month: "short" });
+        if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+      });
+      return Array.from(buckets.entries()).map(([month, count]) => ({ month, count }));
     },
   });
 
@@ -161,70 +278,137 @@ function OverviewTab() {
     },
   });
 
-  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({ date: r.date, present: Number(r.present ?? 0), absent: Number(r.absent ?? 0) }));
-  const genderMix = (() => {
-    const m = new Map<string, number>();
-    (kpis?.genders ?? []).forEach((s: any) => { const g = s.gender || "Unknown"; m.set(g, (m.get(g) ?? 0) + 1); });
-    return [...m.entries()].map(([name, value]) => ({ name, value }));
-  })();
+  const attTrend = ((kpis?.attendance ?? []) as any[]).map((r) => ({
+    date: r.date,
+    present: Number(r.present ?? 0),
+    absent: Number(r.absent ?? 0),
+    rate: (Number(r.present ?? 0) + Number(r.absent ?? 0)) > 0
+      ? Math.round((Number(r.present ?? 0) / (Number(r.present ?? 0) + Number(r.absent ?? 0))) * 100)
+      : 0,
+  }));
+
+  const feeSplit = [
+    { name: "Collected", value: kpis?.totalPaid ?? 0 },
+    { name: "Outstanding", value: Math.max((kpis?.totalInvoiced ?? 0) - (kpis?.totalPaid ?? 0), 0) },
+  ];
+  const FEE_COLORS = ["#10b981", "#ef4444"];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi icon={<GraduationCap className="w-4 h-4" />} label="Students" value={kpis?.students ?? 0} />
-        <Kpi icon={<Users className="w-4 h-4" />} label="Staff" value={kpis?.staff ?? 0} />
-        <Kpi icon={<Wallet className="w-4 h-4" />} label="Fee Collection" value={`${(kpis?.collection ?? 0).toFixed(0)}%`} sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`} />
-        <Kpi icon={<AlertTriangle className="w-4 h-4 text-destructive" />} label="Defaulters" value={kpis?.defaulters ?? 0} />
+      {/* KPI row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <AnimatedKpi icon={<GraduationCap className="w-4 h-4" />} label="Active students" value={kpis?.students ?? 0} delay={0} />
+        <AnimatedKpi icon={<Users className="w-4 h-4" />} label="Staff" value={kpis?.staff ?? 0} delay={0.05} />
+        <AnimatedKpi
+          icon={<Activity className="w-4 h-4" />} label="Attendance today"
+          value={kpis?.attRateToday ?? 0} format={(n) => `${Math.round(n)}%`}
+          tone={kpis?.attRateToday !== null && (kpis?.attRateToday ?? 0) < 80 ? "warn" : "good"}
+          delay={0.1}
+        />
+        <AnimatedKpi
+          icon={<Wallet className="w-4 h-4" />} label="Fee collection"
+          value={kpis?.collection ?? 0} format={(n) => `${n.toFixed(0)}%`}
+          sub={`KES ${(kpis?.totalPaid ?? 0).toLocaleString()} / ${(kpis?.totalInvoiced ?? 0).toLocaleString()}`}
+          tone={(kpis?.collection ?? 0) < 60 ? "bad" : (kpis?.collection ?? 0) < 85 ? "warn" : "good"}
+          delay={0.15}
+        />
+        <AnimatedKpi icon={<UserPlus className="w-4 h-4" />} label="New admissions" value={kpis?.newAdmissions ?? 0} sub="Last 30 days" tone="good" delay={0.2} />
+        <AnimatedKpi icon={<AlertTriangle className="w-4 h-4" />} label="Defaulters" value={kpis?.defaulters ?? 0} tone={(kpis?.defaulters ?? 0) > 0 ? "bad" : "default"} delay={0.25} />
       </div>
 
+      {/* Charts row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Attendance trend (30 days)</CardTitle></CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer>
-              <LineChart data={attTrend}>
-                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis /><Tooltip /><Legend />
-                <Line type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} />
-                <Line type="monotone" dataKey="absent" stroke="#ef4444" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Student gender mix</CardTitle></CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={genderMix} dataKey="value" nameKey="name" outerRadius={90} label>
-                  {genderMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip /><Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ChartCard title="Attendance rate (30 days)" icon={<CalendarCheck className="w-4 h-4" />} delay={0}>
+          <ResponsiveContainer>
+            <AreaChart data={attTrend}>
+              <defs>
+                <linearGradient id="attFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} unit="%" />
+              <Tooltip formatter={(v: any, n: any) => (n === "rate" ? [`${v}%`, "Attendance"] : [v, n])} />
+              <Area type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={2} fill="url(#attFill)" isAnimationActive animationDuration={900} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Fee collection" icon={<DollarSign className="w-4 h-4" />} delay={0.1}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={feeSplit} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2} isAnimationActive animationDuration={800}>
+                {feeSplit.map((_, i) => <Cell key={i} fill={FEE_COLORS[i]} />)}
+              </Pie>
+              <Tooltip formatter={(v: any) => `KES ${Number(v).toLocaleString()}`} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-destructive" /> At-risk students</CardTitle></CardHeader>
-        <CardContent>
-          {atRisk.length === 0 ? <p className="text-sm text-muted-foreground">No at-risk students right now.</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Adm No</TableHead><TableHead>Class</TableHead><TableHead>Attendance</TableHead><TableHead>Mean</TableHead><TableHead>Risk</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {atRisk.map((s: any) => (
-                  <TableRow key={s.id}>
-                    <TableCell>{s.name}</TableCell><TableCell>{s.admno}</TableCell><TableCell>{s.className}</TableCell>
-                    <TableCell className={s.attendance !== null && s.attendance < 75 ? "text-destructive" : ""}>{s.attendance !== null ? `${s.attendance}%` : "—"}</TableCell>
-                    <TableCell className={s.mean !== null && s.mean < 40 ? "text-destructive" : ""}>{s.mean !== null ? s.mean : "—"}</TableCell>
-                    <TableCell><Badge variant={s.risk === "Both" ? "destructive" : "secondary"}>{s.risk}</Badge></TableCell>
-                  </TableRow>
+      {/* Charts row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Students per class" icon={<Users className="w-4 h-4" />} delay={0.15}>
+          <ResponsiveContainer>
+            <BarChart data={classDist} layout="vertical" margin={{ left: 12 }}>
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={64} />
+              <Tooltip formatter={(v: any, _n, p: any) => [`${v} students`, p.payload.capacity ? `Capacity ${p.payload.capacity}` : ""]} />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive animationDuration={800}>
+                {classDist.map((c, i) => (
+                  <Cell key={i} fill={c.capacity && c.count > c.capacity ? "#ef4444" : COLORS[i % COLORS.length]} />
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Admissions trend (6 months)" icon={<TrendingUp className="w-4 h-4" />} delay={0.2}>
+          <ResponsiveContainer>
+            <LineChart data={admissionTrend}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="count" name="New admissions" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} isAnimationActive animationDuration={900} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
+      {/* At-risk students */}
+      <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-10% 0px" }} transition={{ duration: 0.45 }}>
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Activity className="w-4 h-4 text-destructive" /> At-risk students</CardTitle></CardHeader>
+          <CardContent>
+            {atRisk.length === 0 ? <p className="text-sm text-muted-foreground">No at-risk students right now.</p> : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Adm No</TableHead><TableHead>Class</TableHead><TableHead>Attendance</TableHead><TableHead>Mean</TableHead><TableHead>Risk</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {atRisk.map((s: any, i: number) => (
+                    <motion.tr
+                      key={s.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.6) }}
+                      className="border-b transition-colors hover:bg-muted/50"
+                    >
+                      <TableCell>{s.name}</TableCell><TableCell>{s.admno}</TableCell><TableCell>{s.className}</TableCell>
+                      <TableCell className={s.attendance !== null && s.attendance < 75 ? "text-destructive" : ""}>{s.attendance !== null ? `${s.attendance}%` : "—"}</TableCell>
+                      <TableCell className={s.mean !== null && s.mean < 40 ? "text-destructive" : ""}>{s.mean !== null ? s.mean : "—"}</TableCell>
+                      <TableCell><Badge variant={s.risk === "Both" ? "destructive" : "secondary"}>{s.risk}</Badge></TableCell>
+                    </motion.tr>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
