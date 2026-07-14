@@ -67,6 +67,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease --stacktrace --info
 
+      - name: Rename Android build outputs
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk \
+             android/app/build/outputs/apk/release/SmartDev-ERP-Android.apk
+          mv android/app/build/outputs/bundle/release/app-release.aab \
+             android/app/build/outputs/bundle/release/SmartDev-ERP-Android.aab
+
       - name: Create GitHub Release and upload
         uses: softprops/action-gh-release@v2
         with:
@@ -75,7 +82,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            android/app/build/outputs/apk/release/app-release.apk
-            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/release/SmartDev-ERP-Android.apk
+            android/app/build/outputs/bundle/release/SmartDev-ERP-Android.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
