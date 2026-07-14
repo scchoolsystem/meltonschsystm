@@ -438,56 +438,127 @@ function AcademicsTab() {
     },
   });
 
+  // Grade distribution — uses whatever grade letters are already assigned on
+  // exam_results (school's own grading scale), so it stays correct even
+  // though the band cutoffs live in a separate school-configured table.
+  const { data: gradeDist = [] } = useQuery({
+    queryKey: ["analytics-grade-dist"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("exam_results").select("grade").not("grade", "is", null);
+      const map = new Map<string, number>();
+      (data ?? []).forEach((r: any) => { const g = r.grade || "—"; map.set(g, (map.get(g) ?? 0) + 1); });
+      return Array.from(map.entries()).map(([grade, count]) => ({ grade, count })).sort((a, b) => b.count - a.count);
+    },
+  });
+
+  // Overall KPIs, computed once here instead of duplicated per-chart.
+  const { data: academicKpis } = useQuery({
+    queryKey: ["analytics-academic-kpis"],
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("exam_results").select("score");
+      const scores = (data ?? []).map((r: any) => Number(r.score ?? 0));
+      const mean = scores.length ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0;
+      const passRate = scores.length ? (scores.filter((s: number) => s >= 50).length / scores.length) * 100 : 0;
+      return { mean, passRate, totalSat: scores.length };
+    },
+  });
+
+  // Only surface CURRENTLY ENROLLED students as "at risk" — a student who
+  // scored poorly and then graduated/left isn't something a teacher can act
+  // on today, and showing them here would be misleading (same class of bug
+  // as the students-still-counted-after-graduating issue on Overview).
   const { data: weakStudents = [] } = useQuery({
     queryKey: ["analytics-weak"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("v_weak_students").select("student_id,admission_no,first_name,last_name,mean_score").order("mean_score", { ascending: true }).limit(10);
-      return (data ?? []).map((r: any) => ({ id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(), admno: r.admission_no ?? "", mean: Number(r.mean_score) }));
+      const [weak, active] = await Promise.all([
+        (supabase as any).from("v_weak_students").select("student_id,admission_no,first_name,last_name,mean_score").order("mean_score", { ascending: true }).limit(30),
+        supabase.from("students").select("id").eq("lifecycle_status", "active"),
+      ]);
+      const activeIds = new Set((active.data ?? []).map((s: any) => s.id));
+      return (weak.data ?? [])
+        .filter((r: any) => activeIds.has(r.student_id))
+        .slice(0, 10)
+        .map((r: any) => ({ id: r.student_id, name: `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(), admno: r.admission_no ?? "", mean: Number(r.mean_score) }));
     },
   });
+
+  const GRADE_COLORS: Record<string, string> = { A: "#10b981", "A-": "#22c55e", "B+": "#84cc16", B: "#a3e635", "B-": "#eab308", "C+": "#f59e0b", C: "#f97316", "C-": "#fb923c", "D+": "#ef4444", D: "#dc2626", "D-": "#b91c1c", E: "#7f1d1d" };
+  const subjectTier = (mean: number) => (mean >= 70 ? "#10b981" : mean >= 50 ? "#f59e0b" : "#ef4444");
 
   return (
     <div className="space-y-6">
       <AcademicAnalyticsPanel />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Subject performance (avg score)</CardTitle></CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={subjectAvg.slice(0, 10)}>
-                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="code" /><YAxis domain={[0, 100]} /><Tooltip />
-                <Bar dataKey="mean" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Class performance comparison</CardTitle></CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={classPerf}>
-                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="className" /><YAxis domain={[0, 100]} /><Tooltip />
-                <Bar dataKey="mean" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <AnimatedKpi icon={<BookOpen className="w-4 h-4" />} label="Overall mean score" value={academicKpis?.mean ?? 0} format={(n) => n.toFixed(1)} delay={0} />
+        <AnimatedKpi
+          icon={<Trophy className="w-4 h-4" />} label="Pass rate (≥50)"
+          value={academicKpis?.passRate ?? 0} format={(n) => `${n.toFixed(0)}%`}
+          tone={(academicKpis?.passRate ?? 0) < 50 ? "bad" : (academicKpis?.passRate ?? 0) < 75 ? "warn" : "good"}
+          delay={0.05}
+        />
+        <AnimatedKpi icon={<GraduationCap className="w-4 h-4" />} label="Top subject" value={subjectAvg[0] ? subjectAvg[0].mean : 0} format={(n) => subjectAvg[0] ? `${subjectAvg[0].code} · ${n.toFixed(0)}` : "—"} delay={0.1} />
+        <AnimatedKpi icon={<AlertTriangle className="w-4 h-4" />} label="At-risk (enrolled)" value={weakStudents.length} tone={weakStudents.length > 0 ? "warn" : "default"} delay={0.15} />
       </div>
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> AI insights — students at risk (academic)</CardTitle></CardHeader>
-        <CardContent>
-          {weakStudents.length === 0 ? <p className="text-sm text-muted-foreground">No struggling students detected — great work!</p> : (
-            <ul className="text-sm space-y-1.5">
-              {weakStudents.map((s: any) => (
-                <li key={s.id} className="flex items-center justify-between border-b pb-1.5">
-                  <div><div className="font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.admno}</div></div>
-                  <Badge variant="destructive">{s.mean.toFixed(1)} avg</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Subject performance (avg score)" icon={<BookOpen className="w-4 h-4" />} delay={0} className="lg:col-span-1">
+          <ResponsiveContainer>
+            <BarChart data={subjectAvg.slice(0, 10)}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="code" tick={{ fontSize: 10 }} /><YAxis domain={[0, 100]} tick={{ fontSize: 10 }} /><Tooltip />
+              <Bar dataKey="mean" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={800}>
+                {subjectAvg.slice(0, 10).map((s, i) => <Cell key={i} fill={subjectTier(s.mean)} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="Class performance comparison" icon={<Users className="w-4 h-4" />} delay={0.05}>
+          <ResponsiveContainer>
+            <BarChart data={classPerf}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="className" tick={{ fontSize: 10 }} /><YAxis domain={[0, 100]} tick={{ fontSize: 10 }} /><Tooltip />
+              <Bar dataKey="mean" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={800}>
+                {classPerf.map((c, i) => <Cell key={i} fill={subjectTier(c.mean)} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
+      <ChartCard title="Grade distribution" icon={<Trophy className="w-4 h-4" />} delay={0.1} className="w-full">
+        <ResponsiveContainer>
+          <BarChart data={gradeDist}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="grade" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+            <Tooltip formatter={(v: any) => [`${v} results`, "Count"]} />
+            <Bar dataKey="count" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={800}>
+              {gradeDist.map((g, i) => <Cell key={i} fill={GRADE_COLORS[g.grade] ?? COLORS[i % COLORS.length]} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
+
+      <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-10% 0px" }} transition={{ duration: 0.45 }}>
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> AI insights — students at risk (academic)</CardTitle></CardHeader>
+          <CardContent>
+            {weakStudents.length === 0 ? <p className="text-sm text-muted-foreground">No currently-enrolled students below the risk threshold — great work!</p> : (
+              <ul className="text-sm space-y-1.5">
+                {weakStudents.map((s: any, i: number) => (
+                  <motion.li
+                    key={s.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.5) }}
+                    className="flex items-center justify-between border-b pb-1.5"
+                  >
+                    <div><div className="font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.admno}</div></div>
+                    <Badge variant="destructive">{s.mean.toFixed(1)} avg</Badge>
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
