@@ -374,11 +374,11 @@ export function isAdminRole(roles: string[]): boolean {
  * - Multiple roles → ONE Dashboard at the top, then every group from every
  *   role merged together, de-duplicated by URL. No group or link appears twice.
  */
-export function buildNavigation(roles: string[]): NavGroup[] {
+export function buildNavigation(roles: string[], features?: Record<string, boolean>): NavGroup[] {
   if (!roles || roles.length === 0) {
     return [{ label: "Main", items: [dashboard] }];
   }
-  if (isAdminRole(roles)) return ADMIN_NAV;
+  if (isAdminRole(roles)) return filterNavByFeatures(ADMIN_NAV, features);
 
   // Accumulate contributions from every role, merging items by URL across groups.
   // groupOrder preserves the first time we see each group label.
@@ -422,7 +422,57 @@ export function buildNavigation(roles: string[]): NavGroup[] {
     if (items.length > 0) groups.push({ label, items });
   }
 
-  return groups;
+  return filterNavByFeatures(groups, features);
+}
+
+// ─── Feature-toggle filtering ───────────────────────────────────────────────
+// Maps a nav item's URL to the school_features.feature_key that gates it, so
+// a platform admin (or school admin) disabling a module also hides its link
+// from the sidebar — not just blocks the page after the click. Ordered
+// longest-prefix-first isn't required since every entry is checked against
+// `startsWith`, but keep more specific prefixes above their broader parents
+// if that's ever needed (none currently overlap).
+const NAV_FEATURE_BY_PREFIX: [prefix: string, feature: string][] = [
+  ["/timetable", "timetable"],
+  ["/announcements", "announcements"],
+  ["/classroom", "classroom"],
+  ["/live", "live_classes"],
+  ["/library", "library"],
+  ["/boarding", "boarding"],
+  ["/kitchen", "kitchen"],
+  ["/transport", "transport"],
+  ["/clinic", "clinic"],
+  ["/security", "security"],
+  ["/discipline", "discipline"],
+  ["/finance", "finance"],
+  ["/ids", "ids"],
+  ["/admin/leaving-certificates", "leaving_certs"],
+  ["/admin/leaving-certificate", "leaving_certs"],
+  ["/admin/communications", "communications"],
+];
+
+function featureForUrl(url: string, explicit?: string): string | undefined {
+  if (explicit) return explicit;
+  const path = url.split("?")[0];
+  const match = NAV_FEATURE_BY_PREFIX.find(([prefix]) => path === prefix || path.startsWith(prefix + "/"));
+  return match?.[1];
+}
+
+function filterNavByFeatures(groups: NavGroup[], features?: Record<string, boolean>): NavGroup[] {
+  // No features loaded yet (still fetching, or platform-host context with no
+  // school) → default-on, same as useFeatureGate, so we never hide links
+  // before we actually know they should be hidden.
+  if (!features) return groups;
+  return groups
+    .map((group) => ({
+      label: group.label,
+      items: group.items.filter((item) => {
+        const key = featureForUrl(item.url, item.feature);
+        if (!key) return true;
+        return features[key] !== false;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 // ─── Self-check: nav/permission consistency ───────────────────────────────────
