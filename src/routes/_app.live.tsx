@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Video, Users, Calendar, Clock } from "lucide-react";
+import { Loader2, Plus, Video, Users, Calendar, Clock, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -92,6 +92,7 @@ function LivePage() {
         <TabsList>
           <TabsTrigger value="upcoming">Upcoming ({upcoming.length})</TabsTrigger>
           <TabsTrigger value="past">Past ({past.length})</TabsTrigger>
+          <TabsTrigger value="by-class">By class</TabsTrigger>
           {canManage && <TabsTrigger value="reports">Attendance reports</TabsTrigger>}
         </TabsList>
 
@@ -101,6 +102,19 @@ function LivePage() {
 
         <TabsContent value="past" className="space-y-3 mt-4">
           {isLoading ? <Spinner /> : past.length === 0 ? <Empty msg="No past sessions yet." /> : past.map(s => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />)}
+        </TabsContent>
+
+        <TabsContent value="by-class" className="mt-4">
+          {isLoading ? (
+            <Spinner />
+          ) : (
+            <ClassRecordsView
+              classes={classes as any[]}
+              sessions={sessions as any[]}
+              canManage={canManage}
+              onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })}
+            />
+          )}
         </TabsContent>
 
         {canManage && (
@@ -246,6 +260,136 @@ function NewSessionDialog({ classes, onCreated }: { classes: any[]; onCreated: (
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── BY CLASS: pick a class, see every session for it (upcoming + past,
+// newest first) plus a rolled-up attendance record for that class alone. ───
+function ClassRecordsView({
+  classes,
+  sessions,
+  canManage,
+  onChanged,
+}: {
+  classes: any[];
+  sessions: any[];
+  canManage: boolean;
+  onChanged: () => void;
+}) {
+  const [classId, setClassId] = useState<string>(classes[0]?.id ?? "");
+
+  const classSessions = useMemo(
+    () =>
+      sessions
+        .filter((s) => s.class_id === classId)
+        .sort((a, b) => +new Date(b.scheduled_start) - +new Date(a.scheduled_start)),
+    [sessions, classId],
+  );
+
+  const sessionIds = useMemo(() => classSessions.map((s) => s.id), [classSessions]);
+
+  const { data: attendanceRows = [], isLoading: attLoading } = useQuery({
+    queryKey: ["live-attendance-by-class", classId, sessionIds.join(",")],
+    enabled: canManage && sessionIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("live_session_attendance")
+        .select("session_id, student_id, duration_seconds, status, students!inner(first_name, last_name, unique_id)")
+        .in("session_id", sessionIds);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Roll attendance up per-student across every session of this class.
+  const studentRecords = useMemo(() => {
+    const m = new Map<string, { name: string; uid: string; present: number; late: number; absent: number; durationMin: number }>();
+    (attendanceRows as any[]).forEach((r) => {
+      const k = r.student_id;
+      const cur = m.get(k) || {
+        name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim(),
+        uid: r.students?.unique_id ?? "",
+        present: 0, late: 0, absent: 0, durationMin: 0,
+      };
+      if (r.status === "present") cur.present += 1;
+      else if (r.status === "late") cur.late += 1;
+      else if (r.status === "absent") cur.absent += 1;
+      cur.durationMin += Math.round((r.duration_seconds || 0) / 60);
+      m.set(k, cur);
+    });
+    return Array.from(m.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [attendanceRows]);
+
+  if (classes.length === 0) {
+    return <Empty msg="No classes available." />;
+  }
+
+  const selectedClassName = classes.find((c) => c.id === classId)?.name ?? "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+        <Select value={classId} onValueChange={setClassId}>
+          <SelectTrigger className="w-[240px]"><SelectValue placeholder="Choose class" /></SelectTrigger>
+          <SelectContent>
+            {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground">
+          {classSessions.length} session{classSessions.length === 1 ? "" : "s"} for {selectedClassName || "this class"}
+        </span>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-2">Sessions</h3>
+        {classSessions.length === 0 ? (
+          <Empty msg="No sessions for this class yet." />
+        ) : (
+          <div className="space-y-3">
+            {classSessions.map((s) => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={onChanged} />)}
+          </div>
+        )}
+      </div>
+
+      {canManage && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2">Attendance record — {selectedClassName || "class"}</h3>
+          <Card>
+            <CardContent className="pt-4">
+              {attLoading ? (
+                <Spinner />
+              ) : studentRecords.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">No attendance recorded for this class yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead className="text-right">Present</TableHead>
+                      <TableHead className="text-right">Late</TableHead>
+                      <TableHead className="text-right">Absent</TableHead>
+                      <TableHead className="text-right">Min</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {studentRecords.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell><div className="font-medium">{r.name}</div><div className="text-xs text-muted-foreground">{r.uid}</div></TableCell>
+                        <TableCell className="text-right text-emerald-600">{r.present}</TableCell>
+                        <TableCell className="text-right text-amber-600">{r.late}</TableCell>
+                        <TableCell className="text-right text-destructive">{r.absent}</TableCell>
+                        <TableCell className="text-right">{r.durationMin}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }
 
