@@ -23,7 +23,7 @@ export function FeatureGate({
           <h2 className="text-lg font-semibold">Module not enabled</h2>
           <p className="text-sm text-muted-foreground">
             The <span className="font-mono">{feature}</span> module is disabled for this school.
-            Ask your school administrator to enable it from Admin → Settings.
+            Ask your school administrator to enable it from Admin → Features.
           </p>
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard">Back to dashboard</Link>
