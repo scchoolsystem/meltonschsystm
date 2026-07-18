@@ -88,6 +88,11 @@ function LivePage() {
       if (error) throw error;
       return data || [];
     },
+    // Session status (scheduled/live/ended) can flip from another client
+    // (the session page's auto-start/auto-end effects, or another admin
+    // clicking Cancel/End) — without polling, cards here would keep showing
+    // a stale "live" pill and an active Join button after a class ended.
+    refetchInterval: 15_000,
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["live-sessions"] });
