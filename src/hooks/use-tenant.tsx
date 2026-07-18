@@ -214,6 +214,37 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       document.title = isPlatformHost ? "Platform Admin — SmartDev ERP" : school?.name ? `${school.name} — ERP` : "SmartDev ERP";
   }, [school, isPlatformHost]);
 
+  // Live module toggles: a platform admin can flip a school's feature flags
+  // at any time while that school's users are already logged in. `features`
+  // only loaded once on mount otherwise, so without this a toggle wouldn't
+  // take effect for an open session until the user manually refreshed.
+  // Scoped to school.id via the postgres_changes filter so this session only
+  // reacts to rows for its own school, not every school on the platform.
+  useEffect(() => {
+    if (!school?.id) return;
+    const ch = supabase
+      .channel(`school-features-${school.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "school_features", filter: `school_id=eq.${school.id}` },
+        (payload) => {
+          const row: any = payload.new ?? payload.old;
+          if (!row?.feature_key) return;
+          if (payload.eventType === "DELETE") {
+            setFeatures((prev) => {
+              const next = { ...prev };
+              delete next[row.feature_key];
+              return next;
+            });
+          } else {
+            setFeatures((prev) => ({ ...prev, [row.feature_key]: (payload.new as any).enabled }));
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [school?.id]);
+
   const setSchoolSlug = useCallback(async (newSlug: string, onStage?: (stage: string) => void) => {
     onStage?.("Saving your selection...");
     // Previously this awaited storageSet() before ever starting loadSchool().
