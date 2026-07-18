@@ -12,6 +12,7 @@
  */
 
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
@@ -42,7 +43,11 @@ export const Route = createFileRoute("/_app/academics/oversight")({
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: OversightPage,
+  component: () => (
+    <FeatureGate feature="academics">
+      <OversightPage />
+    </FeatureGate>
+  ),
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
