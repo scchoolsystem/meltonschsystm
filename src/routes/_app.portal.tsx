@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, redirect, useNavigate, Link } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getSessionSafe, supabase } from "@/integrations/supabase/client";
@@ -81,7 +82,11 @@ export const Route = createFileRoute("/_app/portal")({
 
     throw redirect({ to: target, search: search as any, replace: true });
   },
-  component: UniversalPortal,
+  component: () => (
+    <FeatureGate feature="portals">
+      <UniversalPortal />
+    </FeatureGate>
+  ),
 });
 
 function UniversalPortal() {

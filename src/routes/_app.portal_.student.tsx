@@ -5,6 +5,7 @@
 
 import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
@@ -52,7 +53,11 @@ export const Route = createFileRoute("/_app/portal_/student")({
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: StudentPortalGuard,
+  component: () => (
+    <FeatureGate feature="portals">
+      <StudentPortalGuard />
+    </FeatureGate>
+  ),
 });
 
 // ─── Animation Variants ───────────────────────────────────────────────────

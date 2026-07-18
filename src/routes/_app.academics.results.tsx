@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
@@ -45,7 +46,11 @@ export const Route = createFileRoute("/_app/academics/results")({
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: ResultsGuard,
+  component: () => (
+    <FeatureGate feature="academics">
+      <ResultsGuard />
+    </FeatureGate>
+  ),
 });
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────

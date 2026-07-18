@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
@@ -7,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Printer, AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-export const Route = createFileRoute("/_app/admin/leaving-certificate/$id")({ component: Page });
+export const Route = createFileRoute("/_app/admin/leaving-certificate/$id")({
+  component: () => (
+    <FeatureGate feature="leaving_certs">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 /**
  * Fetch whether a specific school feature is enabled.

@@ -8,6 +8,7 @@
  */
 
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -70,7 +71,11 @@ export const Route = createFileRoute("/_app/assignments")({
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: AssignmentsPage,
+  component: () => (
+    <FeatureGate feature="classroom">
+      <AssignmentsPage />
+    </FeatureGate>
+  ),
 });
 
 function AssignmentsPage() {

@@ -1,4 +1,5 @@
 import { createFileRoute, useRouter, Link, useParams } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +14,11 @@ import { toast } from "sonner";
 import { format, differenceInMinutes } from "date-fns";
 
 export const Route = createFileRoute("/_app/live/$sessionId")({
-  component: SessionRoom,
+  component: () => (
+    <FeatureGate feature="live_classes">
+      <SessionRoom />
+    </FeatureGate>
+  ),
   errorComponent: ({ error }) => <div className="p-6 text-destructive">Couldn't load: {error.message}</div>,
   notFoundComponent: () => <div className="p-6">Session not found</div>,
 });

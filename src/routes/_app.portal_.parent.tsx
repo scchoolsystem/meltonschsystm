@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,7 +43,11 @@ const C = {
 const PIE_COLORS = [C.primary, C.green, C.yellow, C.red, C.cyan, "#8b5cf6", "#f97316"];
 
 export const Route = createFileRoute("/_app/portal_/parent")({
-  component: ParentPortal,
+  component: () => (
+    <FeatureGate feature="portals">
+      <ParentPortal />
+    </FeatureGate>
+  ),
 });
 
 function gradeLabel(score: number): { grade: string; color: string } {

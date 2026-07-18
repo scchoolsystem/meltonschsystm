@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { motion, useInView, animate } from "framer-motion";
@@ -21,7 +22,13 @@ import { AcademicAnalyticsPanel } from "@/components/dashboard/AcademicAnalytics
 import type { AppRole } from "@/core/rbac";
 import { ANALYTICS_MODULES, getVisibleAnalyticsModules, type AnalyticsModuleKey } from "@/core/rbac/analytics";
 
-export const Route = createFileRoute("/_app/analytics")({ component: Analytics });
+export const Route = createFileRoute("/_app/analytics")({
+  component: () => (
+    <FeatureGate feature="analytics">
+      <Analytics />
+    </FeatureGate>
+  ),
+});
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
 
