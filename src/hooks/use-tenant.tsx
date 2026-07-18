@@ -177,11 +177,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         onStage?.("Loading school settings...");
         const { data: flags } = await stageTimeout(
           "loading school settings (school_features table)",
-          supabase.from("school_features").select("feature_key,enabled").eq("school_id", data.id).abortSignal(controller.signal),
+          supabase.from("school_features").select("feature_key,enabled,platform_enabled").eq("school_id", data.id).abortSignal(controller.signal),
           18000
         );
         const map: Record<string, boolean> = {};
-        (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled; });
+        // A module is only "on" when BOTH the school admin's toggle and the
+        // platform admin's toggle are true — same rule enforced by the
+        // school_feature_enabled() RLS helper. The admin/features.tsx UI
+        // already locks the school-level switch whenever platform_enabled
+        // is false, so these two normally can't drift apart, but reading
+        // only `enabled` here would silently show a module as available in
+        // the UI even in a state the database would reject writes for.
+        (flags ?? []).forEach((f: any) => { map[f.feature_key] = f.enabled && (f.platform_enabled ?? true); });
         setFeatures(map);
         onStage?.("Done");
       } finally {
@@ -237,7 +244,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
               return next;
             });
           } else {
-            setFeatures((prev) => ({ ...prev, [row.feature_key]: (payload.new as any).enabled }));
+            const newRow = payload.new as any;
+            setFeatures((prev) => ({ ...prev, [row.feature_key]: newRow.enabled && (newRow.platform_enabled ?? true) }));
           }
         }
       )
