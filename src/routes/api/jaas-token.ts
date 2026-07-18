@@ -147,7 +147,7 @@ export const Route = createFileRoute("/api/jaas-token")({
         // Fetch real user identity from DB — never trust client-supplied values
         const { data: profile, error: profileErr } = await supabaseAdmin
           .from("profiles")
-          .select("full_name, email")
+          .select("full_name")
           .eq("id", userId)
           .maybeSingle();
 
@@ -165,6 +165,14 @@ export const Route = createFileRoute("/api/jaas-token")({
             { status: 403, headers: { "content-type": "application/json" } },
           );
         }
+
+        // Email lives on auth.users, not profiles — fetch it separately via the
+        // service-role admin client. Non-fatal if it errors; we just fall back to "".
+        const { data: authUserRes, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (authUserErr) {
+          console.error("[jaas-token] auth user fetch error:", authUserErr);
+        }
+        const email = authUserRes?.user?.email ?? "";
 
         // Determine moderator status from DB role — never from request body
         const { data: roleRow } = await supabaseAdmin
@@ -192,7 +200,7 @@ export const Route = createFileRoute("/api/jaas-token")({
             user: {
               id: userId,
               name: profile.full_name ?? "User",
-              email: profile.email ?? "",
+              email,
               moderator: isModerator,
             },
             features: {
