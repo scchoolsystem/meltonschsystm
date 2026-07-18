@@ -330,6 +330,11 @@ function SessionRoom() {
       if (error) throw error;
       return data;
     },
+    // Without this, only the client that flips the status (the manager
+    // ending the class, or the auto-end effect below) ever sees it change —
+    // students already in the room would keep seeing "live" until they
+    // manually left and reopened the session.
+    refetchInterval: 15_000,
   });
 
   const { data: myStudent } = useQuery({
@@ -362,6 +367,24 @@ function SessionRoom() {
         .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
     }
   }, [session?.id, session?.status, session?.scheduled_start, canManage, sessionId, qc]);
+
+  // Auto-end once scheduled_end passes. Mirrors the auto-start effect above,
+  // and only fires from a manager's client — everyone else picks up the
+  // resulting "ended" status via the refetchInterval on the session query.
+  useEffect(() => {
+    if (!session || !canManage) return;
+    if (
+      session.status === "live" &&
+      session.scheduled_end &&
+      Date.now() >= new Date(session.scheduled_end).getTime()
+    ) {
+      supabase
+        .from("live_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", sessionId)
+        .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
+    }
+  }, [session?.id, session?.status, session?.scheduled_end, canManage, sessionId, qc]);
 
   // Warn (once) if a student's account isn't linked, since attendance can
   // never be recorded for them regardless of whether the meeting itself works.
