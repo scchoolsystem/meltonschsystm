@@ -29,8 +29,15 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { generateTimetable } from "@/lib/timetable.functions";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export const Route = createFileRoute("/_app/timetable")({ component: Page });
+export const Route = createFileRoute("/_app/timetable")({
+  component: () => (
+    <FeatureGate feature="timetable">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];

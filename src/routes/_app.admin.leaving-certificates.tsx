@@ -14,8 +14,15 @@ import { Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { issueLeavingCertificate } from "@/lib/leaving-certs.functions";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export const Route = createFileRoute("/_app/admin/leaving-certificates")({ component: Page });
+export const Route = createFileRoute("/_app/admin/leaving-certificates")({
+  component: () => (
+    <FeatureGate feature="leaving_certs">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 function Page() {
   const qc = useQueryClient();

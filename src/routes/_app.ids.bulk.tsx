@@ -8,8 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Printer } from "lucide-react";
 import { IdCard } from "@/components/IdCard";
 import { useTenant } from "@/hooks/use-tenant";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export const Route = createFileRoute("/_app/ids/bulk")({ component: Page });
+export const Route = createFileRoute("/_app/ids/bulk")({
+  component: () => (
+    <FeatureGate feature="ids">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 function Page() {
   const [classId, setClassId] = useState<string>("all");

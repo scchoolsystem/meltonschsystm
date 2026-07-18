@@ -13,8 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Loader2, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export const Route = createFileRoute("/_app/announcements")({ component: Page });
+export const Route = createFileRoute("/_app/announcements")({
+  component: () => (
+    <FeatureGate feature="announcements">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 function Page() {
   const qc = useQueryClient();

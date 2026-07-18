@@ -12,9 +12,14 @@ import {
   User, Phone, Mail, MapPin, GraduationCap, Calendar,
   Heart, AlertCircle, Search,
 } from "lucide-react";
+import { FeatureGate } from "@/components/FeatureGate";
 
 export const Route = createFileRoute("/_app/ids/verify")({
-  component: Page,
+  component: () => (
+    <FeatureGate feature="ids">
+      <Page />
+    </FeatureGate>
+  ),
   validateSearch: (search: Record<string, unknown>) => ({
     code: typeof search.code === "string" ? search.code : undefined,
   }),

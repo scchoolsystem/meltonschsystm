@@ -19,9 +19,14 @@ import { Receipt, UserX, GraduationCap, Download } from "lucide-react";
 import { sendBulkSms, sendEmailBlast } from "@/lib/sms.functions";
 import { notifyFeeDue, notifyAttendanceAlert, notifyResultsPublished } from "@/lib/notifications.functions";
 import { downloadCsv } from "@/lib/export-utils";
+import { FeatureGate } from "@/components/FeatureGate";
 
 export const Route = createFileRoute("/_app/admin/communications")({
-  component: CommunicationsPage,
+  component: () => (
+    <FeatureGate feature="communications">
+      <CommunicationsPage />
+    </FeatureGate>
+  ),
 });
 
 type AudienceType = "all_students" | "all_parents" | "class" | "custom";

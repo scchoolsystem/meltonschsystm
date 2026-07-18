@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Printer, Loader2 } from "lucide-react";
 import { IdCard } from "@/components/IdCard";
 import { useTenant } from "@/hooks/use-tenant";
+import { FeatureGate } from "@/components/FeatureGate";
 
-export const Route = createFileRoute("/_app/ids/student/$id")({ component: Page });
+export const Route = createFileRoute("/_app/ids/student/$id")({
+  component: () => (
+    <FeatureGate feature="ids">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 function Page() {
   const { id } = Route.useParams();

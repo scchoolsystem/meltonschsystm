@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, Plus, KeyRound, Megaphone, BookOpen, FileText, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { FeatureGate } from "@/components/FeatureGate";
 
 async function uploadClassroomFile(file: File, schoolId: string): Promise<string> {
   const ext = file.name.split(".").pop();
@@ -28,7 +29,13 @@ async function uploadClassroomFile(file: File, schoolId: string): Promise<string
 }
 
 
-export const Route = createFileRoute("/_app/classroom")({ component: ClassroomPage });
+export const Route = createFileRoute("/_app/classroom")({
+  component: () => (
+    <FeatureGate feature="classroom">
+      <ClassroomPage />
+    </FeatureGate>
+  ),
+});
 
 const KIND_META: Record<string, { icon: any; label: string; color: string }> = {
   announcement: { icon: Megaphone, label: "Announcement", color: "bg-blue-500/10 text-blue-700" },

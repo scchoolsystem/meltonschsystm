@@ -16,9 +16,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Plus, Video, Users, Calendar, Clock, GraduationCap, Pencil, Download, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { FeatureGate } from "@/components/FeatureGate";
 
 export const Route = createFileRoute("/_app/live")({
-  component: LiveShell,
+  component: () => (
+    <FeatureGate feature="live_classes">
+      <LiveShell />
+    </FeatureGate>
+  ),
   errorComponent: ({ error }) => <div className="p-6 text-destructive">Couldn't load: {error.message}</div>,
   notFoundComponent: () => <div className="p-6">Not found</div>,
 });
