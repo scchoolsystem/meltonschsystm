@@ -225,7 +225,13 @@ function LiveRoom({
           width: "100%",
           height: "100%",
           configOverwrite: {
+            // FIX: newer Jitsi/JaaS releases moved the prejoin ("Join
+            // meeting" device-check) screen from this flat legacy flag to
+            // the nested one below. Recent versions silently ignore the
+            // legacy flag, so it's kept here for older deployments but the
+            // nested flag is what actually suppresses the screen now.
             prejoinPageEnabled: false,
+            prejoinConfig: { enabled: false },
             disableDeepLinking: true,
             startWithAudioMuted: false,
             startWithVideoMuted: false,
