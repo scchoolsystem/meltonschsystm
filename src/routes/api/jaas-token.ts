@@ -220,7 +220,16 @@ export const Route = createFileRoute("/api/jaas-token")({
           },
         };
 
-        const headerB64    = encodeJson({ alg: "RS256", typ: "JWT", kid: apiKey });
+        // FIX: JaaS's key-lookup service resolves the signing key by the
+        // *compound* id "{appId}/{keyId}" — not the bare key id alone. If
+        // JAAS_API_KEY was ever saved as just the short key id (a very easy
+        // mistake, since that's usually the label shown next to it in the
+        // JaaS console), every token this route issues gets silently
+        // rejected by JaaS's key lookup — no error here, just a broken
+        // meeting/moderator experience on the Jitsi side. This makes the
+        // header correct either way apiKey was saved.
+        const kid = apiKey!.includes("/") ? apiKey! : `${appId}/${apiKey}`;
+        const headerB64    = encodeJson({ alg: "RS256", typ: "JWT", kid });
         const payloadB64   = encodeJson(jwtPayload);
         const signingInput = `${headerB64}.${payloadB64}`;
 
