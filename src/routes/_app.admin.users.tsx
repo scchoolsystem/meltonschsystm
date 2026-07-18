@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -242,10 +241,8 @@ function UsersPage() {
     { type: "revoke" | "restore"; ids: string[]; label: string } | null
   >(null);
 
-  // Do not statically import server-only functions into client bundle.
-  const createFn = useServerFn(() => import("@/lib/auth-admin.functions").then((m) => m.createAccount));
-  const resetFn = useServerFn(() => import("@/lib/auth-admin.functions").then((m) => m.resetPassword));
-  const setActiveFn = useServerFn(() => import("@/lib/auth-admin.functions").then((m) => m.setAccountActive));
+  // Do not statically import server-only functions into client bundle —
+  // resolve each server fn from the lazy import right before calling it.
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["all-credentials"],
@@ -296,7 +293,8 @@ function UsersPage() {
   // ── Mutations ────────────────────────────────────────────────────────────
   const resetMutation = useMutation({
     mutationFn: async (vars: { user_id: string; label: string }) => {
-      const { password } = await resetFn({ data: { user_id: vars.user_id } });
+      const { resetPassword } = await import("@/lib/auth-admin.functions");
+      const { password } = await resetPassword({ data: { user_id: vars.user_id } });
       return { password, label: vars.label };
     },
     onSuccess: ({ password, label }) => {
@@ -308,7 +306,8 @@ function UsersPage() {
 
   const setActiveMutation = useMutation({
     mutationFn: async (vars: { user_id: string; active: boolean }) => {
-      await setActiveFn({ data: vars });
+      const { setAccountActive } = await import("@/lib/auth-admin.functions");
+      await setAccountActive({ data: vars });
       return vars;
     },
     onSuccess: ({ active }) => {
@@ -320,8 +319,9 @@ function UsersPage() {
 
   const bulkActiveMutation = useMutation({
     mutationFn: async (vars: { ids: string[]; active: boolean }) => {
+      const { setAccountActive } = await import("@/lib/auth-admin.functions");
       const results = await Promise.allSettled(
-        vars.ids.map((user_id) => setActiveFn({ data: { user_id, active: vars.active } }))
+        vars.ids.map((user_id) => setAccountActive({ data: { user_id, active: vars.active } }))
       );
       const failed = results.filter((r) => r.status === "rejected").length;
       return { total: vars.ids.length, failed, active: vars.active };
@@ -341,7 +341,8 @@ function UsersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (vars: { full_name: string; role: string; email?: string }) => {
-      return await createFn({ data: vars });
+      const { createAccount } = await import("@/lib/auth-admin.functions");
+      return await createAccount({ data: vars });
     },
   });
 
