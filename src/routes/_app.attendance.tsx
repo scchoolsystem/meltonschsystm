@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,7 +9,11 @@ import { Loader2, CheckCircle2, Clock, XCircle, ShieldQuestion, CalendarDays, Us
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/attendance/mark")({
-  component: TeacherAttendanceMark,
+  component: () => (
+    <FeatureGate feature="attendance">
+      <TeacherAttendanceMark />
+    </FeatureGate>
+  ),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
