@@ -21,13 +21,13 @@ export function AppSidebar() {
   const { fullName, user, signOut, roles } = useAuth();
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
-  const { school } = useTenant();
+  const { school, features } = useTenant();
 
   const settings = school
     ? { school_name: school.name, motto: school.motto, logo_url: school.logo_url }
     : null;
 
-  const navGroups = buildNavigation(roles ?? []);
+  const navGroups = buildNavigation(roles ?? [], features);
 
   return (
     <Sidebar collapsible="icon">
