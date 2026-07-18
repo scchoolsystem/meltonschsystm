@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter, Link, useParams } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
@@ -79,11 +79,229 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
 }
 
 // ---------------------------------------------------------------------------
+// Jitsi External API script loader — cached at module scope so the ~heavy
+// 8x8.vc/external_api.js bundle is only ever fetched once per page session,
+// even if the user navigates in/out of several live rooms.
+// ---------------------------------------------------------------------------
+declare global {
+  interface Window {
+    JitsiMeetExternalAPI?: any;
+  }
+}
+
+let jitsiScriptPromise: Promise<void> | null = null;
+
+function loadJitsiScript(appId: string): Promise<void> {
+  if (window.JitsiMeetExternalAPI) return Promise.resolve();
+  if (jitsiScriptPromise) return jitsiScriptPromise;
+  jitsiScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-jitsi-external-api]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load meeting library")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://8x8.vc/${appId}/external_api.js`;
+    script.async = true;
+    script.dataset.jitsiExternalApi = "true";
+    script.onload = () => resolve();
+    script.onerror = () => {
+      jitsiScriptPromise = null; // allow retry
+      reject(new Error("Failed to load meeting library"));
+    };
+    document.head.appendChild(script);
+  });
+  return jitsiScriptPromise;
+}
+
+// ---------------------------------------------------------------------------
+// Live room embed — uses the Jitsi/JaaS External API (not a bare iframe) so
+// we get real lifecycle events instead of guessing:
+//   - userInfo.displayName is handed to Jitsi directly at construction time,
+//     so nobody ever sees a "what's your name?" prompt — this works even in
+//     cases where the URL-hash config flags (prejoinPageEnabled, etc.) get
+//     ignored by a Jitsi/JaaS version.
+//   - videoConferenceJoined only fires once the person has actually entered
+//     the call, so attendance reflects real presence, not just "the page was
+//     open". Previously attendance was written as soon as the route mounted,
+//     which is also why a join could silently fail to record: any DB error
+//     was swallowed with console.warn and never shown to anyone.
+//   - videoConferenceLeft / beforeunload close out the attendance row with a
+//     real duration.
+// ---------------------------------------------------------------------------
+function LiveRoom({
+  jaasAppId,
+  roomName,
+  jwt,
+  title,
+  displayName,
+  email,
+  isStudent,
+  studentId,
+  sessionId,
+  scheduledStart,
+  userId,
+}: {
+  jaasAppId: string;
+  roomName: string;
+  jwt: string;
+  title: string;
+  displayName: string;
+  email: string;
+  isStudent: boolean;
+  studentId: string | null;
+  sessionId: string;
+  scheduledStart: string;
+  userId: string | undefined;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const apiRef = useRef<any>(null);
+  const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    let cancelled = false;
+    let api: any;
+
+    const markJoined = async () => {
+      if (!isStudent || !studentId) return;
+      const joinedAt = Date.now();
+      const minsLate = differenceInMinutes(new Date(joinedAt), new Date(scheduledStart));
+      const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
+      const { data, error } = await supabase
+        .from("live_session_attendance")
+        .upsert(
+          {
+            session_id: sessionId,
+            student_id: studentId,
+            user_id: userId ?? null,
+            joined_at: new Date(joinedAt).toISOString(),
+            left_at: null,
+            duration_seconds: null,
+            status: autoStatus,
+          } as any,
+          { onConflict: "session_id,student_id" },
+        )
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        // FIX: this used to be console.warn-only, so a failed write (e.g. an
+        // RLS or network hiccup) was invisible — the roster would just show
+        // the student as never having joined, with no signal anything went
+        // wrong. Now it surfaces directly.
+        console.error("attendance insert failed", error);
+        toast.error(`Couldn't record your attendance: ${error.message}`);
+        return;
+      }
+      attendanceRef.current = { id: data?.id, joinedAt };
+      qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+    };
+
+    const markLeft = () => {
+      const { id, joinedAt } = attendanceRef.current;
+      if (!id || !joinedAt) return;
+      const dur = Math.round((Date.now() - joinedAt) / 1000);
+      supabase
+        .from("live_session_attendance")
+        .update({ left_at: new Date().toISOString(), duration_seconds: dur })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.error("attendance leave-update failed", error);
+          qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+        });
+    };
+
+    window.addEventListener("beforeunload", markLeft);
+
+    loadJitsiScript(jaasAppId)
+      .then(() => {
+        if (cancelled || !containerRef.current) return;
+        api = new window.JitsiMeetExternalAPI("8x8.vc", {
+          roomName: `${jaasAppId}/${roomName}`,
+          jwt,
+          parentNode: containerRef.current,
+          width: "100%",
+          height: "100%",
+          configOverwrite: {
+            prejoinPageEnabled: false,
+            disableDeepLinking: true,
+            startWithAudioMuted: false,
+            startWithVideoMuted: false,
+            requireDisplayName: false,
+            enableWelcomePage: false,
+            startAudioOnly: false,
+          },
+          interfaceConfigOverwrite: {
+            MOBILE_APP_PROMO: false,
+            SHOW_JITSI_WATERMARK: false,
+            HIDE_INVITE_MORE_HEADER: true,
+          },
+          // This is the actual fix for "why do I have to type my name":
+          // handing Jitsi the name up front at construction time means the
+          // prejoin/name prompt never appears, regardless of what the
+          // config flags above do on any given Jitsi/JaaS release.
+          userInfo: {
+            displayName: displayName || "User",
+            email: email || undefined,
+          },
+        });
+        apiRef.current = api;
+        api.addEventListener("videoConferenceJoined", markJoined);
+        api.addEventListener("videoConferenceLeft", markLeft);
+        api.addEventListener("readyToClose", markLeft);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setLoadError(err.message);
+      });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("beforeunload", markLeft);
+      markLeft();
+      if (api) {
+        try {
+          api.removeEventListener("videoConferenceJoined", markJoined);
+          api.removeEventListener("videoConferenceLeft", markLeft);
+          api.removeEventListener("readyToClose", markLeft);
+          api.dispose();
+        } catch {
+          // ignore dispose errors on unmount
+        }
+      }
+    };
+    // Intentionally re-run only when the identity of the room/token changes —
+    // not on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jaasAppId, roomName, jwt]);
+
+  if (loadError) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center space-y-3">
+          <p className="text-destructive text-sm font-medium">{loadError}</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div ref={containerRef} title={title} style={{ width: "100%", height: "70vh", minHeight: 480 }} />
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main room component
 // ---------------------------------------------------------------------------
 function SessionRoom() {
   const { sessionId } = useParams({ from: "/_app/live/$sessionId" });
-  const { user, roles, isAdmin } = useAuth();
+  const { user, roles, isAdmin, fullName } = useAuth();
   const qc = useQueryClient();
   const isStudent = roles.includes("student" as any);
   const canManage =
@@ -122,6 +340,9 @@ function SessionRoom() {
   });
 
   // Auto-start if teacher/admin opens room at or after scheduled start time
+  // FIX: depend on primitive fields, not the `session` object reference —
+  // react-query hands back a new object on every refetch, which was
+  // re-running this (and the old attendance effect) far more than intended.
   useEffect(() => {
     if (!session || !canManage) return;
     if (
@@ -134,53 +355,15 @@ function SessionRoom() {
         .eq("id", sessionId)
         .then(() => qc.invalidateQueries({ queryKey: ["live-session", sessionId] }));
     }
-  }, [session?.id, session?.status, canManage]);
+  }, [session?.id, session?.status, session?.scheduled_start, canManage, sessionId, qc]);
 
-  // Auto-track attendance on join/leave; auto-derive present vs late
-  const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  // Warn (once) if a student's account isn't linked, since attendance can
+  // never be recorded for them regardless of whether the meeting itself works.
   useEffect(() => {
-    if (!session || !isStudent || !myStudent) return;
-    let active = true;
-    (async () => {
-      const joinedAt = Date.now();
-      const minsLate = differenceInMinutes(new Date(joinedAt), new Date(session.scheduled_start));
-      const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
-      const { data, error } = await supabase
-        .from("live_session_attendance")
-        .upsert(
-          {
-            session_id: sessionId,
-            student_id: myStudent,
-            user_id: user?.id ?? null,
-            joined_at: new Date(joinedAt).toISOString(),
-            left_at: null,
-            duration_seconds: null,
-            status: autoStatus,
-          } as any,
-          { onConflict: "session_id,student_id" },
-        )
-        .select("id")
-        .maybeSingle();
-      if (error) { console.warn("attendance insert", error); return; }
-      if (active && data) attendanceRef.current = { id: data.id, joinedAt };
-    })();
-    const markLeft = () => {
-      const { id, joinedAt } = attendanceRef.current;
-      if (!id || !joinedAt) return;
-      const dur = Math.round((Date.now() - joinedAt) / 1000);
-      supabase
-        .from("live_session_attendance")
-        .update({ left_at: new Date().toISOString(), duration_seconds: dur })
-        .eq("id", id)
-        .then(() => {});
-    };
-    window.addEventListener("beforeunload", markLeft);
-    return () => {
-      active = false;
-      markLeft();
-      window.removeEventListener("beforeunload", markLeft);
-    };
-  }, [session, isStudent, myStudent, sessionId, user?.id]);
+    if (isStudent && myStudent === null && user?.id) {
+      toast.warning("Your account isn't linked to a student record — your attendance won't be tracked automatically.");
+    }
+  }, [isStudent, myStudent, user?.id]);
 
   const startSession = async () => {
     await supabase
@@ -219,26 +402,6 @@ function SessionRoom() {
       </div>
     );
   if (!session) return <div className="p-6">Session not found.</div>;
-
-  // Build JaaS iframe URL once token is ready
-  const jitsiIframeSrc =
-    jaasToken && jaasAppId
-      ? [
-          `https://8x8.vc/${jaasAppId}/${session.room_name}`,
-          `#jwt=${jaasToken}`,
-          `&config.prejoinPageEnabled=false`,
-          `&config.disableDeepLinking=true`,
-          `&config.startWithAudioMuted=false`,
-          `&config.startWithVideoMuted=false`,
-          `&config.requireDisplayName=false`,
-          `&config.enableWelcomePage=false`,
-          `&config.disableModeratorIndicator=false`,
-          `&config.startAudioOnly=false`,
-          `&interfaceConfig.MOBILE_APP_PROMO=false`,
-          `&interfaceConfig.SHOW_JITSI_WATERMARK=false`,
-          `&interfaceConfig.HIDE_INVITE_MORE_HEADER=true`,
-        ].join("")
-      : null;
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
@@ -317,7 +480,7 @@ function SessionRoom() {
             <p className="text-sm text-muted-foreground">Connecting to live class…</p>
           </CardContent>
         </Card>
-      ) : tokenError || !jitsiIframeSrc ? (
+      ) : tokenError || !jaasAppId || !jaasToken ? (
         <Card>
           <CardContent className="py-10 text-center space-y-3">
             <p className="text-destructive text-sm font-medium">
@@ -339,17 +502,20 @@ function SessionRoom() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <iframe
-            key={jitsiIframeSrc} // remount if token changes
-            title={session.title}
-            src={jitsiIframeSrc}
-            allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *; clipboard-write *"
-            allowFullScreen
-            className="w-full"
-            style={{ height: "70vh", minHeight: 480, border: 0 }}
-          />
-        </Card>
+        <LiveRoom
+          key={session.room_name}
+          jaasAppId={jaasAppId}
+          roomName={session.room_name}
+          jwt={jaasToken}
+          title={session.title}
+          displayName={fullName || user?.email || "User"}
+          email={user?.email ?? ""}
+          isStudent={isStudent}
+          studentId={myStudent ?? null}
+          sessionId={sessionId}
+          scheduledStart={session.scheduled_start}
+          userId={user?.id}
+        />
       )}
 
       {canManage && (
@@ -422,7 +588,9 @@ function AttendanceRoster({
 
   const { data: attendance = [], isLoading: attLoading } = useQuery({
     queryKey: ["live-session-attendance", sessionId],
-    refetchInterval: sessionEnded ? false : 15_000,
+    // FIX: was 15s only; drop to 5s so a join shows up on the teacher's
+    // roster promptly instead of looking like it "didn't register".
+    refetchInterval: sessionEnded ? false : 5_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("live_session_attendance")
