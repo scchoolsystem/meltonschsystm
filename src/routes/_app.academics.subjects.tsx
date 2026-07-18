@@ -12,6 +12,7 @@
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
@@ -51,7 +52,13 @@ import {
   GraduationCap, ChevronRight,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_app/academics/subjects")({ component: Page });
+export const Route = createFileRoute("/_app/academics/subjects")({
+  component: () => (
+    <FeatureGate feature="academics">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
