@@ -264,19 +264,48 @@ function AttendanceReports({ sessions }: { sessions: any[] }) {
     },
   });
 
-  const byStudent = useMemo(() => {
-    const m = new Map<string, { name: string; uid: string; present: number; late: number; absent: number; durationMin: number }>();
+  // Which class a given session belongs to. We key off the *session's* class
+  // (not the student's current class_id) so a student who's since moved
+  // classes still shows up under the class the lesson was actually taught to.
+  const sessionClassMap = useMemo(() => {
+    const m = new Map<string, { classId: string; className: string }>();
+    for (const s of sessions) {
+      m.set(s.id, { classId: s.class_id ?? "unassigned", className: s.classes?.name ?? "Unassigned" });
+    }
+    return m;
+  }, [sessions]);
+
+  // class_id -> { className, students: [...] }, classes and students both
+  // alphabetically sorted so the report reads the same way every time.
+  const byClass = useMemo(() => {
+    const classes = new Map<string, { className: string; students: Map<string, any> }>();
     (rows as any[]).forEach(r => {
+      const sessInfo = sessionClassMap.get(r.session_id);
+      const classId = sessInfo?.classId ?? "unassigned";
+      const className = sessInfo?.className ?? "Unassigned";
+      if (!classes.has(classId)) classes.set(classId, { className, students: new Map() });
+      const classEntry = classes.get(classId)!;
+
       const k = r.student_id;
-      const cur = m.get(k) || { name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim(), uid: r.students?.unique_id ?? "", present: 0, late: 0, absent: 0, durationMin: 0 };
+      const cur = classEntry.students.get(k) || {
+        name: `${r.students?.first_name ?? ""} ${r.students?.last_name ?? ""}`.trim(),
+        uid: r.students?.unique_id ?? "",
+        present: 0, late: 0, absent: 0, durationMin: 0,
+      };
       if (r.status === "present") cur.present += 1;
       else if (r.status === "late") cur.late += 1;
       else if (r.status === "absent") cur.absent += 1;
       cur.durationMin += Math.round((r.duration_seconds || 0) / 60);
-      m.set(k, cur);
+      classEntry.students.set(k, cur);
     });
-    return Array.from(m.values()).sort((a,b) => (b.present + b.late) - (a.present + a.late));
-  }, [rows]);
+    return Array.from(classes.entries())
+      .map(([classId, v]) => ({
+        classId,
+        className: v.className,
+        students: Array.from(v.students.values()).sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.className.localeCompare(b.className));
+  }, [rows, sessionClassMap]);
 
   const bySession = useMemo(() => {
     const m = new Map<string, { present: number; late: number; absent: number }>();
@@ -293,46 +322,71 @@ function AttendanceReports({ sessions }: { sessions: any[] }) {
   if (isLoading) return <Spinner />;
 
   return (
-    <div className="grid md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader><CardTitle className="text-base">By student</CardTitle></CardHeader>
-        <CardContent>
-          {byStudent.length === 0 ? <p className="text-sm text-muted-foreground">No attendance yet.</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead className="text-right">Present</TableHead><TableHead className="text-right">Late</TableHead><TableHead className="text-right">Absent</TableHead><TableHead className="text-right">Min</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {byStudent.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell><div className="font-medium">{r.name}</div><div className="text-xs text-muted-foreground">{r.uid}</div></TableCell>
-                    <TableCell className="text-right text-emerald-600">{r.present}</TableCell>
-                    <TableCell className="text-right text-amber-600">{r.late}</TableCell>
-                    <TableCell className="text-right text-destructive">{r.absent}</TableCell>
-                    <TableCell className="text-right">{r.durationMin}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle className="text-base">By session</CardTitle></CardHeader>
-        <CardContent>
-          {bySession.length === 0 ? <p className="text-sm text-muted-foreground">No sessions.</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Session</TableHead><TableHead className="text-right">P / L / A</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {bySession.slice(0, 50).map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell><div className="font-medium truncate max-w-[220px]">{s.title}</div><div className="text-xs text-muted-foreground">{s.classes?.name} • {format(new Date(s.scheduled_start), "PP")}</div></TableCell>
-                    <TableCell className="text-right text-sm"><span className="text-emerald-600">{s.stats.present}</span> / <span className="text-amber-600">{s.stats.late}</span> / <span className="text-destructive">{s.stats.absent}</span></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-2">By class, then student</h3>
+        {byClass.length === 0 ? (
+          <Card><CardContent className="py-12 text-center text-muted-foreground">No attendance yet.</CardContent></Card>
+        ) : (
+          <div className="space-y-4">
+            {byClass.map(({ classId, className, students }) => (
+              <Card key={classId}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span>{className}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{students.length} student{students.length === 1 ? "" : "s"}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead className="text-right">Present</TableHead>
+                        <TableHead className="text-right">Late</TableHead>
+                        <TableHead className="text-right">Absent</TableHead>
+                        <TableHead className="text-right">Min</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {students.map((r, i) => (
+                        <TableRow key={i}>
+                          <TableCell><div className="font-medium">{r.name}</div><div className="text-xs text-muted-foreground">{r.uid}</div></TableCell>
+                          <TableCell className="text-right text-emerald-600">{r.present}</TableCell>
+                          <TableCell className="text-right text-amber-600">{r.late}</TableCell>
+                          <TableCell className="text-right text-destructive">{r.absent}</TableCell>
+                          <TableCell className="text-right">{r.durationMin}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-2">By session</h3>
+        <Card>
+          <CardContent className="pt-4">
+            {bySession.length === 0 ? <p className="text-sm text-muted-foreground">No sessions.</p> : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Session</TableHead><TableHead className="text-right">P / L / A</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {bySession.slice(0, 50).map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell><div className="font-medium truncate max-w-[220px]">{s.title}</div><div className="text-xs text-muted-foreground">{s.classes?.name} • {format(new Date(s.scheduled_start), "PP")}</div></TableCell>
+                      <TableCell className="text-right text-sm"><span className="text-emerald-600">{s.stats.present}</span> / <span className="text-amber-600">{s.stats.late}</span> / <span className="text-destructive">{s.stats.absent}</span></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
