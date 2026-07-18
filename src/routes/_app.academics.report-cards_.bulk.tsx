@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
@@ -19,7 +20,11 @@ export const Route = createFileRoute("/_app/academics/report-cards/bulk")({
     if (timedOut) return;
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: BulkReportCardsPage,
+  component: () => (
+    <FeatureGate feature="academics">
+      <BulkReportCardsPage />
+    </FeatureGate>
+  ),
 });
 
 function BulkReportCardsPage() {
