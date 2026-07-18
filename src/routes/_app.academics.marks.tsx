@@ -11,6 +11,7 @@
  * class/subject flow, etc).
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveStudents } from "@/lib/students.functions";
@@ -29,7 +30,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { fallbackGrade } from "@/lib/grade-utils";
 
-export const Route = createFileRoute("/_app/academics/marks")({ component: Page });
+export const Route = createFileRoute("/_app/academics/marks")({
+  component: () => (
+    <FeatureGate feature="academics">
+      <Page />
+    </FeatureGate>
+  ),
+});
 
 function Page() {
   const qc = useQueryClient();
