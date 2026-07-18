@@ -116,7 +116,7 @@ function FeaturesPage() {
                   const Icon = mod.icon;
                   const featureData = data?.[key];
                   const platformOn = featureData?.platform_enabled ?? true;
-                  const schoolOn   = featureData?.enabled ?? false;
+                  const schoolOn   = featureData?.enabled ?? true;
                   const locked     = !platformOn;
                   return (
                     <Card key={key} className={`transition-opacity ${locked || !schoolOn ? "opacity-60" : ""}`}>
