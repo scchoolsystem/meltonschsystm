@@ -815,14 +815,14 @@ function ClinicTab() {
     queryKey: ["analytics-clinic-visits"],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-      const { data } = await supabase.from("clinic_visits").select("id, visit_date, complaint, student_id").gte("visit_date", since);
+      const { data } = await supabase.from("clinic_visits").select("id, visit_date, complaint_type, student_id").gte("visit_date", since);
       return data ?? [];
     },
   });
 
   const byComplaint = (() => {
     const m = new Map<string, number>();
-    visits.forEach((v: any) => { const c = v.complaint ?? "General"; m.set(c, (m.get(c) ?? 0) + 1); });
+    visits.forEach((v: any) => { const c = v.complaint_type ?? "General"; m.set(c, (m.get(c) ?? 0) + 1); });
     return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name, value }));
   })();
 
@@ -1014,7 +1014,7 @@ function BoardingTab() {
   });
   const { data: assignments = [] } = useQuery({
     queryKey: ["analytics-dorm-assignments"],
-    queryFn: async () => (await (supabase as any).from("dorm_assignments").select("id, dorm_id, active").eq("active", true)).data ?? [],
+    queryFn: async () => (await (supabase as any).from("dorm_assignments").select("id, dormitory_id, active").eq("active", true)).data ?? [],
   });
   const { data: rollCall = [] } = useQuery({
     queryKey: ["analytics-boarding-roll-call", today],
@@ -1032,7 +1032,7 @@ function BoardingTab() {
 
   const byDorm = (() => {
     const counts = new Map<string, number>();
-    assignments.forEach((a: any) => { if (a.dorm_id) counts.set(a.dorm_id, (counts.get(a.dorm_id) ?? 0) + 1); });
+    assignments.forEach((a: any) => { if (a.dormitory_id) counts.set(a.dormitory_id, (counts.get(a.dormitory_id) ?? 0) + 1); });
     return dorms.map((d: any) => ({ name: d.name, occupied: counts.get(d.id) ?? 0, capacity: Number(d.capacity ?? 0) }));
   })();
 
