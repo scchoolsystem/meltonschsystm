@@ -174,17 +174,25 @@ export const Route = createFileRoute("/api/jaas-token")({
         }
         const email = authUserRes?.user?.email ?? "";
 
-        // Determine moderator status from DB role — never from request body
-        const { data: roleRow } = await supabaseAdmin
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        const isModerator =
-          roleRow?.role === "admin" ||
-          roleRow?.role === "teacher" ||
-          roleRow?.role === "school_admin";
+        // Determine moderator status from DB role — never from request body.
+        // FIX: this used to check a single arbitrary role row (.maybeSingle())
+        // against a hand-rolled list that included a role literal ("admin")
+        // which doesn't exist anywhere in this system's role enum, and left out
+        // class_teacher / subject_teacher / hod / academic_master / super_admin /
+        // principal / deputy_principal entirely. In practice that meant almost
+        // no one who actually starts a live class ever got moderator rights in
+        // the meeting. is_teaching() is the same DB function the app's RLS
+        // policies already use to decide "can this person manage this class" —
+        // reusing it here keeps JaaS moderator status in sync with that instead
+        // of drifting out of it again.
+        const { data: isModeratorRpc, error: modErr } = await supabaseAdmin.rpc(
+          "is_teaching",
+          { _user_id: userId },
+        );
+        if (modErr) {
+          console.error("[jaas-token] is_teaching RPC failed:", modErr);
+        }
+        const isModerator = isModeratorRpc === true;
 
         const now = Math.floor(Date.now() / 1000);
 
