@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
@@ -22,7 +23,11 @@ export const Route = createFileRoute("/_app/academics/report-cards")({
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: ReportCardsPicker,
+  component: () => (
+    <FeatureGate feature="academics">
+      <ReportCardsPicker />
+    </FeatureGate>
+  ),
 });
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
