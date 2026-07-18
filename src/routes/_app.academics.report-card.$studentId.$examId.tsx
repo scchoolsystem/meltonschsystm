@@ -1,5 +1,6 @@
 import React from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,11 @@ export const Route = createFileRoute("/_app/academics/report-card/$studentId/$ex
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
-  component: ReportCardPage,
+  component: () => (
+    <FeatureGate feature="academics">
+      <ReportCardPage />
+    </FeatureGate>
+  ),
 });
 
 // ── Security guard ──────────────────────────────────────────────────────────
