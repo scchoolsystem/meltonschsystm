@@ -4,7 +4,25 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ── helpers ─────────────────────────────────────────────────
+// NOTE: every export in this file reads/writes through `supabaseAdmin`
+// (service-role client), which bypasses RLS entirely — so the
+// `module_toggle_*` RESTRICTIVE policies on fee_structures /
+// class_fee_components / expense_categories have no effect on the calls
+// made from here. This check is the actual enforcement point for this
+// file: it uses the *caller's* RLS-scoped `context.supabase` (not the
+// admin client) to read the toggle, so it can't be bypassed the same way.
+async function assertModuleEnabled(context: { supabase: any }, featureKey: string) {
+  const schoolId = await getSchoolId(context);
+  const { data: enabled, error } = await context.supabase.rpc("school_feature_enabled", {
+    p_school_id: schoolId,
+    p_feature_key: featureKey,
+  });
+  if (error) throw new Error(error.message);
+  if (!enabled) throw new Error("The finance module is disabled for this school.");
+}
+
 async function assertFinance(context: { supabase: any; userId: string }) {
+  await assertModuleEnabled(context, "finance");
   const { data: admin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
   if (admin) return;
   for (const role of ["bursar", "finance_admin", "finance_user"]) {
@@ -15,6 +33,7 @@ async function assertFinance(context: { supabase: any; userId: string }) {
 }
 
 async function assertFinanceWrite(context: { supabase: any; userId: string }) {
+  await assertModuleEnabled(context, "finance");
   const { data: admin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
   if (admin) return;
   for (const role of ["bursar", "finance_admin"]) {

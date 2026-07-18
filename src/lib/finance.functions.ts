@@ -4,7 +4,20 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ---- helpers ----
+// Same reasoning as finance-extended.functions.ts: these calls go through
+// supabaseAdmin (service role), so RLS module-toggle policies never see
+// them. Check the toggle explicitly, via the caller's RLS-scoped client.
 async function assertFinance(context: { supabase: any; userId: string }) {
+  const { data: schoolId, error: schErr } = await context.supabase.rpc("my_school_id");
+  if (schErr) throw new Error(schErr.message);
+  if (!schoolId) throw new Error("No school context");
+  const { data: enabled, error: featErr } = await context.supabase.rpc("school_feature_enabled", {
+    p_school_id: schoolId,
+    p_feature_key: "finance",
+  });
+  if (featErr) throw new Error(featErr.message);
+  if (!enabled) throw new Error("The finance module is disabled for this school.");
+
   const { data: admin } = await context.supabase.rpc("is_admin", { _user_id: context.userId });
   if (admin) return;
   const { data: bursar } = await context.supabase.rpc("has_role", {

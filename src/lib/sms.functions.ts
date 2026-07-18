@@ -16,6 +16,20 @@ async function resolveSchoolId(ctx: { supabase: any }) {
   return schoolId as string;
 }
 
+// sendBulkSms / sendEmailBlast write to sms_queue / notifications_log via
+// supabaseAdmin (service role), which bypasses the module_toggle_sms_queue
+// / module_toggle_notifications_log RESTRICTIVE policies entirely. Check
+// the toggle here, through the caller's RLS-scoped client, so disabling
+// Communications actually stops the send rather than just hiding the page.
+async function assertCommunicationsEnabled(ctx: { supabase: any }, schoolId: string) {
+  const { data: enabled, error } = await ctx.supabase.rpc("school_feature_enabled", {
+    p_school_id: schoolId,
+    p_feature_key: "communications",
+  });
+  if (error) throw new Error(error.message);
+  if (!enabled) throw new Error("The communications module is disabled for this school.");
+}
+
 async function resolvePhones(
   schoolId: string,
   audience: z.infer<typeof AudienceSchema>
@@ -63,6 +77,7 @@ export const sendBulkSms = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const schoolId = await resolveSchoolId(context);
+    await assertCommunicationsEnabled(context, schoolId);
     const numbers = await resolvePhones(schoolId, data.audience);
 
     let status = "queued";
@@ -177,6 +192,7 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const schoolId = await resolveSchoolId(context);
+    await assertCommunicationsEnabled(context, schoolId);
     const [emails, schoolName] = await Promise.all([
       resolveEmails(schoolId, data.audience),
       resolveSchoolName(schoolId),
