@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Video, Users, Calendar, Clock, GraduationCap } from "lucide-react";
+import { Loader2, Plus, Video, Users, Calendar, Clock, GraduationCap, Pencil, Download, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -30,6 +30,24 @@ function LiveShell() {
   const params = useParams({ strict: false }) as { sessionId?: string };
   if (params.sessionId) return <Outlet />;
   return <LivePage />;
+}
+
+// ─── CSV EXPORT HELPER ───
+function downloadCSV(filename: string, header: string[], rows: (string | number)[][]) {
+  const esc = (v: string | number) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function LivePage() {
@@ -72,9 +90,37 @@ function LivePage() {
     },
   });
 
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["live-sessions"] });
+
+  // ─── SEARCH & FILTER (applies to Upcoming / Past / Reports; By-class has
+  // its own dedicated class picker so only the text search applies there) ───
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterClassId, setFilterClassId] = useState<string>("all");
+
+  const matchesSearch = (s: any, term: string) => {
+    const t = term.trim().toLowerCase();
+    if (!t) return true;
+    return (
+      (s.title || "").toLowerCase().includes(t) ||
+      (s.description || "").toLowerCase().includes(t) ||
+      (s.classes?.name || "").toLowerCase().includes(t)
+    );
+  };
+
+  const filteredSessions = useMemo(
+    () =>
+      (sessions as any[]).filter(
+        (s) => (filterClassId === "all" || s.class_id === filterClassId) && matchesSearch(s, searchTerm),
+      ),
+    [sessions, filterClassId, searchTerm],
+  );
+
   const now = Date.now();
-  const upcoming = useMemo(() => (sessions as any[]).filter(s => s.status !== "ended" && s.status !== "cancelled" && new Date(s.scheduled_start).getTime() > now - 15 * 60_000).sort((a,b)=>+new Date(a.scheduled_start)-+new Date(b.scheduled_start)), [sessions, now]);
-  const past = useMemo(() => (sessions as any[]).filter(s => s.status === "ended" || s.status === "cancelled" || new Date(s.scheduled_start).getTime() <= now - 15 * 60_000), [sessions, now]);
+  const upcoming = useMemo(() => filteredSessions.filter(s => s.status !== "ended" && s.status !== "cancelled" && new Date(s.scheduled_start).getTime() > now - 15 * 60_000).sort((a,b)=>+new Date(a.scheduled_start)-+new Date(b.scheduled_start)), [filteredSessions, now]);
+  const past = useMemo(() => filteredSessions.filter(s => s.status === "ended" || s.status === "cancelled" || new Date(s.scheduled_start).getTime() <= now - 15 * 60_000), [filteredSessions, now]);
+
+  const hasActiveFilters = searchTerm.trim() !== "" || filterClassId !== "all";
+  const clearFilters = () => { setSearchTerm(""); setFilterClassId("all"); };
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -84,7 +130,31 @@ function LivePage() {
           <p className="text-sm text-muted-foreground mt-1">Scheduled online lessons — join directly in-app.</p>
         </div>
         {canManage && classes.length > 0 && (
-          <NewSessionDialog classes={classes as any[]} onCreated={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />
+          <SessionFormDialog classes={classes as any[]} onSaved={invalidate} />
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search title, description, class…"
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Select value={filterClassId} onValueChange={setFilterClassId}>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="All classes" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All classes</SelectItem>
+            {(classes as any[]).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="w-4 h-4 mr-1" />Clear
+          </Button>
         )}
       </div>
 
@@ -97,11 +167,11 @@ function LivePage() {
         </TabsList>
 
         <TabsContent value="upcoming" className="space-y-3 mt-4">
-          {isLoading ? <Spinner /> : upcoming.length === 0 ? <Empty msg="No upcoming sessions." /> : upcoming.map(s => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />)}
+          {isLoading ? <Spinner /> : upcoming.length === 0 ? <Empty msg={hasActiveFilters ? "No sessions match your search." : "No upcoming sessions."} /> : upcoming.map(s => <SessionCard key={s.id} s={s} classes={classes as any[]} canManage={canManage} onChanged={invalidate} />)}
         </TabsContent>
 
         <TabsContent value="past" className="space-y-3 mt-4">
-          {isLoading ? <Spinner /> : past.length === 0 ? <Empty msg="No past sessions yet." /> : past.map(s => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })} />)}
+          {isLoading ? <Spinner /> : past.length === 0 ? <Empty msg={hasActiveFilters ? "No sessions match your search." : "No past sessions yet."} /> : past.map(s => <SessionCard key={s.id} s={s} classes={classes as any[]} canManage={canManage} onChanged={invalidate} />)}
         </TabsContent>
 
         <TabsContent value="by-class" className="mt-4">
@@ -111,15 +181,16 @@ function LivePage() {
             <ClassRecordsView
               classes={classes as any[]}
               sessions={sessions as any[]}
+              searchTerm={searchTerm}
               canManage={canManage}
-              onChanged={() => qc.invalidateQueries({ queryKey: ["live-sessions"] })}
+              onChanged={invalidate}
             />
           )}
         </TabsContent>
 
         {canManage && (
           <TabsContent value="reports" className="mt-4">
-            <AttendanceReports sessions={sessions as any[]} />
+            <AttendanceReports sessions={filteredSessions} />
           </TabsContent>
         )}
       </Tabs>
@@ -142,9 +213,10 @@ function SessionDescription({ description }: { description: string }) {
   );
 }
 
-function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; onChanged: () => void }) {
+function SessionCard({ s, classes, canManage, onChanged }: { s: any; classes: any[]; canManage: boolean; onChanged: () => void }) {
   const start = new Date(s.scheduled_start);
   const isLiveWindow = s.status === "live" || s.status === "scheduled";
+  const canEdit = canManage && s.status === "scheduled";
   const cancel = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("live_sessions").update({ status: "cancelled" }).eq("id", s.id);
@@ -172,6 +244,9 @@ function SessionCard({ s, canManage, onChanged }: { s: any; canManage: boolean; 
             {isLiveWindow && (
               <Button asChild size="sm"><Link to="/live/$sessionId" params={{ sessionId: s.id }}><Video className="w-4 h-4 mr-2" />Join</Link></Button>
             )}
+            {canEdit && (
+              <SessionFormDialog classes={classes} session={s} onSaved={onChanged} />
+            )}
             {canManage && s.status !== "cancelled" && s.status !== "ended" && (
               <Button variant="ghost" size="sm" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel</Button>
             )}
@@ -196,49 +271,105 @@ function StatusPill({ status }: { status: string }) {
   return <span className={`text-[10px] uppercase tracking-wider rounded px-2 py-0.5 ${map[status] || "bg-muted"}`}>{status}</span>;
 }
 
-function NewSessionDialog({ classes, onCreated }: { classes: any[]; onCreated: () => void }) {
+// ─── CREATE / EDIT dialog. Pass `session` to edit an existing scheduled
+// session in place; omit it to create a new one. Editing keeps the original
+// class + room_name fixed (join links already shared shouldn't break) and
+// only lets you change title, description, start and end time. ───
+function SessionFormDialog({ classes, session, onSaved }: { classes: any[]; session?: any; onSaved: () => void }) {
+  const isEdit = !!session;
   const [open, setOpen] = useState(false);
-  const [classId, setClassId] = useState(classes[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [classId, setClassId] = useState(session?.class_id ?? classes[0]?.id ?? "");
+  const [title, setTitle] = useState(session?.title ?? "");
+  const [description, setDescription] = useState(session?.description ?? "");
+  const toLocalInput = (iso: string) => {
+    const d = new Date(iso);
+    d.setSeconds(0, 0);
+    const tzOffset = d.getTimezoneOffset() * 60_000;
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  };
   const [start, setStart] = useState(() => {
+    if (session?.scheduled_start) return toLocalInput(session.scheduled_start);
     const d = new Date(Date.now() + 30 * 60_000);
     d.setSeconds(0, 0);
     return d.toISOString().slice(0, 16);
   });
-  const [end, setEnd] = useState("");
+  const [end, setEnd] = useState(() => (session?.scheduled_end ? toLocalInput(session.scheduled_end) : ""));
 
-  const create = useMutation({
+  const timeInvalid = end !== "" && new Date(end) <= new Date(start);
+
+  const resetForCreate = () => {
+    setClassId(classes[0]?.id ?? "");
+    setTitle("");
+    setDescription("");
+    const d = new Date(Date.now() + 30 * 60_000);
+    d.setSeconds(0, 0);
+    setStart(d.toISOString().slice(0, 16));
+    setEnd("");
+  };
+
+  const save = useMutation({
     mutationFn: async () => {
-      const room = `melton-${classId.slice(0, 8)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("live_sessions").insert({
-        class_id: classId,
-        title: title.trim(),
-        description: description.trim() || null,
-        room_name: room,
-        scheduled_start: new Date(start).toISOString(),
-        scheduled_end: end ? new Date(end).toISOString() : null,
-        created_by: user?.id ?? null,
-      } as any);
-      if (error) throw error;
+      if (timeInvalid) throw new Error("End time must be after the start time.");
+      if (isEdit) {
+        const { error } = await supabase
+          .from("live_sessions")
+          .update({
+            title: title.trim(),
+            description: description.trim() || null,
+            scheduled_start: new Date(start).toISOString(),
+            scheduled_end: end ? new Date(end).toISOString() : null,
+          } as any)
+          .eq("id", session.id);
+        if (error) throw error;
+      } else {
+        const room = `melton-${classId.slice(0, 8)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error } = await supabase.from("live_sessions").insert({
+          class_id: classId,
+          title: title.trim(),
+          description: description.trim() || null,
+          room_name: room,
+          scheduled_start: new Date(start).toISOString(),
+          scheduled_end: end ? new Date(end).toISOString() : null,
+          created_by: user?.id ?? null,
+        } as any);
+        if (error) throw error;
+      }
     },
-    onSuccess: () => { toast.success("Session scheduled"); setOpen(false); setTitle(""); setDescription(""); onCreated(); },
+    onSuccess: () => {
+      toast.success(isEdit ? "Session updated" : "Session scheduled");
+      setOpen(false);
+      if (!isEdit) resetForCreate();
+      onSaved();
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Schedule live class</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        {isEdit ? (
+          <Button variant="outline" size="sm"><Pencil className="w-4 h-4 mr-2" />Edit</Button>
+        ) : (
+          <Button><Plus className="w-4 h-4 mr-2" />Schedule live class</Button>
+        )}
+      </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Schedule a live class</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? "Edit live class" : "Schedule a live class"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <Select value={classId} onValueChange={setClassId}>
-            <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
-            <SelectContent>
-              {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {isEdit ? (
+            <div className="text-sm text-muted-foreground">
+              Class: <Badge variant="outline">{session.classes?.name}</Badge>
+              <span className="block text-xs mt-1">Class can't be changed after a session is created.</span>
+            </div>
+          ) : (
+            <Select value={classId} onValueChange={setClassId}>
+              <SelectTrigger><SelectValue placeholder="Choose class" /></SelectTrigger>
+              <SelectContent>
+                {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Input placeholder="Title (e.g. Algebra revision)" value={title} onChange={e => setTitle(e.target.value)} />
           <Textarea placeholder="Description (optional)" rows={3} value={description} onChange={e => setDescription(e.target.value)} />
           <div className="grid grid-cols-2 gap-2">
@@ -251,11 +382,12 @@ function NewSessionDialog({ classes, onCreated }: { classes: any[]; onCreated: (
               <Input type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} />
             </div>
           </div>
+          {timeInvalid && <p className="text-xs text-destructive">End time must be after the start time.</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={() => create.mutate()} disabled={!classId || !title.trim() || !start || create.isPending}>
-            {create.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Schedule
+          <Button onClick={() => save.mutate()} disabled={!classId || !title.trim() || !start || timeInvalid || save.isPending}>
+            {save.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{isEdit ? "Save changes" : "Schedule"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -268,23 +400,25 @@ function NewSessionDialog({ classes, onCreated }: { classes: any[]; onCreated: (
 function ClassRecordsView({
   classes,
   sessions,
+  searchTerm,
   canManage,
   onChanged,
 }: {
   classes: any[];
   sessions: any[];
+  searchTerm: string;
   canManage: boolean;
   onChanged: () => void;
 }) {
   const [classId, setClassId] = useState<string>(classes[0]?.id ?? "");
 
-  const classSessions = useMemo(
-    () =>
-      sessions
-        .filter((s) => s.class_id === classId)
-        .sort((a, b) => +new Date(b.scheduled_start) - +new Date(a.scheduled_start)),
-    [sessions, classId],
-  );
+  const classSessions = useMemo(() => {
+    const t = searchTerm.trim().toLowerCase();
+    return sessions
+      .filter((s) => s.class_id === classId)
+      .filter((s) => !t || (s.title || "").toLowerCase().includes(t) || (s.description || "").toLowerCase().includes(t))
+      .sort((a, b) => +new Date(b.scheduled_start) - +new Date(a.scheduled_start));
+  }, [sessions, classId, searchTerm]);
 
   const sessionIds = useMemo(() => classSessions.map((s) => s.id), [classSessions]);
 
@@ -326,6 +460,14 @@ function ClassRecordsView({
 
   const selectedClassName = classes.find((c) => c.id === classId)?.name ?? "";
 
+  const exportClassCSV = () => {
+    downloadCSV(
+      `attendance-${selectedClassName || "class"}`,
+      ["Student", "Unique ID", "Present", "Late", "Absent", "Minutes"],
+      studentRecords.map((r) => [r.name, r.uid, r.present, r.late, r.absent, r.durationMin]),
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -347,14 +489,21 @@ function ClassRecordsView({
           <Empty msg="No sessions for this class yet." />
         ) : (
           <div className="space-y-3">
-            {classSessions.map((s) => <SessionCard key={s.id} s={s} canManage={canManage} onChanged={onChanged} />)}
+            {classSessions.map((s) => <SessionCard key={s.id} s={s} classes={classes} canManage={canManage} onChanged={onChanged} />)}
           </div>
         )}
       </div>
 
       {canManage && (
         <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-2">Attendance record — {selectedClassName || "class"}</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">Attendance record — {selectedClassName || "class"}</h3>
+            {studentRecords.length > 0 && (
+              <Button variant="outline" size="sm" onClick={exportClassCSV}>
+                <Download className="w-4 h-4 mr-2" />Export CSV
+              </Button>
+            )}
+          </div>
           <Card>
             <CardContent className="pt-4">
               {attLoading ? (
@@ -396,7 +545,7 @@ function ClassRecordsView({
 function AttendanceReports({ sessions }: { sessions: any[] }) {
   const sessionIds = sessions.map(s => s.id);
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["live-attendance-all", sessionIds.length],
+    queryKey: ["live-attendance-all", sessionIds.join(",")],
     enabled: sessionIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -463,12 +612,29 @@ function AttendanceReports({ sessions }: { sessions: any[] }) {
     return sessions.map(s => ({ ...s, stats: m.get(s.id) || { present: 0, late: 0, absent: 0 } }));
   }, [rows, sessions]);
 
+  const exportFullCSV = () => {
+    const rowsOut: (string | number)[][] = [];
+    byClass.forEach(({ className, students }) => {
+      students.forEach((r: any) => {
+        rowsOut.push([className, r.name, r.uid, r.present, r.late, r.absent, r.durationMin]);
+      });
+    });
+    downloadCSV("attendance-report-all-classes", ["Class", "Student", "Unique ID", "Present", "Late", "Absent", "Minutes"], rowsOut);
+  };
+
   if (isLoading) return <Spinner />;
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-2">By class, then student</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">By class, then student</h3>
+          {byClass.length > 0 && (
+            <Button variant="outline" size="sm" onClick={exportFullCSV}>
+              <Download className="w-4 h-4 mr-2" />Export CSV
+            </Button>
+          )}
+        </div>
         {byClass.length === 0 ? (
           <Card><CardContent className="py-12 text-center text-muted-foreground">No attendance yet.</CardContent></Card>
         ) : (
