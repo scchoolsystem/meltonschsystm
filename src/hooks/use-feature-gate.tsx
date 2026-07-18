@@ -15,12 +15,16 @@ export type FeatureKey =
   | "finance"
   | "discipline"
   | "timetable"
+  | "attendance"
+  | "academics"
+  | "portals"
   | "announcements"
-  | "id_cards"
+  | "ids"
   | "leaving_certs"
   | "classroom"
   | "live_classes"
-  | "communications";
+  | "communications"
+  | "analytics";
 
 export function useFeatureGate(): { isEnabled: (k: FeatureKey) => boolean; features: Record<string, boolean> } {
   const { features } = useTenant();
