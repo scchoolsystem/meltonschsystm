@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_app/academics/report-cards/bulk")({
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_report_cards">
       <BulkReportCardsPage />
     </FeatureGate>
   ),

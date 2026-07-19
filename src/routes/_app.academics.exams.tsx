@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/academics/exams")({
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_exams">
       <Page />
     </FeatureGate>
   ),

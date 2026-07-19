@@ -69,7 +69,9 @@ export const Route = createFileRoute("/platform/schools")({
 });
 
 const FEATURE_KEYS = [
-  "academics", "finance", "boarding", "kitchen", "library",
+  "academics_subjects", "academics_exams", "academics_marks", "academics_remarks",
+  "academics_results", "academics_report_cards", "academics_oversight",
+  "finance", "boarding", "kitchen", "library",
   "clinic", "transport", "security", "discipline", "portals",
 ];
 

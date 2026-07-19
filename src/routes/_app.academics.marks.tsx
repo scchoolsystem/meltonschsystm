@@ -32,7 +32,7 @@ import { fallbackGrade } from "@/lib/grade-utils";
 
 export const Route = createFileRoute("/_app/academics/marks")({
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_marks">
       <Page />
     </FeatureGate>
   ),

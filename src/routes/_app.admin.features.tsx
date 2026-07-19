@@ -14,7 +14,13 @@ export const Route = createFileRoute("/_app/admin/features")({ component: Featur
 const MODULES = [
   { key: "timetable",      icon: CalendarDays,  name: "Timetable",                desc: "Class schedules and auto-generation" },
   { key: "attendance",     icon: Users,         name: "Attendance",               desc: "Daily attendance tracking" },
-  { key: "academics",      icon: GraduationCap, name: "Academics & Exams",        desc: "Subjects, exams, marks, results, report cards" },
+  { key: "academics_subjects",     icon: GraduationCap, name: "Subjects",             desc: "Subject list and teacher assignments" },
+  { key: "academics_exams",        icon: GraduationCap, name: "Exams",                desc: "Exam creation and scheduling" },
+  { key: "academics_marks",        icon: GraduationCap, name: "Marks Entry",          desc: "Entering marks and results log" },
+  { key: "academics_remarks",      icon: GraduationCap, name: "Remark Templates",     desc: "Reusable remark wording for report cards" },
+  { key: "academics_results",      icon: GraduationCap, name: "Results",              desc: "Results dashboard and analysis" },
+  { key: "academics_report_cards", icon: GraduationCap, name: "Report Cards",         desc: "Generating and printing report cards" },
+  { key: "academics_oversight",    icon: GraduationCap, name: "Exam Oversight",       desc: "Cross-class exam completion tracking" },
   { key: "discipline",     icon: AlertTriangle, name: "Discipline",               desc: "Incident records and behavior tracking" },
   { key: "announcements",  icon: Megaphone,     name: "Announcements",            desc: "School-wide announcements and pinned notices" },
   { key: "portals",        icon: Users,         name: "Parent / Student Portals", desc: "Parents and students can log in and view their portal" },
@@ -34,7 +40,7 @@ const MODULES = [
 ] as const;
 
 const CATEGORIES = [
-  { label: "Core Academic",   keys: ["timetable","attendance","academics","discipline","announcements","portals"] },
+  { label: "Core Academic",   keys: ["timetable","attendance","academics_subjects","academics_exams","academics_marks","academics_remarks","academics_results","academics_report_cards","academics_oversight","discipline","announcements","portals"] },
   { label: "Finance & Admin", keys: ["finance","ids","leaving_certs"] },
   { label: "Facilities",      keys: ["boarding","kitchen","library","clinic","transport","security"] },
   { label: "Digital",         keys: ["classroom","live_classes","communications","analytics"] },

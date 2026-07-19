@@ -46,7 +46,10 @@ export const Route = createFileRoute("/platform/schools/$id")({
 });
 
 const MODULE_META: Record<string, string> = {
-  timetable:"Timetable", attendance:"Attendance", academics:"Academics & Exams",
+  timetable:"Timetable", attendance:"Attendance",
+  academics_subjects:"Subjects", academics_exams:"Exams", academics_marks:"Marks Entry",
+  academics_remarks:"Remark Templates", academics_results:"Results",
+  academics_report_cards:"Report Cards", academics_oversight:"Exam Oversight",
   discipline:"Discipline", announcements:"Announcements", portals:"Parent / Student Portals",
   finance:"Finance & Billing", ids:"Digital IDs", leaving_certs:"Leaving Certificates",
   boarding:"Boarding", kitchen:"Kitchen", library:"Library", clinic:"Clinic",
@@ -54,7 +57,7 @@ const MODULE_META: Record<string, string> = {
   live_classes:"Live Classes", communications:"Communications", analytics:"Analytics",
 };
 const CATEGORIES = [
-  { label: "Core Academic",   keys: ["timetable","attendance","academics","discipline","announcements","portals"] },
+  { label: "Core Academic",   keys: ["timetable","attendance","academics_subjects","academics_exams","academics_marks","academics_remarks","academics_results","academics_report_cards","academics_oversight","discipline","announcements","portals"] },
   { label: "Finance & Admin", keys: ["finance","ids","leaving_certs"] },
   { label: "Facilities",      keys: ["boarding","kitchen","library","clinic","transport","security"] },
   { label: "Digital",         keys: ["classroom","live_classes","communications","analytics"] },

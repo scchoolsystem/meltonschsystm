@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_app/academics/report-cards")({
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_report_cards">
       <ReportCardsPicker />
     </FeatureGate>
   ),

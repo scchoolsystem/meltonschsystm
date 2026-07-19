@@ -54,7 +54,7 @@ import {
 
 export const Route = createFileRoute("/_app/academics/subjects")({
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_subjects">
       <Page />
     </FeatureGate>
   ),

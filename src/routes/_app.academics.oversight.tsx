@@ -44,7 +44,7 @@ export const Route = createFileRoute("/_app/academics/oversight")({
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: () => (
-    <FeatureGate feature="academics">
+    <FeatureGate feature="academics_oversight">
       <OversightPage />
     </FeatureGate>
   ),
