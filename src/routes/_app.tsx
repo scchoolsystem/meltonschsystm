@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -78,6 +79,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { loading, session, roles, rolesLoaded, sessionChecked } = useAuth();
+  const { school, loading: tenantLoading } = useTenant();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
 
@@ -128,6 +130,22 @@ function AppLayout() {
   }
 
   const appRoles = roles as AppRole[];
+
+  // A suspended school (via /platform → Team & Access → Suspend) blocks
+  // every school-scoped user immediately. Platform staff are exempt — they
+  // need to be able to get in to actually investigate/fix whatever caused
+  // the suspension, and re-activate it, without unsuspending first.
+  const isPlatformStaff = appRoles.includes("platform_owner") || appRoles.includes("platform_support");
+  if (!tenantLoading && school?.status === "suspended" && !isPlatformStaff) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-md text-center space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">This school's access is currently suspended</h2>
+          <p className="text-sm text-muted-foreground">Contact your school administrator or SmartDev support for details.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Only block access once roles are loaded AND user has roles assigned.
   // Never block while still loading (empty appRoles during load would deny everything).
