@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +21,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
 import { format } from "date-fns";
 
-export const Route = createFileRoute("/_app/boarding")({ component: () => (<FeatureGate feature="boarding"><Page /></FeatureGate>) });
+const BOARDING_TABS = ["dorms", "assignments", "rollcall", "out", "maintenance"] as const;
+
+export const Route = createFileRoute("/_app/boarding")({
+  validateSearch: z.object({ tab: z.enum(BOARDING_TABS).optional() }),
+  component: () => (<FeatureGate feature="boarding"><Page /></FeatureGate>),
+});
 
 function Page() {
   const qc = useQueryClient();
@@ -28,6 +34,9 @@ function Page() {
   const { school } = useTenant();
   const schoolId = school?.id;
   const can = isAdmin || hasRole("matron") || hasRole("boarding_admin") || hasRole("boarding_user");
+  const navigate = useNavigate({ from: "/boarding" });
+  const { tab } = Route.useSearch();
+  const activeTab = tab ?? "dorms";
 
   const { data: dorms = [], isLoading: dLoading } = useQuery({
     queryKey: ["dormitories"],
@@ -119,7 +128,10 @@ function Page() {
         )}
       </div>
 
-      <Tabs defaultValue="dorms">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v as typeof BOARDING_TABS[number] }) })}
+      >
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="dorms">Dorms</TabsTrigger>
           <TabsTrigger value="assignments">Assignments</TabsTrigger>
