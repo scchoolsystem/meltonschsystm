@@ -5,6 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { provisionSchoolAdmin } from "@/lib/school-admin.functions";
+import { platformSetSchoolStatus } from "@/lib/platform-admin.functions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from "sonner";
 import {
   ArrowLeft, ExternalLink, Plus, Save, KeyRound, Copy, Upload, FileText,
-  CheckCircle2, XCircle, AlertTriangle, Trash2, Download, ShieldCheck,
+  CheckCircle2, XCircle, AlertTriangle, Trash2, Download, ShieldCheck, Ban, PlayCircle,
 } from "lucide-react";
 import {
   KENYA_COUNTIES, OWNERSHIP_TYPES, INSTITUTION_LEVELS, CURRICULA, legalStatusBadge,
@@ -249,6 +254,18 @@ function PlatformSchoolDetail() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const setSchoolStatus = useServerFn(platformSetSchoolStatus);
+  const toggleStatus = useMutation({
+    mutationFn: async (status: "active" | "suspended") =>
+      setSchoolStatus({ data: { school_id: id, status } }),
+    onSuccess: (_d, status) => {
+      toast.success(status === "suspended" ? "School suspended" : "School reactivated");
+      qc.invalidateQueries({ queryKey: ["platform-school", id] });
+      qc.invalidateQueries({ queryKey: ["platform-schools"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const { data: documents } = useQuery({
     queryKey: ["school-documents", id],
     queryFn: async () => {
@@ -418,6 +435,40 @@ function PlatformSchoolDetail() {
             {school.slug}.{rootDomain} <ExternalLink className="h-3 w-3" />
           </a>
         </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="sm"
+              variant={school.status === "active" ? "destructive" : "default"}
+              disabled={toggleStatus.isPending}
+            >
+              {school.status === "active"
+                ? <><Ban className="h-4 w-4 mr-1" /> Suspend</>
+                : <><PlayCircle className="h-4 w-4 mr-1" /> Reactivate</>}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {school.status === "active" ? `Suspend ${school.name}?` : `Reactivate ${school.name}?`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {school.status === "active"
+                  ? "Every user at this school — admins, teachers, students, parents — loses access immediately. This is logged and reversible."
+                  : "This restores full access for everyone at this school right away."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className={school.status === "active" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                onClick={() => toggleStatus.mutate(school.status === "active" ? "suspended" : "active")}
+              >
+                {school.status === "active" ? "Suspend school" : "Reactivate school"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <Card>
