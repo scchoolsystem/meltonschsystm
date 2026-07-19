@@ -289,6 +289,7 @@ function PlatformDashboard() {
           <p>• <Link to="/platform/schools" className="text-primary hover:underline">Add a new school</Link> to onboard a customer.</p>
           <p>• <Link to="/platform/plans" className="text-primary hover:underline">Manage subscription plans</Link> and pricing.</p>
           <p>• <Link to="/platform/invoices" className="text-primary hover:underline">Issue an invoice</Link> for the current billing period.</p>
+          <p>• <Link to="/platform/team" className="text-primary hover:underline">Manage team access</Link> or check the audit log.</p>
         </CardContent>
       </Card>
     </div>
