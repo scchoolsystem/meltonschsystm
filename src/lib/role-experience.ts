@@ -227,8 +227,8 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   matron: [
     { group: "Boarding", items: [
       { title: "Boarding", url: "/boarding" },
-      { title: "Dormitories", url: "/boarding/dormitories" },
-      { title: "Night Attendance", url: "/boarding/attendance" },
+      { title: "Dormitories", url: "/boarding?tab=dorms" },
+      { title: "Night Attendance", url: "/boarding?tab=rollcall" },
       { title: "Students", url: "/students" },
       { title: "Clinic", url: "/clinic" },
       { title: "Analytics", url: "/analytics" },
