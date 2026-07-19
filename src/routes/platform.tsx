@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe,
+  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ const NAV = [
   { to: "/platform/support", label: "Support", icon: LifeBuoy },
   { to: "/platform/plans", label: "Plans", icon: Package },
   { to: "/platform/website", label: "Website Content", icon: Globe },
+  { to: "/platform/team", label: "Team & Access", icon: Users },
 ] as const;
 
 function PlatformLayout() {
