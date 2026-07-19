@@ -520,11 +520,14 @@ function SessionRoom() {
             <p className="text-destructive text-sm font-medium">
               {tokenError
                 ? `Could not get meeting token: ${(tokenError as Error).message}`
-                : "JaaS App ID not configured. Set VITE_JAAS_APP_ID in your environment."}
+                : "JaaS App ID not configured. VITE_JAAS_APP_ID is missing from this build."}
             </p>
             {!jaasAppId && (
               <p className="text-xs text-muted-foreground">
-                Add <code className="bg-muted px-1 rounded">VITE_JAAS_APP_ID</code> to your Cloudflare environment variables.
+                Add <code className="bg-muted px-1 rounded">VITE_JAAS_APP_ID</code> as a GitHub Actions repository
+                secret (Settings → Secrets and variables → Actions), then push to <code className="bg-muted px-1 rounded">main</code> or
+                re-run the deploy workflow. It's baked into the bundle at build time — Cloudflare Worker/Pages
+                environment variables have no effect on this one.
               </p>
             )}
             <Button
