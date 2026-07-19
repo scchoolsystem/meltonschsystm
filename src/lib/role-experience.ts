@@ -433,6 +433,15 @@ export function buildNavigation(roles: string[], features?: Record<string, boole
 // `startsWith`, but keep more specific prefixes above their broader parents
 // if that's ever needed (none currently overlap).
 const NAV_FEATURE_BY_PREFIX: [prefix: string, feature: string][] = [
+  ["/academics/subjects", "academics_subjects"],
+  ["/academics/exams", "academics_exams"],
+  ["/academics/entry", "academics_marks"],
+  ["/academics/marks", "academics_marks"],
+  ["/academics/remarks", "academics_remarks"],
+  ["/academics/results", "academics_results"],
+  ["/academics/report-cards", "academics_report_cards"],
+  ["/academics/report-card", "academics_report_cards"],
+  ["/academics/oversight", "academics_oversight"],
   ["/timetable", "timetable"],
   ["/announcements", "announcements"],
   ["/classroom", "classroom"],
