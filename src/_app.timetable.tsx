@@ -152,10 +152,18 @@ function Page() {
       new Set((periods as any[]).map((p) => p.period_index))
     ).sort((a, b) => a - b);
 
-    // Fast lookup: day + period_template_id -> the lesson booked there.
-    const slotByDayPeriod: Record<string, any> = {};
+    // Fast lookup: day + period_template_id -> ALL lessons booked there.
+    // Electives put 2+ subjects in the exact same day/period for one class
+    // (different students take different options in parallel), so this must
+    // collect every slot into a list rather than keep only the last one —
+    // otherwise parallel options silently overwrite each other, or end up
+    // rendered as if they were separate, conflicting periods.
+    const slotByDayPeriod: Record<string, any[]> = {};
     (slots as any[]).forEach((s: any) => {
-      if (s.period_template_id) slotByDayPeriod[`${s.day_of_week}-${s.period_template_id}`] = s;
+      if (s.period_template_id) {
+        const key = `${s.day_of_week}-${s.period_template_id}`;
+        (slotByDayPeriod[key] ||= []).push(s);
+      }
     });
 
     // day-period_index pairs already swallowed into a rowspan above them.
@@ -172,35 +180,44 @@ function Page() {
         return `<td style="padding:6px 8px;border:1px solid #ddd;background:#f3f3f3;text-align:center;font-size:11px;color:#666;font-style:italic">${p.label || "Break"}<br/>${p.start_time?.slice(0,5)}–${p.end_time?.slice(0,5)}</td>`;
       }
 
-      const slot = slotByDayPeriod[`${day}-${p.id}`];
-      if (!slot) return `<td style="padding:6px 8px;border:1px solid #ddd"></td>`;
+      const slotsHere = slotByDayPeriod[`${day}-${p.id}`];
+      if (!slotsHere?.length) return `<td style="padding:6px 8px;border:1px solid #ddd"></td>`;
+      const slot = slotsHere[0]; // used for timing/rowspan-walk purposes below
+
+      // Parallel elective options sharing this exact slot are rendered
+      // together in one cell (one line per option) instead of one winning
+      // and the rest disappearing, or each getting pushed to its own cell.
+      const isElectiveBlock = slotsHere.length > 1 || !!slot.elective_group;
 
       // Walk forward merging wall-clock-adjacent periods that carry the
-      // exact same subject+teacher+room into one spanning cell (double
-      // lessons in a single box instead of two).
+      // exact same set of subjects+teachers+rooms into one spanning cell
+      // (double lessons in a single box instead of two).
       let rowspan = 1;
       let endTime = slot.end_time;
       const dayPeriods = periodsByDay[day] ?? [];
       let curIdx = idx;
+      const sameSlotSignature = (arr: any[]) =>
+        arr.map((s) => `${s.subject_id}|${s.teacher_id ?? ""}|${s.room ?? ""}`).sort().join(",");
       while (true) {
         const curPeriod = dayPeriods.find((pp) => pp.period_index === curIdx);
         const nextPeriod = dayPeriods.find((pp) => pp.period_index === curIdx + 1);
         if (!curPeriod || !nextPeriod || nextPeriod.is_break) break;
         if (curPeriod.end_time !== nextPeriod.start_time) break; // gap -> not truly adjacent
-        const nextSlot = slotByDayPeriod[`${day}-${nextPeriod.id}`];
-        if (!nextSlot) break;
-        const sameLesson =
-          nextSlot.subject_id === slot.subject_id &&
-          nextSlot.teacher_id === slot.teacher_id &&
-          (nextSlot.room ?? null) === (slot.room ?? null);
+        const nextSlotsHere = slotByDayPeriod[`${day}-${nextPeriod.id}`];
+        if (!nextSlotsHere?.length) break;
+        const sameLesson = sameSlotSignature(nextSlotsHere) === sameSlotSignature(slotsHere);
         if (!sameLesson) break;
         consumed.add(`${day}-${nextPeriod.period_index}`);
-        endTime = nextSlot.end_time;
+        endTime = nextSlotsHere[0].end_time;
         rowspan++;
         curIdx = nextPeriod.period_index;
       }
 
-      return `<td rowspan="${rowspan}" style="padding:6px 8px;border:1px solid #ddd;vertical-align:top"><b>${slot.subjects?.code ?? ""}</b><br/><span style="font-size:11px;color:#555">${slot.start_time?.slice(0,5)}–${endTime?.slice(0,5)}</span><br/><span style="font-size:11px">${slot.staff ? `${slot.staff.first_name} ${slot.staff.last_name}` : ""}${slot.room ? ` · ${slot.room}` : ""}</span></td>`;
+      const optionsHtml = slotsHere
+        .map((s: any) => `<b>${s.subjects?.code ?? ""}</b>${s.staff ? ` <span style="font-size:11px">(${s.staff.first_name} ${s.staff.last_name})</span>` : ""}${s.room ? ` <span style="font-size:11px">· ${s.room}</span>` : ""}`)
+        .join("<br/>");
+
+      return `<td rowspan="${rowspan}" style="padding:6px 8px;border:1px solid #ddd;vertical-align:top">${isElectiveBlock ? `<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.02em">Elective options</div>` : ""}${optionsHtml}<br/><span style="font-size:11px;color:#555">${slot.start_time?.slice(0,5)}–${endTime?.slice(0,5)}</span></td>`;
     };
 
     const header = `<tr><th style="padding:6px 8px;border:1px solid #ddd;background:#f0f0f0;text-align:left">Period</th>${daysToShow.map((d) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#f0f0f0;text-align:left">${DAYS_FULL[d - 1]}</th>`).join("")}</tr>`;
@@ -684,9 +701,10 @@ function SlotCard({ slot, subjects, staff, canEdit, onChanged }: {
       <div className="font-mono text-xs text-muted-foreground">
         {slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}
       </div>
-      <div className="font-medium">
+      <div className="font-medium flex items-center gap-1.5 flex-wrap">
         {slot.subjects?.code}{" "}
         <span className="text-xs text-muted-foreground font-normal">{slot.subjects?.name}</span>
+        {slot.elective_group && <Badge variant="outline" className="text-xs">Elective: {slot.elective_group}</Badge>}
       </div>
       <div className="text-xs text-muted-foreground">
         {slot.staff ? `${slot.staff.first_name} ${slot.staff.last_name}` : "—"}
@@ -738,6 +756,7 @@ function SlotDialog({ classId, subjects, staff, existing, onDone }: {
     start_time: existing?.start_time?.slice(0, 5) ?? "07:30",
     end_time: existing?.end_time?.slice(0, 5) ?? "08:10",
     room: existing?.room ?? "",
+    elective_group: existing?.elective_group ?? "",
   });
 
   const m = useMutation({
@@ -745,9 +764,16 @@ function SlotDialog({ classId, subjects, staff, existing, onDone }: {
       const payload: any = { ...f, class_id: classId };
       if (!payload.teacher_id || payload.teacher_id === "__none__") delete payload.teacher_id;
       if (!payload.room) delete payload.room;
-      const classQ = supabase.from("timetable_slots").select("id, subjects(name)").eq("class_id", classId).eq("day_of_week", f.day_of_week).lt("start_time", f.end_time).gt("end_time", f.start_time);
+      const group = payload.elective_group?.trim();
+      if (group) payload.elective_group = group; else delete payload.elective_group;
+      // Overlapping slots for the same class are normally a conflict, EXCEPT
+      // when both slots share the same elective group — those are meant to
+      // run in parallel (different subject per student subset) in one shared
+      // block, not pushed into separate time cells.
+      const classQ = supabase.from("timetable_slots").select("id, subjects(name), elective_group").eq("class_id", classId).eq("day_of_week", f.day_of_week).lt("start_time", f.end_time).gt("end_time", f.start_time);
       if (isEdit) classQ.neq("id", existing.id);
-      const { data: classConflicts } = await classQ;
+      const { data: classConflictsRaw } = await classQ;
+      const classConflicts = (classConflictsRaw ?? []).filter((c: any) => !(group && c.elective_group === group));
       if (classConflicts?.length) throw new Error(`Class conflict: ${(classConflicts[0] as any).subjects?.name ?? "another subject"} already in this slot.`);
       if (payload.teacher_id) {
         const tQ = supabase.from("timetable_slots").select("id, classes(name)").eq("teacher_id", payload.teacher_id).eq("day_of_week", f.day_of_week).lt("start_time", f.end_time).gt("end_time", f.start_time);
@@ -799,6 +825,19 @@ function SlotDialog({ classId, subjects, staff, existing, onDone }: {
               {staff.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label>Elective group (optional)</Label>
+          <Input
+            value={f.elective_group}
+            onChange={(e) => setF({ ...f, elective_group: e.target.value })}
+            placeholder="e.g. Humanities Options"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Give two or more subjects at this class the same elective group name to schedule
+            them in this exact same day/time as parallel options — they'll share one slot
+            instead of conflicting or being pushed to separate cells.
+          </p>
         </div>
         <DialogFooter>
           <Button onClick={() => m.mutate()} disabled={m.isPending || !f.subject_id}>
