@@ -9,6 +9,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
+import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2712,26 +2713,62 @@ function StudentPortal() {
                     const slots = timetable.filter((s) => s.day_of_week === dow);
                     if (slots.length === 0) return null;
                     const isToday = dow === todayDow;
+                    const blocks = groupTimetableSlots(slots);
                     return (
                       <motion.div key={dow} variants={fadeUp}>
                         <div className={`text-sm font-semibold mb-2 flex items-center gap-2 ${isToday ? "text-primary" : ""}`}>
                           {DAYS[dow]}{isToday && <Badge className="text-xs">Today</Badge>}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {slots.map((s) => {
-                            const isNow = isToday && toMin(s.start_time) <= nowMin && toMin(s.end_time) > nowMin;
+                          {blocks.map((block) => {
+                            const isNow = isToday && toMin(block.start_time) <= nowMin && toMin(block.end_time) > nowMin;
+                            if (!block.isElective) {
+                              const s = block.options[0];
+                              return (
+                                <motion.div key={s.id} whileHover={{ scale: 1.02 }}
+                                  className={`rounded-xl border p-3 text-sm transition-all ${isNow ? "border-primary bg-primary/5 shadow-md" : "hover:bg-muted/30"}`}>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium">{s.subjects?.name ?? "—"}</span>
+                                    {isNow && <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground space-y-0.5">
+                                    <div className="flex items-center gap-1"><Clock className="w-3 h-3" />{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</div>
+                                    {s.staff && <div className="flex items-center gap-1"><User className="w-3 h-3" />{staffName(s.staff)}</div>}
+                                    {s.room && <div className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.room}</div>}
+                                  </div>
+                                </motion.div>
+                              );
+                            }
+                            // Elective options: 2+ subjects in this exact same
+                            // slot (different subsets of the class), shown as
+                            // one table instead of separate cards.
                             return (
-                              <motion.div key={s.id} whileHover={{ scale: 1.02 }}
-                                className={`rounded-xl border p-3 text-sm transition-all ${isNow ? "border-primary bg-primary/5 shadow-md" : "hover:bg-muted/30"}`}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-medium">{s.subjects?.name ?? "—"}</span>
-                                  {isNow && <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
+                              <motion.div key={`${block.day_of_week}-${block.start_time}`} whileHover={{ scale: 1.01 }}
+                                className={`rounded-xl border p-3 text-sm transition-all sm:col-span-2 lg:col-span-3 ${isNow ? "border-primary bg-primary/5 shadow-md" : "hover:bg-muted/30"}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />{block.start_time?.slice(0, 5)}–{block.end_time?.slice(0, 5)}
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">Elective options</Badge>
                                 </div>
-                                <div className="text-xs text-muted-foreground space-y-0.5">
-                                  <div className="flex items-center gap-1"><Clock className="w-3 h-3" />{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</div>
-                                  {s.staff && <div className="flex items-center gap-1"><User className="w-3 h-3" />{s.staff.first_name} {s.staff.last_name}</div>}
-                                  {s.room && <div className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.room}</div>}
-                                </div>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-xs text-muted-foreground">
+                                      <th className="text-left font-normal pb-1">Subject</th>
+                                      <th className="text-left font-normal pb-1">Teacher</th>
+                                      <th className="text-left font-normal pb-1">Room</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {block.options.map((s: any) => (
+                                      <tr key={s.id} className="border-t">
+                                        <td className="py-1 pr-2 font-medium">{s.subjects?.name ?? "—"}</td>
+                                        <td className="py-1 pr-2 text-xs text-muted-foreground">{staffName(s.staff) || "—"}</td>
+                                        <td className="py-1 text-xs text-muted-foreground">{s.room ?? "—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </motion.div>
                             );
                           })}
