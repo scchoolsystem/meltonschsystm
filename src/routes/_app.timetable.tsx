@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { generateTimetable } from "@/lib/timetable.functions";
+import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { FeatureGate } from "@/components/FeatureGate";
 
 export const Route = createFileRoute("/_app/timetable")({
@@ -123,7 +124,11 @@ function Page() {
   const grid = useMemo(() => {
     const g: Record<number, any[]> = {};
     (slots as any[]).forEach((s) => { (g[s.day_of_week] ||= []).push(s); });
-    return g;
+    const blocksByDay: Record<number, ReturnType<typeof groupTimetableSlots>> = {};
+    Object.entries(g).forEach(([dow, daySlots]) => {
+      blocksByDay[+dow] = groupTimetableSlots(daySlots);
+    });
+    return blocksByDay;
   }, [slots]);
 
   const refreshGrid = () => {
@@ -213,9 +218,18 @@ function Page() {
         curIdx = nextPeriod.period_index;
       }
 
-      const optionsHtml = slotsHere
-        .map((s: any) => `<b>${s.subjects?.code ?? ""}</b>${s.staff ? ` <span style="font-size:11px">(${s.staff.first_name} ${s.staff.last_name})</span>` : ""}${s.room ? ` <span style="font-size:11px">· ${s.room}</span>` : ""}`)
-        .join("<br/>");
+      const optionsHtml = isElectiveBlock
+        ? `<table style="width:100%;border-collapse:collapse;margin-top:2px">
+             <tbody>
+               ${slotsHere.map((s: any) => `
+                 <tr>
+                   <td style="padding:1px 3px 1px 0;font-weight:600;white-space:nowrap">${s.subjects?.code ?? ""}</td>
+                   <td style="padding:1px 3px;color:#555;font-size:10px">${s.staff ? `${s.staff.first_name} ${s.staff.last_name}` : ""}</td>
+                   <td style="padding:1px 0 1px 3px;color:#555;font-size:10px;white-space:nowrap">${s.room ?? ""}</td>
+                 </tr>`).join("")}
+             </tbody>
+           </table>`
+        : `<b>${slot.subjects?.code ?? ""}</b>${slot.staff ? ` <span style="font-size:11px">(${slot.staff.first_name} ${slot.staff.last_name})</span>` : ""}${slot.room ? ` <span style="font-size:11px">· ${slot.room}</span>` : ""}`;
 
       return `<td rowspan="${rowspan}" style="padding:6px 8px;border:1px solid #ddd;vertical-align:top">${isElectiveBlock ? `<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.02em">Elective options</div>` : ""}${optionsHtml}<br/><span style="font-size:11px;color:#555">${slot.start_time?.slice(0,5)}–${endTime?.slice(0,5)}</span></td>`;
     };
@@ -330,16 +344,27 @@ function Page() {
                     {(grid[i + 1] ?? []).length === 0 && (
                       <p className="text-xs text-muted-foreground">No slots.</p>
                     )}
-                    {(grid[i + 1] ?? []).map((s: any) => (
-                      <SlotCard
-                        key={s.id}
-                        slot={s}
-                        subjects={subjects as any[]}
-                        staff={staff as any[]}
-                        canEdit={!!isAdmin}
-                        onChanged={refreshGrid}
-                      />
-                    ))}
+                    {(grid[i + 1] ?? []).map((block) =>
+                      block.isElective ? (
+                        <ElectiveBlockTable
+                          key={`${block.day_of_week}-${block.start_time}`}
+                          block={block}
+                          subjects={subjects as any[]}
+                          staff={staff as any[]}
+                          canEdit={!!isAdmin}
+                          onChanged={refreshGrid}
+                        />
+                      ) : (
+                        <SlotCard
+                          key={block.options[0].id}
+                          slot={block.options[0]}
+                          subjects={subjects as any[]}
+                          staff={staff as any[]}
+                          canEdit={!!isAdmin}
+                          onChanged={refreshGrid}
+                        />
+                      )
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -739,6 +764,99 @@ function SlotCard({ slot, subjects, staff, canEdit, onChanged }: {
           </AlertDialog>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────────── Elective Block Table ──────────────────────── */
+// Renders 2+ subjects that share the exact same day/time for a class (each
+// taught to a different subset of students) as one table — Subject / Teacher
+// / Room per row — instead of scattering them across separate cards.
+
+function ElectiveBlockTable({ block, subjects, staff, canEdit, onChanged }: {
+  block: ReturnType<typeof groupTimetableSlots>[number]; subjects: any[]; staff: any[]; canEdit: boolean; onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("timetable_slots").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, id) => { toast.success("Slot deleted"); setDeletedIds((p) => new Set(p).add(id)); onChanged(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const options = block.options.filter((o: any) => !deletedIds.has(o.id));
+  if (options.length === 0) return null;
+
+  return (
+    <div className="border rounded p-2">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="font-mono text-xs text-muted-foreground">
+          {block.start_time?.slice(0, 5)} – {block.end_time?.slice(0, 5)}
+        </div>
+        <Badge variant="outline" className="text-xs">Elective options</Badge>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-muted-foreground">
+            <th className="text-left font-normal pb-1">Subject</th>
+            <th className="text-left font-normal pb-1">Teacher</th>
+            <th className="text-left font-normal pb-1">Room</th>
+            {canEdit && <th className="w-14" />}
+          </tr>
+        </thead>
+        <tbody>
+          {options.map((s: any) => (
+            <tr key={s.id} className="group border-t">
+              <td className="py-1 pr-2">
+                <div className="font-medium">{s.subjects?.code}</div>
+                <div className="text-xs text-muted-foreground">{s.subjects?.name}</div>
+              </td>
+              <td className="py-1 pr-2 text-xs text-muted-foreground">{staffName(s.staff) || "—"}</td>
+              <td className="py-1 pr-2 text-xs text-muted-foreground">{s.room ?? "—"}</td>
+              {canEdit && (
+                <td className="py-1">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(s)}><Pencil className="w-3 h-3" /></Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(s)}><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        {editing && (
+          <SlotDialog classId={editing.class_id} subjects={subjects} staff={staff} existing={editing} onDone={() => { setEditing(null); onChanged(); }} />
+        )}
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete slot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.subjects?.name} on {block.start_time?.slice(0, 5)} will be removed from this elective group.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deleteTarget) { deleteMut.mutate(deleteTarget.id); setDeleteTarget(null); } }}
+              disabled={deleteMut.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
