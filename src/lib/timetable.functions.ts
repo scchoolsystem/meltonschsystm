@@ -502,8 +502,9 @@ export const generateTimetable = createServerFn({ method: "POST" })
         // school days (e.g. 6 lessons, 5 weekdays), or a day simply had no
         // usable slot, some lessons are structurally left over. If this
         // class_subject has "Double lesson" (allow_double) switched on, treat
-        // that as permission to place the leftover lesson(s) as an EXTRA
-        // lesson on top of an existing day, rather than dropping them.
+        // that as permission to place the leftover lesson(s) as an ordinary
+        // EXTRA single lesson wherever there's a free slot in the week —
+        // NOT paired next to the existing lesson as a back-to-back double.
         if (remaining > 0 && d.allow_double) {
           let guard = remaining; // hard cap so a pathological config can't loop forever
           while (remaining > 0 && guard-- > 0) {
@@ -511,21 +512,22 @@ export const generateTimetable = createServerFn({ method: "POST" })
             let best: ExtraCandidate | null = null;
             for (const day of allDays) {
               const dayPeriods = periodsByDay.get(day)!;
-              const alreadyHasSubjectToday = (daySubjectCount.get(day)!.get(d.subject_id) ?? 0) > 0;
               for (const period of dayPeriods) {
                 const k = slotKey(period.day_of_week, period.start_time);
                 if (!isClassFreeAt(k)) continue;
                 if (!isTeacherFree(teacherId, day, period.period_index, k)) continue;
                 if (loadOn(teacherId, day) >= data.maxLessonsPerTeacherPerDay) continue;
 
+                const subj = subjectMap.get(d.subject_id);
                 let score = 0;
-                // Prefer turning a day that already has this subject into a
-                // double, rather than spreading onto a brand-new day.
-                if (alreadyHasSubjectToday) score += 20;
-                // Prefer a period immediately adjacent to today's existing
-                // lesson so it reads as a genuine double lesson.
-                if (adjacentSameSubject(day, d.subject_id, period.period_index)) score += 15;
+                if (subj?.preferred_time_of_day === "morning") score += Math.max(0, 6 - period.period_index) * 2;
+                if (subj?.preferred_time_of_day === "afternoon") score += Math.min(period.period_index, 6) * 2;
                 score -= loadOn(teacherId, day) * 3;
+                score -= periodIndexRepeatCount(d.subject_id, period.period_index) * 6;
+                // Actively avoid the period right next to an existing lesson
+                // of this subject that day — this is meant to be a separate
+                // extra lesson at a random other time, not a double block.
+                if (adjacentSameSubject(day, d.subject_id, period.period_index)) score -= 30;
                 const cand = { day, period, score };
                 if (!best || cand.score > best.score) best = cand;
               }
@@ -557,7 +559,7 @@ export const generateTimetable = createServerFn({ method: "POST" })
         if (remaining > 0) {
           const hint = d.allow_double
             ? ""
-            : ` Turn on "Double lesson" for this subject in Class Subjects to allow an extra lesson on one day instead.`;
+            : ` Turn on "Double lesson" for this subject in Class Subjects to allow an extra lesson elsewhere in the week instead.`;
           conflicts.push(`${classNames.get(classId)}: ${subjectMap.get(d.subject_id)?.name ?? d.subject_id} (core) — only placed ${d.lessons - remaining}/${d.lessons} days, ran out of free slots.${hint}`);
         }
       }
