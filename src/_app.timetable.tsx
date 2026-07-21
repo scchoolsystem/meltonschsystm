@@ -1446,6 +1446,11 @@ function ClassSubjectsPanel({
                   <Label htmlFor="triple">Triple lesson</Label>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                For core subjects, "Double lesson" also lets the generator place an extra lesson on
+                one day when the weekly lesson count is higher than the number of school days
+                (e.g. 6 lessons/week over 5 days) — instead of leaving the last lesson unscheduled.
+              </p>
             </div>
           )}
           <DialogFooter>
