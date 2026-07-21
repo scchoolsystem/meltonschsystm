@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createParentAccount } from "@/lib/admissions.functions";
+import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -398,17 +399,49 @@ function StudentProfilePage() {
                 [0, 1, 2, 3, 4, 5, 6].map((dow) => {
                   const slots = (timetable ?? []).filter((s: any) => s.day_of_week === dow);
                   if (slots.length === 0) return null;
+                  const blocks = groupTimetableSlots(slots);
                   return (
                     <div key={dow}>
                       <div className="font-medium text-sm mb-1">{DAYS[dow]}</div>
                       <div className="space-y-1">
-                        {slots.map((s: any) => (
-                          <div key={s.id} className="flex gap-3 text-sm border-b py-1">
-                            <span className="font-mono text-xs text-muted-foreground w-24">{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</span>
-                            <span className="flex-1 truncate">{s.subjects?.name} {s.staff ? `· ${s.staff.first_name} ${s.staff.last_name}` : ""}</span>
-                            <span className="text-xs text-muted-foreground">{s.room ?? ""}</span>
-                          </div>
-                        ))}
+                        {blocks.map((block) => {
+                          if (!block.isElective) {
+                            const s = block.options[0];
+                            return (
+                              <div key={s.id} className="flex gap-3 text-sm border-b py-1">
+                                <span className="font-mono text-xs text-muted-foreground w-24">{s.start_time?.slice(0, 5)}–{s.end_time?.slice(0, 5)}</span>
+                                <span className="flex-1 truncate">{s.subjects?.name} {s.staff ? `· ${staffName(s.staff)}` : ""}</span>
+                                <span className="text-xs text-muted-foreground">{s.room ?? ""}</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={`${block.day_of_week}-${block.start_time}`} className="border rounded py-1.5 px-2 my-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-mono text-xs text-muted-foreground">{block.start_time?.slice(0, 5)}–{block.end_time?.slice(0, 5)}</span>
+                                <Badge variant="outline" className="text-xs">Elective options</Badge>
+                              </div>
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-xs text-muted-foreground">
+                                    <th className="text-left font-normal pb-1">Subject</th>
+                                    <th className="text-left font-normal pb-1">Teacher</th>
+                                    <th className="text-left font-normal pb-1">Room</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {block.options.map((s: any) => (
+                                    <tr key={s.id} className="border-t">
+                                      <td className="py-1 pr-2 font-medium">{s.subjects?.name}</td>
+                                      <td className="py-1 pr-2 text-xs text-muted-foreground">{staffName(s.staff) || "—"}</td>
+                                      <td className="py-1 text-xs text-muted-foreground">{s.room ?? "—"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
