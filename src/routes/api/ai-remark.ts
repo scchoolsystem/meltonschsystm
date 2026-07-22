@@ -70,7 +70,27 @@ export const Route = createFileRoute("/api/ai-remark")({
         if (!anthropicRes.ok) {
           const errText = await anthropicRes.text().catch(() => "");
           console.error("[ai-remark] Anthropic API error:", anthropicRes.status, errText);
-          return jsonResponse({ error: `AI suggestion failed (${anthropicRes.status})` }, 502);
+
+          // Surface the actual reason (e.g. "credit balance is too low", "invalid
+          // x-api-key") instead of just a bare status code — the earlier version
+          // swallowed this into the Worker logs, so every failure looked identical
+          // from the browser regardless of cause.
+          let reason = "";
+          try {
+            const parsed = JSON.parse(errText);
+            reason = parsed?.error?.message ?? "";
+          } catch {
+            reason = errText.slice(0, 300);
+          }
+
+          return jsonResponse(
+            {
+              error: reason
+                ? `AI suggestion failed: ${reason}`
+                : `AI suggestion failed (${anthropicRes.status})`,
+            },
+            502,
+          );
         }
 
         const data: any = await anthropicRes.json();
