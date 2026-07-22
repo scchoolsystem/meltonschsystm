@@ -200,12 +200,23 @@ async function aiSuggestRemark(
       ? `Write a class teacher's end-of-term remark for a Kenyan secondary school student named ${studentName}. Focus on character, behaviour, participation and overall performance. 1-2 sentences.`
       : `Write a subject teacher's remark for ${studentName} in ${subjectName ?? "the subject"}${grade ? ` who scored grade ${grade}` : ""}. Be specific and constructive, 1-2 sentences. Kenyan secondary school context.`;
 
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session?.access_token) {
+    throw new Error("Not authenticated — please log in again");
+  }
+
   const resp = await fetch("/api/ai-remark", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionData.session.access_token}`,
+    },
     body: JSON.stringify({ prompt }),
   });
-  if (!resp.ok) throw new Error("AI suggestion failed");
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error ?? "AI suggestion failed");
+  }
   const json = await resp.json();
   return json.remark ?? "";
 }
@@ -302,8 +313,8 @@ function SubjectRemarksPanel({
       const grade = gradeMap[studentId];
       const text = await aiSuggestRemark(studentName, "subject_teacher", grade, sub?.name);
       setDrafts((d) => ({ ...d, [studentId]: text }));
-    } catch {
-      toast.error("AI suggestion failed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "AI suggestion failed");
     } finally {
       setAiLoadingId(null);
     }
@@ -487,7 +498,7 @@ function ClassTeacherRemarksPanel({
     try {
       const text = await aiSuggestRemark(name, "class_teacher");
       setDrafts((d) => ({ ...d, [studentId]: text }));
-    } catch { toast.error("AI failed"); }
+    } catch (e: any) { toast.error(e?.message ?? "AI suggestion failed"); }
     finally { setAiLoadingId(null); }
   }
 
