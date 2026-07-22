@@ -1,20 +1,25 @@
 // src/routes/api/ai-assignment-extract.ts
 //
 // Teacher uploads a PDF (question paper) when creating an assignment. This
-// route pulls its text out locally (unpdf) and splits it into questions
-// with regex/rule-based heuristics — no AI call, no API key, no cost.
+// route pulls its text and any embedded images out locally (unpdf) and
+// splits it into questions with regex/rule-based heuristics — no AI call,
+// no API key, no cost. Any diagram/figure embedded in the PDF near a
+// question is attached to that question so teachers see it during review
+// instead of just a blank "diagram" placeholder.
 //
 // Trade-off vs the old Anthropic-based version: this needs a real text
 // layer in the PDF and fairly standard numbering ("1.", "Q2:", etc). It
 // can't read scanned/photographed papers (no OCR) and won't handle
 // multi-column layouts or genuine diagrams as well as a vision model would.
+// Image placement is a positional heuristic, not real layout analysis — see
+// the comments in pdf-question-extractor.ts for its limits.
 // The frontend already treats this as a first-pass draft the teacher
 // reviews/edits before publishing, so a rougher first pass is an acceptable
 // trade for zero ongoing cost.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { extractTextFromPdf, parseQuestionsFromText } from "@/lib/pdf-question-extractor";
+import { extractQuestionsFromPdf } from "@/lib/pdf-question-extractor";
 
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15MB raw file (base64 is ~33% bigger on the wire)
 
@@ -51,11 +56,11 @@ export const Route = createFileRoute("/api/ai-assignment-extract")({
           );
         }
 
-        let rawText: string;
+        let questions: Awaited<ReturnType<typeof extractQuestionsFromPdf>>;
         try {
-          rawText = await extractTextFromPdf(pdfBase64);
+          questions = await extractQuestionsFromPdf(pdfBase64);
         } catch (e: any) {
-          console.error("[ai-assignment-extract] PDF text extraction failed:", e?.message);
+          console.error("[ai-assignment-extract] PDF extraction failed:", e?.message);
           return jsonResponse(
             {
               error:
@@ -64,18 +69,6 @@ export const Route = createFileRoute("/api/ai-assignment-extract")({
             422,
           );
         }
-
-        if (!rawText.trim()) {
-          return jsonResponse(
-            {
-              error:
-                "No readable text was found in that PDF. It may be scanned or image-only — try adding questions manually instead.",
-            },
-            422,
-          );
-        }
-
-        const questions = parseQuestionsFromText(rawText);
 
         if (questions.length === 0) {
           return jsonResponse(
