@@ -654,6 +654,57 @@ function AssignmentFormDialog({
   const [questions, setQuestions] = useState<Question[]>(
     editing?.questions ?? []
   );
+  const [importing, setImporting] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePdfImport = async (e: any) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast.error("Please upload a PDF file.");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("PDF is too large — please upload a file under 15MB.");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = () => reject(new Error("Could not read the file"));
+        reader.readAsDataURL(file);
+      });
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error("Not authenticated — please log in again");
+      }
+
+      const res = await fetch("/api/ai-assignment-extract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ pdfBase64: base64, fileName: file.name }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "AI extraction failed");
+
+      setQuestions((qs) => [...qs, ...json.questions]);
+      toast.success(`Imported ${json.questions.length} question${json.questions.length === 1 ? "" : "s"} from PDF — review before publishing.`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not extract questions from that PDF");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const addQuestion = (type: QuestionType) => {
     setQuestions((qs) => [
@@ -855,7 +906,26 @@ function AssignmentFormDialog({
                 ({questions.length})
               </span>
             </p>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handlePdfImport}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                disabled={importing}
+                onClick={() => pdfInputRef.current?.click()}
+              >
+                {importing ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                {importing ? "Reading PDF…" : "Import from PDF"}
+              </Button>
+              <div className="w-px bg-border mx-0.5" />
               <Button
                 type="button"
                 size="sm"
@@ -888,8 +958,8 @@ function AssignmentFormDialog({
 
           {questions.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">
-              No questions yet. Add text, MCQ, or diagram questions above.
-              Students can also submit a file without questions.
+              No questions yet. Upload a PDF above to auto-extract them, or add text, MCQ,
+              or diagram questions manually. Students can also submit a file without questions.
             </p>
           ) : (
             <div className="space-y-3">
