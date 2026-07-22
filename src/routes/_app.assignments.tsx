@@ -54,6 +54,7 @@ interface Question {
   text: string;
   options?: string[];   // MCQ only
   max_marks: number;
+  images?: { dataUrl: string; width: number; height: number }[]; // from PDF import, e.g. a diagram
 }
 
 interface AnswerPayload {
@@ -1048,6 +1049,31 @@ function QuestionEditor({
         className="text-sm"
       />
 
+      {question.images && question.images.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-2">
+          {question.images.map((img, ii) => (
+            <div key={ii} className="relative">
+              <img
+                src={img.dataUrl}
+                alt={`Question ${index + 1} figure ${ii + 1}`}
+                className="h-20 w-auto rounded border object-contain bg-white"
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-background border text-destructive hover:text-destructive"
+                onClick={() =>
+                  onChange({ images: question.images!.filter((_, i2) => i2 !== ii) })
+                }
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {question.type === "mcq" && (
         <div className="space-y-1.5 pl-2">
           {(question.options ?? ["", "", "", ""]).map((opt, oi) => (
@@ -1405,6 +1431,19 @@ function StudentSubmitDialog({
                   ({q.max_marks} marks)
                 </span>
               </p>
+
+              {q.images && q.images.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {q.images.map((img, ii) => (
+                    <img
+                      key={ii}
+                      src={img.dataUrl}
+                      alt={`Question ${i + 1} figure ${ii + 1}`}
+                      className="max-h-48 w-auto rounded border object-contain bg-white"
+                    />
+                  ))}
+                </div>
+              )}
 
               {q.type === "text" && (
                 <Textarea
