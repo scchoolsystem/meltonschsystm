@@ -28,6 +28,30 @@ const Q_START = /^(?:q(?:uestion)?\.?\s*)?(\d{1,3})[.)]\s*(.*)$/i;
 // Matches an MCQ option line: "A.", "b)", etc, followed by the option text.
 const OPTION_START = /^([A-Za-z])[.)]\s+(.+)$/;
 
+// Some papers put every option on its own line ("A. Nucleus\nB. Ribosome"),
+// but many cram all of them onto one line instead:
+// "A. Nucleus B. Ribosome C. Mitochondrion D. Vacuole". Detect that shape
+// and split it into separate options. Requires the letters to start at A
+// and run consecutively (A, B, C, D...) so this doesn't misfire on
+// unrelated text that happens to contain "B." or "C." mid-sentence.
+function extractInlineOptions(line: string): string[] | null {
+  const matches = [...line.matchAll(/\b([A-Z])\.\s+/g)];
+  if (matches.length < 2) return null;
+  const letters = matches.map((m) => m[1]);
+  const expected = letters.map((_, i) => String.fromCharCode(65 + i));
+  if (JSON.stringify(letters) !== JSON.stringify(expected)) return null;
+
+  const options: string[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index! + matches[i][0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : line.length;
+    const opt = line.slice(start, end).trim();
+    if (!opt) return null; // malformed match — bail rather than push an empty option
+    options.push(opt);
+  }
+  return options;
+}
+
 // Matches a marks annotation anywhere in the question text, e.g.
 // "(5 marks)", "[10 mks]", "(2 mk)".
 const MARKS_PATTERN = /[([]\s*(\d{1,3})\s*(?:marks?|mks?)\s*[)\]]/i;
@@ -79,6 +103,11 @@ export function parseQuestionsFromText(rawText: string): ExtractedQuestion[] {
       const bodyLines: string[] = [];
 
       for (const line of block.lines) {
+        const inline = extractInlineOptions(line);
+        if (inline) {
+          optionLines.push(...inline);
+          continue;
+        }
         const om = line.match(OPTION_START);
         if (om) optionLines.push(om[2].trim());
         else bodyLines.push(line);
