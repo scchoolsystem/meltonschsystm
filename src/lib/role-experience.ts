@@ -20,7 +20,6 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Analytics", url: "/analytics" },
     { title: "Students", url: "/students" },
     { title: "Staff", url: "/staff" },
-    { title: "Payslips", url: "/staff/payslips" },
     { title: "Classes", url: "/classes" },
     { title: "Announcements", url: "/announcements" },
   ]},
@@ -60,6 +59,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Payments", url: "/finance/payments" },
     { title: "Expenses", url: "/finance/expenses" },
     { title: "Budget", url: "/finance/budget" },
+    { title: "Payslips", url: "/staff/payslips" },
     { title: "Analytics", url: "/finance/analytics" },
   ]},
   { label: "Digital IDs", items: [
@@ -214,6 +214,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Payments", url: "/finance/payments" },
       { title: "Expenses", url: "/finance/expenses" },
       { title: "Budget", url: "/finance/budget" },
+      { title: "Payslips", url: "/staff/payslips" },
       { title: "Analytics", url: "/finance/analytics" },
     ]},
   ],
