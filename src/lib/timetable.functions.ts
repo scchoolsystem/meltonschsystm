@@ -517,6 +517,11 @@ export const generateTimetable = createServerFn({ method: "POST" })
                 if (!isClassFreeAt(k)) continue;
                 if (!isTeacherFree(teacherId, day, period.period_index, k)) continue;
                 if (loadOn(teacherId, day) >= data.maxLessonsPerTeacherPerDay) continue;
+                // Hard rule, not just a preference: this must land as a separate
+                // extra lesson somewhere else in the week, never back-to-back
+                // with the subject's existing lesson that day (that would read
+                // as, and get visually merged into, a double lesson).
+                if (adjacentSameSubject(day, d.subject_id, period.period_index)) continue;
 
                 const subj = subjectMap.get(d.subject_id);
                 let score = 0;
@@ -524,15 +529,11 @@ export const generateTimetable = createServerFn({ method: "POST" })
                 if (subj?.preferred_time_of_day === "afternoon") score += Math.min(period.period_index, 6) * 2;
                 score -= loadOn(teacherId, day) * 3;
                 score -= periodIndexRepeatCount(d.subject_id, period.period_index) * 6;
-                // Actively avoid the period right next to an existing lesson
-                // of this subject that day — this is meant to be a separate
-                // extra lesson at a random other time, not a double block.
-                if (adjacentSameSubject(day, d.subject_id, period.period_index)) score -= 30;
                 const cand = { day, period, score };
                 if (!best || cand.score > best.score) best = cand;
               }
             }
-            if (!best) break; // truly nowhere left this week
+            if (!best) break; // no non-adjacent slot left anywhere this week
 
             const { day, period } = best;
             const k = slotKey(period.day_of_week, period.start_time);
