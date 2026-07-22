@@ -19,6 +19,7 @@
     "desktop:build": "pnpm desktop:frontend && tauri build"
   },
   "dependencies": {
+    "unpdf": "^1.6.2",
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
