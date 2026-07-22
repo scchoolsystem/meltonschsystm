@@ -9,11 +9,19 @@ concurrency:
   group: cloudflare-deploy-${{ github.ref }}
   cancel-in-progress: false
 
+# Needed so the "Commit updated lockfile" step below can push back to main.
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # A PAT/deploy key would be needed for this push to re-trigger the
+      # workflow on its own commit, but that's not the goal here — pushes
+      # made with the default GITHUB_TOKEN intentionally do NOT trigger
+      # further workflow runs, so this can't create a push loop.
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -23,8 +31,26 @@ jobs:
       - name: Enable pnpm
         run: corepack enable
 
+      # --no-frozen-lockfile: package.json can get edited (e.g. adding a
+      # dependency) without pnpm-lock.yaml being regenerated locally first,
+      # since there's no local dev machine in this workflow — everything
+      # happens through Actions. This lets install proceed by updating the
+      # lockfile in place instead of hard-failing; the step below commits
+      # that update back so the repo's lockfile doesn't drift out of sync.
       - name: Install dependencies
-         run: pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit updated lockfile
+        run: |
+          if ! git diff --quiet -- pnpm-lock.yaml; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "chore: sync pnpm-lock.yaml [skip ci]"
+            git push
+          else
+            echo "pnpm-lock.yaml already up to date — nothing to commit."
+          fi
 
       - name: Build project
         run: pnpm build
