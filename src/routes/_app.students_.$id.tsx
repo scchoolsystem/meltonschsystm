@@ -19,6 +19,7 @@ import {
   Award, Bed, Bus, Stethoscope, FileText, BookOpen, ExternalLink, Mail, Home,
 } from "lucide-react";
 import { LifecycleActions } from "@/components/LifecycleActions";
+import { LockedFieldGate } from "@/components/LockedFieldGate";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/hooks/use-auth";
 import { StudentWizard } from "@/components/students/StudentWizard";
@@ -366,7 +367,18 @@ function StudentProfilePage() {
             <CardHeader><CardTitle className="text-base">Personal details</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
               <Field label="Date of birth" value={student.date_of_birth} />
-              <Field label="National ID" value={student.national_id} />
+              {canEdit ? (
+                <LockedFieldGate
+                  resource="students"
+                  resourceId={student.id}
+                  field="national_id"
+                  label="National ID"
+                  currentValue={student.national_id}
+                  onSaved={() => qc.invalidateQueries({ queryKey: ["student-profile", id] })}
+                />
+              ) : (
+                <Field label="National ID" value={student.national_id} />
+              )}
               <Field label="Address" value={student.address} />
               <Field label="Desk no" value={student.desk_no?.toString()} />
               <Field label="Parent email" value={student.parent_email} />
