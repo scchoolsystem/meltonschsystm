@@ -53,6 +53,13 @@ async function storageGet(key: string): Promise<string | null> {
     const { value } = await Preferences.get({ key });
     return value;
   }
+  // Plain web browser (e.g. app.smartdev.co.ke, a flat domain with no
+  // per-school subdomain to read the slug from). Without this branch,
+  // storageGet always returned null here, so the school picked on the
+  // School Picker screen was never remembered — every refresh forgot it
+  // and bounced the user back to the picker, looking exactly like a full
+  // logout even though their actual Supabase session was still valid.
+  if (typeof window !== "undefined") return localStorage.getItem(key);
   return null;
 }
 
@@ -61,7 +68,9 @@ async function storageSet(key: string, value: string): Promise<void> {
   if (isCapacitor()) {
     const Preferences = await getCapacitorPreferences();
     await Preferences.set({ key, value });
+    return;
   }
+  if (typeof window !== "undefined") localStorage.setItem(key, value);
 }
 
 async function storageRemove(key: string): Promise<void> {
@@ -69,7 +78,9 @@ async function storageRemove(key: string): Promise<void> {
   if (isCapacitor()) {
     const Preferences = await getCapacitorPreferences();
     await Preferences.remove({ key });
+    return;
   }
+  if (typeof window !== "undefined") localStorage.removeItem(key);
 }
 
 // Diagnostic helper: races `promise` against a per-step timeout so we can
@@ -126,7 +137,14 @@ export function getSubdomainSlug(hostname: string): string | null {
 
 async function resolveSlug(): Promise<string | null> {
   if (isNativeApp()) return storageGet(STORAGE_KEY);
-  if (typeof window !== "undefined") return getSubdomainSlug(window.location.hostname);
+  if (typeof window !== "undefined") {
+    const subdomainSlug = getSubdomainSlug(window.location.hostname);
+    if (subdomainSlug) return subdomainSlug;
+    // Flat domain (app.smartdev.co.ke, smartdev.co.ke, etc) — there's no
+    // school encoded in the hostname itself, so fall back to whatever was
+    // last picked on the School Picker screen for THIS browser.
+    return storageGet(STORAGE_KEY);
+  }
   return null;
 }
 
