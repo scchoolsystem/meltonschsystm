@@ -77,7 +77,9 @@ async function resolvePhones(
   }
   const raw = Array.from(new Set(rows.map((r) => String(r ?? "").trim()).filter(Boolean)));
   return raw.map(toE164Kenya).filter((n): n is string => n !== null);
-} = createServerFn({ method: "POST" })
+}
+
+export const sendBulkSms = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z
