@@ -30,6 +30,19 @@ async function assertCommunicationsEnabled(ctx: { supabase: any }, schoolId: str
   if (!enabled) throw new Error("The communications module is disabled for this school.");
 }
 
+// Africa's Talking expects E.164 (+254...). Numbers stored/entered as local
+// Kenyan formats (0712345678, 254712345678, 712345678) get silently
+// rejected per-recipient rather than erroring the whole request, which is
+// easy to miss. Normalize before sending.
+function toE164Kenya(raw: string): string | null {
+  const digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("+254") && digits.length === 13) return digits;
+  if (digits.startsWith("254") && digits.length === 12) return `+${digits}`;
+  if (digits.startsWith("0") && digits.length === 10) return `+254${digits.slice(1)}`;
+  if (digits.length === 9) return `+254${digits}`; // bare subscriber number
+  return null; // unrecognized shape — let it through as-is downstream? no: drop it, it would just fail silently
+}
+
 async function resolvePhones(
   schoolId: string,
   audience: z.infer<typeof AudienceSchema>
@@ -62,10 +75,9 @@ async function resolvePhones(
   } else if (audience.type === "custom") {
     rows = audience.phones ?? [];
   }
-  return Array.from(new Set(rows.map((r) => String(r ?? "").trim()).filter(Boolean)));
-}
-
-export const sendBulkSms = createServerFn({ method: "POST" })
+  const raw = Array.from(new Set(rows.map((r) => String(r ?? "").trim()).filter(Boolean)));
+  return raw.map(toE164Kenya).filter((n): n is string => n !== null);
+} = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z
@@ -83,9 +95,11 @@ export const sendBulkSms = createServerFn({ method: "POST" })
     let status = "queued";
     let sent = 0;
     let failed = 0;
+    let sendError: string | null = null;
 
     if (numbers.length === 0) {
       status = "failed";
+      sendError = "No recipient phone numbers resolved";
     } else if (process.env.AFRICAS_TALKING_API_KEY && process.env.AFRICAS_TALKING_USERNAME) {
       try {
         const params = new URLSearchParams({
@@ -105,16 +119,36 @@ export const sendBulkSms = createServerFn({ method: "POST" })
           },
           body: params.toString(),
         });
+        const bodyText = await res.text();
         if (res.ok) {
           status = "sent";
           sent = numbers.length;
+          // Africa's Talking returns 200/201 even for per-recipient
+          // rejections (e.g. invalid number, insufficient balance) — the
+          // real outcome is nested in the response body, not the HTTP
+          // status. Surface it so "sent" isn't a false positive.
+          try {
+            const parsed = JSON.parse(bodyText);
+            const recipients = parsed?.SMSMessageData?.Recipients ?? [];
+            const rejected = recipients.filter((r: any) => r.status !== "Success");
+            if (rejected.length > 0) {
+              status = rejected.length === recipients.length ? "failed" : "partial";
+              sent = recipients.length - rejected.length;
+              failed = rejected.length;
+              sendError = rejected.map((r: any) => `${r.number}: ${r.status}`).slice(0, 5).join("; ");
+            }
+          } catch {
+            // Non-JSON 2xx body — treat as sent, nothing more to extract.
+          }
         } else {
           status = "failed";
           failed = numbers.length;
+          sendError = `Africa's Talking ${res.status}: ${bodyText.slice(0, 300)}`;
         }
-      } catch {
+      } catch (e: any) {
         status = "failed";
         failed = numbers.length;
+        sendError = e?.message?.slice(0, 300) ?? "Network error calling Africa's Talking";
       }
     } else {
       // No SMS provider configured — nothing was actually sent, and there's
@@ -124,6 +158,7 @@ export const sendBulkSms = createServerFn({ method: "POST" })
       // "queued" badge that would never resolve.
       status = "failed";
       failed = numbers.length;
+      sendError = "SMS provider not configured (AFRICAS_TALKING_API_KEY missing)";
     }
 
     await (supabaseAdmin as any).from("sms_queue").insert({
@@ -134,9 +169,7 @@ export const sendBulkSms = createServerFn({ method: "POST" })
       sent_count: sent,
       failed_count: failed,
       created_by: context.userId,
-      error: status === "failed" && sent === 0 && failed === numbers.length
-        ? (process.env.AFRICAS_TALKING_API_KEY ? undefined : "SMS provider not configured (AFRICAS_TALKING_API_KEY missing)")
-        : undefined,
+      error: sendError,
     } as any);
     await (supabaseAdmin as any).from("notifications_log").insert({
       school_id: schoolId,
