@@ -117,9 +117,13 @@ export const sendBulkSms = createServerFn({ method: "POST" })
         failed = numbers.length;
       }
     } else {
-      // No SMS provider configured — mark as queued so admin can see intent
-      status = "queued";
-      sent = numbers.length;
+      // No SMS provider configured — nothing was actually sent, and there's
+      // no background job that will ever pick this up later (unlike email).
+      // Report it honestly as failed rather than claiming sent_count =
+      // numbers.length, which made the UI show e.g. "Sent: 120" next to a
+      // "queued" badge that would never resolve.
+      status = "failed";
+      failed = numbers.length;
     }
 
     await (supabaseAdmin as any).from("sms_queue").insert({
@@ -130,7 +134,10 @@ export const sendBulkSms = createServerFn({ method: "POST" })
       sent_count: sent,
       failed_count: failed,
       created_by: context.userId,
-    });
+      error: status === "failed" && sent === 0 && failed === numbers.length
+        ? (process.env.AFRICAS_TALKING_API_KEY ? undefined : "SMS provider not configured (AFRICAS_TALKING_API_KEY missing)")
+        : undefined,
+    } as any);
     await (supabaseAdmin as any).from("notifications_log").insert({
       school_id: schoolId,
       channel: "sms",
