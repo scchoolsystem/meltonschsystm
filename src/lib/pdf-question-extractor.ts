@@ -272,13 +272,18 @@ function buildQuestionsFromLineStream(tokens: LineToken[]): ExtractedQuestion[] 
   type Block = { lines: string[]; images: ExtractedImage[] };
   const blocks: Block[] = [];
   let current: Block | null = null;
+  // Images that show up before any question number has been recognized
+  // yet. Common case: a diagram sits visually above its question (e.g. a
+  // labelled cell diagram printed above "1. The labelled structure is..."),
+  // so by the time we reach it in reading order there's no block to drop it
+  // into. Rather than discard it, hold onto it and hand it to the first
+  // question we do find — much more often right than silently dropping it.
+  const pendingImages: ExtractedImage[] = [];
 
   for (const token of tokens) {
     if (token.kind === "image") {
-      // An image before any question number is recognized has nowhere to
-      // go (e.g. a school badge in the header) — drop it, same as stray
-      // preamble text is already dropped below.
       if (current) current.images.push(token.image);
+      else pendingImages.push(token.image);
       continue;
     }
 
@@ -287,12 +292,18 @@ function buildQuestionsFromLineStream(tokens: LineToken[]): ExtractedQuestion[] 
     if (m) {
       if (current) blocks.push(current);
       current = { lines: m[2] ? [m[2]] : [], images: [] };
+      if (pendingImages.length > 0) {
+        current.images.push(...pendingImages);
+        pendingImages.length = 0;
+      }
     } else if (current) {
       current.lines.push(line);
     }
     // Lines before the first recognized question number (title, byline,
     // "answer all questions" preamble) are intentionally dropped — there's
-    // no `current` block yet to push them into.
+    // no `current` block yet to push them into. Only images get the
+    // pending-buffer treatment above; stray preamble text has no natural
+    // "next" owner the way a diagram does.
   }
   if (current) blocks.push(current);
 
