@@ -192,6 +192,13 @@ function ClassRankingPage() {
                 <Printer className="w-4 h-4" /> Print
               </Button>
             )}
+            {examId && (
+              <Button asChild variant="outline" className="gap-1.5">
+                <Link to="/academics/class-ranking/bulk" search={{ examId, rankBasis }}>
+                  <Printer className="w-4 h-4" /> Print All Classes
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
