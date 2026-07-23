@@ -248,6 +248,10 @@ export function moduleForPath(pathname: string): string | null {
     // permission set rather than duplicating the role list.
     if (seg[1] === "entry") return "marks";
     if (seg[1] === "results") return "results";
+    // /academics/class-ranking — per-class merit list / subject ranking
+    // sheets. Same audience as whole-class results, so it shares that
+    // permission set rather than duplicating the role list.
+    if (seg[1] === "class-ranking") return "results";
     // /academics/report-card/$studentId/$examId — own report card detail.
     if (seg[1] === "report-card") return "report-card-view";
     // /academics/report-cards — admin class-wide picker/ranking.
