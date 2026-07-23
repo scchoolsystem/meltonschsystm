@@ -217,15 +217,20 @@ function SheetHeader({
 
 // ── Full merit list (all subjects + overall position) ──────────────────────
 export function ClassMeritListSheet({
-  school, classLabel, exam, ranking, rankBasis,
+  school, classLabel, exam, ranking, rankBasis, pageBreakAfter = false,
 }: {
   school: any; classLabel: string; exam: any; ranking: ClassRankingResult; rankBasis: "mean" | "total";
+  /** Adds print page-break-after; set true on every card except the last in a batch. */
+  pageBreakAfter?: boolean;
 }) {
   const { subjectCols, rows } = ranking;
   const classMean = rows.length ? rows.reduce((a, r) => a + r.mean, 0) / rows.length : 0;
 
   return (
-    <div className="cr-page bg-white text-gray-900 border rounded-xl p-6 shadow-sm">
+    <div
+      className="cr-page bg-white text-gray-900 border rounded-xl p-6 shadow-sm"
+      style={pageBreakAfter ? { pageBreakAfter: "always", breakAfter: "page" } : undefined}
+    >
       <SheetHeader school={school} classLabel={classLabel} exam={exam} subtitle="Class Merit List — Full Results" />
 
       {rows.length === 0 ? (
