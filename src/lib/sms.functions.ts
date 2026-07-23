@@ -200,6 +200,7 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
 
     let status = "sent";
     let errorMsg: string | null = null;
+    let messageIds: string[] = [];
 
     if (emails.length === 0) {
       status = "failed";
@@ -229,6 +230,7 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
             },
           });
           if (enqueueError) throw enqueueError;
+          messageIds.push(messageId);
         }
         status = "queued";
       } catch (e: any) {
@@ -245,6 +247,10 @@ export const sendEmailBlast = createServerFn({ method: "POST" })
       recipient_count: emails.length,
       status,
       error: errorMsg,
+      // Lets the email_send_log trigger find this row and flip it from
+      // 'queued' to 'sent'/'partial'/'failed' once the queue processor
+      // actually sends (or gives up on) each recipient.
+      message_ids: messageIds.length > 0 ? messageIds : null,
     });
     return { sent: emails.length, status };
   });
