@@ -1182,6 +1182,21 @@ function Page() {
             </ChartCard>
           </motion.div>
 
+          {/* Link to the printable per-class merit list / subject ranking sheets */}
+          <div className="flex items-center justify-between rounded-xl border bg-muted/20 p-3">
+            <div className="text-sm">
+              <p className="font-medium">Need a printable class list?</p>
+              <p className="text-xs text-muted-foreground">
+                Pick a class to see every student ranked 1st–last, per subject and overall — ready to print.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline" className="gap-1.5 shrink-0">
+              <Link to="/academics/class-ranking">
+                <Award className="w-3.5 h-3.5" /> Open Class Ranking
+              </Link>
+            </Button>
+          </div>
+
           {/* Class ranking table */}
           <ChartCard title="Class Rankings" icon={<Award className="w-4 h-4" />}>
             <div className="rounded-lg border overflow-x-auto">
