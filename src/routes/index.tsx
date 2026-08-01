@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTenant, isNativeApp } from "@/hooks/use-tenant";
 import { SchoolPicker } from "@/components/SchoolPicker";
 import { supabase } from "@/integrations/supabase/client";
+import { gmailComposeUrl } from "@/lib/email-link";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -447,7 +448,7 @@ function Landing() {
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">{site.tagline}</p>
               <div className="mt-3 flex flex-col gap-1.5">
-                <a href={`mailto:${site.email_hello}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
+                <a href={gmailComposeUrl(site.email_hello)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
                   <Mail className="w-3 h-3" />{site.email_hello}
                 </a>
                 <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5">
@@ -475,9 +476,9 @@ function Landing() {
             <div>
               <div className="font-semibold text-sm mb-3">Contact</div>
               <div className="flex flex-col gap-2">
-                <a href={`mailto:${site.email_sales}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_sales}</a>
-                <a href={`mailto:${site.email_support}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_support}</a>
-                <a href={`mailto:${site.email_admin}`} className="text-xs text-muted-foreground hover:text-primary">{site.email_admin}</a>
+                <a href={gmailComposeUrl(site.email_sales)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">{site.email_sales}</a>
+                <a href={gmailComposeUrl(site.email_support)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">{site.email_support}</a>
+                <a href={gmailComposeUrl(site.email_admin)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary">{site.email_admin}</a>
                 <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-xs text-muted-foreground hover:text-primary">{site.phone_primary}</a>
               </div>
             </div>
@@ -1176,7 +1177,7 @@ function StoryPage() {
             <div className="font-bold text-lg">Based in {site.location}</div>
             <p className="text-muted-foreground mt-1">We're a Kenyan company, built by Kenyans, for Kenyan schools. We understand the local curriculum, the M-Pesa ecosystem, boarding school culture and what teachers actually need.</p>
             <div className="mt-3 flex flex-wrap gap-4 text-sm">
-              <a href={`mailto:${site.email_hello}`} className="text-primary hover:underline flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{site.email_hello}</a>
+              <a href={gmailComposeUrl(site.email_hello)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />{site.email_hello}</a>
               <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`} className="text-primary hover:underline flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" />{site.phone_primary}</a>
             </div>
           </div>
@@ -1382,7 +1383,7 @@ function PricingPage({ goTo, site, onProceed }: { goTo: (p: Page) => void; site:
           <h2 className="text-2xl font-bold">Need a custom quote?</h2>
           <p className="text-muted-foreground mt-2 max-w-lg mx-auto">Large institutions, county governments, NGOs and school networks get custom pricing. Talk to us.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <a href={`mailto:${site.email_sales}`}>
+            <a href={gmailComposeUrl(site.email_sales)} target="_blank" rel="noopener noreferrer">
               <Button className="gap-2"><Mail className="w-4 h-4" /> Email Sales</Button>
             </a>
             <a href={`tel:${site.phone_primary.replace(/\s/g,"")}`}>
@@ -1458,7 +1459,7 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
         </div>
 
         <div className="rounded-2xl border bg-muted/30 p-6 text-center">
-          <p className="text-sm text-muted-foreground">Need help with installation? Call <a href={`tel:${site.phone_support.replace(/\s/g,"")}`} className="text-primary hover:underline font-medium">{site.phone_support}</a> or email <a href={`mailto:${site.email_support}`} className="text-primary hover:underline">{site.email_support}</a></p>
+          <p className="text-sm text-muted-foreground">Need help with installation? Call <a href={`tel:${site.phone_support.replace(/\s/g,"")}`} className="text-primary hover:underline font-medium">{site.phone_support}</a> or email <a href={gmailComposeUrl(site.email_support)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{site.email_support}</a></p>
         </div>
       </div>
     </div>
@@ -1499,20 +1500,23 @@ function MerchPage({ site }: { site: typeof SITE_DEFAULTS }) {
 
         {items.length === 0 ? (
           <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
-            Merch is coming soon — check back shortly, or email <a href={`mailto:${site.email_sales}`} className="text-primary hover:underline">{site.email_sales}</a> to ask about branded items.
+            Merch is coming soon — check back shortly, or email <a href={gmailComposeUrl(site.email_sales)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{site.email_sales}</a> to ask about branded items.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
             {items.map((m, i) => {
-              const enquireHref = `mailto:${site.email_sales}?subject=${encodeURIComponent(`Merch enquiry — ${m.name}`)}&body=${encodeURIComponent(`Hi, I'd like to order:\n\n${m.name}${m.price_label ? ` (${m.price_label})` : ""}\n\nPlease let me know how to complete the purchase.`)}`;
+              const enquireHref = gmailComposeUrl(
+                site.email_sales,
+                `Merch enquiry — ${m.name}`,
+                `Hi, I'd like to order:\n\n${m.name}${m.price_label ? ` (${m.price_label})` : ""}\n\nPlease let me know how to complete the purchase.`
+              );
               const href = m.is_external && m.link_url ? m.link_url : enquireHref;
-              const external = m.is_external && !!m.link_url;
               return (
                 <a
                   key={`${m.name}-${i}`}
                   href={href}
-                  target={external ? "_blank" : undefined}
-                  rel={external ? "noopener noreferrer" : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="rounded-xl border bg-card overflow-hidden flex flex-col hover:border-primary/50 hover:shadow-md transition-all"
                 >
                   <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
@@ -1568,25 +1572,17 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
       ].join("\n")
     : "";
 
-  const salesMailto = planSelection
-    ? `mailto:${site.email_sales}?subject=${encodeURIComponent(`New school sign-up — ${planSelection.planName} plan`)}&body=${encodeURIComponent(
-        `Hi SmartDev team,\n\nI'd like to get started with the following plan:\n\n${selectionSummaryText}\n\nSchool name:\nLocation:\nApprox. student count:\n\nThanks!`
-      )}`
-    : `mailto:${site.email_sales}`;
-
-  // Gmail's web compose window, opened in a new tab. This is the reliable
-  // path: a plain mailto: link only opens something if the visitor's
-  // browser/OS has a default mail app registered, which many desktop Chrome
-  // users and phones don't have set up — the click just silently does
-  // nothing. Opening Gmail's compose UI directly always works in-browser,
-  // regardless of what (if anything) is configured as the system mail app.
+  // Opens Gmail's web compose window in a new tab — a plain mailto: link
+  // only opens something if the visitor's browser/OS has a default mail app
+  // registered, which many desktop Chrome users and phones don't, so the
+  // click would otherwise silently do nothing.
   const salesGmailCompose = planSelection
-    ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(site.email_sales)}&su=${encodeURIComponent(
-        `New school sign-up — ${planSelection.planName} plan`
-      )}&body=${encodeURIComponent(
+    ? gmailComposeUrl(
+        site.email_sales,
+        `New school sign-up — ${planSelection.planName} plan`,
         `Hi SmartDev team,\n\nI'd like to get started with the following plan:\n\n${selectionSummaryText}\n\nSchool name:\nLocation:\nApprox. student count:\n\nThanks!`
-      )}`
-    : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(site.email_sales)}`;
+      )
+    : gmailComposeUrl(site.email_sales);
 
   const [selectionCopied, setSelectionCopied] = useState(false);
   const copySelectionDetails = async () => {
@@ -1604,10 +1600,10 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
   };
 
   const CONTACTS = [
-    { icon: Mail, label: "General Enquiries", value: site.email_hello, href: `mailto:${site.email_hello}`, color: "bg-blue-100 text-blue-700" },
-    { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: salesMailto, color: "bg-green-100 text-green-700" },
-    { icon: Mail, label: "Technical Support", value: site.email_support, href: `mailto:${site.email_support}`, color: "bg-orange-100 text-orange-700" },
-    { icon: Mail, label: "Admin & Legal", value: site.email_admin, href: `mailto:${site.email_admin}`, color: "bg-purple-100 text-purple-700" },
+    { icon: Mail, label: "General Enquiries", value: site.email_hello, href: gmailComposeUrl(site.email_hello), color: "bg-blue-100 text-blue-700" },
+    { icon: Mail, label: "Sales & Pricing", value: site.email_sales, href: salesGmailCompose, color: "bg-green-100 text-green-700" },
+    { icon: Mail, label: "Technical Support", value: site.email_support, href: gmailComposeUrl(site.email_support), color: "bg-orange-100 text-orange-700" },
+    { icon: Mail, label: "Admin & Legal", value: site.email_admin, href: gmailComposeUrl(site.email_admin), color: "bg-purple-100 text-purple-700" },
     { icon: Phone, label: "Call or WhatsApp", value: site.phone_primary, href: `tel:${site.phone_primary.replace(/\s/g,"")}`, color: "bg-teal-100 text-teal-700" },
   ];
 
@@ -1633,9 +1629,6 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
               <a href={salesGmailCompose} target="_blank" rel="noopener noreferrer">
                 <Button className="gap-2">Email us this selection <ArrowRight className="w-4 h-4" /></Button>
               </a>
-              <a href={salesMailto} className="text-xs text-muted-foreground hover:text-primary underline">
-                Use my default mail app instead
-              </a>
               <button type="button" onClick={copySelectionDetails} className="text-xs text-muted-foreground hover:text-primary underline">
                 {selectionCopied ? "Copied ✓" : "Or copy the details"}
               </button>
@@ -1652,6 +1645,8 @@ function ContactPage({ site, planSelection }: { site: typeof SITE_DEFAULTS; plan
                 <a
                   key={c.label}
                   href={c.href}
+                  target={c.href.startsWith("tel:") ? undefined : "_blank"}
+                  rel={c.href.startsWith("tel:") ? undefined : "noopener noreferrer"}
                   className="flex items-center gap-4 rounded-xl border bg-card p-4 hover:border-primary/50 hover:bg-primary/5 transition-colors group"
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${c.color}`}>
@@ -1783,7 +1778,7 @@ function LegalPage({ site }: { site: typeof SITE_DEFAULTS }) {
             <div className="font-bold">Legal enquiries</div>
             <p className="text-sm text-muted-foreground mt-0.5">For DPA requests, compliance questions, data subject access requests or legal notices, contact our legal team directly.</p>
           </div>
-          <a href={`mailto:${site.email_admin}`} className="shrink-0">
+          <a href={gmailComposeUrl(site.email_admin)} target="_blank" rel="noopener noreferrer" className="shrink-0">
             <Button variant="outline" className="gap-2"><Mail className="w-4 h-4" />{site.email_admin}</Button>
           </a>
         </div>
