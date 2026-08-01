@@ -13,6 +13,7 @@ import {
   Heart, AlertCircle, Search,
 } from "lucide-react";
 import { FeatureGate } from "@/components/FeatureGate";
+import { gmailComposeUrl } from "@/lib/email-link";
 
 export const Route = createFileRoute("/_app/ids/verify")({
   component: () => (
@@ -499,7 +500,9 @@ function Page() {
                         )}
                         {p.email && (
                           <a
-                            href={`mailto:${p.email}`}
+                            href={gmailComposeUrl(p.email)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex items-center gap-1.5 text-xs text-primary hover:underline"
                           >
                             <Mail className="w-3 h-3" /> {p.email}
