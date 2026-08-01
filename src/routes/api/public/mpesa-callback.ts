@@ -3,13 +3,18 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // Safaricom Daraja STK push callback.
 //
-// Auth: shared-secret passed as the x-callback-token request header.
-// Register your callback URL WITHOUT a ?token= query param — the token
-// must only travel in a header so it is not logged by Cloudflare, Safaricom
-// retry infrastructure, or any HTTP proxy sitting between Safaricom and us.
+// Auth: shared-secret token. Safaricom's Daraja API has NO mechanism to
+// attach a custom header to its callback request — CallBackURL is just a
+// plain URL that Safaricom's servers POST JSON to. A header-only check was
+// briefly tried here for defense-in-depth, but it silently broke every real
+// payment: Safaricom never sends x-callback-token, so every genuine
+// callback was rejected with 401 and invoices never got marked paid. The
+// token MUST travel in the query string (the only channel Safaricom
+// actually supports); we also accept it via header so a trusted internal
+// caller (e.g. manual reconciliation tooling) can use either.
 //
-// Example callback URL to register with Daraja:
-//   https://app.smartdev.co.ke/api/public/mpesa-callback
+// Register the callback URL WITH the token query param, e.g.:
+//   https://app.smartdev.co.ke/api/public/mpesa-callback?token=YOUR_TOKEN
 //
 // Set MPESA_CALLBACK_TOKEN in Cloudflare Worker secrets (wrangler secret put).
 
@@ -22,11 +27,12 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           return new Response("Callback not configured", { status: 503 });
         }
 
-        // Accept the token from the header ONLY.
-        // The old ?token= query-string fallback has been removed because
-        // query params are recorded in Cloudflare access logs and Safaricom
-        // retry logs, leaking the shared secret.
-        const provided = request.headers.get("x-callback-token") ?? "";
+        // Accept the token via header OR query string. Query string is the
+        // only option Safaricom itself can actually use; header is kept for
+        // trusted internal/manual callers.
+        const url = new URL(request.url);
+        const provided =
+          request.headers.get("x-callback-token") ?? url.searchParams.get("token") ?? "";
         if (provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
