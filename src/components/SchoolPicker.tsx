@@ -27,10 +27,12 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
   const [debugError, setDebugError] = useState<string | null>(null);
 
   const openPicker = async () => {
+    console.log("[SchoolPicker] openPicker() called");
     setOpen(true);
     if (schools.length) return;
     setLoadingList(true);
     setDebugError(null);
+    console.log("[SchoolPicker] about to build AbortController + call supabase.rpc");
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 15000);
     // IMPORTANT: `.abortSignal()` only cancels the actual HTTP fetch. Every
@@ -56,10 +58,12 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
       );
     });
     try {
+      console.log("[SchoolPicker] awaiting Promise.race(rpc, outerTimedOut)...");
       const { data, error } = await Promise.race([
         supabase.rpc("list_active_schools").abortSignal(controller.signal),
         outerTimedOut,
       ]);
+      console.log("[SchoolPicker] race settled", { data, error });
       if (error) {
         setDebugError(`RPC error: ${error.message} (code: ${error.code})`);
       } else {
@@ -68,6 +72,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
         setFiltered(rows);
       }
     } catch (e: any) {
+      console.log("[SchoolPicker] race threw", e);
       setDebugError(e?.name === "AbortError"
         ? "The school list request timed out. Check your internet connection and try again."
         : e?.message ?? "Network request failed (no response from server).");
