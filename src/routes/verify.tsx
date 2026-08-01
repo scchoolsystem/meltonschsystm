@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { gmailComposeUrl } from "@/lib/email-link";
 import {
   Loader2,
   ShieldCheck,
@@ -305,7 +306,9 @@ function Page() {
                         )}
                         {result.guardian.email && (
                           <a
-                            href={`mailto:${result.guardian.email}`}
+                            href={gmailComposeUrl(result.guardian.email)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="flex items-center gap-1.5 text-red-700 underline underline-offset-2"
                           >
                             <Mail className="w-3.5 h-3.5" /> {result.guardian.email}
