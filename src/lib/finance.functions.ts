@@ -171,21 +171,52 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinance(context);
 
-    const consumerKey = process.env.MPESA_CONSUMER_KEY;
-    const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-    const shortcode = process.env.MPESA_SHORTCODE;
-    const passkey = process.env.MPESA_PASSKEY;
-    const callbackBase = process.env.MPESA_CALLBACK_URL; // e.g. https://project--xxx.lovable.app
-    const callbackToken = process.env.MPESA_CALLBACK_TOKEN;
-    const env = process.env.MPESA_ENV || "sandbox";
+    // Resolve caller's school and confirm the invoice actually belongs to
+    // it (previously this pushed a payment for any invoice_id supplied by
+    // the client with no ownership or balance check at all).
+    const { data: schoolId, error: schErr } = await context.supabase.rpc("my_school_id");
+    if (schErr) throw new Error(schErr.message);
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: inv, error: invErr } = await supabaseAdmin
+      .from("invoices")
+      .select("id, amount, paid, status, school_id")
+      .eq("id", data.invoice_id)
+      .eq("school_id", schoolId)
+      .single();
+    if (invErr || !inv) throw new Error("Invoice not found in this school");
+    if (inv.status === "paid") throw new Error("Invoice is already fully paid");
+    const outstanding = Number(inv.amount) - Number(inv.paid);
+    if (data.amount > outstanding + 0.01) {
+      throw new Error(`Amount exceeds outstanding balance of KES ${outstanding.toLocaleString()}`);
+    }
+
+    // Load this school's own Daraja credentials first — each school has
+    // (or should have) its own Paybill/Till configured under Admin →
+    // Settings → M-Pesa. Falling back to the platform-wide env vars only
+    // when a school hasn't configured its own, so this doesn't silently
+    // route every school's fee collections through one shared shortcode.
+    const { data: cfg } = await supabaseAdmin
+      .rpc("get_school_mpesa_config", { p_school_id: schoolId })
+      .maybeSingle();
+
+    const consumerKey = cfg?.enabled ? cfg.consumer_key : process.env.MPESA_CONSUMER_KEY;
+    const consumerSecret = cfg?.enabled ? cfg.consumer_secret : process.env.MPESA_CONSUMER_SECRET;
+    const shortcode = cfg?.enabled ? cfg.shortcode : process.env.MPESA_SHORTCODE;
+    const passkey = cfg?.enabled ? cfg.passkey : process.env.MPESA_PASSKEY;
+    const callbackToken = cfg?.enabled ? cfg.callback_token : process.env.MPESA_CALLBACK_TOKEN;
+    const env = cfg?.enabled ? cfg.env : process.env.MPESA_ENV || "sandbox";
+    const callbackBase = process.env.MPESA_CALLBACK_URL; // e.g. https://app.smartdev.co.ke
 
     if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackBase || !callbackToken) {
       throw new Error(
-        "M-Pesa not configured. Add MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL, MPESA_CALLBACK_TOKEN secrets."
+        cfg
+          ? "M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it."
+          : "M-Pesa not configured. Add MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL, MPESA_CALLBACK_TOKEN secrets, or configure this school's own credentials under Admin → Settings → M-Pesa."
       );
     }
 
-    const base = env === "live" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
+    const base = env === "live" || env === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
 
     // 1. OAuth token
     const tokenRes = await fetch(`${base}/oauth/v1/generate?grant_type=client_credentials`, {
