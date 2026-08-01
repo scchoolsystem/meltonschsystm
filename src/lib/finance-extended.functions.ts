@@ -294,7 +294,10 @@ export const recordPayment = createServerFn({ method: "POST" })
     const balance = Number(inv.amount) - Number(inv.paid);
     if (data.amount > balance + 0.01) throw new Error(`Payment exceeds balance of KES ${balance.toLocaleString()}`);
 
-    // Insert payment (receipt_no set by trigger)
+    // Insert payment (receipt_no set by trigger). The trg_upd_invoice_paid
+    // trigger on payments recalculates invoices.paid/status itself from an
+    // authoritative SUM(payments) after this insert — no need (and no
+    // safe way, under concurrent payments) to also set it manually here.
     const { error } = await supabaseAdmin.from("payments").insert({
       invoice_id: data.invoice_id,
       amount: data.amount,
@@ -303,14 +306,6 @@ export const recordPayment = createServerFn({ method: "POST" })
       paid_on: data.paid_on ?? new Date().toISOString().slice(0, 10),
     } as any);
     if (error) throw new Error(error.message);
-
-    // Update invoice paid / status
-    const newPaid = Number(inv.paid) + data.amount;
-    const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
-    await supabaseAdmin
-      .from("invoices")
-      .update({ paid: newPaid, status: newStatus } as any)
-      .eq("id", data.invoice_id);
   });
 
 // ── 14. Write-off invoice balance ────────────────────────────
@@ -491,20 +486,10 @@ export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
       const { error: payErr } = await supabaseAdmin.from("payments").insert(paymentsRows as any);
       if (payErr) throw new Error(payErr.message);
 
-      // Update all invoices in ONE request via bulk upsert (each row's id
-      // already exists, so this always takes the DO UPDATE path — it
-      // never inserts a fresh row).
-      const invoiceRows = eligible.map((inv) => {
-        const balance = Number(inv.amount) - Number(inv.paid || 0);
-        const newPaid = Number(inv.paid || 0) + balance;
-        const newStatus = newPaid >= Number(inv.amount) - 0.01 ? "paid" : "partial";
-        return { id: inv.id, paid: newPaid, status: newStatus };
-      });
-      const { error: updErr } = await supabaseAdmin
-        .from("invoices")
-        .upsert(invoiceRows as any, { onConflict: "id" });
-      if (updErr) throw new Error(updErr.message);
-
+      // No follow-up invoice update needed: trg_upd_invoice_paid fires per
+      // row on the insert above and recalculates each invoice's paid/status
+      // from an authoritative SUM(payments) — a manual overwrite here would
+      // be redundant and, under concurrent payments, could race against it.
       updated = eligible.length;
     }
 
