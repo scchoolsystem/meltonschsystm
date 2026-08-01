@@ -52,7 +52,8 @@ export const generateTermInvoices = createServerFn({ method: "POST" })
       .from("students")
       .select("id, class_id")
       .eq("school_id", schoolId)
-      .eq("lifecycle_status", "active");
+      .eq("status", "active")
+      .eq("lifecycle_status", "active"); // canonical active check — matches isStudentActive()
     if (data.class_id) q = q.eq("class_id", data.class_id);
     const { data: students, error } = await q;
     if (error) throw new Error(error.message);
