@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { mpesaStkPush, bulkGenerateInvoices, bulkGenerateComponentInvoices } from "@/lib/finance.functions";
-import { recordPayment, bulkMarkInvoicesPaid } from "@/lib/finance-extended.functions";
+import { recordPayment, bulkMarkInvoicesPaid, writeOffInvoice } from "@/lib/finance-extended.functions";
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogTrigger, DialogFooter,
@@ -65,6 +70,7 @@ function Page() {
 
   const [open, setOpen] = useState(false);
   const [openPay, setOpenPay] = useState<string | null>(null);
+  const [openWriteOff, setOpenWriteOff] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
@@ -574,6 +580,26 @@ function Page() {
                               />
                             </Dialog>
                             <StkButton invoiceId={r.id} balance={balance} />
+                            <Dialog
+                              open={openWriteOff === r.id}
+                              onOpenChange={(v) => setOpenWriteOff(v ? r.id : null)}
+                            >
+                              <DialogTrigger asChild>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground">
+                                  Write off
+                                </Button>
+                              </DialogTrigger>
+                              <WriteOffDialog
+                                invoiceId={r.id}
+                                balance={balance}
+                                onDone={() => {
+                                  setOpenWriteOff(null);
+                                  qc.invalidateQueries({ queryKey: ["invoices"] });
+                                  qc.invalidateQueries({ queryKey: ["invoices-totals"] });
+                                  qc.invalidateQueries({ queryKey: ["invoice-payments", r.id] });
+                                }}
+                              />
+                            </Dialog>
                           </>
                         )}
                         <Dialog
@@ -707,7 +733,7 @@ function IssueDialog({ onDone }: { onDone: () => void }) {
   const { data: students = [] } = useQuery({
     queryKey: ["students-min2"],
     queryFn: async () =>
-      (await supabase.from("students").select("id,admission_no,first_name,last_name,class_id").eq("status", "active").limit(2000)).data ?? [],
+      (await supabase.from("students").select("id,admission_no,first_name,last_name,class_id").eq("status", "active").eq("lifecycle_status", "active").limit(2000)).data ?? [],
   });
   const { data: fees = [] } = useQuery({
     queryKey: ["fees-min-issue"],
@@ -1052,6 +1078,96 @@ function PayDialog({
           {m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}
           Record
         </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
+
+// ── Write-off Dialog ──────────────────────────────────────────
+// writeOffInvoice already existed as a server function with proper role
+// checks (assertFinanceWrite), but nothing in the UI called it — a bursar
+// had no way to clear a bad debt / scholarship waiver off an invoice
+// without recording a fake "payment". This wires it to a real button.
+function WriteOffDialog({
+  invoiceId,
+  balance,
+  onDone,
+}: {
+  invoiceId: string;
+  balance: number;
+  onDone: () => void;
+}) {
+  const writeOffFn = useServerFn(writeOffInvoice);
+  const [amount, setAmount] = useState(balance);
+  const [reason, setReason] = useState("");
+
+  const m = useMutation({
+    mutationFn: () =>
+      writeOffFn({ data: { invoice_id: invoiceId, amount, reason } }),
+    onSuccess: () => {
+      toast.success("Invoice balance written off");
+      onDone();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Write Off Balance</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          This clears the outstanding balance without recording it as a payment received — use for
+          bad debt, scholarships, or waivers. This cannot be undone.
+        </p>
+        <div>
+          <Label>Amount to write off (balance: KES {balance.toLocaleString()})</Label>
+          <Input
+            type="number"
+            min={1}
+            max={balance}
+            value={amount}
+            onChange={(e) => setAmount(+e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>Reason *</Label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Bursary award, confirmed bad debt, fee waiver..."
+            rows={3}
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" disabled={amount <= 0 || !reason.trim()}>
+              Write Off
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm write-off</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently write off KES {amount.toLocaleString()} from this invoice. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => m.mutate()}
+                disabled={m.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}
+                Confirm Write Off
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogFooter>
     </DialogContent>
   );
