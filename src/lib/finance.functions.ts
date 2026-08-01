@@ -59,7 +59,8 @@ export const bulkGenerateInvoices = createServerFn({ method: "POST" })
       .from("students")
       .select("id")
       .eq("school_id", schoolId)
-      .eq("status", "active");
+      .eq("status", "active")
+      .eq("lifecycle_status", "active"); // canonical active check — status alone can still be 'active' for a suspended/expelled/transferred student
     if (data.class_id) q = q.eq("class_id", data.class_id);
     const { data: students, error: stuErr } = await q;
     if (stuErr) throw new Error(stuErr.message);
@@ -124,7 +125,8 @@ export const bulkGenerateComponentInvoices = createServerFn({ method: "POST" })
       .select("id")
       .eq("school_id", schoolId)
       .eq("class_id", comp.class_id)
-      .eq("status", "active");
+      .eq("status", "active")
+      .eq("lifecycle_status", "active"); // canonical active check — matches isStudentActive()
     if (stuErr) throw new Error(stuErr.message);
     if (!students?.length) return { created: 0, skipped: 0 };
 
