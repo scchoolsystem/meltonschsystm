@@ -33,7 +33,7 @@ function Page() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold">Payments</h1><p className="text-sm text-muted-foreground mt-1">{totalCount.toLocaleString()} transactions · showing {data.length}</p></div>
-        <Badge variant="outline" className="text-base px-3 py-1">Total: KES {total.toLocaleString()}</Badge>
+        <Badge variant="outline" className="text-base px-3 py-1">This page: KES {total.toLocaleString()}</Badge>
       </div>
       <Card><CardHeader /><CardContent>
         {isLoading ? <div className="h-40 grid place-items-center"><Loader2 className="animate-spin" /></div> : (
