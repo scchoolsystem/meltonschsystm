@@ -4,6 +4,7 @@ import { useTenant, isTauri } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { gmailComposeUrl } from "@/lib/email-link";
 import {
   Loader2, Search, Building2, ChevronRight,
   GraduationCap, Shield, BarChart3, Bell, ArrowRight, X,
@@ -166,7 +167,7 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
 
       <footer className="border-t py-6 text-center text-xs text-muted-foreground">
         © {new Date().getFullYear()} SmartDev ERP · Nairobi, Kenya ·{" "}
-        <a href="mailto:support@smartdev.co.ke" className="hover:underline">support@smartdev.co.ke</a>
+        <a href={gmailComposeUrl("support@smartdev.co.ke")} target="_blank" rel="noopener noreferrer" className="hover:underline">support@smartdev.co.ke</a>
       </footer>
 
       {open && (
