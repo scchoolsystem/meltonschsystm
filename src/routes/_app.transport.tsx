@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Loader2, Bus, ChevronDown, ChevronUp, Phone, User } from "lucide-react";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
@@ -240,10 +241,7 @@ function AssignDialog({ routes, onDone, schoolId }: { routes: any[]; onDone: () 
     <DialogContent><DialogHeader><DialogTitle>Assign Student to Route</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}>
-            <SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox value={f.student_id} onChange={v => setF(p => ({ ...p, student_id: v }))} students={students as any[]} />
         </div>
         <div><Label>Route</Label>
           <Select value={f.route_id} onValueChange={v => setF(p => ({ ...p, route_id: v }))}>
