@@ -523,14 +523,14 @@ function ItemsTab({ q, schoolId, canEdit, stores }: { q: any; schoolId: string; 
         </Card>
       ) : (
         Array.from(grouped.entries()).map(([cat, catItems]) => (
-          <CategoryGroup key={cat} category={cat} items={catItems} />
+          <CategoryGroup key={cat} category={cat} items={catItems} schoolId={schoolId} stores={stores} canEdit={canEdit} />
         ))
       )}
     </div>
   );
 }
 
-function CategoryGroup({ category, items }: { category: string; items: any[] }) {
+function CategoryGroup({ category, items, schoolId, stores, canEdit }: { category: string; items: any[]; schoolId: string; stores: any[]; canEdit: boolean }) {
   const [collapsed, setCollapsed] = useState(false);
   const catDef = ITEM_CATEGORIES.find(c => c.value === category);
   const lowCount = items.filter(i =>
@@ -563,6 +563,7 @@ function CategoryGroup({ category, items }: { category: string; items: any[] }) 
                 <TableHead>Location</TableHead>
                 <TableHead>Condition</TableHead>
                 <TableHead>Status</TableHead>
+                {canEdit && <TableHead>Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -621,6 +622,11 @@ function CategoryGroup({ category, items }: { category: string; items: any[] }) 
                         {!expired && expiringSoon && <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-[10px]">Expiring soon</Badge>}
                       </div>
                     </TableCell>
+                    {canEdit && (
+                      <TableCell>
+                        <ItemDialog schoolId={schoolId} stores={stores} item={item} />
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -1429,7 +1435,8 @@ function formatLookup(id: any, rows?: any[]): string {
 }
 
 // ─── Item dialog ──────────────────────────────────────────────────────────────
-function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
+function ItemDialog({ schoolId, stores, item }: { schoolId: string; stores: any[]; item?: any }) {
+  const isEdit = !!item;
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const empty = {
@@ -1444,7 +1451,23 @@ function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
     store_id: "", room: "", shelf: "", bin: "", rack: "", floor: "",
     is_individually_tracked: false,
   };
-  const [form, setForm] = useState(empty);
+  const fromItem = (it: any) => ({
+    sku: it.sku ?? "", name: it.name ?? "", category: it.category ?? "general", unit: it.unit ?? "unit",
+    current_qty: it.current_qty ?? 0, reorder_level: it.reorder_level ?? 0,
+    location: it.location ?? "", description: it.description ?? "",
+    subcategory: it.subcategory ?? "", barcode: it.barcode ?? "", qr_code: it.qr_code ?? "",
+    asset_tag_prefix: it.asset_tag_prefix ?? "",
+    serial_number: it.serial_number ?? "", batch_number: it.batch_number ?? "",
+    manufacturer: it.manufacturer ?? "", brand: it.brand ?? "", model: it.model ?? "",
+    warranty_expiry: it.warranty_expiry ?? "", expiry_date: it.expiry_date ?? "", purchase_date: it.purchase_date ?? "",
+    condition: it.condition ?? "good", unit_cost: it.unit_cost ?? 0, photo_url: it.photo_url ?? "",
+    store_id: it.store_id ?? "", room: it.room ?? "", shelf: it.shelf ?? "", bin: it.bin ?? "", rack: it.rack ?? "", floor: it.floor ?? "",
+    is_individually_tracked: it.is_individually_tracked ?? false,
+  });
+  const [form, setForm] = useState(isEdit ? fromItem(item) : empty);
+  useEffect(() => {
+    if (open) setForm(isEdit ? fromItem(item) : empty);
+  }, [open]);
   const f = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value });
   const subcats = SUBCATEGORIES[form.category];
 
@@ -1480,6 +1503,12 @@ function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
         bin: form.bin || null, rack: form.rack || null, floor: form.floor || null,
         is_individually_tracked: form.is_individually_tracked,
       };
+      if (isEdit) {
+        const { error } = await supabase.from("inventory_items" as any).update(payload).eq("id", item.id);
+        if (error) throw error;
+        return;
+      }
+
       const { data, error } = await supabase.from("inventory_items" as any).insert(payload).select("id").single();
       if (error) throw error;
 
@@ -1498,11 +1527,14 @@ function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
       qc.invalidateQueries({ queryKey: ["inventory", "inventory_items", schoolId] });
       qc.invalidateQueries({ queryKey: ["inventory-asset-units", schoolId] });
       toast.success(
-        form.is_individually_tracked
+        isEdit
+          ? "Item updated"
+          : form.is_individually_tracked
           ? `Item added — ${form.current_qty} individually tracked units generated (${form.asset_tag_prefix}-0001…)`
           : "Item added"
       );
-      setOpen(false); setForm(empty);
+      setOpen(false);
+      if (!isEdit) setForm(empty);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -1510,10 +1542,14 @@ function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="w-4 h-4 mr-1" />Add Item</Button>
+        {isEdit ? (
+          <Button size="sm" variant="outline" className="h-7 text-xs">Edit</Button>
+        ) : (
+          <Button size="sm"><Plus className="w-4 h-4 mr-1" />Add Item</Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New Inventory Item</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{isEdit ? `Edit ${item.name}` : "New Inventory Item"}</DialogTitle></DialogHeader>
         <Tabs defaultValue="basic">
           <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="basic">Basic</TabsTrigger>
@@ -1567,7 +1603,7 @@ function ItemDialog({ schoolId, stores }: { schoolId: string; stores: any[] }) {
                 </Select>
               </div>
               <div>
-                <Label>Opening Qty</Label>
+                <Label>{isEdit ? "Current Qty" : "Opening Qty"}</Label>
                 <Input type="number" value={form.current_qty} onChange={(e) => setForm({ ...form, current_qty: Number(e.target.value) })} />
               </div>
               <div>
