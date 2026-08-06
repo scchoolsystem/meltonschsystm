@@ -1050,7 +1050,7 @@ function StudentPortal() {
   const [transport, setTransport] = useState<any | null>(null);
   const [weekMeals, setWeekMeals] = useState<any[]>([]);
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
+  const [sportsAchievements, setSportsAchievements] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   // Independent, mount-tied failsafe — fires no matter *why* loadStudentData
@@ -1227,9 +1227,9 @@ function StudentPortal() {
         .eq("student_id", sid)
         .order("achievement_date", { ascending: false })
         .limit(20),
-      8000, EMPTY, "achievements",
+      8000, EMPTY, "sportsAchievements",
     );
-    setAchievements(ach ?? []);
+    setSportsAchievements(ach ?? []);
 
     const { data: ne } = await withTimeout(
       supabase.from("exams").select("*")
@@ -3083,8 +3083,8 @@ function StudentPortal() {
           <GlassCard>
             <CardContent className="pt-6 space-y-3">
               <div className="font-medium flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> Achievements</div>
-              {achievements.length === 0 && <p className="text-sm text-muted-foreground">No achievements logged yet.</p>}
-              {achievements.map((a: any, i: number) => (
+              {sportsAchievements.length === 0 && <p className="text-sm text-muted-foreground">No achievements logged yet.</p>}
+              {sportsAchievements.map((a: any, i: number) => (
                 <motion.div key={a.id} variants={fadeUp} initial="hidden" animate="show"
                   transition={{ delay: i * 0.06 }}
                   className="border rounded-xl p-4">
