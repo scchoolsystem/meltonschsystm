@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listActivities,
@@ -743,9 +743,15 @@ function EnrolStudentDialog({
 }) {
   const [studentId, setStudentId] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const { data: students = [] } = useQuery({
-    queryKey: ["students-search-cocurr", search],
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: students = [], isFetching } = useQuery({
+    queryKey: ["students-search-cocurr", debouncedSearch],
     queryFn: async () => {
       let q = supabase
         .from("students")
@@ -753,9 +759,9 @@ function EnrolStudentDialog({
         .eq("status", "active")
         .order("first_name")
         .limit(50);
-      if (search.trim()) {
+      if (debouncedSearch.trim()) {
         q = q.or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,admission_no.ilike.%${search}%`
+          `first_name.ilike.%${debouncedSearch}%,last_name.ilike.%${debouncedSearch}%,admission_no.ilike.%${debouncedSearch}%`
         );
       }
       const { data } = await q;
@@ -774,6 +780,10 @@ function EnrolStudentDialog({
     onError: (e: any) => toast.error(e.message),
   });
 
+  const studentOptions = (students as any[])
+    .filter((s) => s.id)
+    .map((s) => ({ id: s.id, admission_no: s.admission_no, first_name: s.first_name, last_name: s.last_name, meta: s.classes?.name ? `(${s.classes.name})` : null }));
+
   return (
     <DialogContent>
       <DialogHeader>
@@ -781,33 +791,16 @@ function EnrolStudentDialog({
       </DialogHeader>
       <div className="space-y-4 py-2">
         <div>
-          <Label>Search student</Label>
-          <Input
-            placeholder="Name or admission no…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <Label>Student</Label>
+          <StudentCombobox
+            value={studentId}
+            onChange={setStudentId}
+            students={studentOptions}
+            placeholder="Search by name or admission no…"
+            onSearchChange={setSearch}
+            loading={isFetching}
+            emptyText={search.trim() ? "No student matches that search." : "No students found."}
           />
-        </div>
-        <div>
-          <Label>Select student</Label>
-          <Select value={studentId} onValueChange={setStudentId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose…" />
-            </SelectTrigger>
-            <SelectContent>
-              {(students as any[]).length === 0 && (
-                <SelectItem value="__none__" disabled>
-                  No students found
-                </SelectItem>
-              )}
-              {(students as any[]).filter((s) => s.id).map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.first_name} {s.last_name} — {s.admission_no}
-                  {s.classes?.name ? ` (${s.classes.name})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
       <DialogFooter>
