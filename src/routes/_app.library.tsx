@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Loader2, Search, AlertTriangle, BarChart3, Bell, BookOpen, TrendingUp, CheckCircle } from "lucide-react";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { format, differenceInDays, subMonths } from "date-fns";
@@ -525,13 +526,13 @@ function LoanDialog({ books, onDone }: { books: any[]; onDone: () => void }) {
               </Select>
             </div>
             <div><Label>Student ({(students as any[]).length})</Label>
-              <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-                <SelectContent>
-                  {(students as any[]).length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">No students in this class.</div>}
-                  {(students as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <StudentCombobox
+                value={f.student_id}
+                onChange={v => setF(p => ({ ...p, student_id: v }))}
+                students={students as any[]}
+                placeholder={(students as any[]).length === 0 ? "No students in this class" : "Search student…"}
+                disabled={(students as any[]).length === 0}
+              />
             </div>
           </>
         ) : (
