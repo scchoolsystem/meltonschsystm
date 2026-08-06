@@ -94,6 +94,10 @@ function Page() {
                 setLastIssuedCode(code);
                 qc.invalidateQueries({ queryKey: ["access-cards"] });
                 qc.invalidateQueries({ queryKey: ["parking-bays"] });
+                qc.invalidateQueries({ queryKey: ["parking-slots"] });
+                qc.invalidateQueries({ queryKey: ["parking-bays-free"] });
+                qc.invalidateQueries({ queryKey: ["visitor-log"] });
+                qc.invalidateQueries({ queryKey: ["vehicle-log"] });
               }} />
             </Dialog>
           </div>
@@ -290,7 +294,7 @@ function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
 
   const { data: freeBays = [] } = useQuery({
     queryKey: ["parking-bays-free"],
-    queryFn: async () => (await supabase.from("parking_bays").select("*").eq("status", "free").order("bay_code")).data ?? [],
+    queryFn: async () => (await supabase.from("parking_bay_availability").select("*").eq("bay_status", "free").gt("free_slots", 0).order("bay_code")).data ?? [],
     enabled: hasVehicle,
   });
 
@@ -299,7 +303,7 @@ function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
   // Auto-select the top-ranked bay whenever the ranking changes and nothing's
   // been explicitly chosen yet, so the common case needs zero extra clicks.
   useEffect(() => {
-    if (hasVehicle && !bayId && rankedBays.length > 0) setBayId(rankedBays[0].id);
+    if (hasVehicle && !bayId && rankedBays.length > 0) setBayId(rankedBays[0].bay_id);
   }, [hasVehicle, rankedBays, bayId]);
 
   const m = useMutation({
@@ -355,8 +359,8 @@ function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
                 <SelectTrigger><SelectValue placeholder={rankedBays.length ? "Choose a free bay" : "No free bays"} /></SelectTrigger>
                 <SelectContent>
                   {rankedBays.map(b => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.bay_code}{b.zone ? ` — ${b.zone}` : ""} {b.bay_type === preferredType ? "· suggested" : ""}
+                    <SelectItem key={b.bay_id} value={b.bay_id}>
+                      {b.bay_code}{b.zone ? ` — ${b.zone}` : ""} · {b.free_slots} free {b.bay_type === preferredType ? "· suggested" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -402,7 +406,7 @@ function ScanTab({ can }: { can: boolean }) {
       if (card.status === "assigned") {
         const { data: assignment, error: aErr } = await supabase
           .from("card_assignments")
-          .select("*, parking_bays(bay_code,zone)")
+          .select("*, parking_slots(slot_number, parking_bays(bay_code,zone))")
           .eq("card_id", card.id)
           .is("checked_out_at", null)
           .maybeSingle();
@@ -427,7 +431,11 @@ function ScanTab({ can }: { can: boolean }) {
     onSuccess: () => {
       toast.success("Card checked out and cleared");
       qc.invalidateQueries({ queryKey: ["parking-bays"] });
+      qc.invalidateQueries({ queryKey: ["parking-slots"] });
+      qc.invalidateQueries({ queryKey: ["parking-bays-free"] });
       qc.invalidateQueries({ queryKey: ["access-cards"] });
+      qc.invalidateQueries({ queryKey: ["visitor-log"] });
+      qc.invalidateQueries({ queryKey: ["vehicle-log"] });
       reset();
     },
     onError: (e: any) => toast.error(e.message),
@@ -502,7 +510,15 @@ function ScanTab({ can }: { can: boolean }) {
 
       {result?.card?.status === "available" && (
         can ? (
-          <IssueCardForm card={result.card} onDone={() => { qc.invalidateQueries({ queryKey: ["access-cards"] }); reset(); }} onCancel={reset} />
+          <IssueCardForm card={result.card} onDone={() => {
+            qc.invalidateQueries({ queryKey: ["access-cards"] });
+            qc.invalidateQueries({ queryKey: ["parking-bays"] });
+            qc.invalidateQueries({ queryKey: ["parking-slots"] });
+            qc.invalidateQueries({ queryKey: ["parking-bays-free"] });
+            qc.invalidateQueries({ queryKey: ["visitor-log"] });
+            qc.invalidateQueries({ queryKey: ["vehicle-log"] });
+            reset();
+          }} onCancel={reset} />
         ) : (
           <Card className="border-emerald-500/30"><CardContent className="pt-4 text-center space-y-1">
             <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
@@ -535,7 +551,7 @@ function IssueCardForm({ card, onDone, onCancel }: { card: any; onDone: () => vo
 
   const { data: freeBays = [] } = useQuery({
     queryKey: ["parking-bays-free"],
-    queryFn: async () => (await supabase.from("parking_bays").select("*").eq("status", "free").order("bay_code")).data ?? [],
+    queryFn: async () => (await supabase.from("parking_bay_availability").select("*").eq("bay_status", "free").gt("free_slots", 0).order("bay_code")).data ?? [],
     enabled: needsBay,
   });
 
@@ -592,7 +608,7 @@ function IssueCardForm({ card, onDone, onCancel }: { card: any; onDone: () => vo
                 <Select value={f.parking_bay_id} onValueChange={v => setF(p => ({ ...p, parking_bay_id: v }))}>
                   <SelectTrigger><SelectValue placeholder={(freeBays as any[]).length ? "Choose a free bay" : "No free bays"} /></SelectTrigger>
                   <SelectContent>
-                    {(freeBays as any[]).map(b => <SelectItem key={b.id} value={b.id}>{b.bay_code}{b.zone ? ` — ${b.zone}` : ""}</SelectItem>)}
+                    {(freeBays as any[]).map(b => <SelectItem key={b.bay_id} value={b.bay_id}>{b.bay_code}{b.zone ? ` — ${b.zone}` : ""} · {b.free_slots} free</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -624,7 +640,8 @@ function HolderPanel({ card, assignment, can, checkingOut, onCheckout, onDismiss
     return () => clearInterval(id);
   }, [assignment.checked_in_at]);
 
-  const bay = assignment.parking_bays;
+  const slot = assignment.parking_slots;
+  const bay = slot?.parking_bays;
 
   return (
     <Card className="border-amber-500/40">
@@ -642,7 +659,7 @@ function HolderPanel({ card, assignment, can, checkingOut, onCheckout, onDismiss
           <div><span className="text-muted-foreground">Visiting:</span> {assignment.visiting ?? "—"}</div>
           <div className="col-span-2"><span className="text-muted-foreground">Purpose:</span> {assignment.purpose ?? "—"}</div>
           <div><span className="text-muted-foreground">Vehicle:</span> {assignment.vehicle_reg ?? "—"}</div>
-          <div><span className="text-muted-foreground">Parking:</span> {bay ? `${bay.bay_code}${bay.zone ? ` (${bay.zone})` : ""}` : "—"}</div>
+          <div><span className="text-muted-foreground">Parking:</span> {bay ? `${bay.bay_code} · slot ${slot.slot_number}${bay.zone ? ` (${bay.zone})` : ""}` : "—"}</div>
           <div className="col-span-2"><span className="text-muted-foreground">Checked in:</span> {new Date(assignment.checked_in_at).toLocaleTimeString()} · {elapsed} ago</div>
         </div>
         <div className="flex gap-2 pt-2">
@@ -839,34 +856,64 @@ function ParkingTab({ can }: { can: boolean }) {
   const qc = useQueryClient();
   const { school } = useTenant();
   const [addBay, setAddBay] = useState(false);
+  const [editCapacity, setEditCapacity] = useState<any | null>(null);
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["parking-bays"] });
+    qc.invalidateQueries({ queryKey: ["parking-slots"] });
+  };
 
   const { data: bays = [], isLoading } = useQuery({
     queryKey: ["parking-bays"],
     queryFn: async () => (await supabase.from("parking_bays").select("*").order("bay_code")).data ?? [],
   });
 
-  const { data: activeAssignments = [] } = useQuery({
-    queryKey: ["active-bay-assignments"],
-    queryFn: async () => (await supabase.from("card_assignments").select("*, access_cards(card_code)").is("checked_out_at", null).not("parking_bay_id", "is", null)).data ?? [],
+  const { data: slots = [] } = useQuery({
+    queryKey: ["parking-slots"],
+    queryFn: async () => (await supabase.from("parking_slots").select("*").order("slot_number")).data ?? [],
   });
 
-  const byBay = useMemo(() => {
+  // Every occupant is looked up by the specific slot they hold, not the bay —
+  // several holders can be "in" the same bay/lot at once now.
+  const { data: activeAssignments = [] } = useQuery({
+    queryKey: ["active-bay-assignments"],
+    queryFn: async () => (await supabase.from("card_assignments").select("*, access_cards(card_code)").is("checked_out_at", null).not("parking_slot_id", "is", null)).data ?? [],
+  });
+
+  const bySlot = useMemo(() => {
     const m = new Map<string, any>();
-    (activeAssignments as any[]).forEach(a => m.set(a.parking_bay_id, a));
+    (activeAssignments as any[]).forEach(a => m.set(a.parking_slot_id, a));
     return m;
   }, [activeAssignments]);
+
+  const slotsByBay = useMemo(() => {
+    const m = new Map<string, any[]>();
+    (slots as any[]).forEach(s => { const arr = m.get(s.bay_id) ?? []; arr.push(s); m.set(s.bay_id, arr); });
+    return m;
+  }, [slots]);
+
+  const slotStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("parking_slots").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Slot updated"); invalidateAll(); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const bayStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("parking_bays").update({ status }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Bay updated"); qc.invalidateQueries({ queryKey: ["parking-bays"] }); },
+    onSuccess: () => { toast.success("Bay updated"); invalidateAll(); },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const free = (bays as any[]).filter(b => b.status === "free").length;
-  const occupied = (bays as any[]).filter(b => b.status === "occupied").length;
+  const allSlots = slots as any[];
+  const free = allSlots.filter(s => s.status === "free").length;
+  const occupied = allSlots.filter(s => s.status === "occupied").length;
+  const outOfService = allSlots.filter(s => s.status === "out_of_service").length;
 
   return (
     <div className="space-y-4">
@@ -874,43 +921,72 @@ function ParkingTab({ can }: { can: boolean }) {
         <div className="flex gap-3 text-sm">
           <Badge variant="secondary">{free} free</Badge>
           <Badge>{occupied} occupied</Badge>
+          {outOfService > 0 && <Badge variant="outline">{outOfService} out of service</Badge>}
         </div>
         {can && (
           <Dialog open={addBay} onOpenChange={setAddBay}>
             <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-2" />Bay</Button></DialogTrigger>
-            <BayDialog schoolId={school?.id} onDone={() => { setAddBay(false); qc.invalidateQueries({ queryKey: ["parking-bays"] }); }} />
+            <BayDialog schoolId={school?.id} onDone={() => { setAddBay(false); invalidateAll(); }} />
           </Dialog>
         )}
       </div>
 
       {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {(bays as any[]).map(b => {
-            const assignment = byBay.get(b.id);
-            const borderClass = b.status === "occupied" ? "border-amber-500/40" : b.status === "out_of_service" ? "opacity-70" : "border-emerald-500/30";
+            const bSlots = (slotsByBay.get(b.id) ?? []).slice().sort((x, y) => x.slot_number - y.slot_number);
+            const bFree = bSlots.filter(s => s.status === "free").length;
             return (
-              <Card key={b.id} className={borderClass}>
-                <CardContent className="pt-4 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold">{b.bay_code}</div>
-                    <Badge variant={b.status === "free" ? "secondary" : b.status === "occupied" ? "default" : "outline"}>{b.status.replace("_", " ")}</Badge>
-                  </div>
-                  {b.zone && <div className="text-xs text-muted-foreground">{b.zone}</div>}
-                  {assignment && (
-                    <div className="text-xs pt-1 border-t mt-1">
-                      <div className="font-medium">{assignment.holder_name}</div>
-                      <div className="text-muted-foreground">{assignment.vehicle_reg ?? "—"} · card {assignment.access_cards?.card_code}</div>
+              <Card key={b.id} className={b.status === "out_of_service" ? "opacity-70" : undefined}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <div>
+                      {b.bay_code}
+                      {b.zone && <span className="text-xs font-normal text-muted-foreground ml-2">{b.zone}</span>}
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{bFree}/{bSlots.length} free</Badge>
+                      {b.status === "out_of_service" && <Badge variant="outline">bay disabled</Badge>}
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {bSlots.map(s => {
+                      const assignment = bySlot.get(s.id);
+                      const color = s.status === "occupied" ? "bg-amber-500/15 border-amber-500/50 text-amber-700 dark:text-amber-400"
+                        : s.status === "out_of_service" ? "bg-muted border-border text-muted-foreground"
+                        : "bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-400";
+                      return (
+                        <div
+                          key={s.id}
+                          title={assignment ? `${assignment.holder_name} · ${assignment.vehicle_reg ?? "—"} · card ${assignment.access_cards?.card_code ?? "—"}` : s.status === "out_of_service" ? "Out of service" : "Free"}
+                          className={`w-14 h-14 rounded-md border flex flex-col items-center justify-center text-xs font-medium ${color}`}
+                        >
+                          <span className="font-semibold">#{s.slot_number}</span>
+                          {assignment ? (
+                            <span className="text-[10px] leading-tight text-center px-0.5 truncate max-w-[3.2rem]">{assignment.vehicle_reg ?? assignment.holder_name}</span>
+                          ) : (
+                            <span className="text-[10px] leading-tight">{s.status === "out_of_service" ? "n/a" : "free"}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {bSlots.length === 0 && <p className="text-xs text-muted-foreground">No slots configured.</p>}
+                  </div>
+
                   {can && (
-                    <div className="pt-2">
+                    <div className="flex flex-wrap gap-2 pt-2 border-t">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditCapacity(b)}>
+                        Edit slot count
+                      </Button>
                       {b.status !== "out_of_service" ? (
-                        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={b.status === "occupied"} onClick={() => bayStatusMutation.mutate({ id: b.id, status: "out_of_service" })}>
-                          Mark out of service
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bayStatusMutation.mutate({ id: b.id, status: "out_of_service" })}>
+                          Disable whole bay
                         </Button>
                       ) : (
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bayStatusMutation.mutate({ id: b.id, status: "free" })}>
-                          Reactivate
+                          Reactivate bay
                         </Button>
                       )}
                     </div>
@@ -922,15 +998,30 @@ function ParkingTab({ can }: { can: boolean }) {
           {(bays as any[]).length === 0 && <p className="text-sm text-muted-foreground col-span-full py-8 text-center">No parking bays configured yet.</p>}
         </div>
       )}
+
+      <Dialog open={!!editCapacity} onOpenChange={o => !o && setEditCapacity(null)}>
+        {editCapacity && (
+          <BayCapacityDialog
+            bay={editCapacity}
+            onDone={() => { setEditCapacity(null); invalidateAll(); }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
 
 function BayDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
-  const [f, setF] = useState({ bay_code: "", zone: "" });
+  const [f, setF] = useState({ bay_code: "", zone: "", bay_type: "general", total_slots: "1" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("parking_bays").insert({ ...f, school_id: schoolId });
+      const { error } = await supabase.rpc("create_parking_bay", {
+        p_school_id: schoolId,
+        p_bay_code: f.bay_code,
+        p_zone: f.zone || null,
+        p_bay_type: f.bay_type,
+        p_total_slots: Number(f.total_slots) || 1,
+      });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Bay added"); onDone(); }, onError: (e: any) => toast.error(e.message),
@@ -938,8 +1029,46 @@ function BayDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string
   return (
     <DialogContent><DialogHeader><DialogTitle>Add Parking Bay</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-        <div><Label>Bay Code *</Label><Input required value={f.bay_code} onChange={e => setF(p => ({ ...p, bay_code: e.target.value }))} placeholder="P-01" /></div>
+        <div><Label>Bay / Lot Name *</Label><Input required value={f.bay_code} onChange={e => setF(p => ({ ...p, bay_code: e.target.value }))} placeholder="Front Lobby" /></div>
         <div><Label>Zone</Label><Input value={f.zone} onChange={e => setF(p => ({ ...p, zone: e.target.value }))} placeholder="Front lot" /></div>
+        <div>
+          <Label>Bay Type</Label>
+          <Select value={f.bay_type} onValueChange={v => setF(p => ({ ...p, bay_type: v }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="general">General</SelectItem>
+              <SelectItem value="visitor">Visitor</SelectItem>
+              <SelectItem value="staff">Staff</SelectItem>
+              <SelectItem value="delivery">Delivery</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label>Number of Slots *</Label><Input required type="number" min={1} value={f.total_slots} onChange={e => setF(p => ({ ...p, total_slots: e.target.value }))} placeholder="10" /></div>
+        <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+function BayCapacityDialog({ bay, onDone }: { bay: any; onDone: () => void }) {
+  const [totalSlots, setTotalSlots] = useState(String(bay.total_slots ?? 1));
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("set_bay_total_slots", { p_bay_id: bay.id, p_total_slots: Number(totalSlots) || 1 });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Slot count updated"); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Edit Slot Count — {bay.bay_code}</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div>
+          <Label>Number of Slots *</Label>
+          <Input required type="number" min={1} value={totalSlots} onChange={e => setTotalSlots(e.target.value)} />
+          <p className="text-xs text-muted-foreground mt-1">Shrinking will fail if any of the slots being removed are currently occupied.</p>
+        </div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
       </form>
     </DialogContent>
