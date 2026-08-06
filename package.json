@@ -71,6 +71,7 @@
     "embla-carousel-react": "^8.6.0",
     "entities": "4.5.0",
     "framer-motion": "^12.42.0",
+    "html5-qrcode": "^2.3.8",
     "htmlparser2": "9.1.0",
     "input-otp": "^1.4.2",
     "lenis": "^1.1.13",
