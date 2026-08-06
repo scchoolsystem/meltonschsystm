@@ -18,6 +18,12 @@ export interface StudentComboboxOption {
 /**
  * Fast, type-to-search student picker. Drop-in replacement for a plain
  * <Select> of students — avoids scrolling long dropdown lists.
+ *
+ * By default it filters the `students` list client-side as you type.
+ * Pass `onSearchChange` + `loading` when the list itself is fetched
+ * server-side per keystroke (e.g. large rosters) — the combobox then
+ * shows whatever `students` currently holds and lets the parent own
+ * the search text, so there's one search box instead of two controls.
  */
 export function StudentCombobox({
   value,
@@ -25,15 +31,23 @@ export function StudentCombobox({
   students,
   placeholder = "Search student…",
   disabled = false,
+  onSearchChange,
+  loading = false,
+  emptyText = "No matching student.",
 }: {
   value: string;
   onChange: (id: string) => void;
   students: StudentComboboxOption[];
   placeholder?: string;
   disabled?: boolean;
+  /** If provided, search filtering happens server-side; the combobox stops filtering client-side. */
+  onSearchChange?: (search: string) => void;
+  loading?: boolean;
+  emptyText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = students.find((s) => s.id === value);
+  const serverSearch = !!onSearchChange;
 
   const label = (s: StudentComboboxOption) =>
     `${s.admission_no ? s.admission_no + " – " : ""}${s.first_name} ${s.last_name}`;
@@ -54,10 +68,14 @@ export function StudentCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="Type a name or admission no…" />
+        <Command shouldFilter={!serverSearch}>
+          <CommandInput
+            placeholder="Type a name or admission no…"
+            onValueChange={serverSearch ? onSearchChange : undefined}
+          />
           <CommandList>
-            <CommandEmpty>No matching student.</CommandEmpty>
+            {loading && <div className="py-4 text-center text-sm text-muted-foreground">Searching…</div>}
+            {!loading && <CommandEmpty>{emptyText}</CommandEmpty>}
             <CommandGroup>
               {students.map((s) => (
                 <CommandItem
