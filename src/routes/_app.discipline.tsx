@@ -17,6 +17,7 @@ import { Plus, Loader2, CheckCircle, Bell, BarChart3, AlertTriangle, TrendingUp,
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useActiveStudents } from "@/lib/students.functions";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { format, subMonths } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 
@@ -440,9 +441,7 @@ function IncidentDialog({ onDone }: { onDone: () => void }) {
     <DialogContent><DialogHeader><DialogTitle>Log Incident</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox value={f.student_id} onChange={v => setF(p => ({ ...p, student_id: v }))} students={students as any[]} />
         </div>
         <div><Label>Date</Label><Input type="date" value={f.incident_date} onChange={e => setF(p => ({ ...p, incident_date: e.target.value }))} /></div>
         <div><Label>Description *</Label><Textarea required value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))} /></div>
@@ -476,9 +475,7 @@ function CounsellingDialog({ onDone }: { onDone: () => void }) {
     <DialogContent><DialogHeader><DialogTitle>Log Counselling Session</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox value={f.student_id} onChange={v => setF(p => ({ ...p, student_id: v }))} students={students as any[]} />
         </div>
         <div><Label>Counsellor (Staff)</Label>
           <Select value={f.counsellor_id} onValueChange={v => setF(p => ({ ...p, counsellor_id: v }))}><SelectTrigger><SelectValue placeholder="Choose staff" /></SelectTrigger>
