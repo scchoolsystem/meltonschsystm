@@ -4372,6 +4372,50 @@ export type Database = {
         }
         Relationships: []
       },
+      student_gate_scans: {
+        Row: {
+          id: string
+          school_id: string | null
+          student_id: string
+          direction: string
+          scanned_at: string
+          scanned_by: string | null
+          notified: boolean
+          notify_error: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          student_id: string
+          direction: string
+          scanned_at?: string
+          scanned_by?: string | null
+          notified?: boolean
+          notify_error?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          student_id?: string
+          direction?: string
+          scanned_at?: string
+          scanned_by?: string | null
+          notified?: boolean
+          notify_error?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_gate_scans_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      },
       access_cards: {
         Row: {
           id: string
