@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Loader2 } from "lucide-react";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -169,10 +170,13 @@ function AddDialog({ onDone }: { onDone: () => void }) {
           </Select>
         </div>
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF({ ...f, student_id: v, subject_id: "" })}>
-            <SelectTrigger><SelectValue placeholder={isTeacherScoped && (students as any[]).length === 0 ? "No students in your classes" : "Choose student"} /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox
+            value={f.student_id}
+            onChange={v => setF({ ...f, student_id: v, subject_id: "" })}
+            students={students as any[]}
+            placeholder={isTeacherScoped && (students as any[]).length === 0 ? "No students in your classes" : "Search student…"}
+            disabled={isTeacherScoped && (students as any[]).length === 0}
+          />
         </div>
         <div><Label>Subject</Label>
           <Select value={f.subject_id} onValueChange={v => setF({ ...f, subject_id: v })}>
