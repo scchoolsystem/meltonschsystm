@@ -2,19 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, CheckCircle, XCircle, Users } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useTenant } from "@/hooks/use-tenant";
 import { format } from "date-fns";
+import { QRCodeSVG } from "qrcode.react";
 
 export const Route = createFileRoute("/_app/security")({ component: () => (<FeatureGate feature="security"><Page /></FeatureGate>) });
 
@@ -22,6 +27,7 @@ function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
   const can = isAdmin || hasRole("security_admin") || hasRole("security_user");
+  const canManageBays = isAdmin || hasRole("security_admin");
 
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -103,8 +109,11 @@ function Page() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="gatepasses">
-        <TabsList>
+      <Tabs defaultValue="scan">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="scan" className="gap-1"><ScanLine className="w-3.5 h-3.5" />Scan</TabsTrigger>
+          <TabsTrigger value="cards" className="gap-1"><IdCardIcon className="w-3.5 h-3.5" />Badges</TabsTrigger>
+          <TabsTrigger value="parking" className="gap-1"><ParkingSquare className="w-3.5 h-3.5" />Parking</TabsTrigger>
           <TabsTrigger value="gatepasses">
             Gate Pass Queue
             {pendingPasses.length > 0 && <Badge variant="destructive" className="ml-2">{pendingPasses.length}</Badge>}
@@ -113,6 +122,18 @@ function Page() {
           <TabsTrigger value="visitors">Visitors</TabsTrigger>
           <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="scan">
+          <ScanTab can={can} />
+        </TabsContent>
+
+        <TabsContent value="cards">
+          <CardsTab can={can} />
+        </TabsContent>
+
+        <TabsContent value="parking">
+          <ParkingTab can={canManageBays} />
+        </TabsContent>
 
         <TabsContent value="gatepasses">
           <Card><CardHeader><CardTitle className="text-base">Pending Gate Pass Approvals</CardTitle></CardHeader><CardContent>
@@ -255,6 +276,579 @@ function VehicleDialog({ onDone }: { onDone: () => void }) {
         <div><Label>Driver Name</Label><Input value={f.driver_name} onChange={e => setF(p => ({ ...p, driver_name: e.target.value }))} /></div>
         <div><Label>Purpose</Label><Input value={f.purpose} onChange={e => setF(p => ({ ...p, purpose: e.target.value }))} /></div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log Entry</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+// ============================================================
+// Scan tab — the core new capability. A guard scans (USB scanner
+// or camera) or types a card_code; the UI branches on the card's
+// current status. Fast, minimal-click, kiosk-friendly.
+// ============================================================
+
+type ScanResult = { card: any; assignment: any | null } | null;
+
+function ScanTab({ can }: { can: boolean }) {
+  const qc = useQueryClient();
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState<ScanResult>(null);
+  const [notFoundCode, setNotFoundCode] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [result, notFoundCode]);
+
+  const lookupMutation = useMutation({
+    mutationFn: async (cardCode: string): Promise<ScanResult | "not_found"> => {
+      const trimmed = cardCode.trim();
+      const { data: card, error } = await supabase.from("access_cards").select("*").eq("card_code", trimmed).maybeSingle();
+      if (error) throw error;
+      if (!card) return "not_found";
+      if (card.status === "assigned") {
+        const { data: assignment, error: aErr } = await supabase
+          .from("card_assignments")
+          .select("*, parking_bays(bay_code,zone)")
+          .eq("card_id", card.id)
+          .is("checked_out_at", null)
+          .maybeSingle();
+        if (aErr) throw aErr;
+        return { card, assignment };
+      }
+      return { card, assignment: null };
+    },
+    onSuccess: (res, cardCode) => {
+      if (res === "not_found") { setNotFoundCode(cardCode.trim()); setResult(null); }
+      else { setNotFoundCode(null); setResult(res); }
+      setCode("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.rpc("checkout_card_assignment", { p_assignment_id: assignmentId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Card checked out and cleared");
+      qc.invalidateQueries({ queryKey: ["parking-bays"] });
+      qc.invalidateQueries({ queryKey: ["access-cards"] });
+      reset();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const reset = () => { setResult(null); setNotFoundCode(null); setCode(""); };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim() || lookupMutation.isPending) return;
+    lookupMutation.mutate(code);
+  };
+
+  const handleDetected = (text: string) => {
+    setCameraOpen(false);
+    if (!text.trim() || lookupMutation.isPending) return;
+    lookupMutation.mutate(text);
+  };
+
+  return (
+    <div className="space-y-4 max-w-xl mx-auto">
+      <Card>
+        <CardHeader><CardTitle className="text-base flex items-center gap-2"><ScanLine className="w-4 h-4" />Scan a card</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            {/* USB/Bluetooth handheld scanners behave like a keyboard: they type
+               the decoded string fast, then send Enter — which submits this form
+               natively, no extra keystroke-timing logic needed. */}
+            <Input
+              ref={inputRef}
+              autoFocus
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder="Scan or type card code (e.g. SDV-000427)"
+              className="font-mono"
+            />
+            <Button type="submit" disabled={lookupMutation.isPending}>
+              {lookupMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Look up"}
+            </Button>
+          </form>
+          {!cameraOpen ? (
+            <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setCameraOpen(true)}>
+              <Camera className="w-3.5 h-3.5" />Scan with camera
+            </Button>
+          ) : (
+            <CameraScanner onDetected={handleDetected} onClose={() => setCameraOpen(false)} />
+          )}
+        </CardContent>
+      </Card>
+
+      {notFoundCode && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-4 text-center space-y-2">
+            <XCircle className="w-8 h-8 text-destructive mx-auto" />
+            <p className="font-medium">Unknown card</p>
+            <p className="text-sm text-muted-foreground">"{notFoundCode}" doesn't match any printed card. Check the code and try again.</p>
+            <Button variant="outline" size="sm" onClick={reset}>Try again</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {result?.card?.status === "retired" && (
+        <Card className="border-destructive/40">
+          <CardContent className="pt-4 text-center space-y-2">
+            <XCircle className="w-8 h-8 text-destructive mx-auto" />
+            <p className="font-medium">This card has been retired</p>
+            <p className="text-sm text-muted-foreground font-mono">{result.card.card_code}</p>
+            <Button variant="outline" size="sm" onClick={reset}>Scan another</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {result?.card?.status === "available" && (
+        can ? (
+          <IssueCardForm card={result.card} onDone={() => { qc.invalidateQueries({ queryKey: ["access-cards"] }); reset(); }} onCancel={reset} />
+        ) : (
+          <Card className="border-emerald-500/30"><CardContent className="pt-4 text-center space-y-1">
+            <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
+            <p className="font-medium font-mono">{result.card.card_code}</p>
+            <p className="text-sm text-muted-foreground">Available — ready to issue.</p>
+          </CardContent></Card>
+        )
+      )}
+
+      {result?.card?.status === "assigned" && result.assignment && (
+        <HolderPanel
+          card={result.card}
+          assignment={result.assignment}
+          can={can}
+          checkingOut={checkoutMutation.isPending}
+          onCheckout={() => checkoutMutation.mutate(result.assignment.id)}
+          onDismiss={reset}
+        />
+      )}
+    </div>
+  );
+}
+
+function IssueCardForm({ card, onDone, onCancel }: { card: any; onDone: () => void; onCancel: () => void }) {
+  const [holderType, setHolderType] = useState<"visitor" | "vehicle">("visitor");
+  const [broughtVehicle, setBroughtVehicle] = useState(false);
+  const [f, setF] = useState({ holder_name: "", id_number: "", visiting: "", purpose: "", vehicle_reg: "", parking_bay_id: "" });
+
+  const needsBay = holderType === "vehicle" || broughtVehicle;
+
+  const { data: freeBays = [] } = useQuery({
+    queryKey: ["parking-bays-free"],
+    queryFn: async () => (await supabase.from("parking_bays").select("*").eq("status", "free").order("bay_code")).data ?? [],
+    enabled: needsBay,
+  });
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("issue_card_assignment", {
+        p_card_id: card.id,
+        p_holder_type: holderType,
+        p_holder_name: f.holder_name,
+        p_id_number: f.id_number || null,
+        p_visiting: f.visiting || null,
+        p_purpose: f.purpose || null,
+        p_vehicle_reg: needsBay ? (f.vehicle_reg || null) : null,
+        p_parking_bay_id: needsBay && f.parking_bay_id ? f.parking_bay_id : null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success(`${card.card_code} issued`); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between">
+          <span className="font-mono">{card.card_code}</span>
+          <Badge variant="secondary">Available — issue now</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+          <RadioGroup value={holderType} onValueChange={v => setHolderType(v as "visitor" | "vehicle")} className="flex gap-6">
+            <div className="flex items-center gap-2"><RadioGroupItem value="visitor" id="ht-visitor" /><Label htmlFor="ht-visitor" className="font-normal">Visitor (on foot)</Label></div>
+            <div className="flex items-center gap-2"><RadioGroupItem value="vehicle" id="ht-vehicle" /><Label htmlFor="ht-vehicle" className="font-normal">Driver / vehicle</Label></div>
+          </RadioGroup>
+
+          <div><Label>Name *</Label><Input required autoFocus value={f.holder_name} onChange={e => setF(p => ({ ...p, holder_name: e.target.value }))} /></div>
+          <div><Label>ID Number</Label><Input value={f.id_number} onChange={e => setF(p => ({ ...p, id_number: e.target.value }))} /></div>
+          <div><Label>Visiting</Label><Input value={f.visiting} onChange={e => setF(p => ({ ...p, visiting: e.target.value }))} placeholder="Who / which office" /></div>
+          <div><Label>Purpose</Label><Input value={f.purpose} onChange={e => setF(p => ({ ...p, purpose: e.target.value }))} /></div>
+
+          {holderType === "visitor" && (
+            <div className="flex items-center gap-2">
+              <Checkbox id="brought-vehicle" checked={broughtVehicle} onCheckedChange={c => setBroughtVehicle(c === true)} />
+              <Label htmlFor="brought-vehicle" className="font-normal">Brought a vehicle</Label>
+            </div>
+          )}
+
+          {needsBay && (
+            <>
+              <div><Label>Vehicle Reg{holderType === "vehicle" ? " *" : ""}</Label><Input required={holderType === "vehicle"} value={f.vehicle_reg} onChange={e => setF(p => ({ ...p, vehicle_reg: e.target.value }))} /></div>
+              <div>
+                <Label>Parking Bay</Label>
+                <Select value={f.parking_bay_id} onValueChange={v => setF(p => ({ ...p, parking_bay_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder={(freeBays as any[]).length ? "Choose a free bay" : "No free bays"} /></SelectTrigger>
+                  <SelectContent>
+                    {(freeBays as any[]).map(b => <SelectItem key={b.id} value={b.id}>{b.bay_code}{b.zone ? ` — ${b.zone}` : ""}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Issue this card</Button>
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HolderPanel({ card, assignment, can, checkingOut, onCheckout, onDismiss }: {
+  card: any; assignment: any; can: boolean; checkingOut: boolean; onCheckout: () => void; onDismiss: () => void;
+}) {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      const mins = Math.max(0, Math.floor((Date.now() - new Date(assignment.checked_in_at).getTime()) / 60000));
+      setElapsed(mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}m`);
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [assignment.checked_in_at]);
+
+  const bay = assignment.parking_bays;
+
+  return (
+    <Card className="border-amber-500/40">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between">
+          <span className="font-mono">{card.card_code}</span>
+          <Badge>Currently held</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+          <div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{assignment.holder_name}</span></div>
+          <div><span className="text-muted-foreground">Type:</span> {assignment.holder_type === "vehicle" ? "Driver" : "Visitor"}</div>
+          <div><span className="text-muted-foreground">ID No:</span> {assignment.id_number ?? "—"}</div>
+          <div><span className="text-muted-foreground">Visiting:</span> {assignment.visiting ?? "—"}</div>
+          <div className="col-span-2"><span className="text-muted-foreground">Purpose:</span> {assignment.purpose ?? "—"}</div>
+          <div><span className="text-muted-foreground">Vehicle:</span> {assignment.vehicle_reg ?? "—"}</div>
+          <div><span className="text-muted-foreground">Parking:</span> {bay ? `${bay.bay_code}${bay.zone ? ` (${bay.zone})` : ""}` : "—"}</div>
+          <div className="col-span-2"><span className="text-muted-foreground">Checked in:</span> {new Date(assignment.checked_in_at).toLocaleTimeString()} · {elapsed} ago</div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          {can && (
+            <Button variant="destructive" className="flex-1" onClick={onCheckout} disabled={checkingOut}>
+              {checkingOut && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Check out & clear card
+            </Button>
+          )}
+          <Button variant="outline" onClick={onDismiss}>Close</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CameraScanner({ onDetected, onClose }: { onDetected: (text: string) => void; onClose: () => void }) {
+  const containerId = useRef(`qr-reader-${Math.random().toString(36).slice(2)}`).current;
+  const scannerRef = useRef<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) return;
+        const scanner = new Html5Qrcode(containerId);
+        scannerRef.current = scanner;
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 220 },
+          (decodedText: string) => onDetected(decodedText),
+          () => { /* per-frame decode misses are expected, ignore */ },
+        );
+      } catch (err: any) {
+        if (!cancelled) setError(err?.message ?? "Couldn't access the camera. Check permissions.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      const s = scannerRef.current;
+      if (s) {
+        s.stop().then(() => s.clear()).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-2">
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : (
+        <div id={containerId} className="w-full max-w-xs mx-auto rounded-md overflow-hidden border" />
+      )}
+      <Button variant="outline" size="sm" className="w-full" onClick={onClose}>Cancel</Button>
+    </div>
+  );
+}
+
+// ============================================================
+// Badges (Cards) tab — bulk-generate the printed card inventory
+// and produce a print-ready QR sheet. Cards are immutable once
+// printed; the only lifecycle action here is retiring a lost card.
+// ============================================================
+
+function CardsTab({ can }: { can: boolean }) {
+  const qc = useQueryClient();
+  const { school } = useTenant();
+  const [qty, setQty] = useState("1000");
+  const [printBatch, setPrintBatch] = useState<any[] | null>(null);
+
+  const { data: cards = [], isLoading } = useQuery({
+    queryKey: ["access-cards"],
+    queryFn: async () => (await supabase.from("access_cards").select("*").order("card_code")).data ?? [],
+  });
+
+  const counts = useMemo(() => {
+    const c = { available: 0, assigned: 0, retired: 0 } as Record<string, number>;
+    (cards as any[]).forEach(row => { c[row.status] = (c[row.status] ?? 0) + 1; });
+    return c;
+  }, [cards]);
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const n = Math.max(1, Math.min(5000, Number(qty) || 0));
+      const existingCodes = (cards as any[]).map(c => c.card_code as string).filter(c => /^SDV-\d+$/.test(c));
+      const maxSeq = existingCodes.reduce((mx, c) => Math.max(mx, parseInt(c.split("-")[1], 10)), 0);
+      const rows = Array.from({ length: n }, (_, i) => ({
+        card_code: `SDV-${String(maxSeq + i + 1).padStart(6, "0")}`,
+        status: "available",
+      }));
+      const { data, error } = await supabase.from("access_cards").insert(rows).select("*");
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: (data) => { toast.success(`${data.length} card${data.length === 1 ? "" : "s"} generated`); qc.invalidateQueries({ queryKey: ["access-cards"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const retireMutation = useMutation({
+    mutationFn: async (id: string) => { const { error } = await supabase.from("access_cards").update({ status: "retired" }).eq("id", id); if (error) throw error; },
+    onSuccess: () => { toast.success("Card retired"); qc.invalidateQueries({ queryKey: ["access-cards"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      {can && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Generate cards</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap items-end gap-3">
+            <div><Label>Quantity</Label><Input type="number" min={1} max={5000} className="w-32" value={qty} onChange={e => setQty(e.target.value)} /></div>
+            <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
+              {generateMutation.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Generate
+            </Button>
+            <Button variant="outline" onClick={() => setPrintBatch(cards as any[])} disabled={(cards as any[]).length === 0}>
+              <Printer className="w-4 h-4 mr-2" />Print sheet ({(cards as any[]).length})
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-3 text-sm">
+        <Badge variant="secondary">{counts.available ?? 0} available</Badge>
+        <Badge>{counts.assigned ?? 0} assigned</Badge>
+        <Badge variant="outline">{counts.retired ?? 0} retired</Badge>
+      </div>
+
+      <Card><CardHeader /><CardContent>
+        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Status</TableHead>{can && <TableHead className="text-right">Action</TableHead>}</TableRow></TableHeader>
+            <TableBody>
+              {(cards as any[]).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No cards generated yet.</TableCell></TableRow>}
+              {(cards as any[]).slice(0, 200).map((c: any) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-mono">{c.card_code}</TableCell>
+                  <TableCell><Badge variant={c.status === "available" ? "secondary" : c.status === "assigned" ? "default" : "outline"}>{c.status}</Badge></TableCell>
+                  {can && (
+                    <TableCell className="text-right">
+                      {c.status !== "retired" && <Button size="sm" variant="outline" className="h-8" onClick={() => retireMutation.mutate(c.id)}>Retire</Button>}
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {(cards as any[]).length > 200 && (
+          <p className="text-xs text-muted-foreground text-center pt-2">Showing first 200 of {(cards as any[]).length}. Use "Print sheet" for the full batch.</p>
+        )}
+      </CardContent></Card>
+
+      {printBatch && <PrintSheet cards={printBatch} schoolName={school?.name ?? "School"} onClose={() => setPrintBatch(null)} />}
+    </div>
+  );
+}
+
+function PrintSheet({ cards, schoolName, onClose }: { cards: any[]; schoolName: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-background overflow-auto">
+      <div className="print:hidden sticky top-0 bg-background border-b p-3 flex items-center justify-between z-10">
+        <div className="font-medium">Print sheet — {cards.length} card{cards.length === 1 ? "" : "s"}</div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Print</Button>
+        </div>
+      </div>
+      <div className="p-6 grid grid-cols-2 gap-4 max-w-3xl mx-auto print:max-w-none print:mx-0 print:grid-cols-2">
+        {cards.map(c => (
+          <div key={c.id} className="border rounded-lg p-3 flex items-center gap-3 break-inside-avoid">
+            <div className="bg-white p-1 rounded border shrink-0">
+              <QRCodeSVG value={c.card_code} size={64} level="M" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold truncate">{schoolName}</div>
+              <div className="text-[10px] text-muted-foreground tracking-wide">ACCESS CARD</div>
+              <div className="font-mono text-sm font-bold mt-1">{c.card_code}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Parking tab — live bay occupancy board. Bay CRUD is admin-only;
+// occupancy itself only ever changes through issue/checkout above.
+// ============================================================
+
+function ParkingTab({ can }: { can: boolean }) {
+  const qc = useQueryClient();
+  const { school } = useTenant();
+  const [addBay, setAddBay] = useState(false);
+
+  const { data: bays = [], isLoading } = useQuery({
+    queryKey: ["parking-bays"],
+    queryFn: async () => (await supabase.from("parking_bays").select("*").order("bay_code")).data ?? [],
+  });
+
+  const { data: activeAssignments = [] } = useQuery({
+    queryKey: ["active-bay-assignments"],
+    queryFn: async () => (await supabase.from("card_assignments").select("*, access_cards(card_code)").is("checked_out_at", null).not("parking_bay_id", "is", null)).data ?? [],
+  });
+
+  const byBay = useMemo(() => {
+    const m = new Map<string, any>();
+    (activeAssignments as any[]).forEach(a => m.set(a.parking_bay_id, a));
+    return m;
+  }, [activeAssignments]);
+
+  const bayStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("parking_bays").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Bay updated"); qc.invalidateQueries({ queryKey: ["parking-bays"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const free = (bays as any[]).filter(b => b.status === "free").length;
+  const occupied = (bays as any[]).filter(b => b.status === "occupied").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-3 text-sm">
+          <Badge variant="secondary">{free} free</Badge>
+          <Badge>{occupied} occupied</Badge>
+        </div>
+        {can && (
+          <Dialog open={addBay} onOpenChange={setAddBay}>
+            <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-2" />Bay</Button></DialogTrigger>
+            <BayDialog schoolId={school?.id} onDone={() => { setAddBay(false); qc.invalidateQueries({ queryKey: ["parking-bays"] }); }} />
+          </Dialog>
+        )}
+      </div>
+
+      {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(bays as any[]).map(b => {
+            const assignment = byBay.get(b.id);
+            const borderClass = b.status === "occupied" ? "border-amber-500/40" : b.status === "out_of_service" ? "opacity-70" : "border-emerald-500/30";
+            return (
+              <Card key={b.id} className={borderClass}>
+                <CardContent className="pt-4 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold">{b.bay_code}</div>
+                    <Badge variant={b.status === "free" ? "secondary" : b.status === "occupied" ? "default" : "outline"}>{b.status.replace("_", " ")}</Badge>
+                  </div>
+                  {b.zone && <div className="text-xs text-muted-foreground">{b.zone}</div>}
+                  {assignment && (
+                    <div className="text-xs pt-1 border-t mt-1">
+                      <div className="font-medium">{assignment.holder_name}</div>
+                      <div className="text-muted-foreground">{assignment.vehicle_reg ?? "—"} · card {assignment.access_cards?.card_code}</div>
+                    </div>
+                  )}
+                  {can && (
+                    <div className="pt-2">
+                      {b.status !== "out_of_service" ? (
+                        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={b.status === "occupied"} onClick={() => bayStatusMutation.mutate({ id: b.id, status: "out_of_service" })}>
+                          Mark out of service
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => bayStatusMutation.mutate({ id: b.id, status: "free" })}>
+                          Reactivate
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+          {(bays as any[]).length === 0 && <p className="text-sm text-muted-foreground col-span-full py-8 text-center">No parking bays configured yet.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BayDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
+  const [f, setF] = useState({ bay_code: "", zone: "" });
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("parking_bays").insert({ ...f, school_id: schoolId });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Bay added"); onDone(); }, onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent><DialogHeader><DialogTitle>Add Parking Bay</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div><Label>Bay Code *</Label><Input required value={f.bay_code} onChange={e => setF(p => ({ ...p, bay_code: e.target.value }))} placeholder="P-01" /></div>
+        <div><Label>Zone</Label><Input value={f.zone} onChange={e => setF(p => ({ ...p, zone: e.target.value }))} placeholder="Front lot" /></div>
+        <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
       </form>
     </DialogContent>
   );
