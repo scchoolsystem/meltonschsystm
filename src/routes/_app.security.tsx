@@ -14,12 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
 import { StudentCombobox } from "@/components/StudentCombobox";
 import { useActiveStudents } from "@/lib/students.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { logStudentGateScan } from "@/lib/gate-scan.functions";
 import { QRCodeSVG } from "qrcode.react";
 
 export const Route = createFileRoute("/_app/security")({ component: () => (<FeatureGate feature="security"><Page /></FeatureGate>) });
@@ -161,6 +163,7 @@ function Page() {
       <Tabs defaultValue="scan">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="scan" className="gap-1"><ScanLine className="w-3.5 h-3.5" />Scan</TabsTrigger>
+          <TabsTrigger value="studentgate" className="gap-1"><LogIn className="w-3.5 h-3.5" />Student Gate</TabsTrigger>
           <TabsTrigger value="cards" className="gap-1"><IdCardIcon className="w-3.5 h-3.5" />Badges</TabsTrigger>
           <TabsTrigger value="parking" className="gap-1"><ParkingSquare className="w-3.5 h-3.5" />Parking</TabsTrigger>
           <TabsTrigger value="gatepasses">
@@ -174,6 +177,10 @@ function Page() {
 
         <TabsContent value="scan">
           <ScanTab can={can} />
+        </TabsContent>
+
+        <TabsContent value="studentgate">
+          <StudentGateTab />
         </TabsContent>
 
         <TabsContent value="cards">
@@ -806,6 +813,137 @@ function CameraScanner({ onDetected, onClose }: { onDetected: (text: string) => 
         <div id={containerId} className="w-full max-w-xs mx-auto rounded-md overflow-hidden border" />
       )}
       <Button variant="outline" size="sm" className="w-full" onClick={onClose}>Cancel</Button>
+    </div>
+  );
+}
+
+// ============================================================
+// Student Gate tab — scan a student's ID (their existing card QR
+// encodes /verify?code=<unique_id>, plain admission numbers work too)
+// to sign them in or out. Direction toggles automatically off their
+// own last scan. Parent gets an SMS the moment the scan is logged.
+// Distinct from the Gate Pass flow above: this is the everyday
+// "scan at the gate" attendance log, not a pre-authorized leave.
+// ============================================================
+
+function StudentGateTab() {
+  const qc = useQueryClient();
+  const logScan = useServerFn(logStudentGateScan);
+  const [code, setCode] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [lastResult, setLastResult] = useState<Awaited<ReturnType<typeof logScan>> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, [lastResult]);
+
+  const { data: recent = [] } = useQuery({
+    queryKey: ["student-gate-scans-recent"],
+    queryFn: async () => (await supabase.from("student_gate_scans").select("*, students(first_name,last_name,admission_no)").order("scanned_at", { ascending: false }).limit(15)).data ?? [],
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: (scannedCode: string) => logScan({ data: { scannedCode } }),
+    onSuccess: (res) => {
+      setLastResult(res);
+      setCode("");
+      if (!res.found) toast.error("No student matches that code");
+      qc.invalidateQueries({ queryKey: ["student-gate-scans-recent"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim() || scanMutation.isPending) return;
+    scanMutation.mutate(code);
+  };
+
+  const handleDetected = (text: string) => {
+    setCameraOpen(false);
+    if (!text.trim() || scanMutation.isPending) return;
+    scanMutation.mutate(text);
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><ScanLine className="w-4 h-4" />Scan student ID</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <form onSubmit={handleSubmit} className="flex gap-2">
+              <Input
+                ref={inputRef}
+                autoFocus
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                placeholder="Scan ID card or type admission no."
+                className="font-mono"
+              />
+              <Button type="submit" disabled={scanMutation.isPending}>
+                {scanMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Log"}
+              </Button>
+            </form>
+            {!cameraOpen ? (
+              <Button type="button" variant="outline" size="sm" className="gap-1" onClick={() => setCameraOpen(true)}>
+                <Camera className="w-3.5 h-3.5" />Scan with camera
+              </Button>
+            ) : (
+              <CameraScanner onDetected={handleDetected} onClose={() => setCameraOpen(false)} />
+            )}
+          </CardContent>
+        </Card>
+
+        {lastResult && (
+          lastResult.found ? (
+            <Card className={lastResult.direction === "in" ? "border-emerald-500/40" : "border-amber-500/40"}>
+              <CardContent className="pt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  {lastResult.direction === "in" ? <LogIn className="w-6 h-6 text-emerald-500" /> : <LogOut className="w-6 h-6 text-amber-500" />}
+                  <div>
+                    <div className="font-semibold">{lastResult.student.name}</div>
+                    <div className="text-xs text-muted-foreground">{lastResult.student.admissionNo}{lastResult.student.className ? ` · ${lastResult.student.className}` : ""}</div>
+                  </div>
+                </div>
+                <Badge variant={lastResult.direction === "in" ? "default" : "secondary"}>
+                  {lastResult.direction === "in" ? "Signed in" : "Signed out"}
+                </Badge>
+                {lastResult.notified ? (
+                  <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Parent notified by SMS</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1"><MessageSquareWarning className="w-3.5 h-3.5" />Not notified — {lastResult.notifyError ?? "unknown reason"}</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-destructive/40">
+              <CardContent className="pt-4 text-center space-y-1">
+                <XCircle className="w-8 h-8 text-destructive mx-auto" />
+                <p className="font-medium">No student found for that code</p>
+              </CardContent>
+            </Card>
+          )
+        )}
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Recent scans</CardTitle></CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Direction</TableHead><TableHead>Time</TableHead><TableHead>Notified</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(recent as any[]).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No scans yet.</TableCell></TableRow>}
+              {(recent as any[]).map((r: any) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.students?.first_name} {r.students?.last_name}<div className="text-xs text-muted-foreground">{r.students?.admission_no}</div></TableCell>
+                  <TableCell><Badge variant={r.direction === "in" ? "default" : "secondary"}>{r.direction === "in" ? "In" : "Out"}</Badge></TableCell>
+                  <TableCell className="text-xs">{new Date(r.scanned_at).toLocaleTimeString()}</TableCell>
+                  <TableCell>{r.notified ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <MessageSquareWarning className="w-4 h-4 text-muted-foreground" />}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
