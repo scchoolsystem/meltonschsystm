@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Printer } from "lucide-react";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { toast } from "sonner";
 import { useState } from "react";
 import { issueLeavingCertificate } from "@/lib/leaving-certs.functions";
@@ -66,10 +67,7 @@ function Page() {
             <DialogHeader><DialogTitle>Issue leaving certificate</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label>Student</Label>
-                <Select value={f.student_id} onValueChange={v => setF(s => ({ ...s, student_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-                  <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.admission_no})</SelectItem>)}</SelectContent>
-                </Select>
+                <StudentCombobox value={f.student_id} onChange={v => setF(s => ({ ...s, student_id: v }))} students={students as any[]} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Leaving date</Label><Input type="date" value={f.leaving_date} onChange={e => setF(s => ({ ...s, leaving_date: e.target.value }))} /></div>
