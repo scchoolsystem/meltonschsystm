@@ -4402,6 +4402,7 @@ export type Database = {
           school_id: string | null
           bay_code: string
           zone: string | null
+          bay_type: string
           status: string
           created_at: string
         }
@@ -4410,6 +4411,7 @@ export type Database = {
           school_id?: string | null
           bay_code: string
           zone?: string | null
+          bay_type?: string
           status?: string
           created_at?: string
         }
@@ -4418,6 +4420,7 @@ export type Database = {
           school_id?: string | null
           bay_code?: string
           zone?: string | null
+          bay_type?: string
           status?: string
           created_at?: string
         }
@@ -4434,6 +4437,7 @@ export type Database = {
           visiting: string | null
           purpose: string | null
           vehicle_reg: string | null
+          vehicle_type: string | null
           parking_bay_id: string | null
           checked_in_at: string
           checked_out_at: string | null
@@ -4451,6 +4455,7 @@ export type Database = {
           visiting?: string | null
           purpose?: string | null
           vehicle_reg?: string | null
+          vehicle_type?: string | null
           parking_bay_id?: string | null
           checked_in_at?: string
           checked_out_at?: string | null
@@ -4468,6 +4473,7 @@ export type Database = {
           visiting?: string | null
           purpose?: string | null
           vehicle_reg?: string | null
+          vehicle_type?: string | null
           parking_bay_id?: string | null
           checked_in_at?: string
           checked_out_at?: string | null
@@ -5462,16 +5468,20 @@ export type Database = {
       }
       issue_card_assignment: {
         Args: {
-          p_card_id: string
+          p_card_id: string | null
           p_holder_type: string
           p_holder_name: string
           p_id_number: string | null
           p_visiting: string | null
           p_purpose: string | null
           p_vehicle_reg: string | null
+          p_vehicle_type: string | null
           p_parking_bay_id: string | null
         }
-        Returns: string
+        Returns: {
+          assignment_id: string
+          card_code: string
+        }[]
       }
       list_active_schools: {
         Args: Record<PropertyKey, never>
