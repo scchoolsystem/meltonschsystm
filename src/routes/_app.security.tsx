@@ -79,8 +79,8 @@ function Page() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const [addVisitor, setAddVisitor] = useState(false);
-  const [addVehicle, setAddVehicle] = useState(false);
+  const [addEntry, setAddEntry] = useState(false);
+  const [lastIssuedCode, setLastIssuedCode] = useState<string | null>(null);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -88,11 +88,13 @@ function Page() {
         <div><h1 className="text-3xl font-bold">Security</h1></div>
         {can && (
           <div className="flex gap-2">
-            <Dialog open={addVisitor} onOpenChange={setAddVisitor}><DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Visitor</Button></DialogTrigger>
-              <VisitorDialog onDone={() => { setAddVisitor(false); qc.invalidateQueries({ queryKey: ["visitor-log"] }); }} />
-            </Dialog>
-            <Dialog open={addVehicle} onOpenChange={setAddVehicle}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Vehicle</Button></DialogTrigger>
-              <VehicleDialog onDone={() => { setAddVehicle(false); qc.invalidateQueries({ queryKey: ["vehicle-log"] }); }} />
+            <Dialog open={addEntry} onOpenChange={setAddEntry}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Log Entry</Button></DialogTrigger>
+              <LogEntryDialog onDone={(code) => {
+                setAddEntry(false);
+                setLastIssuedCode(code);
+                qc.invalidateQueries({ queryKey: ["access-cards"] });
+                qc.invalidateQueries({ queryKey: ["parking-bays"] });
+              }} />
             </Dialog>
           </div>
         )}
@@ -108,6 +110,18 @@ function Page() {
           </div>
         </CardContent>
       </Card>
+
+      {lastIssuedCode && (
+        <Card className="border-emerald-500/40 bg-emerald-500/5">
+          <CardContent className="pt-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs text-muted-foreground">Hand this card to them</div>
+              <div className="text-2xl font-bold font-mono">{lastIssuedCode}</div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setLastIssuedCode(null)}>Dismiss</Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="scan">
         <TabsList className="flex-wrap h-auto">
@@ -236,46 +250,124 @@ function Page() {
   );
 }
 
-function VisitorDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ visitor_name: "", id_number: "", visiting: "", purpose: "" });
-  const m = useMutation({
-    mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("visitor_log").insert({ ...f, logged_by: u.user?.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Visitor logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
-  });
-  return (
-    <DialogContent><DialogHeader><DialogTitle>Log Visitor</DialogTitle></DialogHeader>
-      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-        <div><Label>Visitor Name *</Label><Input required value={f.visitor_name} onChange={e => setF(p => ({ ...p, visitor_name: e.target.value }))} /></div>
-        <div><Label>ID Number</Label><Input value={f.id_number} onChange={e => setF(p => ({ ...p, id_number: e.target.value }))} /></div>
-        <div><Label>Visiting (student/staff name)</Label><Input value={f.visiting} onChange={e => setF(p => ({ ...p, visiting: e.target.value }))} /></div>
-        <div><Label>Purpose</Label><Input value={f.purpose} onChange={e => setF(p => ({ ...p, purpose: e.target.value }))} /></div>
-        <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log In</Button></DialogFooter>
-      </form>
-    </DialogContent>
-  );
+// ============================================================
+// Shared bay-matching helper — used by both the unified Log Entry
+// dialog and the Scan tab's issue form. Bays are zoned by bay_type
+// (general/visitor/staff/delivery); this just ranks free bays so the
+// zone matching the vehicle/purpose shows up first and gets
+// pre-selected, without hiding the others in case the guard needs
+// to override it.
+// ============================================================
+
+function inferBayType(vehicleType: string, purpose: string): string {
+  const p = (purpose || "").toLowerCase();
+  if (vehicleType === "lorry" || /deliver|supply|stock|goods|store/.test(p)) return "delivery";
+  if (/staff|teacher|employee/.test(p)) return "staff";
+  return "visitor";
 }
 
-function VehicleDialog({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ vehicle_reg: "", driver_name: "", purpose: "" });
+function rankBaysByType(bays: any[], preferredType: string): any[] {
+  const rank = (t: string) => (t === preferredType ? 0 : t === "general" ? 1 : 2);
+  return [...bays].sort((a, b) => rank(a.bay_type) - rank(b.bay_type) || a.bay_code.localeCompare(b.bay_code));
+}
+
+const VEHICLE_TYPES = [
+  { value: "car", label: "Car" },
+  { value: "motorbike", label: "Motorbike" },
+  { value: "van", label: "Van" },
+  { value: "lorry", label: "Lorry / Truck" },
+  { value: "other", label: "Other" },
+];
+
+function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
+  const [f, setF] = useState({ holder_name: "", id_number: "", visiting: "", purpose: "" });
+  const [hasVehicle, setHasVehicle] = useState(false);
+  const [vehicleType, setVehicleType] = useState("car");
+  const [vehicleReg, setVehicleReg] = useState("");
+  const [bayId, setBayId] = useState("");
+
+  const preferredType = useMemo(() => inferBayType(vehicleType, f.purpose), [vehicleType, f.purpose]);
+
+  const { data: freeBays = [] } = useQuery({
+    queryKey: ["parking-bays-free"],
+    queryFn: async () => (await supabase.from("parking_bays").select("*").eq("status", "free").order("bay_code")).data ?? [],
+    enabled: hasVehicle,
+  });
+
+  const rankedBays = useMemo(() => rankBaysByType(freeBays as any[], preferredType), [freeBays, preferredType]);
+
+  // Auto-select the top-ranked bay whenever the ranking changes and nothing's
+  // been explicitly chosen yet, so the common case needs zero extra clicks.
+  useEffect(() => {
+    if (hasVehicle && !bayId && rankedBays.length > 0) setBayId(rankedBays[0].id);
+  }, [hasVehicle, rankedBays, bayId]);
+
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("vehicle_log").insert({ ...f, logged_by: u.user?.id });
+      const { data, error } = await supabase.rpc("issue_card_assignment", {
+        p_card_id: null,
+        p_holder_type: hasVehicle && !f.visiting ? "vehicle" : "visitor",
+        p_holder_name: f.holder_name,
+        p_id_number: f.id_number || null,
+        p_visiting: f.visiting || null,
+        p_purpose: f.purpose || null,
+        p_vehicle_reg: hasVehicle ? (vehicleReg || null) : null,
+        p_vehicle_type: hasVehicle ? vehicleType : null,
+        p_parking_bay_id: hasVehicle && bayId ? bayId : null,
+      });
       if (error) throw error;
+      return data?.[0];
     },
-    onSuccess: () => { toast.success("Vehicle logged"); onDone(); }, onError: (e: any) => toast.error(e.message),
+    onSuccess: (row) => {
+      toast.success("Entry logged");
+      onDone(row?.card_code ?? "—");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
+
   return (
-    <DialogContent><DialogHeader><DialogTitle>Log Vehicle</DialogTitle></DialogHeader>
+    <DialogContent>
+      <DialogHeader><DialogTitle>Log Entry</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-        <div><Label>Vehicle Reg *</Label><Input required value={f.vehicle_reg} onChange={e => setF(p => ({ ...p, vehicle_reg: e.target.value }))} /></div>
-        <div><Label>Driver Name</Label><Input value={f.driver_name} onChange={e => setF(p => ({ ...p, driver_name: e.target.value }))} /></div>
+        <div><Label>Name *</Label><Input required autoFocus value={f.holder_name} onChange={e => setF(p => ({ ...p, holder_name: e.target.value }))} /></div>
+        <div><Label>ID Number</Label><Input value={f.id_number} onChange={e => setF(p => ({ ...p, id_number: e.target.value }))} /></div>
+        <div><Label>Visiting</Label><Input value={f.visiting} onChange={e => setF(p => ({ ...p, visiting: e.target.value }))} placeholder="Who / which office" /></div>
         <div><Label>Purpose</Label><Input value={f.purpose} onChange={e => setF(p => ({ ...p, purpose: e.target.value }))} /></div>
-        <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log Entry</Button></DialogFooter>
+
+        <div className="flex items-center gap-2">
+          <Checkbox id="has-vehicle" checked={hasVehicle} onCheckedChange={c => setHasVehicle(c === true)} />
+          <Label htmlFor="has-vehicle" className="font-normal">Has a vehicle</Label>
+        </div>
+
+        {hasVehicle && (
+          <>
+            <div>
+              <Label>Vehicle Type</Label>
+              <Select value={vehicleType} onValueChange={v => { setVehicleType(v); setBayId(""); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{VEHICLE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Vehicle Reg *</Label><Input required value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} /></div>
+            <div>
+              <Label>Parking Bay</Label>
+              <Select value={bayId} onValueChange={setBayId}>
+                <SelectTrigger><SelectValue placeholder={rankedBays.length ? "Choose a free bay" : "No free bays"} /></SelectTrigger>
+                <SelectContent>
+                  {rankedBays.map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bay_code}{b.zone ? ` — ${b.zone}` : ""} {b.bay_type === preferredType ? "· suggested" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+
+        <DialogFooter>
+          <Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log in & issue card</Button>
+        </DialogFooter>
       </form>
     </DialogContent>
   );
