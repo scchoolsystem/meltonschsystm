@@ -147,6 +147,21 @@ function StudentProfilePage() {
     enabled: !!student,
   });
 
+  const { data: achievements } = useQuery({
+    queryKey: ["student-profile-achievements", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sports_achievements")
+        .select("id, description, award_level, achievement_date, co_curricular_activities(name)")
+        .eq("student_id", id)
+        .order("achievement_date", { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return data as any[];
+    },
+    enabled: !!student,
+  });
+
   const { data: loans } = useQuery({
     queryKey: ["student-profile-library", id],
     queryFn: async () => {
@@ -535,7 +550,7 @@ function StudentProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="cocurricular" className="pt-4">
+        <TabsContent value="cocurricular" className="pt-4 space-y-4">
           <Card>
             <CardHeader><CardTitle className="text-base flex items-center gap-2"><Award className="w-4 h-4" />Clubs & co-curricular activities</CardTitle></CardHeader>
             <CardContent className="space-y-2">
@@ -556,6 +571,24 @@ function StudentProfilePage() {
                   </div>
                 );
               })}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Award className="w-4 h-4" />Achievements</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {(achievements ?? []).length === 0 && <p className="text-sm text-muted-foreground">No achievements logged yet.</p>}
+              {achievements?.map((a: any) => (
+                <div key={a.id} className="border-b py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{a.description}</div>
+                    <Badge variant={a.award_level === "national" || a.award_level === "international" ? "default" : "secondary"} className="capitalize">{a.award_level}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {a.co_curricular_activities?.name ? `${a.co_curricular_activities.name} · ` : ""}{a.achievement_date}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
