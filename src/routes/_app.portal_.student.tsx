@@ -1050,6 +1050,7 @@ function StudentPortal() {
   const [transport, setTransport] = useState<any | null>(null);
   const [weekMeals, setWeekMeals] = useState<any[]>([]);
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
   const [nextExam, setNextExam] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   // Independent, mount-tied failsafe — fires no matter *why* loadStudentData
@@ -1218,6 +1219,17 @@ function StudentPortal() {
       ...c,
       coach: coaches.find((co: any) => co.activity_id === c.co_curricular_activities?.id),
     })));
+
+    const { data: ach } = await withTimeout(
+      supabase
+        .from("sports_achievements")
+        .select("id, description, award_level, achievement_date, co_curricular_activities(name)")
+        .eq("student_id", sid)
+        .order("achievement_date", { ascending: false })
+        .limit(20),
+      8000, EMPTY, "achievements",
+    );
+    setAchievements(ach ?? []);
 
     const { data: ne } = await withTimeout(
       supabase.from("exams").select("*")
@@ -3041,7 +3053,7 @@ function StudentPortal() {
         {/* ══════════════════════════════════════════════════════════════
             CO-CURRICULAR TAB
         ══════════════════════════════════════════════════════════════ */}
-        <TabsContent value="cocurricular" className="mt-4">
+        <TabsContent value="cocurricular" className="mt-4 space-y-4">
           <GlassCard>
             <CardContent className="pt-6 space-y-3">
               {coCurricular.length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any activities.</p>}
@@ -3065,6 +3077,26 @@ function StudentPortal() {
                   </motion.div>
                 );
               })}
+            </CardContent>
+          </GlassCard>
+
+          <GlassCard>
+            <CardContent className="pt-6 space-y-3">
+              <div className="font-medium flex items-center gap-2"><Trophy className="w-4 h-4 text-amber-500" /> Achievements</div>
+              {achievements.length === 0 && <p className="text-sm text-muted-foreground">No achievements logged yet.</p>}
+              {achievements.map((a: any, i: number) => (
+                <motion.div key={a.id} variants={fadeUp} initial="hidden" animate="show"
+                  transition={{ delay: i * 0.06 }}
+                  className="border rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{a.description}</div>
+                    <Badge variant={a.award_level === "national" || a.award_level === "international" ? "default" : "secondary"} className="capitalize">{a.award_level}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {a.co_curricular_activities?.name ? `${a.co_curricular_activities.name} · ` : ""}{a.achievement_date}
+                  </div>
+                </motion.div>
+              ))}
             </CardContent>
           </GlassCard>
         </TabsContent>

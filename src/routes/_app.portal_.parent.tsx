@@ -135,7 +135,7 @@ function ParentPortal() {
   const [data, setData] = useState<any>({
     attendance: [], results: [], invoices: [], liveUpcoming: [], liveAttendance: [],
     discipline: [], transport: null, clinic: [], dorm: null, gatePasses: [],
-    coCurricular: [], timetable: [], loans: [], documents: [], weekMeals: [],
+    coCurricular: [], timetable: [], loans: [], documents: [], weekMeals: [], achievements: [],
   });
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +212,7 @@ function ParentPortal() {
       const EMPTY = { data: [] as any[], error: null } as any;
       const EMPTY_SINGLE = { data: null, error: null } as any;
 
-      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals] = await Promise.all([
+      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals, ach] = await Promise.all([
         withTimeout(supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
         withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
         withTimeout(supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
@@ -232,6 +232,7 @@ function ParentPortal() {
         withTimeout(supabase.from("book_loans").select("*, books(title, author)").eq("student_id", activeId).order("borrowed_on", { ascending: false }).limit(20), 8000, EMPTY, "loans"),
         withTimeout((supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "documents"),
         withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "weekMeals"),
+        withTimeout(supabase.from("sports_achievements").select("id, description, award_level, achievement_date, co_curricular_activities(name)").eq("student_id", activeId).order("achievement_date", { ascending: false }).limit(20), 8000, EMPTY, "achievements"),
       ]);
 
       setData({
@@ -250,6 +251,7 @@ function ParentPortal() {
         loans: loans.data ?? [],
         documents: docs.data ?? [],
         weekMeals: meals.data ?? [],
+        achievements: ach.data ?? [],
       });
       } catch (e: any) {
         console.error("Parent portal child data failed to load:", e);
@@ -1063,23 +1065,41 @@ function ParentPortal() {
 
         {/* ══ CO-CURRICULAR ════════════════════════════════════════════════ */}
         <PortalTabContent value="cocurricular">
-          <GlassCard className="p-6 space-y-2">
-            {(data.coCurricular ?? []).length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any co-curricular activities.</p>}
-            {(data.coCurricular ?? []).map((c: any) => {
-              const a = c.co_curricular_activities;
-              return (
-                <div key={c.id} className="border-b py-2">
+          <div className="space-y-4">
+            <GlassCard className="p-6 space-y-2">
+              {(data.coCurricular ?? []).length === 0 && <p className="text-sm text-muted-foreground">Not enrolled in any co-curricular activities.</p>}
+              {(data.coCurricular ?? []).map((c: any) => {
+                const a = c.co_curricular_activities;
+                return (
+                  <div key={c.id} className="border-b py-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium inline-flex items-center gap-1"><Award className="w-3 h-3" /> {a?.name ?? "—"}</div>
+                      {a?.category && <Badge variant="outline">{a.category}</Badge>}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {a?.schedule_day != null ? `${DAYS[a.schedule_day]} ` : ""}{a?.schedule_time ?? ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </GlassCard>
+
+            <GlassCard className="p-6 space-y-2">
+              <div className="font-medium inline-flex items-center gap-1 mb-1"><Trophy className="w-4 h-4" /> Achievements</div>
+              {(data.achievements ?? []).length === 0 && <p className="text-sm text-muted-foreground">No achievements logged yet.</p>}
+              {(data.achievements ?? []).map((a: any) => (
+                <div key={a.id} className="border-b py-2">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium inline-flex items-center gap-1"><Award className="w-3 h-3" /> {a?.name ?? "—"}</div>
-                    {a?.category && <Badge variant="outline">{a.category}</Badge>}
+                    <div className="font-medium">{a.description}</div>
+                    <Badge variant={a.award_level === "national" || a.award_level === "international" ? "default" : "secondary"} className="capitalize">{a.award_level}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {a?.schedule_day != null ? `${DAYS[a.schedule_day]} ` : ""}{a?.schedule_time ?? ""}
+                    {a.co_curricular_activities?.name ? `${a.co_curricular_activities.name} · ` : ""}{a.achievement_date}
                   </div>
                 </div>
-              );
-            })}
-          </GlassCard>
+              ))}
+            </GlassCard>
+          </div>
         </PortalTabContent>
 
         {/* ══ LIVE CLASSES ════════════════════════════════════════════════ */}
