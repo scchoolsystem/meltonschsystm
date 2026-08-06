@@ -18,7 +18,8 @@ import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, 
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
-import { format } from "date-fns";
+import { StudentCombobox } from "@/components/StudentCombobox";
+import { useActiveStudents } from "@/lib/students.functions";
 import { QRCodeSVG } from "qrcode.react";
 
 export const Route = createFileRoute("/_app/security")({ component: () => (<FeatureGate feature="security"><Page /></FeatureGate>) });
@@ -26,10 +27,9 @@ export const Route = createFileRoute("/_app/security")({ component: () => (<Feat
 function Page() {
   const qc = useQueryClient();
   const { isAdmin, hasRole } = useAuth();
+  const { school } = useTenant();
   const can = isAdmin || hasRole("security_admin") || hasRole("security_user");
   const canManageBays = isAdmin || hasRole("security_admin");
-
-  const today = format(new Date(), "yyyy-MM-dd");
 
   const { data: gatePasses = [], isLoading: gpLoading } = useQuery({
     queryKey: ["gate-passes-all"],
@@ -49,7 +49,7 @@ function Page() {
   });
 
   const pendingPasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "pending"), [gatePasses]);
-  const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.exit_time?.startsWith(today) && !g.actual_return), [gatePasses, today]);
+  const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "out" && !g.actual_return), [gatePasses]);
   const studentsOnCampus = (typeof totalStudents === "number" ? totalStudents : 0) - openGatePasses.length;
 
   const approvalMutation = useMutation({
@@ -58,6 +58,15 @@ function Page() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["gate-passes-all"] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("gate_passes").update({ actual_return: new Date().toISOString(), status: "returned" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Marked as returned"); qc.invalidateQueries({ queryKey: ["gate-passes-all"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -92,6 +101,7 @@ function Page() {
   });
 
   const [addEntry, setAddEntry] = useState(false);
+  const [addGatePass, setAddGatePass] = useState(false);
   const [lastIssued, setLastIssued] = useState<{ code: string; name: string; type: string; vehicleReg?: string | null } | null>(null);
 
   return (
@@ -111,6 +121,10 @@ function Page() {
                 qc.invalidateQueries({ queryKey: ["visitor-log"] });
                 qc.invalidateQueries({ queryKey: ["vehicle-log"] });
               }} />
+            </Dialog>
+            <Dialog open={addGatePass} onOpenChange={setAddGatePass}>
+              <DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Log Gate Pass</Button></DialogTrigger>
+              <LogGatePassDialog schoolId={school?.id} onDone={() => { setAddGatePass(false); qc.invalidateQueries({ queryKey: ["gate-passes-all"] }); }} />
             </Dialog>
           </div>
         )}
@@ -203,16 +217,19 @@ function Page() {
         <TabsContent value="allpasses">
           <Card><CardHeader /><CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Exit</TableHead><TableHead>Return</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Exit</TableHead><TableHead>Return</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(gatePasses as any[]).length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
+                {(gatePasses as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
                 {(gatePasses as any[]).map((g: any) => (
                   <TableRow key={g.id}>
                     <TableCell className="font-medium">{g.students?.first_name} {g.students?.last_name}</TableCell>
                     <TableCell>{g.reason}</TableCell>
                     <TableCell className="text-xs">{g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}</TableCell>
                     <TableCell className="text-xs">{g.actual_return ? new Date(g.actual_return).toLocaleString() : "—"}</TableCell>
-                    <TableCell><Badge variant={g.status === "approved" ? "default" : g.status === "denied" ? "destructive" : "secondary"}>{g.status}</Badge></TableCell>
+                    <TableCell><Badge variant={g.status === "out" ? "destructive" : g.status === "returned" ? "secondary" : g.status === "denied" ? "outline" : "default"}>{g.status}</Badge></TableCell>
+                    <TableCell>
+                      {can && g.status === "out" && !g.actual_return && <Button size="sm" variant="outline" className="h-8" onClick={() => returnMutation.mutate(g.id)}>Mark Returned</Button>}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -393,6 +410,57 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
 
         <DialogFooter>
           <Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log in & issue card</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+// ============================================================
+// Log Gate Pass — a guard logging a student leaving campus in
+// person. Written straight in as status "out" (that's the real
+// default/lifecycle for this table) rather than routed through
+// a pending-approval queue, since the guard is standing right
+// there authorizing it.
+// ============================================================
+
+function LogGatePassDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: string }) {
+  const [studentId, setStudentId] = useState("");
+  const [reason, setReason] = useState("");
+  const [expectedReturn, setExpectedReturn] = useState("");
+  const { data: students = [] } = useActiveStudents();
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("gate_passes").insert({
+        student_id: studentId,
+        reason,
+        expected_return: expectedReturn ? new Date(expectedReturn).toISOString() : null,
+        exit_time: new Date().toISOString(),
+        status: "out",
+        authorized_by: u.user?.id,
+        school_id: schoolId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Gate pass logged"); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Log Gate Pass</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div>
+          <Label>Student *</Label>
+          <StudentCombobox value={studentId} onChange={setStudentId} students={students as any[]} />
+        </div>
+        <div><Label>Reason *</Label><Input required autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder="Medical appointment, home early, etc." /></div>
+        <div><Label>Expected Return</Label><Input type="datetime-local" value={expectedReturn} onChange={e => setExpectedReturn(e.target.value)} /></div>
+        <p className="text-xs text-muted-foreground">Exit time is recorded as now. The student is on record as off-campus until this pass is marked returned.</p>
+        <DialogFooter>
+          <Button type="submit" disabled={m.isPending || !studentId}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log exit</Button>
         </DialogFooter>
       </form>
     </DialogContent>
