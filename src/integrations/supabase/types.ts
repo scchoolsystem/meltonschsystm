@@ -4372,6 +4372,126 @@ export type Database = {
         }
         Relationships: []
       },
+      access_cards: {
+        Row: {
+          id: string
+          school_id: string | null
+          card_code: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          card_code: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          card_code?: string
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      },
+      parking_bays: {
+        Row: {
+          id: string
+          school_id: string | null
+          bay_code: string
+          zone: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          bay_code: string
+          zone?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          bay_code?: string
+          zone?: string | null
+          status?: string
+          created_at?: string
+        }
+        Relationships: []
+      },
+      card_assignments: {
+        Row: {
+          id: string
+          school_id: string | null
+          card_id: string
+          holder_type: string
+          holder_name: string
+          id_number: string | null
+          visiting: string | null
+          purpose: string | null
+          vehicle_reg: string | null
+          parking_bay_id: string | null
+          checked_in_at: string
+          checked_out_at: string | null
+          issued_by: string | null
+          closed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          school_id?: string | null
+          card_id: string
+          holder_type: string
+          holder_name: string
+          id_number?: string | null
+          visiting?: string | null
+          purpose?: string | null
+          vehicle_reg?: string | null
+          parking_bay_id?: string | null
+          checked_in_at?: string
+          checked_out_at?: string | null
+          issued_by?: string | null
+          closed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          school_id?: string | null
+          card_id?: string
+          holder_type?: string
+          holder_name?: string
+          id_number?: string | null
+          visiting?: string | null
+          purpose?: string | null
+          vehicle_reg?: string | null
+          parking_bay_id?: string | null
+          checked_in_at?: string
+          checked_out_at?: string | null
+          issued_by?: string | null
+          closed_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_assignments_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "access_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_assignments_parking_bay_id_fkey"
+            columns: ["parking_bay_id"]
+            isOneToOne: false
+            referencedRelation: "parking_bays"
+            referencedColumns: ["id"]
+          },
+        ]
+      },
       boarding_roll_call: {
         Row: {
           id: string
@@ -5336,6 +5456,23 @@ export type Database = {
       }
     }
     Functions: {
+      checkout_card_assignment: {
+        Args: { p_assignment_id: string }
+        Returns: undefined
+      }
+      issue_card_assignment: {
+        Args: {
+          p_card_id: string
+          p_holder_type: string
+          p_holder_name: string
+          p_id_number: string | null
+          p_visiting: string | null
+          p_purpose: string | null
+          p_vehicle_reg: string | null
+          p_parking_bay_id: string | null
+        }
+        Returns: string
+      }
       list_active_schools: {
         Args: Record<PropertyKey, never>
         Returns: {
