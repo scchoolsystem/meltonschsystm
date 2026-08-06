@@ -57,6 +57,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Plus, Loader2, Pencil, Trash2, UserPlus, UserMinus, Users, Trophy, Calendar, Award } from "lucide-react";
+import { StudentCombobox } from "@/components/StudentCombobox";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -952,9 +953,7 @@ function AchievementDialog({ activities, onDone }: { activities: any[]; onDone: 
     <DialogContent><DialogHeader><DialogTitle>Log Achievement</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).filter((s: any) => s.id).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox value={f.student_id} onChange={v => setF(p => ({ ...p, student_id: v }))} students={(students as any[]).filter((s: any) => s.id)} />
         </div>
         <div><Label>Activity</Label>
           <Select value={f.activity_id} onValueChange={v => setF(p => ({ ...p, activity_id: v }))}><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
