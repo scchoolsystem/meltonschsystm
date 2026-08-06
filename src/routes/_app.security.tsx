@@ -63,19 +63,31 @@ function Page() {
 
   const timeOutMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("visitor_log").update({ time_out: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase.rpc("checkout_visitor_log", { p_visitor_log_id: id });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["visitor-log"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["visitor-log"] });
+      qc.invalidateQueries({ queryKey: ["access-cards"] });
+      qc.invalidateQueries({ queryKey: ["parking-bays"] });
+      qc.invalidateQueries({ queryKey: ["parking-slots"] });
+      qc.invalidateQueries({ queryKey: ["parking-bays-free"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
   const vehicleTimeOutMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("vehicle_log").update({ time_out: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase.rpc("checkout_vehicle_log", { p_vehicle_log_id: id });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["vehicle-log"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vehicle-log"] });
+      qc.invalidateQueries({ queryKey: ["access-cards"] });
+      qc.invalidateQueries({ queryKey: ["parking-bays"] });
+      qc.invalidateQueries({ queryKey: ["parking-slots"] });
+      qc.invalidateQueries({ queryKey: ["parking-bays-free"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
