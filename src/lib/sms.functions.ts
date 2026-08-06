@@ -34,7 +34,7 @@ async function assertCommunicationsEnabled(ctx: { supabase: any }, schoolId: str
 // Kenyan formats (0712345678, 254712345678, 712345678) get silently
 // rejected per-recipient rather than erroring the whole request, which is
 // easy to miss. Normalize before sending.
-function toE164Kenya(raw: string): string | null {
+export function toE164Kenya(raw: string): string | null {
   const digits = raw.replace(/[^\d+]/g, "");
   if (digits.startsWith("+254") && digits.length === 13) return digits;
   if (digits.startsWith("254") && digits.length === 12) return `+${digits}`;
