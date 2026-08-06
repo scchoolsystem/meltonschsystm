@@ -759,9 +759,15 @@ function EnrolStudentDialog({
         .eq("status", "active")
         .order("first_name")
         .limit(50);
-      if (debouncedSearch.trim()) {
+      // Match each typed word against first name / last name / admission no
+      // separately (AND across words, OR across fields) so a full name like
+      // "Jane Muthoni" matches first_name=Jane + last_name=Muthoni instead of
+      // requiring the whole string to sit in a single column.
+      const words = debouncedSearch.trim().split(/\s+/).filter(Boolean);
+      for (const word of words) {
+        const escaped = word.replace(/[%_,]/g, "\\$&");
         q = q.or(
-          `first_name.ilike.%${debouncedSearch}%,last_name.ilike.%${debouncedSearch}%,admission_no.ilike.%${debouncedSearch}%`
+          `first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%,admission_no.ilike.%${escaped}%`
         );
       }
       const { data } = await q;
