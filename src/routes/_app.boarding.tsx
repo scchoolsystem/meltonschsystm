@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
 import { format } from "date-fns";
+import { StudentCombobox } from "@/components/StudentCombobox";
 
 const BOARDING_TABS = ["dorms", "assignments", "rollcall", "out", "maintenance"] as const;
 
@@ -351,9 +352,30 @@ function DormDialog({ onDone, schoolId }: { onDone: () => void; schoolId?: strin
 
 function AssignDialog({ dorms, onDone, schoolId }: { dorms: any[]; onDone: () => void; schoolId?: string }) {
   const [f, setF] = useState({ student_id: "", dormitory_id: "", bed_no: "", assigned_on: format(new Date(), "yyyy-MM-dd") });
-  const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name").order("first_name")).data ?? [] });
+  const { data: students = [] } = useQuery({ queryKey: ["students-min-boarding"], queryFn: async () => (await supabase.from("students").select("id,admission_no,first_name,last_name,gender").order("first_name")).data ?? [] });
+
+  const selectedDorm = (dorms as any[]).find(d => d.id === f.dormitory_id);
+  const dormGender = selectedDorm?.gender?.toLowerCase();
+  const selectedStudent = (students as any[]).find(s => s.id === f.student_id);
+  const studentGender = selectedStudent?.gender?.toLowerCase();
+
+  // Only show students whose gender matches the chosen dorm (mixed dorms show everyone)
+  const eligibleStudents = (students as any[]).filter(s => {
+    if (!dormGender || dormGender === "mixed") return true;
+    return (s.gender ?? "").toLowerCase() === dormGender;
+  });
+  // Only show dorms whose gender matches the chosen student (mixed dorms always eligible)
+  const eligibleDorms = (dorms as any[]).filter(d => {
+    if (!studentGender) return true;
+    const dg = (d.gender ?? "").toLowerCase();
+    return dg === "mixed" || dg === studentGender;
+  });
+
+  const genderMismatch = !!(dormGender && studentGender && dormGender !== "mixed" && dormGender !== studentGender);
+
   const m = useMutation({
     mutationFn: async () => {
+      if (genderMismatch) throw new Error("Dorm gender doesn't match this student's gender.");
       await supabase.from("dorm_assignments").update({ active: false }).eq("student_id", f.student_id).eq("active", true);
       const { error } = await supabase.from("dorm_assignments").insert({
         ...f,
@@ -369,22 +391,28 @@ function AssignDialog({ dorms, onDone, schoolId }: { dorms: any[]; onDone: () =>
     <DialogContent><DialogHeader><DialogTitle>Assign to Dorm</DialogTitle></DialogHeader>
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Student</Label>
-          <Select value={f.student_id} onValueChange={v => setF(p => ({ ...p, student_id: v }))}><SelectTrigger><SelectValue placeholder="Choose student" /></SelectTrigger>
-            <SelectContent>{(students as any[]).map(s => <SelectItem key={s.id} value={s.id}>{s.admission_no} – {s.first_name} {s.last_name}</SelectItem>)}</SelectContent>
-          </Select>
+          <StudentCombobox
+            value={f.student_id}
+            onChange={v => setF(p => ({ ...p, student_id: v }))}
+            students={eligibleStudents}
+          />
         </div>
         <div><Label>Dorm</Label>
           <Select value={f.dormitory_id} onValueChange={v => setF(p => ({ ...p, dormitory_id: v }))}><SelectTrigger><SelectValue placeholder="Choose dorm" /></SelectTrigger>
-            <SelectContent>{dorms.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{eligibleDorms.map(d => <SelectItem key={d.id} value={d.id}>{d.name} · {d.gender ?? "Mixed"}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        {genderMismatch && (
+          <p className="text-sm text-destructive">This dorm is {selectedDorm?.gender} only — pick a matching student or dorm.</p>
+        )}
         <div><Label>Bed Number</Label><Input value={f.bed_no} onChange={e => setF(p => ({ ...p, bed_no: e.target.value }))} /></div>
         <div><Label>Assigned On</Label><Input type="date" value={f.assigned_on} onChange={e => setF(p => ({ ...p, assigned_on: e.target.value }))} /></div>
-        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.dormitory_id}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Assign</Button></DialogFooter>
+        <DialogFooter><Button type="submit" disabled={m.isPending || !f.student_id || !f.dormitory_id || genderMismatch}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Assign</Button></DialogFooter>
       </form>
     </DialogContent>
   );
 }
+
 
 function MaintDialog({ dorms, onDone }: { dorms: any[]; onDone: () => void }) {
   const [f, setF] = useState({ dorm_id: "", description: "", priority: "medium" });
