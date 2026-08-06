@@ -80,7 +80,7 @@ function Page() {
   });
 
   const [addEntry, setAddEntry] = useState(false);
-  const [lastIssuedCode, setLastIssuedCode] = useState<string | null>(null);
+  const [lastIssued, setLastIssued] = useState<{ code: string; name: string; type: string; vehicleReg?: string | null } | null>(null);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -89,9 +89,9 @@ function Page() {
         {can && (
           <div className="flex gap-2">
             <Dialog open={addEntry} onOpenChange={setAddEntry}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Log Entry</Button></DialogTrigger>
-              <LogEntryDialog onDone={(code) => {
+              <LogEntryDialog onDone={(issued) => {
                 setAddEntry(false);
-                setLastIssuedCode(code);
+                setLastIssued(issued);
                 qc.invalidateQueries({ queryKey: ["access-cards"] });
                 qc.invalidateQueries({ queryKey: ["parking-bays"] });
                 qc.invalidateQueries({ queryKey: ["parking-slots"] });
@@ -115,14 +115,19 @@ function Page() {
         </CardContent>
       </Card>
 
-      {lastIssuedCode && (
+      {lastIssued && (
         <Card className="border-emerald-500/40 bg-emerald-500/5">
           <CardContent className="pt-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs text-muted-foreground">Hand this card to them</div>
-              <div className="text-2xl font-bold font-mono">{lastIssuedCode}</div>
+              <div className="text-2xl font-bold font-mono text-red-600 dark:text-red-500">{lastIssued.code}</div>
+              <div className="text-sm font-medium mt-0.5">
+                {lastIssued.name}
+                <span className="text-muted-foreground font-normal"> · {lastIssued.type === "vehicle" ? "Driver" : "Visitor"}</span>
+                {lastIssued.vehicleReg && <span className="text-muted-foreground font-normal"> · {lastIssued.vehicleReg}</span>}
+              </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setLastIssuedCode(null)}>Dismiss</Button>
+            <Button variant="outline" size="sm" onClick={() => setLastIssued(null)}>Dismiss</Button>
           </CardContent>
         </Card>
       )}
@@ -283,7 +288,7 @@ const VEHICLE_TYPES = [
   { value: "other", label: "Other" },
 ];
 
-function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
+function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: string; type: string; vehicleReg?: string | null }) => void }) {
   const [f, setF] = useState({ holder_name: "", id_number: "", visiting: "", purpose: "" });
   const [hasVehicle, setHasVehicle] = useState(false);
   const [vehicleType, setVehicleType] = useState("car");
@@ -324,7 +329,12 @@ function LogEntryDialog({ onDone }: { onDone: (cardCode: string) => void }) {
     },
     onSuccess: (row) => {
       toast.success("Entry logged");
-      onDone(row?.card_code ?? "—");
+      onDone({
+        code: row?.card_code ?? "—",
+        name: f.holder_name,
+        type: hasVehicle ? "vehicle" : "visitor",
+        vehicleReg: hasVehicle ? vehicleReg : null,
+      });
     },
     onError: (e: any) => toast.error(e.message),
   });
