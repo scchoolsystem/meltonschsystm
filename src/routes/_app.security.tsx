@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning, UserCheck, Car, AlertTriangle, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
@@ -22,9 +22,43 @@ import { StudentCombobox } from "@/components/StudentCombobox";
 import { useActiveStudents } from "@/lib/students.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { logStudentGateScan } from "@/lib/gate-scan.functions";
+import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 
 export const Route = createFileRoute("/_app/security")({ component: () => (<FeatureGate feature="security"><Page /></FeatureGate>) });
+
+// A single stat in the live overview strip. The value pops with a small
+// scale/fade whenever it changes (keyed on the value itself), so a fresh
+// scan or checkout at any terminal visibly registers here in real time
+// rather than just silently updating.
+function LiveStat({ icon: Icon, label, value, tone = "default", sub }: { icon: any; label: string; value: number | string; tone?: "default" | "warn" | "danger"; sub?: string }) {
+  const toneClasses =
+    tone === "danger" ? "border-destructive/40 bg-destructive/5" :
+    tone === "warn" ? "border-amber-500/40 bg-amber-500/5" :
+    "border-primary/20 bg-primary/5";
+  const iconClasses = tone === "danger" ? "text-destructive" : tone === "warn" ? "text-amber-500" : "text-primary";
+  return (
+    <Card className={toneClasses}>
+      <CardContent className="pt-4 flex items-center gap-3">
+        <Icon className={`w-6 h-6 shrink-0 ${iconClasses}`} />
+        <div className="min-w-0">
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={String(value)}
+              initial={{ opacity: 0, y: -6, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.25 }}
+              className="text-2xl font-bold leading-none"
+            >
+              {value}
+            </motion.div>
+          </AnimatePresence>
+          <div className="text-xs text-muted-foreground truncate">{label}{sub && <span className="ml-1">{sub}</span>}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function Page() {
   const qc = useQueryClient();
@@ -50,9 +84,49 @@ function Page() {
     queryFn: async () => { const { count } = await supabase.from("students").select("id", { count: "exact", head: true }).eq("status", "active"); return count ?? 0; },
   });
 
+  const { data: allCards = [] } = useQuery({
+    queryKey: ["access-cards"],
+    queryFn: async () => (await supabase.from("access_cards").select("*").order("card_code")).data ?? [],
+  });
+
   const pendingPasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "pending"), [gatePasses]);
   const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "out" && !g.actual_return), [gatePasses]);
+  const overdueGatePasses = useMemo(
+    () => openGatePasses.filter(g => g.expected_return && new Date(g.expected_return).getTime() < Date.now()),
+    [openGatePasses]
+  );
   const studentsOnCampus = (typeof totalStudents === "number" ? totalStudents : 0) - openGatePasses.length;
+  const visitorsOnSite = useMemo(() => (visitors as any[]).filter(v => !v.time_out).length, [visitors]);
+  const vehiclesOnSite = useMemo(() => (vehicles as any[]).filter(v => !v.time_out).length, [vehicles]);
+  const cardsInUse = useMemo(() => (allCards as any[]).filter(c => c.status === "assigned").length, [allCards]);
+
+  // Live updates: every open Security tab — front gate, parking booth,
+  // admin office — reflects new scans, check-ins, and checkouts within a
+  // second or two, without anyone hitting refresh. Requires these tables
+  // to be on the supabase_realtime publication (see
+  // 20260807010000_security_realtime.sql).
+  useEffect(() => {
+    if (!school?.id) return;
+    const invalidate = (keys: string[]) => keys.forEach(k => qc.invalidateQueries({ queryKey: [k] }));
+    const ch = supabase
+      .channel(`security-live-${school.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "access_cards", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["access-cards"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "card_assignments", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["access-cards", "active-bay-assignments"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "parking_slots", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["parking-slots", "parking-bays", "parking-bays-free"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "gate_passes", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["gate-passes-all"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "visitor_log", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["visitor-log"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "vehicle_log", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["vehicle-log"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "student_gate_scans", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["student-gate-scans-recent"]))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [school?.id, qc]);
 
   const approvalMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -104,12 +178,23 @@ function Page() {
 
   const [addEntry, setAddEntry] = useState(false);
   const [addGatePass, setAddGatePass] = useState(false);
+  const [visitorSearch, setVisitorSearch] = useState("");
+  const [vehicleSearch, setVehicleSearch] = useState("");
   const [lastIssued, setLastIssued] = useState<{ code: string; name: string; type: string; vehicleReg?: string | null } | null>(null);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="text-3xl font-bold">Security</h1></div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold">Security</h1>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            Live
+          </span>
+        </div>
         {can && (
           <div className="flex gap-2">
             <Dialog open={addEntry} onOpenChange={setAddEntry}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Log Entry</Button></DialogTrigger>
@@ -132,33 +217,40 @@ function Page() {
         )}
       </div>
 
-      {/* On-campus count */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="pt-4 flex items-center gap-4">
-          <Users className="w-8 h-8 text-primary" />
-          <div>
-            <div className="text-2xl font-bold">{studentsOnCampus}</div>
-            <div className="text-sm text-muted-foreground">Students currently on campus <span className="text-xs">({openGatePasses.length} off-campus today)</span></div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Live overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <LiveStat icon={Users} label="On campus" value={studentsOnCampus} sub={`(${openGatePasses.length} out)`} />
+        <LiveStat icon={UserCheck} label="Visitors on site" value={visitorsOnSite} />
+        <LiveStat icon={Car} label="Vehicles on site" value={vehiclesOnSite} />
+        <LiveStat icon={IdCardIcon} label="Cards in use" value={cardsInUse} sub={`/ ${(allCards as any[]).length}`} />
+        <LiveStat
+          icon={overdueGatePasses.length > 0 ? AlertTriangle : CheckCircle}
+          label="Overdue gate passes"
+          value={overdueGatePasses.length}
+          tone={overdueGatePasses.length > 0 ? "danger" : "default"}
+        />
+      </div>
 
-      {lastIssued && (
-        <Card className="border-emerald-500/40 bg-emerald-500/5">
-          <CardContent className="pt-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs text-muted-foreground">Hand this card to them</div>
-              <div className="text-2xl font-bold font-mono text-red-600 dark:text-red-500">{lastIssued.code}</div>
-              <div className="text-sm font-medium mt-0.5">
-                {lastIssued.name}
-                <span className="text-muted-foreground font-normal"> · {lastIssued.type === "vehicle" ? "Driver" : "Visitor"}</span>
-                {lastIssued.vehicleReg && <span className="text-muted-foreground font-normal"> · {lastIssued.vehicleReg}</span>}
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setLastIssued(null)}>Dismiss</Button>
-          </CardContent>
-        </Card>
-      )}
+      <AnimatePresence>
+        {lastIssued && (
+          <motion.div initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+            <Card className="border-emerald-500/40 bg-emerald-500/5">
+              <CardContent className="pt-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Hand this card to them</div>
+                  <div className="text-2xl font-bold font-mono text-red-600 dark:text-red-500">{lastIssued.code}</div>
+                  <div className="text-sm font-medium mt-0.5">
+                    {lastIssued.name}
+                    <span className="text-muted-foreground font-normal"> · {lastIssued.type === "vehicle" ? "Driver" : "Visitor"}</span>
+                    {lastIssued.vehicleReg && <span className="text-muted-foreground font-normal"> · {lastIssued.vehicleReg}</span>}
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setLastIssued(null)}>Dismiss</Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Tabs defaultValue="scan">
         <TabsList className="flex-wrap h-auto">
@@ -227,54 +319,83 @@ function Page() {
               <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Exit</TableHead><TableHead>Return</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {(gatePasses as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
-                {(gatePasses as any[]).map((g: any) => (
-                  <TableRow key={g.id}>
+                {(gatePasses as any[]).map((g: any) => {
+                  const isOverdue = g.status === "out" && !g.actual_return && g.expected_return && new Date(g.expected_return).getTime() < Date.now();
+                  return (
+                  <TableRow key={g.id} className={isOverdue ? "bg-destructive/5" : undefined}>
                     <TableCell className="font-medium">{g.students?.first_name} {g.students?.last_name}</TableCell>
                     <TableCell>{g.reason}</TableCell>
                     <TableCell className="text-xs">{g.exit_time ? new Date(g.exit_time).toLocaleString() : "—"}</TableCell>
                     <TableCell className="text-xs">{g.actual_return ? new Date(g.actual_return).toLocaleString() : "—"}</TableCell>
-                    <TableCell><Badge variant={g.status === "out" ? "destructive" : g.status === "returned" ? "secondary" : g.status === "denied" ? "outline" : "default"}>{g.status}</Badge></TableCell>
+                    <TableCell className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant={g.status === "out" ? "destructive" : g.status === "returned" ? "secondary" : g.status === "denied" ? "outline" : "default"}>{g.status}</Badge>
+                      {isOverdue && <Badge variant="outline" className="border-destructive/50 text-destructive gap-1"><AlertTriangle className="w-3 h-3" />overdue</Badge>}
+                    </TableCell>
                     <TableCell>
                       {can && g.status === "out" && !g.actual_return && <Button size="sm" variant="outline" className="h-8" onClick={() => returnMutation.mutate(g.id)}>Mark Returned</Button>}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="visitors">
-          <Card><CardHeader /><CardContent>
+          <Card><CardHeader className="flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{visitorsOnSite} on site</Badge>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-8 h-8" placeholder="Search visitors…" value={visitorSearch} onChange={e => setVisitorSearch(e.target.value)} />
+            </div>
+          </CardHeader><CardContent>
             <Table>
               <TableHeader><TableRow><TableHead>Visitor</TableHead><TableHead>ID No</TableHead><TableHead>Visiting</TableHead><TableHead>Purpose</TableHead><TableHead>Time In</TableHead><TableHead>Time Out</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(visitors as any[]).length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No visitor logs.</TableCell></TableRow>}
-                {(visitors as any[]).map((v: any) => (
-                  <TableRow key={v.id}>
-                    <TableCell className="font-medium">{v.visitor_name}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{v.id_number ?? "—"}</TableCell>
-                    <TableCell>{v.visiting ?? "—"}</TableCell>
-                    <TableCell>{v.purpose ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{new Date(v.time_in).toLocaleString()}</TableCell>
-                    <TableCell className="text-xs">{v.time_out ? new Date(v.time_out).toLocaleString() : <Badge variant="secondary">On campus</Badge>}</TableCell>
-                    <TableCell>
-                      {can && !v.time_out && <Button size="sm" variant="outline" className="h-8" onClick={() => timeOutMutation.mutate(v.id)}>Sign Out</Button>}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(() => {
+                  const q = visitorSearch.trim().toLowerCase();
+                  const filtered = q ? (visitors as any[]).filter(v => [v.visitor_name, v.id_number, v.visiting, v.purpose].some((f: any) => f?.toLowerCase?.().includes(q))) : (visitors as any[]);
+                  if (filtered.length === 0) return <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">{q ? "No matching visitors." : "No visitor logs."}</TableCell></TableRow>;
+                  return filtered.map((v: any) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-medium">{v.visitor_name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{v.id_number ?? "—"}</TableCell>
+                      <TableCell>{v.visiting ?? "—"}</TableCell>
+                      <TableCell>{v.purpose ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{new Date(v.time_in).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs">{v.time_out ? new Date(v.time_out).toLocaleString() : <Badge variant="secondary">On campus</Badge>}</TableCell>
+                      <TableCell>
+                        {can && !v.time_out && <Button size="sm" variant="outline" className="h-8" onClick={() => timeOutMutation.mutate(v.id)}>Sign Out</Button>}
+                      </TableCell>
+                    </TableRow>
+                  ));
+                })()}
               </TableBody>
             </Table>
           </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="vehicles">
-          <Card><CardHeader /><CardContent>
+          <Card><CardHeader className="flex-row items-center justify-between gap-3 flex-wrap space-y-0">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{vehiclesOnSite} on site</Badge>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-8 h-8" placeholder="Search vehicles…" value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} />
+            </div>
+          </CardHeader><CardContent>
             <Table>
               <TableHeader><TableRow><TableHead>Reg</TableHead><TableHead>Driver</TableHead><TableHead>Purpose</TableHead><TableHead>Time In</TableHead><TableHead>Time Out</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(vehicles as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No vehicle logs.</TableCell></TableRow>}
-                {(vehicles as any[]).map((v: any) => (
+                {(() => {
+                  const q = vehicleSearch.trim().toLowerCase();
+                  const filtered = q ? (vehicles as any[]).filter(v => [v.vehicle_reg, v.driver_name, v.purpose].some((f: any) => f?.toLowerCase?.().includes(q))) : (vehicles as any[]);
+                  if (filtered.length === 0) return <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">{q ? "No matching vehicles." : "No vehicle logs."}</TableCell></TableRow>;
+                  return filtered.map((v: any) => (
                   <TableRow key={v.id}>
                     <TableCell className="font-medium">{v.vehicle_reg}</TableCell>
                     <TableCell>{v.driver_name ?? "—"}</TableCell>
@@ -285,7 +406,8 @@ function Page() {
                       {can && !v.time_out && <Button size="sm" variant="outline" className="h-8" onClick={() => vehicleTimeOutMutation.mutate(v.id)}>Log Exit</Button>}
                     </TableCell>
                   </TableRow>
-                ))}
+                  ));
+                })()}
               </TableBody>
             </Table>
           </CardContent></Card>
