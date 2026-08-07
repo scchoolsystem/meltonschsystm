@@ -15,16 +15,19 @@ async function resolveSchoolId(ctx: { supabase: any }) {
 // not the bare code — a USB scanner or camera will hand back that full
 // string. Pull `code` out if it's URL-shaped; otherwise treat the scanned
 // value itself as the code (manual typing, or a plain-text code card).
+// Codes are stored uppercase (same convention as public-verify.functions.ts
+// and _app.ids.verify.tsx), so normalize the same way here too — otherwise
+// a lowercase/mixed-case scan silently fails to match and looks "unknown".
 function extractCode(raw: string): string {
   const trimmed = raw.trim();
   try {
     const url = new URL(trimmed);
     const code = url.searchParams.get("code");
-    if (code) return code;
+    if (code) return code.trim().toUpperCase();
   } catch {
     // not a URL — fall through
   }
-  return trimmed;
+  return trimmed.toUpperCase();
 }
 
 export const logStudentGateScan = createServerFn({ method: "POST" })
