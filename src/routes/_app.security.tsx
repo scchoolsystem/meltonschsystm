@@ -1829,6 +1829,7 @@ function FlagPersonDialog({ target, schoolId, onDone }: { target: { name: string
 function DailyLogDialog({ schoolName }: { schoolName: string }) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(todayStr);
+  const [showPrint, setShowPrint] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["daily-log-export", date],
@@ -1884,27 +1885,6 @@ function DailyLogDialog({ schoolName }: { schoolName: string }) {
     return out.sort((a, b) => a.time.localeCompare(b.time));
   }, [data]);
 
-  const handlePrint = () => {
-    const win = window.open("", "_blank");
-    if (!win) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
-    const bodyRows = rows.map(r => `<tr><td>${r.category}</td><td>${r.time}</td><td>${escapeHtml(r.who)}</td><td>${escapeHtml(r.detail)}</td><td>${escapeHtml(r.status)}</td></tr>`).join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Security Log — ${date}</title><style>
-      body{font-family:system-ui,sans-serif;padding:24px;color:#111}
-      h1{font-size:18px;margin-bottom:0}
-      p{color:#555;margin-top:4px}
-      table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
-      th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
-      th{background:#f3f3f3}
-      @media print{a{display:none}}
-    </style></head><body>
-      <h1>${escapeHtml(schoolName)} — Security Log</h1>
-      <p>${date} · ${rows.length} entries</p>
-      <table><thead><tr><th>Category</th><th>Time</th><th>Who</th><th>Detail</th><th>Status</th></tr></thead><tbody>${bodyRows || `<tr><td colspan="5">No activity recorded.</td></tr>`}</tbody></table>
-      <script>window.onload = () => window.print();</script>
-    </body></html>`);
-    win.document.close();
-  };
-
   const handleCsv = () => {
     const header = "Category,Time,Who,Detail,Status\n";
     const body = rows.map(r => [r.category, r.time, r.who, r.detail, r.status].map(csvField).join(",")).join("\n");
@@ -1916,6 +1896,10 @@ function DailyLogDialog({ schoolName }: { schoolName: string }) {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  if (showPrint) {
+    return <DailyLogPrintSheet rows={rows} date={date} schoolName={schoolName} onClose={() => setShowPrint(false)} />;
+  }
 
   return (
     <DialogContent className="max-w-2xl">
@@ -1949,14 +1933,56 @@ function DailyLogDialog({ schoolName }: { schoolName: string }) {
       </div>
       <DialogFooter className="gap-2">
         <Button variant="outline" onClick={handleCsv} disabled={rows.length === 0}><Download className="w-4 h-4 mr-2" />Download CSV</Button>
-        <Button onClick={handlePrint} disabled={rows.length === 0}><Printer className="w-4 h-4 mr-2" />Print</Button>
+        <Button onClick={() => setShowPrint(true)} disabled={rows.length === 0}><Printer className="w-4 h-4 mr-2" />Print</Button>
       </DialogFooter>
     </DialogContent>
   );
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Renders in-app (no new tab/window — nothing to get stuck on with no way
+// back). Same pattern as the badge PrintSheet: a full-screen overlay with
+// its own Close button, and @media print rules hide everything except the
+// table when the browser print dialog opens.
+function DailyLogPrintSheet({ rows, date, schoolName, onClose }: { rows: { category: string; time: string; who: string; detail: string; status: string }[]; date: string; schoolName: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-background overflow-auto">
+      <div className="print:hidden sticky top-0 bg-background border-b p-3 flex items-center justify-between z-10">
+        <div className="font-medium">Security log — {date} ({rows.length} entries)</div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Print</Button>
+        </div>
+      </div>
+      <div className="p-6 max-w-4xl mx-auto print:max-w-none print:mx-0">
+        <h1 className="text-lg font-semibold">{schoolName} — Security Log</h1>
+        <p className="text-sm text-muted-foreground mt-1">{date} · {rows.length} entries</p>
+        <table className="w-full border-collapse mt-4 text-sm">
+          <thead>
+            <tr className="text-left">
+              <th className="border p-2 bg-muted">Category</th>
+              <th className="border p-2 bg-muted">Time</th>
+              <th className="border p-2 bg-muted">Who</th>
+              <th className="border p-2 bg-muted">Detail</th>
+              <th className="border p-2 bg-muted">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={5} className="border p-4 text-center text-muted-foreground">No activity recorded.</td></tr>
+            ) : rows.map((r, idx) => (
+              <tr key={idx} className="break-inside-avoid">
+                <td className="border p-2">{r.category}</td>
+                <td className="border p-2">{r.time}</td>
+                <td className="border p-2">{r.who}</td>
+                <td className="border p-2">{r.detail}</td>
+                <td className="border p-2">{r.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function csvField(v: string): string {
