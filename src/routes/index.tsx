@@ -207,18 +207,30 @@ const MODULE_CATEGORIES = [
     color: "bg-blue-50 border-blue-200",
     iconColor: "bg-blue-100 text-blue-700",
     modules: [
-      { icon: GraduationCap, title: "Admissions", desc: "Online applications, enrollment workflows, class placement and full student onboarding from enquiry to first day.", tags: ["Forms", "Workflow", "Onboarding"] },
-      { icon: Users, title: "Student Management", desc: "Comprehensive student profiles, guardian contacts, medical info, transfers between schools and official leaving certificates.", tags: ["Profiles", "Guardians", "Transfers"] },
-      { icon: BookOpen, title: "Academics", desc: "Subjects, classes, lesson plans, timetables, curriculum mapping and syllabus tracking per term and year.", tags: ["Curriculum", "Timetable", "Syllabus"] },
-      { icon: ClipboardList, title: "Attendance", desc: "Daily and period-by-period attendance for students and staff with automated SMS alerts and monthly reports.", tags: ["Daily", "Period", "SMS Alerts"] },
-      { icon: FileText, title: "Exams & Marks", desc: "End-to-end exam management — scheduling, marks entry, grade computation, position ranking and official report cards.", tags: ["Exams", "Marks", "Report Cards"] },
-      { icon: BarChart3, title: "Results & Reports", desc: "Detailed performance analytics, subject trend analysis, class comparison, student progress tracking and downloadable reports.", tags: ["Analytics", "Ranking", "Progress"] },
-      { icon: Calendar, title: "Timetable", desc: "Automated and manual timetable creation, room allocation, teacher assignment and conflict detection.", tags: ["Auto-gen", "Rooms", "Teachers"] },
-      { icon: Monitor, title: "Live Classes", desc: "Schedule and run live online sessions, record attendance, share materials and manage virtual classrooms.", tags: ["Online", "Attendance", "Resources"] },
-      { icon: BookOpen, title: "Library", desc: "Full book catalogue, borrowing and return records, fine calculation, overdue notifications and reservations.", tags: ["Catalogue", "Borrowing", "Fines"] },
-      { icon: FileText, title: "Student Documents", desc: "Securely upload and manage student certificates, birth certificates, recommendation letters and official documents.", tags: ["Uploads", "Certificates", "Storage"] },
-      { icon: FileText, title: "Leaving Certificates", desc: "Generate official leaving certificates with school branding, stamp positions, and complete academic history.", tags: ["Official", "Printable", "Stamped"] },
-      { icon: Users, title: "Alumni Network", desc: "Searchable alumni directory tracking every graduated, transferred or archived student — last class, exit reason, exit date and where they transferred to, all in one lifecycle record.", tags: ["Directory", "Lifecycle", "Searchable"] },
+      { icon: GraduationCap, title: "Admissions", desc: "Online applications, enrollment workflows, class placement and full student onboarding from enquiry to first day.", tags: ["Forms", "Workflow", "Onboarding"],
+        bullets: ["Online application form, reviewed and approved by an admission officer", "Class placement with automatic admission-number generation", "Bulk CSV/Excel import for whole intakes, with validation and error reporting", "Guardian and medical details captured at enrolment, feeding straight into the student profile"] },
+      { icon: Users, title: "Student Management", desc: "Comprehensive student profiles, guardian contacts, medical info, transfers between schools and official leaving certificates.", tags: ["Profiles", "Guardians", "Transfers"],
+        bullets: ["Full profile per student — bio data, class history, guardians, medical notes, documents", "Lifecycle tracking: active, transferred, expelled, graduated or archived, with reason and date", "Transfer-out records the receiving school so the trail isn't lost", "Feeds ID cards, report cards, leaving certificates and the alumni directory automatically"] },
+      { icon: BookOpen, title: "Academics", desc: "Subjects, classes, lesson plans, timetables, curriculum mapping and syllabus tracking per term and year.", tags: ["Curriculum", "Timetable", "Syllabus"],
+        bullets: ["Subject catalogue with teacher assignments per class", "Class ↔ subject linking so every class only sees what it's actually taught", "Department and head-of-department structure built in", "Per-term and per-year syllabus and curriculum tracking"] },
+      { icon: ClipboardList, title: "Attendance", desc: "Daily and period-by-period attendance for students and staff with automated SMS alerts and monthly reports.", tags: ["Daily", "Period", "SMS Alerts"],
+        bullets: ["Daily and period-by-period marking, by class or by subject teacher", "Automatic Africa's Talking SMS to parents on absence", "Monthly and termly attendance summaries per class and per student", "Staff attendance tracked the same way as student attendance"] },
+      { icon: FileText, title: "Exams & Marks", desc: "End-to-end exam management — scheduling, marks entry, grade computation, position ranking and official report cards.", tags: ["Exams", "Marks", "Report Cards"],
+        bullets: ["Exam scheduling per class, subject and term", "Marks entry with per-subject grading scales and configurable grade boundaries", "Automatic grade computation, class position and stream ranking", "Exam oversight dashboard to track which classes/subjects still have marks outstanding"] },
+      { icon: BarChart3, title: "Results & Reports", desc: "Detailed performance analytics, subject trend analysis, class comparison, student progress tracking and downloadable reports.", tags: ["Analytics", "Ranking", "Progress"],
+        bullets: ["Results dashboard with Overview, Subjects, Classes and Compare views", "Kenyan skip-tie ranking for class merit lists, single-class or bulk-print", "Term-on-term trend analysis per subject and per student", "Class-vs-class performance comparison for department heads"] },
+      { icon: Calendar, title: "Timetable", desc: "Automated and manual timetable creation, room allocation, teacher assignment and conflict detection.", tags: ["Auto-gen", "Rooms", "Teachers"],
+        bullets: ["Automatic timetable generation with clash detection across teachers and rooms", "Manual override for any period, with room allocation per lesson", "Configurable double-lesson periods per subject, not a hardcoded rule", "Printable timetables that include breaks and merged double-lesson cells"] },
+      { icon: Monitor, title: "Live Classes", desc: "Schedule and run live online sessions, record attendance, share materials and manage virtual classrooms.", tags: ["Online", "Attendance", "Resources"],
+        bullets: ["Live video sessions via Jitsi (JaaS), scheduled per class or subject", "Attendance recorded automatically the moment a student actually joins the call", "Materials and resources attached to each session for later access", "Pre-join screen disabled so students land straight in the class"] },
+      { icon: BookOpen, title: "Library", desc: "Full book catalogue, borrowing and return records, fine calculation, overdue notifications and reservations.", tags: ["Catalogue", "Borrowing", "Fines"],
+        bullets: ["Book catalogue with copies, categories and availability tracking", "Loan and return workflow with automatic due-date and fine calculation", "Overdue tab surfaces every late book in one place", "Notification tab for chasing overdue borrowers"] },
+      { icon: FileText, title: "Student Documents", desc: "Securely upload and manage student certificates, birth certificates, recommendation letters and official documents.", tags: ["Uploads", "Certificates", "Storage"],
+        bullets: ["Per-student document store — birth certificates, medical forms, transfer letters", "Access restricted by row-level security so only authorised staff can view them", "Attached directly to the student profile for one-click retrieval", "Same secure storage pattern used for assignment submissions and leaving certificates"] },
+      { icon: FileText, title: "Leaving Certificates", desc: "Generate official leaving certificates with school branding, stamp positions, and complete academic history.", tags: ["Official", "Printable", "Stamped"],
+        bullets: ["School-branded certificate with logo, watermark and configurable stamp position", "Pulls complete academic history and co-curricular badges automatically", "Single or bulk generation for a whole leaving cohort", "Printable PDF, ready to hand to the parent or receiving school"] },
+      { icon: Users, title: "Alumni Network", desc: "Searchable alumni directory tracking every graduated, transferred or archived student — last class, exit reason, exit date and where they transferred to, all in one lifecycle record.", tags: ["Directory", "Lifecycle", "Searchable"],
+        bullets: ["Directory of every graduated, transferred, expelled or archived student", "Search by name or admission number, filter by lifecycle status", "Shows last class attended, exit reason, exit date and transfer destination", "Same lifecycle engine that powers leaving certificates and transfer records"] },
     ],
   },
   {
@@ -226,10 +238,14 @@ const MODULE_CATEGORIES = [
     color: "bg-green-50 border-green-200",
     iconColor: "bg-green-100 text-green-700",
     modules: [
-      { icon: CreditCard, title: "Fee Management", desc: "Flexible fee structures by class, term and category. Invoice generation, payment tracking, balance statements and arrears management.", tags: ["Structures", "Invoices", "Balances"] },
-      { icon: Zap, title: "M-Pesa Integration", desc: "Accept fee payments directly via M-Pesa STK Push. Automatic reconciliation, instant receipts and payment confirmation SMS.", tags: ["STK Push", "Auto-reconcile", "Receipts"] },
-      { icon: FileText, title: "Invoices & Receipts", desc: "Automated invoice generation with school branding, printable receipts, payment history and statement downloads.", tags: ["Branded", "Printable", "History"] },
-      { icon: BarChart3, title: "Billing & Subscription", desc: "School subscription management, billing history, plan upgrades and payment records for the platform.", tags: ["Plans", "Upgrades", "History"] },
+      { icon: CreditCard, title: "Fee Management", desc: "Flexible fee structures by class, term and category. Invoice generation, payment tracking, balance statements and arrears management.", tags: ["Structures", "Invoices", "Balances"],
+        bullets: ["Fee structures configured per class, per term and by fee component (tuition, transport, boarding, etc.)", "Term invoice generation for a whole class or the whole school in one run", "Live balance and arrears tracking per student", "Printable statements for parents and for finance office records"] },
+      { icon: Zap, title: "M-Pesa Integration", desc: "Accept fee payments directly via M-Pesa STK Push. Automatic reconciliation, instant receipts and payment confirmation SMS.", tags: ["STK Push", "Auto-reconcile", "Receipts"],
+        bullets: ["Per-school Daraja (M-Pesa) configuration — each school uses its own paybill/till", "STK Push straight from the parent portal for instant fee payment", "Automatic reconciliation against the student's fee balance on callback", "SMS payment confirmation and printable receipt generated the moment it lands"] },
+      { icon: FileText, title: "Invoices & Receipts", desc: "Automated invoice generation with school branding, printable receipts, payment history and statement downloads.", tags: ["Branded", "Printable", "History"],
+        bullets: ["School-branded invoice and receipt templates", "Full payment history per student, exportable as a statement", "Receipts generated automatically for every payment, M-Pesa or manual", "Downloadable PDF for parents who need a physical copy"] },
+      { icon: BarChart3, title: "Billing & Subscription", desc: "School subscription management, billing history, plan upgrades and payment records for the platform.", tags: ["Plans", "Upgrades", "History"],
+        bullets: ["School's own subscription plan, billing history and invoices in one place", "Plan upgrade/downgrade and add-on module purchase from the same screen", "Platform-side billing records feed the Platform Admin invoicing dashboard", "Payment records kept separately from student fee data — platform billing vs. school billing never mix"] },
     ],
   },
   {
@@ -237,9 +253,12 @@ const MODULE_CATEGORIES = [
     color: "bg-purple-50 border-purple-200",
     iconColor: "bg-purple-100 text-purple-700",
     modules: [
-      { icon: Users, title: "Staff Management", desc: "Complete staff profiles, employment records, departments, roles, payroll references, contracts and performance notes.", tags: ["Profiles", "HR", "Payroll"] },
-      { icon: Settings, title: "Roles & Permissions", desc: "Over 40 built-in user roles with granular, module-level permission controls. Custom roles for any institutional structure.", tags: ["40+ Roles", "Granular", "Custom"] },
-      { icon: Settings, title: "Departments", desc: "Academic and administrative department management, head of department assignments and departmental reporting.", tags: ["Academic", "Admin", "HOD"] },
+      { icon: Users, title: "Staff Management", desc: "Complete staff profiles, employment records, departments, roles, payroll references, contracts and performance notes.", tags: ["Profiles", "HR", "Payroll"],
+        bullets: ["Full staff profile — employment record, department, contract details, contacts", "Payslip history and payroll reference numbers per staff member", "Bulk staff import via CSV/Excel for onboarding a whole intake", "Staff ID cards with QR codes generated from the same profile"] },
+      { icon: Settings, title: "Roles & Permissions", desc: "Over 40 built-in user roles with granular, module-level permission controls. Custom roles for any institutional structure.", tags: ["6+ Roles", "Granular", "Custom"],
+        bullets: ["40+ built-in roles — principal, bursar, security admin/user, finance admin/user, matron, librarian and more", "Admin and user tiers per department (e.g. finance_admin vs finance_user) for fine-grained control", "Module-level permissions, not just page-level — a role can see a module without being able to edit it", "Per-school row-level security means one school's staff can never see another school's data"] },
+      { icon: Settings, title: "Departments", desc: "Academic and administrative department management, head of department assignments and departmental reporting.", tags: ["Academic", "Admin", "HOD"],
+        bullets: ["Academic and administrative departments configured per school", "Head-of-department assignment with departmental oversight permissions", "Subjects linked to departments for departmental reporting", "Feeds the Staff Management module's department field"] },
     ],
   },
   {
@@ -247,11 +266,16 @@ const MODULE_CATEGORIES = [
     color: "bg-orange-50 border-orange-200",
     iconColor: "bg-orange-100 text-orange-700",
     modules: [
-      { icon: Shield, title: "Boarding", desc: "Dormitory management, bed and room allocation, duty roster scheduling, boarding fee tracking and matron/warden reports.", tags: ["Dorms", "Allocation", "Duty Rosters"] },
-      { icon: FlaskConical, title: "Clinic", desc: "Student health records, sick bay visit logs, medication administration records, referral letters and health trend reports.", tags: ["Health Records", "Sick Bay", "Medications"] },
-      { icon: Utensils, title: "Kitchen & Catering", desc: "Weekly meal planning, kitchen stock management, catering records, special diet tracking and nutrition reports.", tags: ["Meal Plans", "Stock", "Nutrition"] },
-      { icon: Bus, title: "Transport", desc: "Bus route management, student allocation per route, transport fee billing, driver records and route attendance.", tags: ["Routes", "Allocation", "Drivers"] },
-      { icon: Shield, title: "Insurance", desc: "Student insurance policy tracking, coverage records, claim management and premium payment monitoring.", tags: ["Policies", "Claims", "Premiums"] },
+      { icon: Shield, title: "Boarding", desc: "Dormitory management, bed and room allocation, duty roster scheduling, boarding fee tracking and matron/warden reports.", tags: ["Dorms", "Allocation", "Duty Rosters"],
+        bullets: ["Dorm and bed/room allocation per student, with capacity tracking", "Nightly roll call tab to mark who's present in the dorm", "\"Out tonight\" view for students on leave, with reason and expected return", "Maintenance log for dorm facility issues, plus matron/warden reporting"] },
+      { icon: FlaskConical, title: "Clinic", desc: "Student health records, sick bay visit logs, medication administration records, referral letters and health trend reports.", tags: ["Health Records", "Sick Bay", "Medications"],
+        bullets: ["Sick bay visit log with symptoms, diagnosis notes and treatment given", "\"Today\" view for the nurse to see who's currently in the sick bay", "Medication administration records tied to each visit", "Referral letter generation for cases sent to an outside clinic or hospital"] },
+      { icon: Utensils, title: "Kitchen & Catering", desc: "Weekly meal planning, kitchen stock management, catering records, special diet tracking and nutrition reports.", tags: ["Meal Plans", "Stock", "Nutrition"],
+        bullets: ["Weekly meal planner covering breakfast, lunch and supper", "Meal log to record what was actually served each day", "Stock management with low-stock alerts for pantry items", "Special diet flags per student, visible to kitchen staff"] },
+      { icon: Bus, title: "Transport", desc: "Bus route management, student allocation per route, transport fee billing, driver records and route attendance.", tags: ["Routes", "Allocation", "Drivers"],
+        bullets: ["Route management with stops, capacity and assigned vehicle", "Student-to-route assignment, linked to the transport fee component", "Driver directory with license and contact details", "Daily log for route attendance and boarding confirmation"] },
+      { icon: Shield, title: "Insurance", desc: "Student insurance policy tracking, coverage records, claim management and premium payment monitoring.", tags: ["Policies", "Claims", "Premiums"],
+        bullets: ["Enrolment tab tracking which students are covered and under which policy", "Policy tab with coverage details, provider and premium schedule", "Claim tracking from filing to settlement", "Premium payment monitoring so lapsed cover doesn't go unnoticed"] },
     ],
   },
   {
@@ -259,8 +283,10 @@ const MODULE_CATEGORIES = [
     color: "bg-red-50 border-red-200",
     iconColor: "bg-red-100 text-red-700",
     modules: [
-      { icon: Dumbbell, title: "Co-curricular", desc: "Clubs, societies, sports teams, academic competitions and co-curricular achievement records for certificates and portfolios.", tags: ["Clubs", "Sports", "Achievements"] },
-      { icon: Shield, title: "Discipline", desc: "Incident recording, disciplinary action tracking, warnings, suspension logs, counselling notes and behaviour trends.", tags: ["Incidents", "Actions", "Counselling"] },
+      { icon: Dumbbell, title: "Co-curricular", desc: "Clubs, societies, sports teams, academic competitions and co-curricular achievement records for certificates and portfolios.", tags: ["Clubs", "Sports", "Achievements"],
+        bullets: ["Activities tab covering clubs, societies and sports teams", "Fixtures tab for scheduling matches and competitions", "Achievements tab that feeds directly onto the leaving certificate as badges", "Coach/patron and student roster management per activity"] },
+      { icon: Shield, title: "Discipline", desc: "Incident recording, disciplinary action tracking, warnings, suspension logs, counselling notes and behaviour trends.", tags: ["Incidents", "Actions", "Counselling"],
+        bullets: ["Incident log with severity, category and action taken", "Repeat-offender tab that flags students with a pattern of incidents", "Counselling session records logged alongside the incident", "Automatic parent notification tab for incidents that require one"] },
     ],
   },
   {
@@ -268,10 +294,14 @@ const MODULE_CATEGORIES = [
     color: "bg-teal-50 border-teal-200",
     iconColor: "bg-teal-100 text-teal-700",
     modules: [
-      { icon: Bell, title: "Communications", desc: "SMS and in-app push notifications to parents, staff and students. Bulk messaging, targeted groups and delivery tracking.", tags: ["SMS", "Push", "Bulk"] },
-      { icon: MessageSquare, title: "Announcements", desc: "School-wide and class-specific announcements with file attachments, read receipts and scheduled publishing.", tags: ["School-wide", "Class", "Scheduled"] },
-      { icon: Globe, title: "Parent Portal", desc: "Parents access real-time fee balances, results, attendance records, communicate with teachers and receive school notifications.", tags: ["Real-time", "Results", "Fees"] },
-      { icon: GraduationCap, title: "Student Portal", desc: "Students view timetables, exam results, assignments, download resources and access class announcements.", tags: ["Timetable", "Results", "Resources"] },
+      { icon: Bell, title: "Communications", desc: "SMS and in-app push notifications to parents, staff and students. Bulk messaging, targeted groups and delivery tracking.", tags: ["SMS", "Push", "Bulk"],
+        bullets: ["Bulk SMS via Africa's Talking to any group — a class, a route, the whole school", "Per-recipient delivery status, since a 200 response doesn't always mean the SMS actually landed", "Targeted messaging by role (parents only, staff only, etc.)", "Used automatically by attendance, discipline, gate scans and fee reminders — not just manual blasts"] },
+      { icon: MessageSquare, title: "Announcements", desc: "School-wide and class-specific announcements with file attachments, read receipts and scheduled publishing.", tags: ["School-wide", "Class", "Scheduled"],
+        bullets: ["School-wide or class-specific announcements with file attachments", "Scheduled publishing for announcements that shouldn't go out immediately", "Pinned notices stay at the top of the parent and student portals", "Read receipts so you know who's actually seen it"] },
+      { icon: Globe, title: "Parent Portal", desc: "Parents access real-time fee balances, results, attendance records, communicate with teachers and receive school notifications.", tags: ["Real-time", "Results", "Fees"],
+        bullets: ["Live fee balance and M-Pesa payment straight from the portal", "Results and report cards as soon as they're published", "Attendance history and gate scan-in/out visibility for the child", "Direct messaging with class teachers and school-wide announcements"] },
+      { icon: GraduationCap, title: "Student Portal", desc: "Students view timetables, exam results, assignments, download resources and access class announcements.", tags: ["Timetable", "Results", "Resources"],
+        bullets: ["Personal timetable and exam results the moment they're published", "Classroom feed with assignments, submissions and shared resources", "Class announcements and school-wide notices in one feed", "Own attendance record and library loan status"] },
     ],
   },
   {
@@ -279,17 +309,28 @@ const MODULE_CATEGORIES = [
     color: "bg-gray-50 border-gray-200",
     iconColor: "bg-gray-100 text-gray-700",
     modules: [
-      { icon: IdCard, title: "ID Cards & Badges", desc: "Generate and print student, staff and visitor photo ID cards and gate badges with embedded QR codes, used platform-wide for instant scan verification at the gate, in the library and at exams.", tags: ["Photo IDs", "QR Code", "Print"] },
-      { icon: LogIn, title: "Student Gate Scan-In/Out", desc: "Students scan their badge or QR code at the gate to log in and out of campus. Every scan updates a live on-campus headcount in real time and automatically fires an Africa's Talking SMS to the parent — no manual gate register.", tags: ["QR Scan", "Live Headcount", "SMS Alerts"] },
-      { icon: ScanLine, title: "Gate Passes & Approvals", desc: "Staff or parents raise a gate pass for a student leaving during school hours; a duty officer approves or denies it from a live queue, with automatic overdue flags if the student hasn't returned by the expected time.", tags: ["Approval Queue", "Overdue Flags", "Audit Trail"] },
-      { icon: UserCheck, title: "Visitor Management", desc: "Every visitor is logged through a single Log Entry flow at the gate — name, phone, ID number, host and purpose of visit — with time-in and time-out, a live \"visitors on site\" count, and instant name search for the security desk.", tags: ["Log Entry", "Live Count", "Search"] },
-      { icon: Car, title: "Vehicle & Parking Tracking", desc: "Vehicle registration, driver and passenger details are captured alongside a parking bay assignment from a live bay map. Checking a vehicle out automatically frees its bay, so parking never silently fills up.", tags: ["Bay Assignment", "Live Map", "Auto Check-out"] },
-      { icon: MessageSquareWarning, title: "Incidents & Panic Alerts", desc: "Security staff log on-campus incidents with severity and status tracking, and a one-tap panic alert flags an active emergency to admin instantly for a fast, coordinated response.", tags: ["Incident Log", "Panic Button", "Escalation"] },
-      { icon: Lock, title: "Security & Compliance Audit", desc: "Complete activity logs, login history, suspicious access detection, per-school data isolation and compliance audit trails covering every module on the platform.", tags: ["Audit Logs", "Login History", "Compliance"] },
-      { icon: BarChart3, title: "Analytics Dashboard", desc: "Real-time executive dashboards for enrollment trends, fee collection, attendance rates, results and platform health.", tags: ["Real-time", "Executive", "Trends"] },
-      { icon: Settings, title: "School Settings", desc: "Academic terms, grading scales, school branding, custom fields, system configuration and integration settings.", tags: ["Terms", "Grading", "Branding"] },
-      { icon: Settings, title: "Data Import", desc: "Bulk import students, staff and historical data from Excel and CSV files. Data validation and error reporting.", tags: ["Bulk Import", "Excel", "Validation"] },
-      { icon: Globe, title: "Multi-school Platform", desc: "Manage multiple schools from a single super-admin dashboard. School isolation, cross-school reporting and platform billing.", tags: ["Multi-tenant", "Isolation", "Reporting"] },
+      { icon: IdCard, title: "ID Cards & Badges", desc: "Generate and print student, staff and visitor photo ID cards and gate badges with embedded QR codes, used platform-wide for instant scan verification at the gate, in the library and at exams.", tags: ["Photo IDs", "QR Code", "Print"],
+        bullets: ["Photo ID cards for students and staff, each with a unique QR code", "Single or bulk printing for a whole class, department or intake", "One tap ID verification screen — scan a card and see who it belongs to instantly", "The same QR code is what the gate, library and exam-room scanners read"] },
+      { icon: LogIn, title: "Student Gate Scan-In/Out", desc: "Students scan their badge or QR code at the gate to log in and out of campus. Every scan updates a live on-campus headcount in real time and automatically fires an Africa's Talking SMS to the parent — no manual gate register.", tags: ["QR Scan", "Live Headcount", "SMS Alerts"],
+        bullets: ["Badge/QR scan at the gate logs the student in or out — no manual register", "Live \"on campus\" headcount updates the instant a scan happens", "Automatic Africa's Talking SMS to the parent for every scan-in and scan-out", "Recent-scans feed for the security desk to review who's just come through"] },
+      { icon: ScanLine, title: "Gate Passes & Approvals", desc: "Staff or parents raise a gate pass for a student leaving during school hours; a duty officer approves or denies it from a live queue, with automatic overdue flags if the student hasn't returned by the expected time.", tags: ["Approval Queue", "Overdue Flags", "Audit Trail"],
+        bullets: ["Gate pass request with reason and expected return time", "Live approval queue for the duty officer — approve, deny, or leave pending", "Automatic overdue flag the moment expected-return time passes with no check-in", "Full history of every pass ever issued, with status and return time, for audit"] },
+      { icon: UserCheck, title: "Visitor Management", desc: "Every visitor is logged through a single Log Entry flow at the gate — name, phone, ID number, host and purpose of visit — with time-in and time-out, a live \"visitors on site\" count, and instant name search for the security desk.", tags: ["Log Entry", "Live Count", "Search"],
+        bullets: ["One unified Log Entry form for name, phone, ID number, host and purpose", "Time-in and time-out with a live \"visitors on site\" counter on the security dashboard", "Instant search by name for the front desk to look up a visitor mid-conversation", "Feeds the same live-updating dashboard as gate passes, vehicles and student scans"] },
+      { icon: Car, title: "Vehicle & Parking Tracking", desc: "Vehicle registration, driver and passenger details are captured alongside a parking bay assignment from a live bay map. Checking a vehicle out automatically frees its bay, so parking never silently fills up.", tags: ["Bay Assignment", "Live Map", "Auto Check-out"],
+        bullets: ["Vehicle registration, driver name and purpose captured through the same Log Entry flow as visitors", "Live parking bay map shows exactly which bays are free right now", "Bay assigned at check-in, automatically released the moment the vehicle checks out", "Search by number plate for fast lookup at the gate"] },
+      { icon: MessageSquareWarning, title: "Incidents & Panic Alerts", desc: "Security staff log on-campus incidents with severity and status tracking, and a one-tap panic alert flags an active emergency to admin instantly for a fast, coordinated response.", tags: ["Incident Log", "Panic Button", "Escalation"],
+        bullets: ["On-campus incident log with severity and open/resolved status", "One-tap panic alert that flags an active emergency to admin in real time", "Open incidents surface as a badge count right on the Security dashboard", "Full incident history kept for post-incident review and reporting"] },
+      { icon: Lock, title: "Security & Compliance Audit", desc: "Complete activity logs, login history, suspicious access detection, per-school data isolation and compliance audit trails covering every module on the platform.", tags: ["Audit Logs", "Login History", "Compliance"],
+        bullets: ["Activity log and login history across every module, not just the security app", "Per-school row-level security — one school's data is never visible to another, enforced at the database level", "Suspicious access detection flags unusual login patterns", "Audit trail retained for compliance review and platform support investigations"] },
+      { icon: BarChart3, title: "Analytics Dashboard", desc: "Real-time executive dashboards for enrollment trends, fee collection, attendance rates, results and platform health.", tags: ["Real-time", "Executive", "Trends"],
+        bullets: ["Executive dashboard covering enrolment trends, fee collection and attendance rates in one view", "Results analytics broken down by subject, class and term", "Real-time — refreshes as new data comes in rather than a static end-of-day report", "Built for the principal/deputy layer, distinct from the department-level Results & Reports view"] },
+      { icon: Settings, title: "School Settings", desc: "Academic terms, grading scales, school branding, custom fields, system configuration and integration settings.", tags: ["Terms", "Grading", "Branding"],
+        bullets: ["Academic term and year configuration that drives the whole platform's calendar", "Per-subject grading scales and report-card settings", "School identity — logo, branding and letterhead used across IDs, receipts and certificates", "Integration settings for M-Pesa Daraja and Africa's Talking SMS, configured per school"] },
+      { icon: Settings, title: "Data Import", desc: "Bulk import students, staff and historical data from Excel and CSV files. Data validation and error reporting.", tags: ["Bulk Import", "Excel", "Validation"],
+        bullets: ["Bulk import for students, staff, classes, class structure and subjects", "Class ↔ subject linking importable in bulk rather than one at a time", "Row-by-row validation with clear error reporting before anything is committed", "Built for onboarding a whole school's historical records in one sitting"] },
+      { icon: Globe, title: "Multi-school Platform", desc: "Manage multiple schools from a single super-admin dashboard. School isolation, cross-school reporting and platform billing.", tags: ["Multi-tenant", "Isolation", "Reporting"],
+        bullets: ["Single Platform Admin dashboard to manage every school on SmartDev", "Strict tenant isolation — enforced by row-level security, not just app logic", "Cross-school reporting and platform-wide billing/invoicing", "Team management, audit logs and school suspension enforcement for platform staff"] },
     ],
   },
 ];
@@ -298,7 +339,7 @@ const STORY_MILESTONES = [
   { year: "2020", title: "The Problem", desc: "We visited dozens of Kenyan schools still running on paper registers, WhatsApp groups and Excel sheets. We knew there was a better way." },
   { year: "2021", title: "First Build", desc: "SmartDev v1 launched with a small pilot group — three schools in Nairobi County testing the core academics and fee modules." },
   { year: "2022", title: "M-Pesa Goes Live", desc: "The M-Pesa integration launched, letting parents pay fees directly from their phones. Collections improved dramatically for pilot schools." },
-  { year: "2023", title: "Full Platform", desc: "35+ modules now cover every school department — boarding, clinic, transport, library, kitchen and more. Android app released." },
+  { year: "2023", title: "Full Platform", desc: "40+ modules now cover every school department — boarding, clinic, transport, library, kitchen and more. Android app released." },
   { year: "2024", title: "East Africa Expansion", desc: "Schools in Uganda and Tanzania joined the platform. Multi-currency and multi-country billing introduced." },
   { year: "2025", title: "Desktop App", desc: "Windows desktop software released for schools with limited internet, working offline and syncing when connected." },
   { year: "2026", title: "Growing Strong", desc: "Hundreds of schools on the platform. Continuous development driven by real feedback from administrators, teachers and parents." },
@@ -988,6 +1029,16 @@ function ModulesPage() {
                           {open && (
                             <div className="px-4 pb-4 pt-0 border-t bg-white/60">
                               <p className="text-sm text-muted-foreground leading-relaxed mt-3">{mod.desc}</p>
+                              {mod.bullets && mod.bullets.length > 0 && (
+                                <ul className="mt-3 space-y-1.5">
+                                  {mod.bullets.map((b: string) => (
+                                    <li key={b} className="text-xs text-muted-foreground flex gap-2 leading-relaxed">
+                                      <CheckCircle className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                                      <span>{b}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                               <div className="flex flex-wrap gap-1.5 mt-3">
                                 {mod.tags.map(tag => (
                                   <span key={tag} className={`text-xs px-2 py-0.5 rounded-full border ${cat.color}`}>{tag}</span>
