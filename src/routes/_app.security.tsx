@@ -89,6 +89,13 @@ function Page() {
     queryFn: async () => (await supabase.from("access_cards").select("*").order("card_code")).data ?? [],
   });
 
+  const { data: incidents = [] } = useQuery({
+    queryKey: ["security-incidents"],
+    queryFn: async () => (await supabase.from("security_incidents").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
+  });
+  const openIncidents = useMemo(() => (incidents as any[]).filter(i => i.status === "open"), [incidents]);
+  const activePanics = useMemo(() => openIncidents.filter(i => i.type === "panic"), [openIncidents]);
+
   const pendingPasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "pending"), [gatePasses]);
   const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "out" && !g.actual_return), [gatePasses]);
   const overdueGatePasses = useMemo(
@@ -124,6 +131,8 @@ function Page() {
         () => invalidate(["vehicle-log"]))
       .on("postgres_changes", { event: "*", schema: "public", table: "student_gate_scans", filter: `school_id=eq.${school.id}` },
         () => invalidate(["student-gate-scans-recent"]))
+      .on("postgres_changes", { event: "*", schema: "public", table: "security_incidents", filter: `school_id=eq.${school.id}` },
+        () => invalidate(["security-incidents"]))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [school?.id, qc]);
@@ -178,6 +187,23 @@ function Page() {
 
   const [addEntry, setAddEntry] = useState(false);
   const [addGatePass, setAddGatePass] = useState(false);
+  const [flagTarget, setFlagTarget] = useState<{ name: string; idNumber?: string | null } | null>(null);
+
+  const panicMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("security_incidents").insert({
+        school_id: school?.id,
+        type: "panic",
+        severity: "critical",
+        title: "Panic alert triggered at the gate",
+        status: "open",
+        reported_by: (await supabase.auth.getUser()).data.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Panic alert sent — visible to everyone on this page"); qc.invalidateQueries({ queryKey: ["security-incidents"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
   const [visitorSearch, setVisitorSearch] = useState("");
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [lastIssued, setLastIssued] = useState<{ code: string; name: string; type: string; vehicleReg?: string | null } | null>(null);
@@ -213,12 +239,36 @@ function Page() {
               <DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Log Gate Pass</Button></DialogTrigger>
               <LogGatePassDialog schoolId={school?.id} onDone={() => { setAddGatePass(false); qc.invalidateQueries({ queryKey: ["gate-passes-all"] }); }} />
             </Dialog>
+            <Button
+              variant="destructive"
+              onClick={() => { if (confirm("Send a panic alert? This notifies everyone with the Security page open right now.")) panicMutation.mutate(); }}
+              disabled={panicMutation.isPending}
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />Panic
+            </Button>
           </div>
         )}
       </div>
 
+      <AnimatePresence>
+        {activePanics.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="rounded-lg border border-destructive bg-destructive text-destructive-foreground px-4 py-3 flex items-center gap-3 animate-pulse">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <div className="text-sm font-medium">
+                {activePanics.length === 1 ? "Panic alert active" : `${activePanics.length} panic alerts active`} — go to the Incidents tab to acknowledge.
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Live overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <LiveStat icon={Users} label="On campus" value={studentsOnCampus} sub={`(${openGatePasses.length} out)`} />
         <LiveStat icon={UserCheck} label="Visitors on site" value={visitorsOnSite} />
         <LiveStat icon={Car} label="Vehicles on site" value={vehiclesOnSite} />
@@ -228,6 +278,12 @@ function Page() {
           label="Overdue gate passes"
           value={overdueGatePasses.length}
           tone={overdueGatePasses.length > 0 ? "danger" : "default"}
+        />
+        <LiveStat
+          icon={AlertTriangle}
+          label="Open incidents"
+          value={openIncidents.length}
+          tone={activePanics.length > 0 ? "danger" : openIncidents.length > 0 ? "warn" : "default"}
         />
       </div>
 
@@ -265,6 +321,10 @@ function Page() {
           <TabsTrigger value="allpasses">All Gate Passes</TabsTrigger>
           <TabsTrigger value="visitors">Visitors</TabsTrigger>
           <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+          <TabsTrigger value="incidents" className="gap-1.5">
+            Incidents
+            {openIncidents.length > 0 && <Badge variant={activePanics.length > 0 ? "destructive" : "secondary"} className="h-4 px-1.5 text-[10px]">{openIncidents.length}</Badge>}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="scan">
@@ -367,8 +427,9 @@ function Page() {
                       <TableCell>{v.purpose ?? "—"}</TableCell>
                       <TableCell className="text-xs">{new Date(v.time_in).toLocaleString()}</TableCell>
                       <TableCell className="text-xs">{v.time_out ? new Date(v.time_out).toLocaleString() : <Badge variant="secondary">On campus</Badge>}</TableCell>
-                      <TableCell>
+                      <TableCell className="space-x-2">
                         {can && !v.time_out && <Button size="sm" variant="outline" className="h-8" onClick={() => timeOutMutation.mutate(v.id)}>Sign Out</Button>}
+                        {can && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => setFlagTarget({ name: v.visitor_name, idNumber: v.id_number })}>Flag</Button>}
                       </TableCell>
                     </TableRow>
                   ));
@@ -402,8 +463,9 @@ function Page() {
                     <TableCell>{v.purpose ?? "—"}</TableCell>
                     <TableCell className="text-xs">{new Date(v.time_in).toLocaleString()}</TableCell>
                     <TableCell className="text-xs">{v.time_out ? new Date(v.time_out).toLocaleString() : <Badge variant="secondary">On campus</Badge>}</TableCell>
-                    <TableCell>
+                    <TableCell className="space-x-2">
                       {can && !v.time_out && <Button size="sm" variant="outline" className="h-8" onClick={() => vehicleTimeOutMutation.mutate(v.id)}>Log Exit</Button>}
+                      {can && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => setFlagTarget({ name: v.driver_name || v.vehicle_reg, idNumber: v.vehicle_reg })}>Flag</Button>}
                     </TableCell>
                   </TableRow>
                   ));
@@ -412,7 +474,21 @@ function Page() {
             </Table>
           </CardContent></Card>
         </TabsContent>
+
+        <TabsContent value="incidents">
+          <IncidentsTab can={can} incidents={incidents as any[]} />
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={!!flagTarget} onOpenChange={o => !o && setFlagTarget(null)}>
+        {flagTarget && (
+          <FlagPersonDialog
+            target={flagTarget}
+            schoolId={school?.id}
+            onDone={() => { setFlagTarget(null); qc.invalidateQueries({ queryKey: ["security-incidents"] }); }}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
@@ -454,6 +530,25 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
   const [bayId, setBayId] = useState("");
 
   const preferredType = useMemo(() => inferBayType(vehicleType, f.purpose), [vehicleType, f.purpose]);
+
+  // Live watchlist check: debounced against name/id/vehicle reg so a guard
+  // sees an open flag before they finish issuing the card, not after.
+  const [watchQuery, setWatchQuery] = useState<{ name: string; idNumber: string; vehicleReg: string }>({ name: "", idNumber: "", vehicleReg: "" });
+  useEffect(() => {
+    const t = setTimeout(() => setWatchQuery({ name: f.holder_name.trim(), idNumber: f.id_number.trim(), vehicleReg: vehicleReg.trim() }), 350);
+    return () => clearTimeout(t);
+  }, [f.holder_name, f.id_number, vehicleReg]);
+
+  const { data: watchHits = [] } = useQuery({
+    queryKey: ["watchlist-check", watchQuery.name, watchQuery.idNumber, watchQuery.vehicleReg],
+    queryFn: async () => {
+      const terms = [watchQuery.name, watchQuery.idNumber, watchQuery.vehicleReg].filter(t => t.length >= 2);
+      if (terms.length === 0) return [];
+      const or = terms.flatMap(t => [`related_name.ilike.%${t}%`, `related_id_number.ilike.%${t}%`]).join(",");
+      return (await supabase.from("security_incidents").select("*").eq("type", "flagged_visitor").eq("status", "open").or(or)).data ?? [];
+    },
+    enabled: watchQuery.name.length >= 2 || watchQuery.idNumber.length >= 2 || watchQuery.vehicleReg.length >= 2,
+  });
 
   const { data: freeBays = [] } = useQuery({
     queryKey: ["parking-bays-free"],
@@ -503,6 +598,16 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
       <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <div><Label>Name *</Label><Input required autoFocus value={f.holder_name} onChange={e => setF(p => ({ ...p, holder_name: e.target.value }))} /></div>
         <div><Label>ID Number</Label><Input value={f.id_number} onChange={e => setF(p => ({ ...p, id_number: e.target.value }))} /></div>
+
+        {(watchHits as any[]).length > 0 && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 space-y-1">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-destructive"><AlertTriangle className="w-4 h-4" />Watchlist match</div>
+            {(watchHits as any[]).map(h => (
+              <div key={h.id} className="text-xs text-muted-foreground">{h.title}{h.details ? ` — ${h.details}` : ""}</div>
+            ))}
+          </div>
+        )}
+
         <div><Label>Visiting</Label><Input value={f.visiting} onChange={e => setF(p => ({ ...p, visiting: e.target.value }))} placeholder="Who / which office" /></div>
         <div><Label>Purpose</Label><Input value={f.purpose} onChange={e => setF(p => ({ ...p, purpose: e.target.value }))} /></div>
 
@@ -1081,6 +1186,7 @@ function CardsTab({ can }: { can: boolean }) {
   const { school } = useTenant();
   const [qty, setQty] = useState("1000");
   const [printBatch, setPrintBatch] = useState<any[] | null>(null);
+  const [reportCard, setReportCard] = useState<any | null>(null);
 
   const { data: cards = [], isLoading } = useQuery({
     queryKey: ["access-cards"],
@@ -1088,7 +1194,7 @@ function CardsTab({ can }: { can: boolean }) {
   });
 
   const counts = useMemo(() => {
-    const c = { available: 0, assigned: 0, retired: 0 } as Record<string, number>;
+    const c = { available: 0, assigned: 0, retired: 0, lost: 0, stolen: 0 } as Record<string, number>;
     (cards as any[]).forEach(row => { c[row.status] = (c[row.status] ?? 0) + 1; });
     return c;
   }, [cards]);
@@ -1116,6 +1222,9 @@ function CardsTab({ can }: { can: boolean }) {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const statusVariant = (s: string) =>
+    s === "available" ? "secondary" : s === "assigned" ? "default" : s === "lost" || s === "stolen" ? "destructive" : "outline";
+
   return (
     <div className="space-y-4">
       {can && (
@@ -1133,10 +1242,13 @@ function CardsTab({ can }: { can: boolean }) {
         </Card>
       )}
 
-      <div className="flex gap-3 text-sm">
+      <div className="flex gap-3 text-sm flex-wrap">
         <Badge variant="secondary">{counts.available ?? 0} available</Badge>
         <Badge>{counts.assigned ?? 0} assigned</Badge>
         <Badge variant="outline">{counts.retired ?? 0} retired</Badge>
+        {(counts.lost > 0 || counts.stolen > 0) && (
+          <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" />{(counts.lost ?? 0) + (counts.stolen ?? 0)} lost/stolen</Badge>
+        )}
       </div>
 
       <Card><CardHeader /><CardContent>
@@ -1148,10 +1260,15 @@ function CardsTab({ can }: { can: boolean }) {
               {(cards as any[]).slice(0, 200).map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-mono">{c.card_code}</TableCell>
-                  <TableCell><Badge variant={c.status === "available" ? "secondary" : c.status === "assigned" ? "default" : "outline"}>{c.status}</Badge></TableCell>
+                  <TableCell><Badge variant={statusVariant(c.status)}>{c.status}</Badge></TableCell>
                   {can && (
-                    <TableCell className="text-right">
-                      {c.status !== "retired" && <Button size="sm" variant="outline" className="h-8" onClick={() => retireMutation.mutate(c.id)}>Retire</Button>}
+                    <TableCell className="text-right space-x-2">
+                      {c.status !== "retired" && c.status !== "lost" && c.status !== "stolen" && (
+                        <>
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => retireMutation.mutate(c.id)}>Retire</Button>
+                          <Button size="sm" variant="outline" className="h-8 text-destructive hover:text-destructive" onClick={() => setReportCard(c)}>Report Lost/Stolen</Button>
+                        </>
+                      )}
                     </TableCell>
                   )}
                 </TableRow>
@@ -1165,7 +1282,61 @@ function CardsTab({ can }: { can: boolean }) {
       </CardContent></Card>
 
       {printBatch && <PrintSheet cards={printBatch} schoolName={school?.name ?? "School"} onClose={() => setPrintBatch(null)} />}
+
+      <Dialog open={!!reportCard} onOpenChange={o => !o && setReportCard(null)}>
+        {reportCard && (
+          <ReportCardLostDialog
+            card={reportCard}
+            onDone={() => {
+              setReportCard(null);
+              qc.invalidateQueries({ queryKey: ["access-cards"] });
+              qc.invalidateQueries({ queryKey: ["security-incidents"] });
+              qc.invalidateQueries({ queryKey: ["parking-bays"] });
+              qc.invalidateQueries({ queryKey: ["parking-slots"] });
+              qc.invalidateQueries({ queryKey: ["visitor-log"] });
+              qc.invalidateQueries({ queryKey: ["vehicle-log"] });
+            }}
+          />
+        )}
+      </Dialog>
     </div>
+  );
+}
+
+function ReportCardLostDialog({ card, onDone }: { card: any; onDone: () => void }) {
+  const [type, setType] = useState<"lost" | "stolen">("lost");
+  const [details, setDetails] = useState("");
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("report_card_lost", { p_card_id: card.id, p_type: type, p_details: details || null });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success(`Card reported ${type}`); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Report Card {card.card_code}</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div>
+          <Label>Type *</Label>
+          <Select value={type} onValueChange={v => setType(v as "lost" | "stolen")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="lost">Lost / misplaced</SelectItem>
+              <SelectItem value="stolen">Stolen</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label>Details</Label><Input value={details} onChange={e => setDetails(e.target.value)} placeholder="Where/when it went missing, etc." /></div>
+        {card.status === "assigned" && (
+          <p className="text-xs text-muted-foreground">This card is currently assigned — reporting it will check out the current holder, freeing their parking slot and closing their visitor/vehicle log entry.</p>
+        )}
+        <DialogFooter>
+          <Button type="submit" variant="destructive" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Report {type}</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   );
 }
 
@@ -1420,6 +1591,120 @@ function BayCapacityDialog({ bay, onDone }: { bay: any; onDone: () => void }) {
           <p className="text-xs text-muted-foreground mt-1">Shrinking will fail if any of the slots being removed are currently occupied.</p>
         </div>
         <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Save</Button></DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+// ============================================================
+// Incidents — unified log behind lost/stolen cards, flagged
+// visitors/vehicles, and panic alerts. Realtime-backed so a
+// panic alert or a fresh flag shows up here on every other open
+// Security tab within a second or two.
+// ============================================================
+
+function IncidentsTab({ can, incidents }: { can: boolean; incidents: any[] }) {
+  const qc = useQueryClient();
+  const [showResolved, setShowResolved] = useState(false);
+
+  const resolveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("security_incidents").update({ status: "resolved", resolved_by: u.user?.id, resolved_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Marked resolved"); qc.invalidateQueries({ queryKey: ["security-incidents"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const visible = showResolved ? incidents : incidents.filter(i => i.status === "open");
+
+  const typeLabel: Record<string, string> = { lost_card: "Lost card", stolen_card: "Stolen card", flagged_visitor: "Flagged", panic: "Panic", other: "Other" };
+  const severityVariant = (s: string) => s === "critical" || s === "high" ? "destructive" : s === "medium" ? "default" : "secondary";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 text-sm">
+          <Badge variant={incidents.some(i => i.status === "open") ? "destructive" : "secondary"}>{incidents.filter(i => i.status === "open").length} open</Badge>
+          <Badge variant="outline">{incidents.filter(i => i.status === "resolved").length} resolved</Badge>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setShowResolved(s => !s)}>{showResolved ? "Hide resolved" : "Show resolved"}</Button>
+      </div>
+
+      <div className="space-y-2">
+        {visible.length === 0 && (
+          <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">No {showResolved ? "" : "open "}incidents.</CardContent></Card>
+        )}
+        {visible.map(i => (
+          <Card key={i.id} className={i.status === "open" && (i.severity === "critical" || i.severity === "high") ? "border-destructive/50" : undefined}>
+            <CardContent className="pt-4 flex items-start justify-between gap-3 flex-wrap">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={severityVariant(i.severity)}>{typeLabel[i.type] ?? i.type}</Badge>
+                  <Badge variant="outline" className="capitalize">{i.severity}</Badge>
+                  {i.status === "resolved" && <Badge variant="secondary">resolved</Badge>}
+                </div>
+                <div className="font-medium">{i.title}</div>
+                {i.details && <div className="text-sm text-muted-foreground">{i.details}</div>}
+                {(i.related_name || i.related_id_number) && (
+                  <div className="text-xs text-muted-foreground">{[i.related_name, i.related_id_number].filter(Boolean).join(" · ")}</div>
+                )}
+                <div className="text-xs text-muted-foreground">{new Date(i.created_at).toLocaleString()}</div>
+              </div>
+              {can && i.status === "open" && (
+                <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate(i.id)}>Resolve</Button>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FlagPersonDialog({ target, schoolId, onDone }: { target: { name: string; idNumber?: string | null }; schoolId?: string; onDone: () => void }) {
+  const [severity, setSeverity] = useState("medium");
+  const [details, setDetails] = useState("");
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("security_incidents").insert({
+        school_id: schoolId,
+        type: "flagged_visitor",
+        severity,
+        title: `Flagged: ${target.name}`,
+        details: details || null,
+        related_name: target.name,
+        related_id_number: target.idNumber || null,
+        reported_by: u.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Flag recorded"); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>Flag {target.name}</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div>
+          <Label>Severity</Label>
+          <Select value={severity} onValueChange={setSeverity}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low — note for the record</SelectItem>
+              <SelectItem value="medium">Medium — watch next time</SelectItem>
+              <SelectItem value="high">High — restrict entry</SelectItem>
+              <SelectItem value="critical">Critical — do not admit</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div><Label>Details *</Label><Input required autoFocus value={details} onChange={e => setDetails(e.target.value)} placeholder="What happened…" /></div>
+        <p className="text-xs text-muted-foreground">Anyone logging a new visitor with a matching name or ID will see this flag before issuing a card.</p>
+        <DialogFooter>
+          <Button type="submit" variant="destructive" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Flag</Button>
+        </DialogFooter>
       </form>
     </DialogContent>
   );
