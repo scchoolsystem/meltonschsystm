@@ -219,7 +219,7 @@ function SiteMetaEditor() {
 function HeroEditor() {
   const fallback = {
     badge: "", heading_line1: "One platform to run your", heading_highlight: "entire school",
-    subheading: "", stats: [{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
+    subheading: "", stats: [{ value: "40+", label: "Modules" }, { value: "40+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
   };
   const { data, isLoading, save } = useLandingSection("hero", fallback);
   const [form, setForm] = useState(fallback);
