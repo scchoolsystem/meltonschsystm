@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning, UserCheck, Car, AlertTriangle, Search } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning, UserCheck, Car, AlertTriangle, Search, ShieldCheck, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
@@ -32,15 +32,20 @@ export const Route = createFileRoute("/_app/security")({ component: () => (<Feat
 // scan or checkout at any terminal visibly registers here in real time
 // rather than just silently updating.
 function LiveStat({ icon: Icon, label, value, tone = "default", sub }: { icon: any; label: string; value: number | string; tone?: "default" | "warn" | "danger"; sub?: string }) {
-  const toneClasses =
-    tone === "danger" ? "border-destructive/40 bg-destructive/5" :
-    tone === "warn" ? "border-amber-500/40 bg-amber-500/5" :
-    "border-primary/20 bg-primary/5";
-  const iconClasses = tone === "danger" ? "text-destructive" : tone === "warn" ? "text-amber-500" : "text-primary";
+  const accent =
+    tone === "danger" ? "before:bg-destructive" :
+    tone === "warn" ? "before:bg-amber-500" :
+    "before:bg-primary";
+  const chipClasses =
+    tone === "danger" ? "bg-destructive/10 text-destructive" :
+    tone === "warn" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+    "bg-primary/10 text-primary";
   return (
-    <Card className={toneClasses}>
-      <CardContent className="pt-4 flex items-center gap-3">
-        <Icon className={`w-6 h-6 shrink-0 ${iconClasses}`} />
+    <Card className={`relative overflow-hidden pl-1 transition-all hover:-translate-y-0.5 hover:shadow-md before:absolute before:inset-y-0 before:left-0 before:w-1 ${accent}`}>
+      <CardContent className="pt-4 pb-4 flex items-center gap-3">
+        <div className={`shrink-0 rounded-full p-2 ${chipClasses}`}>
+          <Icon className="w-4 h-4" />
+        </div>
         <div className="min-w-0">
           <AnimatePresence mode="popLayout">
             <motion.div
@@ -48,15 +53,27 @@ function LiveStat({ icon: Icon, label, value, tone = "default", sub }: { icon: a
               initial={{ opacity: 0, y: -6, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.25 }}
-              className="text-2xl font-bold leading-none"
+              className="text-2xl font-bold leading-none tabular-nums"
             >
               {value}
             </motion.div>
           </AnimatePresence>
-          <div className="text-xs text-muted-foreground truncate">{label}{sub && <span className="ml-1">{sub}</span>}</div>
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground truncate mt-1">{label}{sub && <span className="ml-1 normal-case font-normal">{sub}</span>}</div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Friendly, in-voice empty state for a table/list — an invitation to act
+// rather than a bare "no data" message.
+function EmptyState({ icon: Icon = Inbox, title, hint }: { icon?: any; title: string; hint?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+      <div className="rounded-full bg-muted p-3"><Icon className="w-5 h-5 text-muted-foreground" /></div>
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      {hint && <p className="text-xs text-muted-foreground max-w-xs">{hint}</p>}
+    </div>
   );
 }
 
@@ -210,16 +227,24 @@ function Page() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold">Security</h1>
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            Live
-          </span>
+          <div className="rounded-xl bg-primary/10 text-primary p-2.5 shrink-0">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Security</h1>
+              <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Live
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">Gate control, visitor &amp; vehicle logging, parking, and campus access</p>
+          </div>
         </div>
         {can && (
           <div className="flex gap-2">
@@ -309,19 +334,19 @@ function Page() {
       </AnimatePresence>
 
       <Tabs defaultValue="scan">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="scan" className="gap-1"><ScanLine className="w-3.5 h-3.5" />Scan</TabsTrigger>
-          <TabsTrigger value="studentgate" className="gap-1"><LogIn className="w-3.5 h-3.5" />Student Gate</TabsTrigger>
-          <TabsTrigger value="cards" className="gap-1"><IdCardIcon className="w-3.5 h-3.5" />Badges</TabsTrigger>
-          <TabsTrigger value="parking" className="gap-1"><ParkingSquare className="w-3.5 h-3.5" />Parking</TabsTrigger>
-          <TabsTrigger value="gatepasses">
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto gap-0.5 p-1">
+          <TabsTrigger value="scan" className="gap-1 shrink-0"><ScanLine className="w-3.5 h-3.5" />Scan</TabsTrigger>
+          <TabsTrigger value="studentgate" className="gap-1 shrink-0"><LogIn className="w-3.5 h-3.5" />Student Gate</TabsTrigger>
+          <TabsTrigger value="cards" className="gap-1 shrink-0"><IdCardIcon className="w-3.5 h-3.5" />Badges</TabsTrigger>
+          <TabsTrigger value="parking" className="gap-1 shrink-0"><ParkingSquare className="w-3.5 h-3.5" />Parking</TabsTrigger>
+          <TabsTrigger value="gatepasses" className="shrink-0">
             Gate Pass Queue
             {pendingPasses.length > 0 && <Badge variant="destructive" className="ml-2">{pendingPasses.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="allpasses">All Gate Passes</TabsTrigger>
-          <TabsTrigger value="visitors">Visitors</TabsTrigger>
-          <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
-          <TabsTrigger value="incidents" className="gap-1.5">
+          <TabsTrigger value="allpasses" className="shrink-0">All Gate Passes</TabsTrigger>
+          <TabsTrigger value="visitors" className="shrink-0">Visitors</TabsTrigger>
+          <TabsTrigger value="vehicles" className="shrink-0">Vehicles</TabsTrigger>
+          <TabsTrigger value="incidents" className="gap-1.5 shrink-0">
             Incidents
             {openIncidents.length > 0 && <Badge variant={activePanics.length > 0 ? "destructive" : "secondary"} className="h-4 px-1.5 text-[10px]">{openIncidents.length}</Badge>}
           </TabsTrigger>
@@ -378,7 +403,7 @@ function Page() {
             <Table>
               <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Reason</TableHead><TableHead>Exit</TableHead><TableHead>Return</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {(gatePasses as any[]).length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No gate passes.</TableCell></TableRow>}
+                {(gatePasses as any[]).length === 0 && <TableRow><TableCell colSpan={6}><EmptyState title="No gate passes yet" hint="Passes logged for students leaving campus will show up here." /></TableCell></TableRow>}
                 {(gatePasses as any[]).map((g: any) => {
                   const isOverdue = g.status === "out" && !g.actual_return && g.expected_return && new Date(g.expected_return).getTime() < Date.now();
                   return (
@@ -418,7 +443,7 @@ function Page() {
                 {(() => {
                   const q = visitorSearch.trim().toLowerCase();
                   const filtered = q ? (visitors as any[]).filter(v => [v.visitor_name, v.id_number, v.visiting, v.purpose].some((f: any) => f?.toLowerCase?.().includes(q))) : (visitors as any[]);
-                  if (filtered.length === 0) return <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">{q ? "No matching visitors." : "No visitor logs."}</TableCell></TableRow>;
+                  if (filtered.length === 0) return <TableRow><TableCell colSpan={7}><EmptyState icon={UserCheck} title={q ? "No matching visitors" : "No visitor logs yet"} hint={q ? "Try a different name, ID, or purpose." : "Entries from Log Entry will appear here."} /></TableCell></TableRow>;
                   return filtered.map((v: any) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-medium">{v.visitor_name}</TableCell>
@@ -455,7 +480,7 @@ function Page() {
                 {(() => {
                   const q = vehicleSearch.trim().toLowerCase();
                   const filtered = q ? (vehicles as any[]).filter(v => [v.vehicle_reg, v.driver_name, v.purpose].some((f: any) => f?.toLowerCase?.().includes(q))) : (vehicles as any[]);
-                  if (filtered.length === 0) return <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">{q ? "No matching vehicles." : "No vehicle logs."}</TableCell></TableRow>;
+                  if (filtered.length === 0) return <TableRow><TableCell colSpan={6}><EmptyState icon={Car} title={q ? "No matching vehicles" : "No vehicle logs yet"} hint={q ? "Try a different reg, driver, or purpose." : "Entries from Log Entry will appear here."} /></TableCell></TableRow>;
                   return filtered.map((v: any) => (
                   <TableRow key={v.id}>
                     <TableCell className="font-medium">{v.vehicle_reg}</TableCell>
@@ -1158,7 +1183,7 @@ function StudentGateTab() {
           <Table>
             <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Direction</TableHead><TableHead>Time</TableHead><TableHead>Notified</TableHead></TableRow></TableHeader>
             <TableBody>
-              {(recent as any[]).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No scans yet.</TableCell></TableRow>}
+              {(recent as any[]).length === 0 && <TableRow><TableCell colSpan={4}><EmptyState icon={ScanLine} title="No scans yet" hint="Scan a student ID above to log them in or out." /></TableCell></TableRow>}
               {(recent as any[]).map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.students?.first_name} {r.students?.last_name}<div className="text-xs text-muted-foreground">{r.students?.admission_no}</div></TableCell>
@@ -1256,7 +1281,7 @@ function CardsTab({ can }: { can: boolean }) {
           <Table>
             <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Status</TableHead>{can && <TableHead className="text-right">Action</TableHead>}</TableRow></TableHeader>
             <TableBody>
-              {(cards as any[]).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No cards generated yet.</TableCell></TableRow>}
+              {(cards as any[]).length === 0 && <TableRow><TableCell colSpan={3}><EmptyState icon={IdCardIcon} title="No cards generated yet" hint="Generate a batch above to start issuing badges." /></TableCell></TableRow>}
               {(cards as any[]).slice(0, 200).map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-mono">{c.card_code}</TableCell>
@@ -1458,7 +1483,7 @@ function ParkingTab({ can }: { can: boolean }) {
             const bSlots = (slotsByBay.get(b.id) ?? []).slice().sort((x, y) => x.slot_number - y.slot_number);
             const bFree = bSlots.filter(s => s.status === "free").length;
             return (
-              <Card key={b.id} className={b.status === "out_of_service" ? "opacity-70" : undefined}>
+              <Card key={b.id} className={`transition-shadow hover:shadow-md ${b.status === "out_of_service" ? "opacity-70" : ""}`}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center justify-between">
                     <div>
@@ -1482,9 +1507,9 @@ function ParkingTab({ can }: { can: boolean }) {
                         <div
                           key={s.id}
                           title={assignment ? `${assignment.holder_name} · ${assignment.vehicle_reg ?? "—"} · card ${assignment.access_cards?.card_code ?? "—"}` : s.status === "out_of_service" ? "Out of service" : "Free"}
-                          className={`w-14 h-14 rounded-md border flex flex-col items-center justify-center text-xs font-medium ${color}`}
+                          className={`w-14 h-14 rounded-md border flex flex-col items-center justify-center text-xs font-medium transition-transform hover:scale-105 ${color}`}
                         >
-                          <span className="font-semibold">#{s.slot_number}</span>
+                          <span className="font-semibold flex items-center gap-0.5">{assignment && <Car className="w-2.5 h-2.5" />}#{s.slot_number}</span>
                           {assignment ? (
                             <span className="text-[10px] leading-tight text-center px-0.5 truncate max-w-[3.2rem]">{assignment.vehicle_reg ?? assignment.holder_name}</span>
                           ) : (
