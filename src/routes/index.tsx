@@ -238,7 +238,7 @@ const MODULE_CATEGORIES = [
     iconColor: "bg-purple-100 text-purple-700",
     modules: [
       { icon: Users, title: "Staff Management", desc: "Complete staff profiles, employment records, departments, roles, payroll references, contracts and performance notes.", tags: ["Profiles", "HR", "Payroll"] },
-      { icon: Settings, title: "Roles & Permissions", desc: "Over 20 built-in user roles with granular, module-level permission controls. Custom roles for any institutional structure.", tags: ["20+ Roles", "Granular", "Custom"] },
+      { icon: Settings, title: "Roles & Permissions", desc: "Over 40 built-in user roles with granular, module-level permission controls. Custom roles for any institutional structure.", tags: ["40+ Roles", "Granular", "Custom"] },
       { icon: Settings, title: "Departments", desc: "Academic and administrative department management, head of department assignments and departmental reporting.", tags: ["Academic", "Admin", "HOD"] },
     ],
   },
@@ -890,7 +890,7 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
     heading_line1: "One platform to run your",
     heading_highlight: "entire school",
     subheading: "From admissions to graduation — 40+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
-    stats: [{ value: "40+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
+    stats: [{ value: "40+", label: "Modules" }, { value: "40+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
   });
   const mission = useLandingContent("mission_teaser", {
     heading: "Our mission: make every Kenyan school paperless by 2030",
