@@ -374,12 +374,12 @@ function Page() {
 
         {/* ─── Periods tab ─── */}
         <TabsContent value="periods" className="mt-4">
-          <PeriodsPanel schoolId={schoolId ?? undefined} />
+          <PeriodsPanel schoolId={schoolId ?? undefined} canEdit={!!isAdmin} />
         </TabsContent>
 
         {/* ─── Rooms tab ─── */}
         <TabsContent value="rooms" className="mt-4">
-          <RoomsPanel schoolId={schoolId ?? undefined} />
+          <RoomsPanel schoolId={schoolId ?? undefined} canEdit={!!isAdmin} />
         </TabsContent>
 
         {/* ─── Class Subjects tab ─── */}
@@ -389,6 +389,7 @@ function Page() {
             subjects={subjects as any[]}
             staff={staff as any[]}
             schoolId={schoolId ?? undefined}
+            canEdit={!!isAdmin}
           />
         </TabsContent>
 
@@ -412,7 +413,7 @@ function Page() {
 
 /* ─────────────────────────────── Periods Panel ─────────────────────────── */
 
-function PeriodsPanel({ schoolId }: { schoolId?: string }) {
+function PeriodsPanel({ schoolId, canEdit }: { schoolId?: string; canEdit: boolean }) {
   const qc = useQueryClient();
   const [activeDay, setActiveDay] = useState(1);
   const [open, setOpen] = useState(false);
@@ -482,13 +483,15 @@ function PeriodsPanel({ schoolId }: { schoolId?: string }) {
           <h2 className="text-xl font-semibold flex items-center gap-2"><Clock className="w-5 h-5 text-primary" />Period Templates</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Define your school day structure. The timetable generator uses these slots to schedule classes.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => copyToAll.mutate()} disabled={copyToAll.isPending}>
-            {copyToAll.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Copy className="w-4 h-4 mr-2" />}
-            Copy Mon → Tue–Fri
-          </Button>
-          <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-2" />Add Period</Button>
-        </div>
+        {canEdit && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => copyToAll.mutate()} disabled={copyToAll.isPending}>
+              {copyToAll.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Copy className="w-4 h-4 mr-2" />}
+              Copy Mon → Tue–Fri
+            </Button>
+            <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-2" />Add Period</Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -513,7 +516,7 @@ function PeriodsPanel({ schoolId }: { schoolId?: string }) {
             </p>
           )}
           {dayPeriods.map((p: any) => (
-            <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 cursor-pointer" onClick={() => openEdit(p)}>
+            <div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 ${canEdit ? "cursor-pointer" : ""}`} onClick={() => canEdit && openEdit(p)}>
               <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -523,10 +526,12 @@ function PeriodsPanel({ schoolId }: { schoolId?: string }) {
                 <div className="text-xs text-muted-foreground">{p.start_time?.slice(0,5)} – {p.end_time?.slice(0,5)}</div>
               </div>
               <span className="text-xs text-muted-foreground">#{p.period_index}</span>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
-                onClick={e => { e.stopPropagation(); remove.mutate(p.id); }}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+              {canEdit && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                  onClick={e => { e.stopPropagation(); remove.mutate(p.id); }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
             </div>
           ))}
         </CardContent>
@@ -574,7 +579,7 @@ const TYPE_COLORS: Record<string, string> = {
   library: "bg-teal-100 text-teal-800", other: "bg-gray-100 text-gray-800",
 };
 
-function RoomsPanel({ schoolId }: { schoolId?: string }) {
+function RoomsPanel({ schoolId, canEdit }: { schoolId?: string; canEdit: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", room_type: "classroom", capacity: 40, is_active: true });
@@ -619,9 +624,11 @@ function RoomsPanel({ schoolId }: { schoolId?: string }) {
           <h2 className="text-xl font-semibold flex items-center gap-2"><DoorOpen className="w-5 h-5 text-primary" />Rooms</h2>
           <p className="text-sm text-muted-foreground mt-0.5">Teaching spaces available to the timetable generator. Only active rooms are used.</p>
         </div>
-        <Button size="sm" onClick={() => { setForm({ name: "", room_type: "classroom", capacity: 40, is_active: true }); setEditId(null); setOpen(true); }}>
-          <Plus className="w-4 h-4 mr-2" />Add Room
-        </Button>
+        {canEdit && (
+          <Button size="sm" onClick={() => { setForm({ name: "", room_type: "classroom", capacity: 40, is_active: true }); setEditId(null); setOpen(true); }}>
+            <Plus className="w-4 h-4 mr-2" />Add Room
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -657,15 +664,17 @@ function RoomsPanel({ schoolId }: { schoolId?: string }) {
                   {!r.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
                 </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                <Button variant="ghost" size="icon" className="h-7 w-7"
-                  onClick={() => { setForm({ name: r.name, room_type: r.room_type, capacity: r.capacity, is_active: r.is_active }); setEditId(r.id); setOpen(true); }}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove.mutate(r.id)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-7 w-7"
+                    onClick={() => { setForm({ name: r.name, room_type: r.room_type, capacity: r.capacity, is_active: r.is_active }); setEditId(r.id); setOpen(true); }}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => remove.mutate(r.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -1067,9 +1076,9 @@ function GeneratePanel({ classes, activeClassId, onGenerated }: {
 /* ─────────────────────────────── Class Subjects Panel ──────────────────── */
 
 function ClassSubjectsPanel({
-  classes, subjects, staff, schoolId,
+  classes, subjects, staff, schoolId, canEdit,
 }: {
-  classes: any[]; subjects: any[]; staff: any[]; schoolId?: string;
+  classes: any[]; subjects: any[]; staff: any[]; schoolId?: string; canEdit: boolean;
 }) {
   const qc = useQueryClient();
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
@@ -1197,7 +1206,7 @@ function ClassSubjectsPanel({
             via <strong>Staff → Subjects Taught</strong> and auto-assigned by the generator.
           </p>
         </div>
-        {classId && (
+        {classId && canEdit && (
           <Button size="sm" onClick={openAdd}>
             <Plus className="w-4 h-4 mr-2" /> Add Subject
           </Button>
@@ -1255,7 +1264,7 @@ function ClassSubjectsPanel({
                   <th className="text-center px-3 py-3 font-medium">Lessons/wk</th>
                   <th className="text-left px-3 py-3 font-medium hidden md:table-cell">Options</th>
                   <th className="text-left px-3 py-3 font-medium hidden lg:table-cell">Preferred room</th>
-                  <th className="px-3 py-3" />
+                  {canEdit && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -1293,38 +1302,40 @@ function ClassSubjectsPanel({
                       <td className="px-3 py-3 text-muted-foreground hidden lg:table-cell">
                         {cs.rooms?.name ?? "—"}
                       </td>
-                      <td className="px-3 py-3">
-                        <div className="flex gap-1 justify-end">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cs)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Remove subject?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Remove <strong>{cs.subjects?.name}</strong> from <strong>{currentClass?.name}</strong>?
-                                  This won't delete any timetable slots already generated.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => remove.mutate(cs.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Remove
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
+                      {canEdit && (
+                        <td className="px-3 py-3">
+                          <div className="flex gap-1 justify-end">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(cs)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove subject?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Remove <strong>{cs.subjects?.name}</strong> from <strong>{currentClass?.name}</strong>?
+                                    This won't delete any timetable slots already generated.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => remove.mutate(cs.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Remove
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
