@@ -18,6 +18,7 @@ import {
   Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
   Coins, ShoppingBag, ExternalLink,
+  ParkingSquare, ScanLine, Car, UserCheck, LogIn, MessageSquareWarning,
 } from "lucide-react";
 import mpesaShot from "@/assets/portals/mpesa.png";
 import parentShot from "@/assets/portals/parent.png";
@@ -217,6 +218,7 @@ const MODULE_CATEGORIES = [
       { icon: BookOpen, title: "Library", desc: "Full book catalogue, borrowing and return records, fine calculation, overdue notifications and reservations.", tags: ["Catalogue", "Borrowing", "Fines"] },
       { icon: FileText, title: "Student Documents", desc: "Securely upload and manage student certificates, birth certificates, recommendation letters and official documents.", tags: ["Uploads", "Certificates", "Storage"] },
       { icon: FileText, title: "Leaving Certificates", desc: "Generate official leaving certificates with school branding, stamp positions, and complete academic history.", tags: ["Official", "Printable", "Stamped"] },
+      { icon: Users, title: "Alumni Network", desc: "Searchable alumni directory tracking every graduated, transferred or archived student — last class, exit reason, exit date and where they transferred to, all in one lifecycle record.", tags: ["Directory", "Lifecycle", "Searchable"] },
     ],
   },
   {
@@ -277,8 +279,13 @@ const MODULE_CATEGORIES = [
     color: "bg-gray-50 border-gray-200",
     iconColor: "bg-gray-100 text-gray-700",
     modules: [
-      { icon: IdCard, title: "ID Cards", desc: "Generate and print student and staff photo ID cards with embedded QR codes for instant identity verification.", tags: ["Photo IDs", "QR Code", "Print"] },
-      { icon: Lock, title: "Security & Audit", desc: "Complete activity logs, login history, suspicious access detection, data access controls and compliance audit trails.", tags: ["Audit Logs", "Login History", "Compliance"] },
+      { icon: IdCard, title: "ID Cards & Badges", desc: "Generate and print student, staff and visitor photo ID cards and gate badges with embedded QR codes, used platform-wide for instant scan verification at the gate, in the library and at exams.", tags: ["Photo IDs", "QR Code", "Print"] },
+      { icon: LogIn, title: "Student Gate Scan-In/Out", desc: "Students scan their badge or QR code at the gate to log in and out of campus. Every scan updates a live on-campus headcount in real time and automatically fires an Africa's Talking SMS to the parent — no manual gate register.", tags: ["QR Scan", "Live Headcount", "SMS Alerts"] },
+      { icon: ScanLine, title: "Gate Passes & Approvals", desc: "Staff or parents raise a gate pass for a student leaving during school hours; a duty officer approves or denies it from a live queue, with automatic overdue flags if the student hasn't returned by the expected time.", tags: ["Approval Queue", "Overdue Flags", "Audit Trail"] },
+      { icon: UserCheck, title: "Visitor Management", desc: "Every visitor is logged through a single Log Entry flow at the gate — name, phone, ID number, host and purpose of visit — with time-in and time-out, a live \"visitors on site\" count, and instant name search for the security desk.", tags: ["Log Entry", "Live Count", "Search"] },
+      { icon: Car, title: "Vehicle & Parking Tracking", desc: "Vehicle registration, driver and passenger details are captured alongside a parking bay assignment from a live bay map. Checking a vehicle out automatically frees its bay, so parking never silently fills up.", tags: ["Bay Assignment", "Live Map", "Auto Check-out"] },
+      { icon: MessageSquareWarning, title: "Incidents & Panic Alerts", desc: "Security staff log on-campus incidents with severity and status tracking, and a one-tap panic alert flags an active emergency to admin instantly for a fast, coordinated response.", tags: ["Incident Log", "Panic Button", "Escalation"] },
+      { icon: Lock, title: "Security & Compliance Audit", desc: "Complete activity logs, login history, suspicious access detection, per-school data isolation and compliance audit trails covering every module on the platform.", tags: ["Audit Logs", "Login History", "Compliance"] },
       { icon: BarChart3, title: "Analytics Dashboard", desc: "Real-time executive dashboards for enrollment trends, fee collection, attendance rates, results and platform health.", tags: ["Real-time", "Executive", "Trends"] },
       { icon: Settings, title: "School Settings", desc: "Academic terms, grading scales, school branding, custom fields, system configuration and integration settings.", tags: ["Terms", "Grading", "Branding"] },
       { icon: Settings, title: "Data Import", desc: "Bulk import students, staff and historical data from Excel and CSV files. Data validation and error reporting.", tags: ["Bulk Import", "Excel", "Validation"] },
@@ -664,7 +671,7 @@ function ModulesScene({ goTo, categories }: { goTo: (p: Page) => void; categorie
         <Reveal className="mb-10 sm:mb-12 text-white">
           <div className="text-xs uppercase tracking-widest text-primary mb-2">Platform tour</div>
           <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-semibold max-w-xl">Everything your school needs, in one place</h2>
-          <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">35+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
+          <p className="mt-3 text-sm sm:text-base text-white/60 max-w-md">40+ modules, one login. Admin, teachers, parents and students each see their own tailored portal.</p>
         </Reveal>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {categories.map((c, i) => (
@@ -695,7 +702,7 @@ function ModulesScene({ goTo, categories }: { goTo: (p: Page) => void; categorie
               onClick={() => goTo("modules")}
               className="h-[280px] sm:h-[320px] w-full rounded-2xl border border-white/15 flex flex-col items-center justify-center gap-4 text-white hover:bg-white/5 transition-colors"
             >
-              <div className="text-lg font-semibold">See all 35+ modules</div>
+              <div className="text-lg font-semibold">See all 40+ modules</div>
               <span className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2 text-sm">
                 View all modules <ArrowRight className="w-4 h-4" />
               </span>
@@ -882,8 +889,8 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
     badge: "Cloud school ERP for Kenya & East Africa",
     heading_line1: "One platform to run your",
     heading_highlight: "entire school",
-    subheading: "From admissions to graduation — 35+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
-    stats: [{ value: "35+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
+    subheading: "From admissions to graduation — 40+ modules covering every department. Built for Kenyan schools, available as Android app and Windows desktop.",
+    stats: [{ value: "40+", label: "Modules" }, { value: "20+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
   });
   const mission = useLandingContent("mission_teaser", {
     heading: "Our mission: make every Kenyan school paperless by 2030",
@@ -929,7 +936,7 @@ function ModulesPage() {
       <div className="container mx-auto px-6 max-w-7xl">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs font-medium mb-4">
-            <Layers className="w-3.5 h-3.5" /> 35+ Modules
+            <Layers className="w-3.5 h-3.5" /> 40+ Modules
           </div>
           <h1 className="text-4xl font-bold">Every module your school needs</h1>
           <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">Click any module to expand details. Click a category header to show or hide all modules in that group.</p>
