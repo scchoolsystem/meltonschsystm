@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useServerFn } from "@tanstack/react-start";
 import { lookupLoginEmail } from "@/lib/auth-admin.functions";
-import { useTenant, isNativeApp } from "@/hooks/use-tenant";
+import { useTenant, isNativeApp, getSubdomainSlug } from "@/hooks/use-tenant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ function LoginPage() {
   const { redirect: redirectTo } = useSearch({ from: "/login" });
   const { session, loading } = useAuth();
   const lookup = useServerFn(lookupLoginEmail);
-  const { school, slug, isPlatformHost, error: tenantError, loading: tenantLoading } = useTenant();
+  const { school, slug, isPlatformHost, error: tenantError, loading: tenantLoading, clearSchoolSlug } = useTenant();
   const [uniqueId, setUniqueId] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,6 +103,30 @@ function LoginPage() {
     } catch (err: any) { toast.error(err.message ?? "Login failed"); } finally { setBusy(false); }
   }
 
+  // Why the old `window.history.back()` looked broken:
+  // On native/desktop and on the flat app.smartdev.co.ke host, the school
+  // shown here was picked on the School Picker screen and is only remembered
+  // via on-device storage (see resolveSlug() in use-tenant.tsx) — it's not
+  // baked into the URL. The "/" route has an effect that immediately
+  // re-navigates to "/login" *whenever a slug is present*. So pressing the
+  // in-app Back button sent you to "/", and before that page could even show
+  // the picker, the effect bounced you straight back to "/login" — back
+  // button appeared to do nothing.
+  // Fix: explicitly clear the picked school first, then go to "/". With no
+  // slug left, "/" no longer bounces forward and the School Picker renders.
+  // On a real school subdomain (school.smartdev.co.ke) there's no picker to
+  // return to — the tenant is baked into that URL — so Back there instead
+  // leaves the app for the marketing site.
+  async function handleBack() {
+    const hasUrlSlug = typeof window !== "undefined" && !!getSubdomainSlug(window.location.hostname);
+    if (!isNativeApp() && hasUrlSlug) {
+      window.location.href = "https://smartdev.co.ke";
+      return;
+    }
+    await clearSchoolSlug();
+    navigate({ to: "/" });
+  }
+
   async function handleSupportSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supportName || !supportEmail || !supportMsg) return;
@@ -124,7 +148,7 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-background p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-in fade-in-0 zoom-in-95 duration-200">
         <div className="text-center mb-8">
           <button type="button" onClick={() => setClicks((c) => c + 1)} className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg cursor-default overflow-hidden" aria-label="School logo">
             {settings?.logo_url ? <img src={settings.logo_url} alt="School logo" className="w-full h-full object-cover" /> : <GraduationCap className="w-8 h-8" />}
@@ -148,7 +172,7 @@ function LoginPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground mt-6">
-          <button type="button" onClick={() => window.history.back()} className="hover:underline text-sm text-muted-foreground cursor-pointer">← Back</button>
+          <button type="button" onClick={handleBack} className="hover:underline text-sm text-muted-foreground cursor-pointer">← Back</button>
           {clicks >= 5 && (<>{" · "}<a href="https://admin.smartdev.co.ke" className="hover:underline text-primary">Platform admin</a>{" · "}<Link to="/sys/control-room" className="hover:underline text-primary">Control room</Link></>)}
         </p>
       </div>
