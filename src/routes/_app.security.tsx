@@ -113,6 +113,28 @@ function Page() {
   const openIncidents = useMemo(() => (incidents as any[]).filter(i => i.status === "open"), [incidents]);
   const activePanics = useMemo(() => openIncidents.filter(i => i.type === "panic"), [openIncidents]);
 
+  const prevPanicCount = useRef(0);
+  useEffect(() => {
+    if (activePanics.length > prevPanicCount.current) {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        [880, 660].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = "sine";
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.22);
+          gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.22 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.22 + 0.2);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.22);
+          osc.stop(ctx.currentTime + i * 0.22 + 0.22);
+        });
+      } catch { /* audio not available — the visual banner still shows */ }
+    }
+    prevPanicCount.current = activePanics.length;
+  }, [activePanics.length]);
+
   const pendingPasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "pending"), [gatePasses]);
   const openGatePasses = useMemo(() => (gatePasses as any[]).filter(g => g.status === "out" && !g.actual_return), [gatePasses]);
   const overdueGatePasses = useMemo(
@@ -205,6 +227,7 @@ function Page() {
   const [addEntry, setAddEntry] = useState(false);
   const [addGatePass, setAddGatePass] = useState(false);
   const [exportDay, setExportDay] = useState(false);
+  const [activeTab, setActiveTab] = useState("scan");
   const [flagTarget, setFlagTarget] = useState<{ name: string; idNumber?: string | null } | null>(null);
 
   const panicMutation = useMutation({
@@ -280,6 +303,14 @@ function Page() {
         )}
       </div>
 
+      <QuickFind
+        onJump={(tab, prefill) => {
+          setActiveTab(tab);
+          if (tab === "visitors") setVisitorSearch(prefill ?? "");
+          if (tab === "vehicles") setVehicleSearch(prefill ?? "");
+        }}
+      />
+
       <AnimatePresence>
         {activePanics.length > 0 && (
           <motion.div
@@ -338,7 +369,7 @@ function Page() {
         )}
       </AnimatePresence>
 
-      <Tabs defaultValue="scan">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto gap-0.5 p-1">
           <TabsTrigger value="scan" className="gap-1 shrink-0"><ScanLine className="w-3.5 h-3.5" />Scan</TabsTrigger>
           <TabsTrigger value="studentgate" className="gap-1 shrink-0"><LogIn className="w-3.5 h-3.5" />Student Gate</TabsTrigger>
@@ -580,6 +611,16 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
     enabled: watchQuery.name.length >= 2 || watchQuery.idNumber.length >= 2 || watchQuery.vehicleReg.length >= 2,
   });
 
+  // Same class of bug as the gate pass one: nothing stops the same reg
+  // being logged in twice while it's still on site, which would leave two
+  // open vehicle_log rows with no clean way to know which one a "Log Exit"
+  // should close. Warn as soon as a match shows up.
+  const { data: alreadyOnSite } = useQuery({
+    queryKey: ["vehicle-onsite-check", watchQuery.vehicleReg],
+    queryFn: async () => (await supabase.from("vehicle_log").select("id, time_in, driver_name").eq("vehicle_reg", watchQuery.vehicleReg).is("time_out", null).maybeSingle()).data ?? null,
+    enabled: hasVehicle && watchQuery.vehicleReg.length >= 3,
+  });
+
   const { data: freeBays = [] } = useQuery({
     queryKey: ["parking-bays-free"],
     queryFn: async () => (await supabase.from("parking_bay_availability").select("*").eq("bay_status", "free").gt("free_slots", 0).order("bay_code")).data ?? [],
@@ -656,6 +697,14 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
               </Select>
             </div>
             <div><Label>Vehicle Reg *</Label><Input required value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} /></div>
+            {alreadyOnSite && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium text-destructive">Already on site</span> — this reg checked in at {new Date(alreadyOnSite.time_in).toLocaleTimeString()}{alreadyOnSite.driver_name ? ` (${alreadyOnSite.driver_name})` : ""} and hasn't logged an exit yet.
+                </div>
+              </div>
+            )}
             <div>
               <Label>Parking Bay</Label>
               <Select value={bayId} onValueChange={setBayId}>
@@ -673,7 +722,7 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
         )}
 
         <DialogFooter>
-          <Button type="submit" disabled={m.isPending}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log in & issue card</Button>
+          <Button type="submit" disabled={m.isPending || !!alreadyOnSite}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log in & issue card</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -1901,4 +1950,136 @@ function escapeHtml(s: string): string {
 function csvField(v: string): string {
   if (v == null) return "";
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+// ============================================================
+// Quick Find — one search box across cards, visitors, vehicles,
+// gate passes, and incidents. A guard asking "has this person
+// been here before / are they on site right now" shouldn't have
+// to check five tabs one at a time.
+// ============================================================
+
+function QuickFind({ onJump }: { onJump: (tab: string, prefill?: string) => void }) {
+  const [raw, setRaw] = useState("");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(raw.trim()), 300);
+    return () => clearTimeout(t);
+  }, [raw]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["quick-find", query],
+    queryFn: async () => {
+      const q = `%${query}%`;
+      const [cards, visitors, vehicles, gatePasses, incidents] = await Promise.all([
+        supabase.from("access_cards").select("id, card_code, status").ilike("card_code", q).limit(5),
+        supabase.from("visitor_log").select("id, visitor_name, id_number, time_in, time_out").or(`visitor_name.ilike.${q},id_number.ilike.${q}`).order("time_in", { ascending: false }).limit(5),
+        supabase.from("vehicle_log").select("id, vehicle_reg, driver_name, time_in, time_out").or(`vehicle_reg.ilike.${q},driver_name.ilike.${q}`).order("time_in", { ascending: false }).limit(5),
+        supabase.from("gate_passes").select("id, reason, status, exit_time, students(first_name,last_name,admission_no)").order("exit_time", { ascending: false }).limit(30),
+        supabase.from("security_incidents").select("id, title, type, status, related_name").or(`title.ilike.${q},related_name.ilike.${q}`).order("created_at", { ascending: false }).limit(5),
+      ]);
+      const gpFiltered = (gatePasses.data ?? []).filter((g: any) => `${g.students?.first_name ?? ""} ${g.students?.last_name ?? ""}`.toLowerCase().includes(query.toLowerCase())).slice(0, 5);
+      return {
+        cards: cards.data ?? [],
+        visitors: visitors.data ?? [],
+        vehicles: vehicles.data ?? [],
+        gatePasses: gpFiltered,
+        incidents: incidents.data ?? [],
+      };
+    },
+    enabled: query.length >= 2,
+  });
+
+  const totalHits = data ? data.cards.length + data.visitors.length + data.vehicles.length + data.gatePasses.length + data.incidents.length : 0;
+
+  const jump = (tab: string, prefill?: string) => { onJump(tab, prefill); setOpen(false); setRaw(""); };
+
+  return (
+    <div ref={boxRef} className="relative max-w-md">
+      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        className="pl-9"
+        placeholder="Quick find — name, card code, plate…"
+        value={raw}
+        onChange={e => { setRaw(e.target.value); setOpen(true); }}
+        onFocus={() => raw.length >= 2 && setOpen(true)}
+      />
+      {open && query.length >= 2 && (
+        <div className="absolute z-20 mt-1.5 w-full max-h-96 overflow-y-auto rounded-lg border bg-popover shadow-lg">
+          {isFetching ? (
+            <div className="p-4 text-center"><Loader2 className="w-4 h-4 animate-spin mx-auto" /></div>
+          ) : totalHits === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">No matches for "{query}".</div>
+          ) : (
+            <div className="py-1">
+              {data!.cards.length > 0 && (
+                <div className="px-2 py-1">
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cards</div>
+                  {data!.cards.map((c: any) => (
+                    <button key={c.id} onClick={() => jump("cards")} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center justify-between">
+                      <span className="font-mono">{c.card_code}</span>
+                      <Badge variant={c.status === "available" ? "secondary" : c.status === "assigned" ? "default" : "destructive"} className="text-[10px]">{c.status}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {data!.visitors.length > 0 && (
+                <div className="px-2 py-1">
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Visitors</div>
+                  {data!.visitors.map((v: any) => (
+                    <button key={v.id} onClick={() => jump("visitors", v.visitor_name)} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center justify-between">
+                      <span>{v.visitor_name}</span>
+                      <Badge variant={v.time_out ? "outline" : "secondary"} className="text-[10px]">{v.time_out ? "past" : "on site"}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {data!.vehicles.length > 0 && (
+                <div className="px-2 py-1">
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Vehicles</div>
+                  {data!.vehicles.map((v: any) => (
+                    <button key={v.id} onClick={() => jump("vehicles", v.vehicle_reg)} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center justify-between">
+                      <span>{v.vehicle_reg}{v.driver_name ? ` — ${v.driver_name}` : ""}</span>
+                      <Badge variant={v.time_out ? "outline" : "secondary"} className="text-[10px]">{v.time_out ? "past" : "on site"}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {data!.gatePasses.length > 0 && (
+                <div className="px-2 py-1">
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Gate Passes</div>
+                  {data!.gatePasses.map((g: any) => (
+                    <button key={g.id} onClick={() => jump("allpasses")} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center justify-between">
+                      <span>{g.students?.first_name} {g.students?.last_name}</span>
+                      <Badge variant={g.status === "out" ? "destructive" : "outline"} className="text-[10px]">{g.status}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {data!.incidents.length > 0 && (
+                <div className="px-2 py-1">
+                  <div className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Incidents</div>
+                  {data!.incidents.map((i: any) => (
+                    <button key={i.id} onClick={() => jump("incidents")} className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center justify-between">
+                      <span className="truncate">{i.title}</span>
+                      <Badge variant={i.status === "open" ? "destructive" : "outline"} className="text-[10px]">{i.status}</Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
