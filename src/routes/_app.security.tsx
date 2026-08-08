@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning, UserCheck, Car, AlertTriangle, Search, ShieldCheck, Inbox } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Users, ScanLine, Camera, Printer, IdCard as IdCardIcon, ParkingSquare, LogIn, LogOut, MessageSquareWarning, UserCheck, Car, AlertTriangle, Search, ShieldCheck, Inbox, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
@@ -204,6 +204,7 @@ function Page() {
 
   const [addEntry, setAddEntry] = useState(false);
   const [addGatePass, setAddGatePass] = useState(false);
+  const [exportDay, setExportDay] = useState(false);
   const [flagTarget, setFlagTarget] = useState<{ name: string; idNumber?: string | null } | null>(null);
 
   const panicMutation = useMutation({
@@ -263,6 +264,10 @@ function Page() {
             <Dialog open={addGatePass} onOpenChange={setAddGatePass}>
               <DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Log Gate Pass</Button></DialogTrigger>
               <LogGatePassDialog schoolId={school?.id} onDone={() => { setAddGatePass(false); qc.invalidateQueries({ queryKey: ["gate-passes-all"] }); }} />
+            </Dialog>
+            <Dialog open={exportDay} onOpenChange={setExportDay}>
+              <DialogTrigger asChild><Button variant="outline"><Download className="w-4 h-4 mr-2" />Export Day</Button></DialogTrigger>
+              <DailyLogDialog schoolName={school?.name ?? "School"} />
             </Dialog>
             <Button
               variant="destructive"
@@ -689,6 +694,15 @@ function LogGatePassDialog({ onDone, schoolId }: { onDone: () => void; schoolId?
   const [expectedReturn, setExpectedReturn] = useState("");
   const { data: students = [] } = useActiveStudents();
 
+  // Guard against logging a second exit for a student who's already off
+  // campus — easy to do by accident at a busy gate, and it would leave two
+  // "out" rows with no way to tell which one a return should close.
+  const { data: existingOpenPass } = useQuery({
+    queryKey: ["open-gate-pass-check", studentId],
+    queryFn: async () => (await supabase.from("gate_passes").select("id, exit_time, reason").eq("student_id", studentId).eq("status", "out").is("actual_return", null).maybeSingle()).data ?? null,
+    enabled: !!studentId,
+  });
+
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -715,11 +729,19 @@ function LogGatePassDialog({ onDone, schoolId }: { onDone: () => void; schoolId?
           <Label>Student *</Label>
           <StudentCombobox value={studentId} onChange={setStudentId} students={students as any[]} />
         </div>
+        {existingOpenPass && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium text-destructive">Already off-campus</span> — left at {new Date(existingOpenPass.exit_time).toLocaleTimeString()} for "{existingOpenPass.reason}". Mark that pass returned first, in All Gate Passes.
+            </div>
+          </div>
+        )}
         <div><Label>Reason *</Label><Input required autoFocus value={reason} onChange={e => setReason(e.target.value)} placeholder="Medical appointment, home early, etc." /></div>
         <div><Label>Expected Return</Label><Input type="datetime-local" value={expectedReturn} onChange={e => setExpectedReturn(e.target.value)} /></div>
         <p className="text-xs text-muted-foreground">Exit time is recorded as now. The student is on record as off-campus until this pass is marked returned.</p>
         <DialogFooter>
-          <Button type="submit" disabled={m.isPending || !studentId}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log exit</Button>
+          <Button type="submit" disabled={m.isPending || !studentId || !!existingOpenPass}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log exit</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -1733,4 +1755,150 @@ function FlagPersonDialog({ target, schoolId, onDone }: { target: { name: string
       </form>
     </DialogContent>
   );
+}
+
+// ============================================================
+// Export Day — a printable/CSV daily log combining gate passes,
+// visitor log, vehicle log, and incidents for a chosen date.
+// Kenyan schools generally need a physical/paper trail for
+// visitor and gate activity, so this exists alongside the live
+// in-app views rather than replacing them.
+// ============================================================
+
+function DailyLogDialog({ schoolName }: { schoolName: string }) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(todayStr);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["daily-log-export", date],
+    queryFn: async () => {
+      const dayStart = new Date(`${date}T00:00:00`).toISOString();
+      const dayEnd = new Date(`${date}T23:59:59.999`).toISOString();
+      const [gp, vis, veh, inc] = await Promise.all([
+        supabase.from("gate_passes").select("*, students(first_name,last_name,admission_no)").gte("exit_time", dayStart).lte("exit_time", dayEnd).order("exit_time"),
+        supabase.from("visitor_log").select("*").gte("time_in", dayStart).lte("time_in", dayEnd).order("time_in"),
+        supabase.from("vehicle_log").select("*").gte("time_in", dayStart).lte("time_in", dayEnd).order("time_in"),
+        supabase.from("security_incidents").select("*").gte("created_at", dayStart).lte("created_at", dayEnd).order("created_at"),
+      ]);
+      return {
+        gatePasses: gp.data ?? [],
+        visitors: vis.data ?? [],
+        vehicles: veh.data ?? [],
+        incidents: inc.data ?? [],
+      };
+    },
+  });
+
+  const rows = useMemo(() => {
+    if (!data) return [];
+    const out: { category: string; time: string; who: string; detail: string; status: string }[] = [];
+    data.gatePasses.forEach((g: any) => out.push({
+      category: "Gate Pass",
+      time: new Date(g.exit_time).toLocaleTimeString(),
+      who: `${g.students?.first_name ?? ""} ${g.students?.last_name ?? ""}`.trim() || "—",
+      detail: g.reason ?? "—",
+      status: g.actual_return ? `Returned ${new Date(g.actual_return).toLocaleTimeString()}` : g.status,
+    }));
+    data.visitors.forEach((v: any) => out.push({
+      category: "Visitor",
+      time: new Date(v.time_in).toLocaleTimeString(),
+      who: v.visitor_name,
+      detail: [v.visiting, v.purpose].filter(Boolean).join(" — ") || "—",
+      status: v.time_out ? `Out ${new Date(v.time_out).toLocaleTimeString()}` : "On campus",
+    }));
+    data.vehicles.forEach((v: any) => out.push({
+      category: "Vehicle",
+      time: new Date(v.time_in).toLocaleTimeString(),
+      who: `${v.vehicle_reg}${v.driver_name ? ` (${v.driver_name})` : ""}`,
+      detail: v.purpose ?? "—",
+      status: v.time_out ? `Out ${new Date(v.time_out).toLocaleTimeString()}` : "On campus",
+    }));
+    data.incidents.forEach((i: any) => out.push({
+      category: "Incident",
+      time: new Date(i.created_at).toLocaleTimeString(),
+      who: i.related_name ?? "—",
+      detail: i.title,
+      status: i.status,
+    }));
+    return out.sort((a, b) => a.time.localeCompare(b.time));
+  }, [data]);
+
+  const handlePrint = () => {
+    const win = window.open("", "_blank");
+    if (!win) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
+    const bodyRows = rows.map(r => `<tr><td>${r.category}</td><td>${r.time}</td><td>${escapeHtml(r.who)}</td><td>${escapeHtml(r.detail)}</td><td>${escapeHtml(r.status)}</td></tr>`).join("");
+    win.document.write(`<!DOCTYPE html><html><head><title>Security Log — ${date}</title><style>
+      body{font-family:system-ui,sans-serif;padding:24px;color:#111}
+      h1{font-size:18px;margin-bottom:0}
+      p{color:#555;margin-top:4px}
+      table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+      th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}
+      th{background:#f3f3f3}
+      @media print{a{display:none}}
+    </style></head><body>
+      <h1>${escapeHtml(schoolName)} — Security Log</h1>
+      <p>${date} · ${rows.length} entries</p>
+      <table><thead><tr><th>Category</th><th>Time</th><th>Who</th><th>Detail</th><th>Status</th></tr></thead><tbody>${bodyRows || `<tr><td colspan="5">No activity recorded.</td></tr>`}</tbody></table>
+      <script>window.onload = () => window.print();</script>
+    </body></html>`);
+    win.document.close();
+  };
+
+  const handleCsv = () => {
+    const header = "Category,Time,Who,Detail,Status\n";
+    const body = rows.map(r => [r.category, r.time, r.who, r.detail, r.status].map(csvField).join(",")).join("\n");
+    const blob = new Blob([header + body], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `security-log-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <DialogContent className="max-w-2xl">
+      <DialogHeader><DialogTitle>Export Day</DialogTitle></DialogHeader>
+      <div className="space-y-3">
+        <div className="flex items-end gap-3">
+          <div><Label>Date</Label><Input type="date" value={date} onChange={e => setDate(e.target.value)} max={todayStr} /></div>
+          <Badge variant="secondary">{rows.length} entries</Badge>
+        </div>
+
+        <div className="max-h-72 overflow-y-auto border rounded-md">
+          {isLoading ? <Loader2 className="animate-spin mx-auto my-8" /> : rows.length === 0 ? (
+            <EmptyState title="No activity that day" hint="Pick a different date, or check back once entries are logged." />
+          ) : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Category</TableHead><TableHead>Time</TableHead><TableHead>Who</TableHead><TableHead>Detail</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {rows.map((r, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell><Badge variant="outline">{r.category}</Badge></TableCell>
+                    <TableCell className="text-xs">{r.time}</TableCell>
+                    <TableCell className="font-medium">{r.who}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.detail}</TableCell>
+                    <TableCell className="text-xs">{r.status}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </div>
+      <DialogFooter className="gap-2">
+        <Button variant="outline" onClick={handleCsv} disabled={rows.length === 0}><Download className="w-4 h-4 mr-2" />Download CSV</Button>
+        <Button onClick={handlePrint} disabled={rows.length === 0}><Printer className="w-4 h-4 mr-2" />Print</Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function csvField(v: string): string {
+  if (v == null) return "";
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
