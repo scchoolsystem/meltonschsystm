@@ -261,7 +261,7 @@ function Page() {
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Security</h1>
               <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
                 Live
@@ -271,8 +271,8 @@ function Page() {
           </div>
         </div>
         {can && (
-          <div className="flex gap-2">
-            <Dialog open={addEntry} onOpenChange={setAddEntry}><DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Log Entry</Button></DialogTrigger>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Dialog open={addEntry} onOpenChange={setAddEntry}><DialogTrigger asChild><Button className="flex-1 sm:flex-none min-w-[8.5rem]"><Plus className="w-4 h-4 mr-2" />Log Entry</Button></DialogTrigger>
               <LogEntryDialog onDone={(issued) => {
                 setAddEntry(false);
                 setLastIssued(issued);
@@ -285,15 +285,17 @@ function Page() {
               }} />
             </Dialog>
             <Dialog open={addGatePass} onOpenChange={setAddGatePass}>
-              <DialogTrigger asChild><Button variant="outline"><Plus className="w-4 h-4 mr-2" />Log Gate Pass</Button></DialogTrigger>
+              <DialogTrigger asChild><Button variant="outline" className="flex-1 sm:flex-none min-w-[8.5rem]"><Plus className="w-4 h-4 mr-2" />Log Gate Pass</Button></DialogTrigger>
               <LogGatePassDialog schoolId={school?.id} onDone={() => { setAddGatePass(false); qc.invalidateQueries({ queryKey: ["gate-passes-all"] }); }} />
             </Dialog>
             <Dialog open={exportDay} onOpenChange={setExportDay}>
-              <DialogTrigger asChild><Button variant="outline"><Download className="w-4 h-4 mr-2" />Export Day</Button></DialogTrigger>
+              <DialogTrigger asChild><Button variant="outline" className="flex-1 sm:flex-none min-w-[8.5rem]"><Download className="w-4 h-4 mr-2" />Export Day</Button></DialogTrigger>
               <DailyLogDialog schoolName={school?.name ?? "School"} />
             </Dialog>
             <Button
               variant="destructive"
+              className="w-full sm:w-auto"
+              aria-label="Send panic alert to everyone with the Security page open"
               onClick={() => { if (confirm("Send a panic alert? This notifies everyone with the Security page open right now.")) panicMutation.mutate(); }}
               disabled={panicMutation.isPending}
             >
@@ -318,11 +320,12 @@ function Page() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
           >
-            <div className="rounded-lg border border-destructive bg-destructive text-destructive-foreground px-4 py-3 flex items-center gap-3 animate-pulse">
+            <div role="alert" className="rounded-lg border border-destructive bg-destructive text-destructive-foreground px-4 py-3 flex items-center gap-3 flex-wrap motion-safe:animate-pulse">
               <AlertTriangle className="w-5 h-5 shrink-0" />
-              <div className="text-sm font-medium">
+              <div className="text-sm font-medium flex-1 min-w-[12rem]">
                 {activePanics.length === 1 ? "Panic alert active" : `${activePanics.length} panic alerts active`} — go to the Incidents tab to acknowledge.
               </div>
+              <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setActiveTab("incidents")}>View</Button>
             </div>
           </motion.div>
         )}
@@ -537,7 +540,7 @@ function Page() {
         </TabsContent>
 
         <TabsContent value="incidents">
-          <IncidentsTab can={can} incidents={incidents as any[]} />
+          <IncidentsTab can={can} incidents={incidents as any[]} schoolId={school?.id} />
         </TabsContent>
       </Tabs>
 
@@ -671,7 +674,7 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
         <div><Label>ID Number</Label><Input value={f.id_number} onChange={e => setF(p => ({ ...p, id_number: e.target.value }))} /></div>
 
         {(watchHits as any[]).length > 0 && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 space-y-1">
+          <div role="status" className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 space-y-1">
             <div className="flex items-center gap-1.5 text-sm font-medium text-destructive"><AlertTriangle className="w-4 h-4" />Watchlist match</div>
             {(watchHits as any[]).map(h => (
               <div key={h.id} className="text-xs text-muted-foreground">{h.title}{h.details ? ` — ${h.details}` : ""}</div>
@@ -698,7 +701,7 @@ function LogEntryDialog({ onDone }: { onDone: (issued: { code: string; name: str
             </div>
             <div><Label>Vehicle Reg *</Label><Input required value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} /></div>
             {alreadyOnSite && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
+              <div role="status" className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 <div className="text-xs text-muted-foreground">
                   <span className="font-medium text-destructive">Already on site</span> — this reg checked in at {new Date(alreadyOnSite.time_in).toLocaleTimeString()}{alreadyOnSite.driver_name ? ` (${alreadyOnSite.driver_name})` : ""} and hasn't logged an exit yet.
@@ -779,7 +782,7 @@ function LogGatePassDialog({ onDone, schoolId }: { onDone: () => void; schoolId?
           <StudentCombobox value={studentId} onChange={setStudentId} students={students as any[]} />
         </div>
         {existingOpenPass && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
+          <div role="status" className="rounded-md border border-destructive/50 bg-destructive/5 p-2.5 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
             <div className="text-xs text-muted-foreground">
               <span className="font-medium text-destructive">Already off-campus</span> — left at {new Date(existingOpenPass.exit_time).toLocaleTimeString()} for "{existingOpenPass.reason}". Mark that pass returned first, in All Gate Passes.
@@ -1699,9 +1702,10 @@ function BayCapacityDialog({ bay, onDone }: { bay: any; onDone: () => void }) {
 // Security tab within a second or two.
 // ============================================================
 
-function IncidentsTab({ can, incidents }: { can: boolean; incidents: any[] }) {
+function IncidentsTab({ can, incidents, schoolId }: { can: boolean; incidents: any[]; schoolId?: string }) {
   const qc = useQueryClient();
   const [showResolved, setShowResolved] = useState(false);
+  const [newIncident, setNewIncident] = useState(false);
 
   const resolveMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -1720,12 +1724,20 @@ function IncidentsTab({ can, incidents }: { can: boolean; incidents: any[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex gap-2 text-sm">
           <Badge variant={incidents.some(i => i.status === "open") ? "destructive" : "secondary"}>{incidents.filter(i => i.status === "open").length} open</Badge>
           <Badge variant="outline">{incidents.filter(i => i.status === "resolved").length} resolved</Badge>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setShowResolved(s => !s)}>{showResolved ? "Hide resolved" : "Show resolved"}</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowResolved(s => !s)}>{showResolved ? "Hide resolved" : "Show resolved"}</Button>
+          {can && (
+            <Dialog open={newIncident} onOpenChange={setNewIncident}>
+              <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-2" />New Incident</Button></DialogTrigger>
+              <NewIncidentDialog schoolId={schoolId} onDone={() => { setNewIncident(false); qc.invalidateQueries({ queryKey: ["security-incidents"] }); }} />
+            </Dialog>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -2081,5 +2093,75 @@ function QuickFind({ onJump }: { onJump: (tab: string, prefill?: string) => void
         </div>
       )}
     </div>
+  );
+}
+
+function NewIncidentDialog({ schoolId, onDone }: { schoolId?: string; onDone: () => void }) {
+  const [type, setType] = useState("other");
+  const [severity, setSeverity] = useState("medium");
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
+  const [relatedName, setRelatedName] = useState("");
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const { error } = await supabase.from("security_incidents").insert({
+        school_id: schoolId,
+        type,
+        severity,
+        title,
+        details: details || null,
+        related_name: relatedName || null,
+        reported_by: u.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Incident logged"); onDone(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <DialogContent>
+      <DialogHeader><DialogTitle>New Incident</DialogTitle></DialogHeader>
+      <form onSubmit={e => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Type</Label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="other">Other / general</SelectItem>
+                <SelectItem value="lost_card">Lost card</SelectItem>
+                <SelectItem value="stolen_card">Stolen card</SelectItem>
+                <SelectItem value="flagged_visitor">Flagged person</SelectItem>
+                <SelectItem value="panic">Panic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Severity — select this to make it critical</Label>
+            <Select value={severity} onValueChange={setSeverity}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div><Label>Title *</Label><Input required autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Short summary of what happened" /></div>
+        <div><Label>Related person / plate (optional)</Label><Input value={relatedName} onChange={e => setRelatedName(e.target.value)} /></div>
+        <div><Label>Details</Label><Input value={details} onChange={e => setDetails(e.target.value)} placeholder="Additional context" /></div>
+        <p className="text-xs text-muted-foreground">
+          For a lost/stolen card, use "Report Lost/Stolen" on the card itself in Badges instead — it also frees the holder's slot automatically. Use this form for anything else that doesn't fit the quick actions elsewhere.
+        </p>
+        <DialogFooter>
+          <Button type="submit" disabled={m.isPending || !title}>{m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}Log incident</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   );
 }
