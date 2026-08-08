@@ -673,6 +673,37 @@ function PricingEditor() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Add a brand-new module row. feature_key should match the key used by
+  // FeatureGate/school_features in the app when this is a real gated module,
+  // so plan inclusion here matches what actually unlocks for schools. For a
+  // marketing-only line item (nothing to gate), any unique slug works.
+  const addModule = useMutation({
+    mutationFn: async () => {
+      const nextSort = Math.max(0, ...(modules ?? []).map((m: any) => m.sort_order ?? 0)) + 1;
+      const featureKey = `new_module_${Date.now().toString(36)}`;
+      const { error } = await (supabase as any).from("module_addon_pricing").insert({
+        feature_key: featureKey,
+        display_name: "New module",
+        category: "general",
+        monthly_price: 0,
+        sort_order: nextSort,
+        is_active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Module added — edit its name, category and key below"); qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteModule = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("module_addon_pricing").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Module removed from pricing & website"); qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }); },
+    onError: (e: any) => toast.error(e.message ?? "Delete failed — schools may already be subscribed to this module's add-on"),
+  });
+
   // Toggling a plan/module cell upserts the join row that both this editor
   // and the public pricing page read — the two can no longer drift apart.
   const setPlanModuleIncluded = useMutation({
@@ -754,15 +785,16 @@ function PricingEditor() {
           <CardDescription>
             Tick which plans already include each module for free, and set the monthly add-on price charged when a school on a plan that doesn't include it wants it anyway.
             This table has one column per plan above, so it always matches exactly what shows on the public pricing page.
+            Adding a module here only controls pricing and the public website — it does not create the module in the app. The "Module key" should match an existing <code>FeatureGate</code> key (e.g. from Admin → Features) so plan inclusion actually unlocks the right thing for schools; for a marketing-only line with nothing to gate, any unique key works.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {modulesLoading || plansLoading || inclusionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="sticky left-0 bg-card">Module</TableHead>
+                    <TableHead className="sticky left-0 bg-card min-w-[220px]">Module</TableHead>
                     {(plans ?? []).map((p: any) => (
                       <TableHead key={p.id} className="text-center whitespace-nowrap">
                         {p.name}
@@ -771,14 +803,32 @@ function PricingEditor() {
                     ))}
                     <TableHead>Add-on price /mo (KES)</TableHead>
                     <TableHead>Active</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(modules ?? []).map((m: any) => (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium sticky left-0 bg-card">
-                        {m.display_name}
-                        <div className="text-xs text-muted-foreground">{m.category}</div>
+                      <TableCell className="font-medium sticky left-0 bg-card align-top">
+                        <Input
+                          className="font-medium mb-1"
+                          defaultValue={m.display_name}
+                          onBlur={(e) => e.target.value !== m.display_name && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { display_name: e.target.value.trim() } })}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            className="text-xs text-muted-foreground h-7"
+                            defaultValue={m.category}
+                            placeholder="Category"
+                            onBlur={(e) => e.target.value !== m.category && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { category: e.target.value.trim() } })}
+                          />
+                          <Input
+                            className="text-xs text-muted-foreground h-7 font-mono"
+                            defaultValue={m.feature_key}
+                            placeholder="module_key"
+                            onBlur={(e) => e.target.value !== m.feature_key && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { feature_key: e.target.value.trim() } })}
+                          />
+                        </div>
                       </TableCell>
                       {(plans ?? []).map((p: any) => (
                         <TableCell key={p.id} className="text-center">
@@ -797,12 +847,29 @@ function PricingEditor() {
                         />
                       </TableCell>
                       <TableCell><Switch checked={m.is_active} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { is_active: v } })} /></TableCell>
+                      <TableCell>
+                        <Button
+                          type="button" variant="ghost" size="icon"
+                          className="text-destructive hover:text-destructive"
+                          disabled={deleteModule.isPending}
+                          onClick={() => {
+                            if (confirm(`Remove "${m.display_name}" from pricing and the public website? This does not remove it from the app itself.`)) {
+                              deleteModule.mutate(m.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
+          <Button type="button" variant="outline" size="sm" className="gap-2" disabled={addModule.isPending} onClick={() => addModule.mutate()}>
+            {addModule.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add module
+          </Button>
         </CardContent>
       </Card>
     </div>
