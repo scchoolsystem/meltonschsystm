@@ -172,10 +172,10 @@ export function SchoolPicker({ onPicked }: { onPicked?: (slug: string) => void }
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in-0 duration-150"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
-          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-2 font-semibold">
                 <Building2 className="w-5 h-5 text-primary" /> Select Your School
