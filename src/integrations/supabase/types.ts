@@ -4056,6 +4056,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          is_examinable: boolean
           lessons_per_week: number
           level: string
           name: string
@@ -4067,6 +4068,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
+          is_examinable?: boolean
           lessons_per_week?: number
           level: string
           name: string
@@ -4078,6 +4080,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          is_examinable?: boolean
           lessons_per_week?: number
           level?: string
           name?: string
