@@ -116,33 +116,48 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          lesson_occurrence_id: string | null
+          marked_at: string | null
           recorded_by: string | null
           remarks: string | null
           school_id: string
           status: string
           student_id: string
+          subject_id: string | null
+          teacher_id: string | null
+          timetable_slot_id: string | null
         }
         Insert: {
           class_id?: string | null
           created_at?: string
           date?: string
           id?: string
+          lesson_occurrence_id?: string | null
+          marked_at?: string | null
           recorded_by?: string | null
           remarks?: string | null
           school_id?: string
           status?: string
           student_id: string
+          subject_id?: string | null
+          teacher_id?: string | null
+          timetable_slot_id?: string | null
         }
         Update: {
           class_id?: string | null
           created_at?: string
           date?: string
           id?: string
+          lesson_occurrence_id?: string | null
+          marked_at?: string | null
           recorded_by?: string | null
           remarks?: string | null
           school_id?: string
           status?: string
           student_id?: string
+          subject_id?: string | null
+          teacher_id?: string | null
+          timetable_slot_id?: string | null
         }
         Relationships: [
           {
@@ -171,6 +186,34 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_lesson_occurrence_id_fkey"
+            columns: ["lesson_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_timetable_slot_id_fkey"
+            columns: ["timetable_slot_id"]
+            isOneToOne: false
+            referencedRelation: "timetable_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
           {
@@ -2329,8 +2372,11 @@ export type Database = {
       timetable_substitutions: {
         Row: {
           absence_date: string
+          assigned_at: string
+          assigned_by: string | null
           created_at: string
           id: string
+          lesson_occurrence_id: string | null
           notes: string | null
           original_teacher_id: string | null
           school_id: string
@@ -2340,8 +2386,11 @@ export type Database = {
         }
         Insert: {
           absence_date: string
+          assigned_at?: string
+          assigned_by?: string | null
           created_at?: string
           id?: string
+          lesson_occurrence_id?: string | null
           notes?: string | null
           original_teacher_id?: string | null
           school_id: string
@@ -2351,8 +2400,11 @@ export type Database = {
         }
         Update: {
           absence_date?: string
+          assigned_at?: string
+          assigned_by?: string | null
           created_at?: string
           id?: string
+          lesson_occurrence_id?: string | null
           notes?: string | null
           original_teacher_id?: string | null
           school_id?: string
@@ -2373,6 +2425,242 @@ export type Database = {
             columns: ["timetable_slot_id"]
             isOneToOne: false
             referencedRelation: "timetable_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timetable_substitutions_lesson_occurrence_id_fkey"
+            columns: ["lesson_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_occurrences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_occurrences: {
+        Row: {
+          actual_end: string | null
+          actual_start: string | null
+          cancellation_reason: string | null
+          class_id: string
+          completion_notes: string | null
+          created_at: string
+          created_by: string | null
+          homework: string | null
+          id: string
+          late_minutes: number | null
+          lesson_date: string
+          reschedule_reason: string | null
+          room_id: string | null
+          scheduled_end: string
+          scheduled_start: string
+          school_id: string
+          status: string
+          subject_id: string
+          substitute_teacher_id: string | null
+          teacher_id: string | null
+          teacher_status: string | null
+          timetable_slot_id: string
+          topic_covered: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_end?: string | null
+          actual_start?: string | null
+          cancellation_reason?: string | null
+          class_id: string
+          completion_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          homework?: string | null
+          id?: string
+          late_minutes?: number | null
+          lesson_date: string
+          reschedule_reason?: string | null
+          room_id?: string | null
+          scheduled_end: string
+          scheduled_start: string
+          school_id: string
+          status?: string
+          subject_id: string
+          substitute_teacher_id?: string | null
+          teacher_id?: string | null
+          teacher_status?: string | null
+          timetable_slot_id: string
+          topic_covered?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_end?: string | null
+          actual_start?: string | null
+          cancellation_reason?: string | null
+          class_id?: string
+          completion_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          homework?: string | null
+          id?: string
+          late_minutes?: number | null
+          lesson_date?: string
+          reschedule_reason?: string | null
+          room_id?: string | null
+          scheduled_end?: string
+          scheduled_start?: string
+          school_id?: string
+          status?: string
+          subject_id?: string
+          substitute_teacher_id?: string | null
+          teacher_id?: string | null
+          teacher_status?: string | null
+          timetable_slot_id?: string
+          topic_covered?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_occurrences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_timetable_slot_id_fkey"
+            columns: ["timetable_slot_id"]
+            isOneToOne: false
+            referencedRelation: "timetable_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_substitute_teacher_id_fkey"
+            columns: ["substitute_teacher_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_occurrences_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_reschedules: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          lesson_occurrence_id: string
+          new_date: string
+          new_end: string
+          new_room_id: string | null
+          new_start: string
+          original_date: string
+          original_end: string
+          original_start: string
+          reason: string
+          school_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          lesson_occurrence_id: string
+          new_date: string
+          new_end: string
+          new_room_id?: string | null
+          new_start: string
+          original_date: string
+          original_end: string
+          original_start: string
+          reason: string
+          school_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          lesson_occurrence_id?: string
+          new_date?: string
+          new_end?: string
+          new_room_id?: string | null
+          new_start?: string
+          original_date?: string
+          original_end?: string
+          original_start?: string
+          reason?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_reschedules_lesson_occurrence_id_fkey"
+            columns: ["lesson_occurrence_id"]
+            isOneToOne: false
+            referencedRelation: "lesson_occurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_reschedules_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      school_holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          id: string
+          is_half_day: boolean
+          label: string
+          school_id: string
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          id?: string
+          is_half_day?: boolean
+          label?: string
+          school_id: string
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          is_half_day?: boolean
+          label?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_holidays_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
