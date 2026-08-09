@@ -371,7 +371,7 @@ function Page() {
 
   const { data: subjects = [] } = useQuery({
     queryKey: ["subjects-list"],
-    queryFn: async () => (await supabase.from("subjects").select("id,name,code")).data ?? [],
+    queryFn: async () => (await supabase.from("subjects").select("id,name,code").eq("is_examinable", true)).data ?? [],
   });
 
   const { data: classes = [] } = useQuery({
