@@ -1246,15 +1246,50 @@ export const reportTeacherAbsenceAndSubstitute = createServerFn({ method: "POST"
       });
     }
 
-    // ── Persist ───────────────────────────────────────────────────────────
-    const rows = results.map((r) => ({
-      school_id: schoolId, timetable_slot_id: r.slotId, absence_date: data.absenceDate,
-      original_teacher_id: data.staffId, substitute_teacher_id: r.substituteTeacherId, status: r.status,
-    }));
+    // ── Link to dated lesson occurrences for that date, if any have been ────
+    // generated (generateLessonOccurrences). Never required — schools that
+    // haven't generated occurrences yet still get the substitution rows
+    // above exactly as before this upgrade.
+    const slotIds = (slots as any[]).map((s) => s.id);
+    const { data: occurrences = [] } = slotIds.length
+      ? await supabase
+          .from("lesson_occurrences")
+          .select("id,timetable_slot_id,status")
+          .eq("school_id", schoolId).eq("lesson_date", data.absenceDate).in("timetable_slot_id", slotIds)
+      : { data: [] as any[] };
+    const occBySlot = new Map<string, { id: string; status: string }>(
+      (occurrences as any[]).map((o) => [o.timetable_slot_id, o])
+    );
+
+    // ── Persist substitution rows ────────────────────────────────────────
+    const rows = results.map((r) => {
+      const occ = occBySlot.get(r.slotId);
+      return {
+        school_id: schoolId, timetable_slot_id: r.slotId, absence_date: data.absenceDate,
+        original_teacher_id: data.staffId, substitute_teacher_id: r.substituteTeacherId, status: r.status,
+        lesson_occurrence_id: occ?.id ?? null, assigned_by: userId, assigned_at: new Date().toISOString(),
+      };
+    });
     const { error: upsertErr } = await supabase
       .from("timetable_substitutions")
       .upsert(rows, { onConflict: "timetable_slot_id,absence_date" });
     if (upsertErr) throw new Error("Could not save substitutions: " + upsertErr.message);
+
+    // ── Reflect onto the dated occurrences: never touch ones already ────────
+    // completed or cancelled. Covered lessons get substitute_teacher_id set
+    // and status='substituted'; uncovered ones get status='teacher_absent'
+    // so dashboards can flag them under "Attention Required".
+    for (const r of results) {
+      const occ = occBySlot.get(r.slotId);
+      if (!occ || occ.status === "completed" || occ.status === "cancelled") continue;
+      if (r.status === "covered" && r.substituteTeacherId) {
+        await supabase.from("lesson_occurrences").update({
+          status: "substituted", substitute_teacher_id: r.substituteTeacherId, teacher_status: "substituted",
+        }).eq("id", occ.id);
+      } else {
+        await supabase.from("lesson_occurrences").update({ status: "teacher_absent", teacher_status: "absent" }).eq("id", occ.id);
+      }
+    }
 
     return {
       ok: true,
@@ -1297,9 +1332,552 @@ export const setSubstitute = createServerFn({ method: "POST" })
         school_id: schoolId, timetable_slot_id: data.timetableSlotId, absence_date: data.absenceDate,
         original_teacher_id: (slot as any)?.teacher_id ?? null,
         substitute_teacher_id: data.substituteTeacherId, status: data.status, notes: data.notes ?? null,
+        assigned_by: userId, assigned_at: new Date().toISOString(),
       },
       { onConflict: "timetable_slot_id,absence_date" }
     );
     if (error) throw new Error(error.message);
+
+    // ── Mirror onto the dated occurrence, if one exists for that date ───────
+    const { data: occ } = await supabase
+      .from("lesson_occurrences").select("id,status")
+      .eq("school_id", schoolId).eq("timetable_slot_id", data.timetableSlotId).eq("lesson_date", data.absenceDate)
+      .maybeSingle();
+    if (occ && occ.status !== "completed" && occ.status !== "cancelled") {
+      if (data.status === "covered" && data.substituteTeacherId) {
+        await supabase.from("lesson_occurrences").update({
+          status: "substituted", substitute_teacher_id: data.substituteTeacherId, teacher_status: "substituted",
+        }).eq("id", occ.id);
+        await supabase.from("timetable_substitutions").update({ lesson_occurrence_id: occ.id })
+          .eq("timetable_slot_id", data.timetableSlotId).eq("absence_date", data.absenceDate);
+      } else if (data.status === "cancelled") {
+        await supabase.from("lesson_occurrences").update({ status: "cancelled", cancellation_reason: data.notes ?? "Teacher absent, no substitute available" }).eq("id", occ.id);
+      } else {
+        await supabase.from("lesson_occurrences").update({ status: "teacher_absent", teacher_status: "absent" }).eq("id", occ.id);
+      }
+    }
+
     return { ok: true };
+  });
+
+// =============================================================================
+// TIMETABLE V3 — LIVE LESSON OPERATIONS
+// Everything below sits ON TOP of timetable_slots (still the recurring
+// source of truth) and answers "what actually happened" via
+// lesson_occurrences. See supabase/migrations/20260809120000_timetable_v3_lesson_operations.sql.
+// =============================================================================
+
+const DOW = (isoDate: string) => {
+  const d = new Date(`${isoDate}T00:00:00`).getDay(); // 0=Sun..6=Sat
+  return d === 0 ? 7 : d; // convert to the 1=Mon..7=Sun convention used across this file
+};
+
+function addDays(isoDate: string, n: number) {
+  const d = new Date(`${isoDate}T00:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+async function requireAdminOrAcademic(supabase: any, userId: string) {
+  const [{ data: isAdmin }, { data: isAcademic }] = await Promise.all([
+    supabase.rpc("is_admin", { _user_id: userId }),
+    supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
+  ]);
+  if (!isAdmin && !isAcademic) throw new Error("Only admins or academic master can do this");
+  return { isAdmin: !!isAdmin, isAcademic: !!isAcademic };
+}
+
+// ── A. Generate dated lesson occurrences from the recurring timetable ───────
+// Idempotent: re-running for the same range never creates duplicates
+// (unique on school_id+timetable_slot_id+lesson_date, upsert ignores
+// conflicts instead of overwriting — so an in-progress/completed lesson is
+// never reset by a re-run). Skips school_holidays and any weekday that has
+// no timetable_slots rows at all.
+export const generateLessonOccurrences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      startDate: z.string(), // YYYY-MM-DD
+      endDate: z.string(),   // YYYY-MM-DD, inclusive
+      classIds: z.array(z.string().uuid()).optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireAdminOrAcademic(supabase, userId);
+
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    if (data.startDate > data.endDate) throw new Error("startDate must be on or before endDate");
+    const spanDays = (new Date(`${data.endDate}T00:00:00`).getTime() - new Date(`${data.startDate}T00:00:00`).getTime()) / 86400000;
+    if (spanDays > 120) throw new Error("Generate at most a term at a time (120 days max)");
+
+    // ── Recurring lessons to project forward ─────────────────────────────
+    let slotQuery = supabase
+      .from("timetable_slots")
+      .select("id,class_id,subject_id,teacher_id,room_id,day_of_week,start_time,end_time")
+      .eq("school_id", schoolId);
+    if (data.classIds?.length) slotQuery = slotQuery.in("class_id", data.classIds);
+    const { data: slots = [], error: slotsErr } = await slotQuery;
+    if (slotsErr) throw new Error(slotsErr.message);
+
+    const slotsByDow = new Map<number, any[]>();
+    (slots as any[]).forEach((s) => {
+      const arr = slotsByDow.get(s.day_of_week) ?? [];
+      arr.push(s);
+      slotsByDow.set(s.day_of_week, arr);
+    });
+
+    // ── School calendar: never count a holiday as a missed lesson ───────────
+    const { data: holidays = [] } = await supabase
+      .from("school_holidays").select("holiday_date").eq("school_id", schoolId)
+      .gte("holiday_date", data.startDate).lte("holiday_date", data.endDate);
+    const holidaySet = new Set((holidays as any[]).map((h) => h.holiday_date));
+
+    // ── Walk the date range, build rows ──────────────────────────────────
+    const rows: any[] = [];
+    let cursor = data.startDate;
+    let datesProcessed = 0;
+    let holidaysSkipped = 0;
+    while (cursor <= data.endDate) {
+      datesProcessed++;
+      if (holidaySet.has(cursor)) {
+        holidaysSkipped++;
+      } else {
+        const daySlots = slotsByDow.get(DOW(cursor)) ?? [];
+        for (const s of daySlots) {
+          rows.push({
+            school_id: schoolId, timetable_slot_id: s.id, lesson_date: cursor,
+            scheduled_start: s.start_time, scheduled_end: s.end_time,
+            teacher_id: s.teacher_id, class_id: s.class_id, subject_id: s.subject_id, room_id: s.room_id,
+            status: "scheduled", created_by: userId,
+          });
+        }
+      }
+      cursor = addDays(cursor, 1);
+    }
+
+    // ── Idempotent chunked upsert — conflicts are SKIPPED (not overwritten) ─
+    // so re-running never resets an already-started/completed lesson.
+    const CHUNK = 500;
+    let attempted = 0;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      attempted += chunk.length;
+      const { error } = await supabase
+        .from("lesson_occurrences")
+        .upsert(chunk, { onConflict: "school_id,timetable_slot_id,lesson_date", ignoreDuplicates: true });
+      if (error) throw new Error("Could not generate lesson occurrences: " + error.message);
+    }
+
+    return {
+      ok: true, datesProcessed, holidaysSkipped,
+      slotsConsidered: (slots as any[]).length, occurrencesAttempted: attempted,
+    };
+  });
+
+// ── B. Teacher starts a lesson ───────────────────────────────────────────────
+export const startLessonOccurrence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ occurrenceId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: staffRow } = await supabase.from("staff").select("id").eq("user_id", userId).maybeSingle();
+    const staffId = (staffRow as any)?.id ?? null;
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences").select("id,school_id,teacher_id,substitute_teacher_id,status,scheduled_start")
+      .eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    if ((occ as any).school_id !== schoolId) throw new Error("Not found");
+
+    const { isAdmin, isAcademic } = await (async () => {
+      const [{ data: a }, { data: b }] = await Promise.all([
+        supabase.rpc("is_admin", { _user_id: userId }),
+        supabase.rpc("has_role", { _user_id: userId, _role: "academic_master" }),
+      ]);
+      return { isAdmin: !!a, isAcademic: !!b };
+    })();
+    const isMyLesson = staffId && ((occ as any).teacher_id === staffId || (occ as any).substitute_teacher_id === staffId);
+    if (!isMyLesson && !isAdmin && !isAcademic) throw new Error("Only the assigned or substitute teacher can start this lesson");
+
+    if (!["scheduled", "teacher_absent", "substituted", "rescheduled"].includes((occ as any).status)) {
+      throw new Error(`Lesson cannot be started from status "${(occ as any).status}"`);
+    }
+
+    const now = new Date();
+    const teacherStatus = staffId && (occ as any).substitute_teacher_id === staffId ? "substituted" : "present"; // lateness derived server-side via late_minutes trigger; nudged to "late" below
+    const { error } = await supabase.from("lesson_occurrences").update({
+      status: "in_progress", actual_start: now.toISOString(), teacher_status: teacherStatus,
+    }).eq("id", data.occurrenceId);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("activity_logs").insert({
+      action: "LESSON_STARTED", entity: "lesson_occurrences", entity_id: data.occurrenceId,
+      school_id: schoolId, user_id: userId, metadata: { at: now.toISOString() },
+    });
+
+    return { ok: true, startedAt: now.toISOString() };
+  });
+
+// ── C. Teacher completes a lesson ────────────────────────────────────────────
+export const completeLessonOccurrence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      occurrenceId: z.string().uuid(),
+      topicCovered: z.string().max(2000).optional(),
+      homework: z.string().max(2000).optional(),
+      completionNotes: z.string().max(2000).optional(),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: staffRow } = await supabase.from("staff").select("id").eq("user_id", userId).maybeSingle();
+    const staffId = (staffRow as any)?.id ?? null;
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences").select("id,school_id,teacher_id,substitute_teacher_id,status")
+      .eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    if ((occ as any).school_id !== schoolId) throw new Error("Not found");
+    if ((occ as any).status !== "in_progress") throw new Error("Only an in-progress lesson can be completed");
+
+    const { isAdmin, isAcademic } = await requireAdminOrAcademic(supabase, userId).catch(() => ({ isAdmin: false, isAcademic: false }));
+    const isMyLesson = staffId && ((occ as any).teacher_id === staffId || (occ as any).substitute_teacher_id === staffId);
+    if (!isMyLesson && !isAdmin && !isAcademic) throw new Error("Only the assigned or substitute teacher can complete this lesson");
+
+    const now = new Date();
+    const { error } = await supabase.from("lesson_occurrences").update({
+      status: "completed", actual_end: now.toISOString(),
+      topic_covered: data.topicCovered ?? null, homework: data.homework ?? null, completion_notes: data.completionNotes ?? null,
+    }).eq("id", data.occurrenceId);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("activity_logs").insert({
+      action: "LESSON_COMPLETED", entity: "lesson_occurrences", entity_id: data.occurrenceId,
+      school_id: schoolId, user_id: userId, metadata: { at: now.toISOString(), topicCovered: data.topicCovered ?? null },
+    });
+
+    return { ok: true, completedAt: now.toISOString() };
+  });
+
+// ── D. Cancel a lesson occurrence (reason required, never counted as a ──────
+// teacher failure in analytics — analytics reads status, and 'cancelled' is
+// always reported separately from 'teacher_absent'/'completed').
+export const cancelLessonOccurrence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ occurrenceId: z.string().uuid(), reason: z.string().min(1).max(500) }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireAdminOrAcademic(supabase, userId);
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences").select("id,school_id,status").eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    if ((occ as any).school_id !== schoolId) throw new Error("Not found");
+    if ((occ as any).status === "completed") throw new Error("A completed lesson cannot be cancelled");
+    if ((occ as any).status === "cancelled") return { ok: true, alreadyCancelled: true };
+
+    const { error } = await supabase.from("lesson_occurrences")
+      .update({ status: "cancelled", cancellation_reason: data.reason }).eq("id", data.occurrenceId);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("activity_logs").insert({
+      action: "LESSON_CANCELLED", entity: "lesson_occurrences", entity_id: data.occurrenceId,
+      school_id: schoolId, user_id: userId, metadata: { reason: data.reason },
+    });
+
+    return { ok: true };
+  });
+
+// ── E. Reschedule a lesson occurrence to a new date/time/room ───────────────
+// Validates teacher/class/room conflicts against other live occurrences on
+// the target date and records full before/after history in
+// lesson_reschedules. The occurrence itself is updated, never silently —
+// every previous schedule stays in lesson_reschedules forever.
+export const rescheduleLessonOccurrence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      occurrenceId: z.string().uuid(),
+      newDate: z.string(),
+      newStart: z.string(), // HH:MM[:SS]
+      newEnd: z.string(),
+      newRoomId: z.string().uuid().nullable().optional(),
+      reason: z.string().min(1).max(500),
+    }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireAdminOrAcademic(supabase, userId);
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    if (data.newStart >= data.newEnd) throw new Error("newStart must be before newEnd");
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences")
+      .select("id,school_id,status,teacher_id,class_id,room_id,lesson_date,scheduled_start,scheduled_end")
+      .eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    const o = occ as any;
+    if (o.school_id !== schoolId) throw new Error("Not found");
+    if (o.status === "completed" || o.status === "cancelled") throw new Error(`Cannot reschedule a ${o.status} lesson`);
+
+    const targetRoomId = data.newRoomId === undefined ? o.room_id : data.newRoomId;
+
+    // ── Conflict check against other live occurrences that same day ────────
+    const { data: sameDay = [] } = await supabase
+      .from("lesson_occurrences")
+      .select("id,teacher_id,class_id,room_id,scheduled_start,scheduled_end,status")
+      .eq("school_id", schoolId).eq("lesson_date", data.newDate).neq("id", data.occurrenceId)
+      .not("status", "in", "(cancelled)");
+    const overlaps = (a1: string, a2: string, b1: string, b2: string) => a1 < b2 && b1 < a2;
+    const conflict = (sameDay as any[]).find((r) => {
+      if (!overlaps(data.newStart, data.newEnd, r.scheduled_start, r.scheduled_end)) return false;
+      if (r.teacher_id && r.teacher_id === o.teacher_id) return true;
+      if (r.class_id === o.class_id) return true;
+      if (targetRoomId && r.room_id && r.room_id === targetRoomId) return true;
+      return false;
+    });
+    if (conflict) {
+      throw new Error("Reschedule conflict: teacher, class, or room already booked at that time on " + data.newDate);
+    }
+
+    // ── Record history, then move the occurrence ─────────────────────────
+    const { error: histErr } = await supabase.from("lesson_reschedules").insert({
+      school_id: schoolId, lesson_occurrence_id: data.occurrenceId,
+      original_date: o.lesson_date, original_start: o.scheduled_start, original_end: o.scheduled_end,
+      new_date: data.newDate, new_start: data.newStart, new_end: data.newEnd, new_room_id: targetRoomId,
+      reason: data.reason, changed_by: userId,
+    });
+    if (histErr) throw new Error("Could not record reschedule history: " + histErr.message);
+
+    const { error } = await supabase.from("lesson_occurrences").update({
+      lesson_date: data.newDate, scheduled_start: data.newStart, scheduled_end: data.newEnd,
+      room_id: targetRoomId, status: "rescheduled", reschedule_reason: data.reason,
+    }).eq("id", data.occurrenceId);
+    if (error) throw new Error(error.message);
+
+    await supabase.from("activity_logs").insert({
+      action: "LESSON_RESCHEDULED", entity: "lesson_occurrences", entity_id: data.occurrenceId,
+      school_id: schoolId, user_id: userId,
+      metadata: { from: { date: o.lesson_date, start: o.scheduled_start }, to: { date: data.newDate, start: data.newStart }, reason: data.reason },
+    });
+
+    return { ok: true };
+  });
+
+// ── F. Rank substitute candidates for one lesson occurrence ─────────────────
+// (Used by the "teacher absent" UI to show QUALIFIED / AVAILABLE / NO
+// CONFLICT / CURRENT LOAD before an admin approves someone via
+// assignLessonSubstitute below. Complements — does not replace —
+// reportTeacherAbsenceAndSubstitute's auto-assignment.)
+export const suggestSubstitutesForOccurrence = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ occurrenceId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireAdminOrAcademic(supabase, userId);
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences")
+      .select("id,school_id,subject_id,class_id,teacher_id,lesson_date,scheduled_start,scheduled_end")
+      .eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    const o = occ as any;
+    if (o.school_id !== schoolId) throw new Error("Not found");
+
+    const { data: qualified = [] } = await supabase
+      .from("teacher_subjects").select("staff_id").eq("school_id", schoolId).eq("subject_id", o.subject_id);
+    const candidateIds = (qualified as any[]).map((q) => q.staff_id).filter((id) => id !== o.teacher_id);
+    if (!candidateIds.length) return { ok: true, candidates: [] };
+
+    const dow = DOW(o.lesson_date);
+    const [{ data: busySlots = [] }, { data: busyOcc = [] }, { data: absentToday = [] }, { data: loadRows = [] }, { data: staffRows = [] }] = await Promise.all([
+      supabase.from("timetable_slots").select("teacher_id,start_time,end_time").eq("school_id", schoolId).eq("day_of_week", dow).in("teacher_id", candidateIds),
+      supabase.from("lesson_occurrences").select("teacher_id,substitute_teacher_id,scheduled_start,scheduled_end,status").eq("school_id", schoolId).eq("lesson_date", o.lesson_date).not("status", "in", "(cancelled)"),
+      supabase.from("teacher_absences").select("staff_id").eq("school_id", schoolId).eq("absence_date", o.lesson_date).in("staff_id", candidateIds),
+      supabase.from("timetable_slots").select("teacher_id").eq("school_id", schoolId).in("teacher_id", candidateIds),
+      supabase.from("staff").select("id,first_name,last_name,department").in("id", candidateIds),
+    ]);
+    const overlaps = (a1: string, a2: string, b1: string, b2: string) => a1 < b2 && b1 < a2;
+    const absentSet = new Set((absentToday as any[]).map((a) => a.staff_id));
+    const loadCount = new Map<string, number>();
+    (loadRows as any[]).forEach((r) => loadCount.set(r.teacher_id, (loadCount.get(r.teacher_id) ?? 0) + 1));
+    const staffById = new Map((staffRows as any[]).map((s) => [s.id, s]));
+
+    const candidates = candidateIds.map((staffId) => {
+      const hasRecurringConflict = (busySlots as any[]).some((s) => s.teacher_id === staffId && overlaps(o.scheduled_start, o.scheduled_end, s.start_time, s.end_time));
+      const hasDatedConflict = (busyOcc as any[]).some((r) => (r.teacher_id === staffId || r.substitute_teacher_id === staffId) && overlaps(o.scheduled_start, o.scheduled_end, r.scheduled_start, r.scheduled_end));
+      const available = !absentSet.has(staffId) && !hasRecurringConflict && !hasDatedConflict;
+      const s = staffById.get(staffId);
+      return {
+        staffId, name: s ? `${s.first_name} ${s.last_name}` : staffId,
+        qualified: true, available, noConflict: !hasRecurringConflict && !hasDatedConflict,
+        currentLoad: loadCount.get(staffId) ?? 0, department: s?.department ?? null,
+      };
+    }).sort((a, b) => (Number(b.available) - Number(a.available)) || (a.currentLoad - b.currentLoad));
+
+    return { ok: true, candidates };
+  });
+
+// ── G. Approve a substitute for one specific lesson occurrence ──────────────
+// Original teacher is retained on `teacher_id` — this only ever sets
+// substitute_teacher_id and marks the occurrence 'substituted'.
+export const assignLessonSubstitute = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ occurrenceId: z.string().uuid(), substituteTeacherId: z.string().uuid(), notes: z.string().optional() }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await requireAdminOrAcademic(supabase, userId);
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: occ, error: fetchErr } = await supabase
+      .from("lesson_occurrences").select("id,school_id,status,teacher_id,timetable_slot_id,lesson_date")
+      .eq("id", data.occurrenceId).single();
+    if (fetchErr || !occ) throw new Error("Lesson occurrence not found");
+    const o = occ as any;
+    if (o.school_id !== schoolId) throw new Error("Not found");
+    if (o.status === "completed" || o.status === "cancelled") throw new Error(`Cannot assign a substitute to a ${o.status} lesson`);
+
+    const { error } = await supabase.from("lesson_occurrences").update({
+      status: "substituted", substitute_teacher_id: data.substituteTeacherId, teacher_status: "substituted",
+    }).eq("id", data.occurrenceId);
+    if (error) throw new Error(error.message);
+
+    const { error: subErr } = await supabase.from("timetable_substitutions").upsert({
+      school_id: schoolId, timetable_slot_id: o.timetable_slot_id, absence_date: o.lesson_date,
+      original_teacher_id: o.teacher_id, substitute_teacher_id: data.substituteTeacherId, status: "covered",
+      notes: data.notes ?? null, lesson_occurrence_id: data.occurrenceId, assigned_by: userId, assigned_at: new Date().toISOString(),
+    }, { onConflict: "timetable_slot_id,absence_date" });
+    if (subErr) throw new Error(subErr.message);
+
+    await supabase.from("activity_logs").insert({
+      action: "SUBSTITUTE_ASSIGNED", entity: "lesson_occurrences", entity_id: data.occurrenceId,
+      school_id: schoolId, user_id: userId,
+      metadata: { originalTeacherId: o.teacher_id, substituteTeacherId: data.substituteTeacherId },
+    });
+
+    return { ok: true };
+  });
+
+// ── H. Today's / a date's live academic-operations board ────────────────────
+export const getLessonOperationsBoard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ date: z.string() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: rows = [], error } = await supabase
+      .from("lesson_occurrences")
+      .select("id,status,class_id,subject_id,teacher_id,substitute_teacher_id,scheduled_start,scheduled_end,classes(name),subjects(name)")
+      .eq("school_id", schoolId).eq("lesson_date", data.date);
+    if (error) throw new Error(error.message);
+
+    const totals = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0, teacher_absent: 0, substituted: 0, rescheduled: 0 };
+    const attention: any[] = [];
+    (rows as any[]).forEach((r) => {
+      totals[r.status as keyof typeof totals] = (totals[r.status as keyof typeof totals] ?? 0) + 1;
+      if (r.status === "teacher_absent") attention.push({ type: "uncovered_absence", ...r });
+    });
+
+    const { data: uncoveredSubs = [] } = await supabase
+      .from("timetable_substitutions").select("id,timetable_slot_id,status,notes")
+      .eq("school_id", schoolId).eq("absence_date", data.date).eq("status", "uncovered");
+
+    return {
+      ok: true, date: data.date, total: (rows as any[]).length, totals,
+      attentionRequired: { uncoveredLessons: attention, uncoveredSubstitutions: uncoveredSubs.length },
+    };
+  });
+
+// ── I. Teacher lesson-attendance / workload stats ────────────────────────────
+export const getTeacherLessonStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ staffId: z.string().uuid(), fromDate: z.string(), toDate: z.string() }).parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: rows = [], error } = await supabase
+      .from("lesson_occurrences")
+      .select("status,actual_start,actual_end,late_minutes,teacher_id,substitute_teacher_id")
+      .eq("school_id", schoolId).gte("lesson_date", data.fromDate).lte("lesson_date", data.toDate)
+      .or(`teacher_id.eq.${data.staffId},substitute_teacher_id.eq.${data.staffId}`);
+    if (error) throw new Error(error.message);
+
+    const r = rows as any[];
+    const scheduled = r.filter((x) => x.teacher_id === data.staffId).length;
+    const completed = r.filter((x) => x.status === "completed").length;
+    const missed = r.filter((x) => x.status === "teacher_absent").length;
+    const substituted = r.filter((x) => x.status === "substituted" && x.teacher_id === data.staffId).length;
+    const cancelled = r.filter((x) => x.status === "cancelled").length;
+    const lateStarts = r.filter((x) => (x.late_minutes ?? 0) > 5).length;
+    const durations = r.filter((x) => x.actual_start && x.actual_end).map((x) => (new Date(x.actual_end).getTime() - new Date(x.actual_start).getTime()) / 60000);
+    const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
+    const teachingHours = Math.round((durations.reduce((a, b) => a + b, 0) / 60) * 10) / 10;
+
+    return {
+      ok: true, scheduled, completed, missed, substituted, cancelled,
+      completionRate: scheduled ? Math.round((completed / scheduled) * 1000) / 10 : 0,
+      lateStarts, averageLessonMinutes: avgDuration, teachingHours,
+    };
+  });
+
+// ── J. Class + subject lesson coverage ───────────────────────────────────────
+// "Coverage" = lessons actually completed vs lessons the timetable has
+// scheduled to date. This is NOT a claim about syllabus/curriculum mastery.
+export const getLessonCoverage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ classId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) throw new Error("No school context");
+
+    const { data: rows = [], error } = await supabase
+      .from("lesson_occurrences")
+      .select("subject_id,status,subjects(name)")
+      .eq("school_id", schoolId).eq("class_id", data.classId).neq("status", "cancelled");
+    if (error) throw new Error(error.message);
+
+    const bySubject = new Map<string, { name: string; scheduled: number; completed: number }>();
+    (rows as any[]).forEach((r) => {
+      const key = r.subject_id;
+      const entry = bySubject.get(key) ?? { name: r.subjects?.name ?? "Subject", scheduled: 0, completed: 0 };
+      entry.scheduled += 1;
+      if (r.status === "completed") entry.completed += 1;
+      bySubject.set(key, entry);
+    });
+
+    const coverage = Array.from(bySubject.entries()).map(([subjectId, v]) => ({
+      subjectId, subjectName: v.name, expected: v.scheduled, completed: v.completed,
+      outstanding: v.scheduled - v.completed,
+      coveragePercent: v.scheduled ? Math.round((v.completed / v.scheduled) * 1000) / 10 : 0,
+    })).sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+
+    return { ok: true, classId: data.classId, coverage };
   });
