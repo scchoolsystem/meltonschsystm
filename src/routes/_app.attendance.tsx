@@ -20,10 +20,15 @@ export const Route = createFileRoute("/_app/attendance/mark")({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-period attendance for a teacher's own timetable slots, reusing the
-// SAME attendance_records table the rest of the school uses (no second
-// attendance system — see supabase/migrations/20260809120000_..._lesson_operations.sql
-// which added timetable_slot_id / subject_id / teacher_id / lesson_occurrence_id
-// / marked_at to attendance_records for exactly this purpose).
+// Uses a dedicated `lesson_attendance` table — NOT attendance_records.
+// attendance_records is the school's existing one-row-per-student-per-day
+// DAILY REGISTER (already consumed by report cards, analytics, dashboards,
+// and both portals under that exact assumption, with a live
+// UNIQUE(student_id, date) constraint). Per-period lesson attendance is a
+// different grain (several rows per student per day, one per lesson), so it
+// lives in lesson_attendance instead — same students/classes/RLS patterns,
+// same status vocabulary, just the correct table for the grain. See
+// supabase/migrations/20260809130000_fix_lesson_attendance_table.sql.
 //
 // Column names and the day_of_week convention (1=Mon..7=Sun) match the rest
 // of the codebase (src/lib/timetable.functions.ts) exactly — this file
@@ -174,7 +179,7 @@ function TeacherAttendanceMark() {
     enabled: !!selectedSlot?.id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("attendance_records")
+        .from("lesson_attendance")
         .select("id, student_id, status")
         .eq("timetable_slot_id", selectedSlot!.id)
         .eq("date", date);
@@ -252,7 +257,7 @@ function TeacherAttendanceMark() {
         marked_at: new Date().toISOString(),
       }));
       const { error } = await supabase
-        .from("attendance_records")
+        .from("lesson_attendance")
         .upsert(rows, { onConflict: "timetable_slot_id,student_id,date" });
       if (error) throw error;
     },
