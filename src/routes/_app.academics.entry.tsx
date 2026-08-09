@@ -108,7 +108,7 @@ function EntryPage() {
   const { data: subjects = [] } = useQuery({
     queryKey: ["entry-subjects", isTeacherScoped, classId, (subjectFilter ?? []).join(",")],
     queryFn: async () => {
-      let q = supabase.from("subjects").select("id,code,name").order("name");
+      let q = supabase.from("subjects").select("id,code,name").eq("is_examinable", true).order("name");
       if (isTeacherScoped) {
         if (!subjectFilter || subjectFilter.length === 0) return [];
         q = q.in("id", subjectFilter);
