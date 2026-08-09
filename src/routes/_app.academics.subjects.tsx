@@ -66,6 +66,7 @@ interface Subject {
   id: string; code: string; name: string; level: string;
   lessons_per_week: number; allow_double_period: boolean;
   preferred_time_of_day: string; school_id: string; created_at: string;
+  is_examinable?: boolean;
 }
 
 const LEVELS = ["primary", "secondary", "both"] as const;
@@ -74,6 +75,7 @@ const TIMES  = ["morning", "afternoon", "any"] as const;
 const BLANK_FORM = {
   code: "", name: "", level: "secondary",
   lessons_per_week: 5, allow_double_period: false, preferred_time_of_day: "any",
+  is_examinable: true,
 };
 
 function fallbackGrade(s: number) {
@@ -283,6 +285,7 @@ function Page() {
         lessons_per_week: addForm.lessons_per_week,
         allow_double_period: addForm.allow_double_period,
         preferred_time_of_day: addForm.preferred_time_of_day,
+        is_examinable: addForm.is_examinable,
       }]);
       if (error) throw error;
     },
@@ -303,6 +306,7 @@ function Page() {
         lessons_per_week: editForm.lessons_per_week,
         allow_double_period: editForm.allow_double_period,
         preferred_time_of_day: editForm.preferred_time_of_day,
+        is_examinable: editForm.is_examinable,
       }).eq("id", editSubject!.id);
       if (error) throw error;
     },
@@ -374,6 +378,7 @@ function Page() {
       lessons_per_week: s.lessons_per_week,
       allow_double_period: s.allow_double_period,
       preferred_time_of_day: s.preferred_time_of_day,
+      is_examinable: s.is_examinable ?? true,
     });
     setEditOpen(true);
   }
@@ -440,6 +445,19 @@ function Page() {
           <Label htmlFor="double" className="cursor-pointer">
             Allow double periods
             <span className="block text-xs text-muted-foreground font-normal">Allow two consecutive slots for this subject</span>
+          </Label>
+        </div>
+        <div className="flex items-center gap-3 p-3 rounded-lg border">
+          <Switch
+            id="examinable"
+            checked={form.is_examinable}
+            onCheckedChange={(v) => setForm({ ...form, is_examinable: v })}
+          />
+          <Label htmlFor="examinable" className="cursor-pointer">
+            Examinable subject
+            <span className="block text-xs text-muted-foreground font-normal">
+              Off = still schedules on the timetable, but won't appear in marks entry, exam results, or remarks (e.g. PE, Co-curricular)
+            </span>
           </Label>
         </div>
       </div>
