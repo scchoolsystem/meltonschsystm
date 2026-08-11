@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import './theme.css';
+
+body {
+  background-color: var(--color-espresso);
+  color: var(--color-warm-cream);
+  font-family: var(--font-pp-neue-montreal);
+}
