@@ -86,12 +86,11 @@ async function stripCfChallengeScripts(response: Response): Promise<Response> {
 // this to work. The Worker just resolves which asset is "latest" and 302s
 // the visitor straight to GitHub's CDN (browser_download_url).
 //
-// RELEASES_GITHUB_TOKEN is now OPTIONAL: if present, it's sent so this
-// lookup counts against the token's 5,000/hr quota instead of the shared
-// 60/hr anonymous quota for the Worker's egress IP. If the token is ever
-// missing, expired, or revoked, the lookup still works unauthenticated
-// (public repos allow this) — it just has a lower shared rate limit.
-// This means an expired token can no longer take the download page down.
+// The repo is public and unauthenticated, so no GitHub token or secret is
+// used at all here anymore — one less thing that can silently expire and
+// break this route. If GitHub's public 60 req/hr-per-IP limit is ever hit
+// (very unlikely for a low-traffic download link), see the KV-cache note
+// at the bottom of this function for how to eliminate that too.
 // ─────────────────────────────────────────────────────────────────────────
 
 const RELEASES_GITHUB_REPO = "scchoolsystem/meltonschsystm";
@@ -110,19 +109,12 @@ function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): G
   );
 }
 
-async function handleReleaseDownload(kind: "android" | "windows", env: Env): Promise<Response> {
-  const token = env.RELEASES_GITHUB_TOKEN;
-
+async function handleReleaseDownload(kind: "android" | "windows", _env: Env): Promise<Response> {
   const githubHeaders: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "smartdev-erp-release-proxy",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  if (token) {
-    githubHeaders.Authorization = `Bearer ${token}`;
-  } else {
-    console.warn("RELEASES_GITHUB_TOKEN not set — using unauthenticated GitHub API (60 req/hr shared limit)");
-  }
 
   const releaseRes = await fetch(
     `https://api.github.com/repos/${RELEASES_GITHUB_REPO}/releases/latest`,
@@ -131,6 +123,11 @@ async function handleReleaseDownload(kind: "android" | "windows", env: Env): Pro
   if (!releaseRes.ok) {
     const body = await releaseRes.text().catch(() => "");
     console.error(`GitHub releases lookup failed: ${releaseRes.status} ${releaseRes.statusText} — ${body}`);
+    // GitHub's unauthenticated limit is 60 req/hr shared across the
+    // Worker's whole egress IP range. If this route gets busy enough to
+    // hit that in practice, add a KV cache here: cache the resolved
+    // browser_download_url for ~10 min so most requests never call
+    // GitHub at all. Not needed at current traffic levels.
     return new Response("Could not find the latest release.", { status: 502 });
   }
   const release = (await releaseRes.json()) as GithubRelease;
