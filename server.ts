@@ -79,21 +79,24 @@ async function stripCfChallengeScripts(response: Response): Promise<Response> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Release download proxy.
+// Release download redirect.
 //
-// The source repo is private, so `github.com/.../releases/latest` isn't
-// reachable by anonymous visitors on the public landing page — they'd hit a
-// login wall instead of a download. Rather than mirroring binaries out to a
-// separate public bucket (Supabase or otherwise), the Worker fetches the
-// asset from GitHub server-side (using a fine-grained, read-only token that
-// only the Worker holds) and streams the bytes straight back. Visitors never
-// see github.com or any third-party storage URL — just a file download from
-// smartdev.co.ke.
+// The repo is now PUBLIC, so GitHub's release assets are reachable directly
+// by anonymous visitors — no server-side proxy or token is required for
+// this to work. The Worker just resolves which asset is "latest" and 302s
+// the visitor straight to GitHub's CDN (browser_download_url).
+//
+// RELEASES_GITHUB_TOKEN is now OPTIONAL: if present, it's sent so this
+// lookup counts against the token's 5,000/hr quota instead of the shared
+// 60/hr anonymous quota for the Worker's egress IP. If the token is ever
+// missing, expired, or revoked, the lookup still works unauthenticated
+// (public repos allow this) — it just has a lower shared rate limit.
+// This means an expired token can no longer take the download page down.
 // ─────────────────────────────────────────────────────────────────────────
 
 const RELEASES_GITHUB_REPO = "scchoolsystem/meltonschsystm";
 
-type GithubAsset = { name: string; url: string };
+type GithubAsset = { name: string; browser_download_url: string };
 type GithubRelease = { assets: GithubAsset[] };
 
 function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): GithubAsset | undefined {
@@ -109,53 +112,38 @@ function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): G
 
 async function handleReleaseDownload(kind: "android" | "windows", env: Env): Promise<Response> {
   const token = env.RELEASES_GITHUB_TOKEN;
-  if (!token) {
-    console.error("RELEASES_GITHUB_TOKEN is not configured");
-    return new Response("Download is temporarily unavailable.", { status: 503 });
-  }
 
-  const githubHeaders = {
-    Authorization: `Bearer ${token}`,
+  const githubHeaders: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "smartdev-erp-release-proxy",
     "X-GitHub-Api-Version": "2022-11-28",
   };
+  if (token) {
+    githubHeaders.Authorization = `Bearer ${token}`;
+  } else {
+    console.warn("RELEASES_GITHUB_TOKEN not set — using unauthenticated GitHub API (60 req/hr shared limit)");
+  }
 
   const releaseRes = await fetch(
     `https://api.github.com/repos/${RELEASES_GITHUB_REPO}/releases/latest`,
     { headers: githubHeaders },
   );
   if (!releaseRes.ok) {
-    console.error(`GitHub releases lookup failed: ${releaseRes.status}`);
+    const body = await releaseRes.text().catch(() => "");
+    console.error(`GitHub releases lookup failed: ${releaseRes.status} ${releaseRes.statusText} — ${body}`);
     return new Response("Could not find the latest release.", { status: 502 });
   }
   const release = (await releaseRes.json()) as GithubRelease;
   const asset = pickReleaseAsset(release.assets ?? [], kind);
   if (!asset) {
+    console.error(`No matching ${kind} asset in latest release. Assets: ${JSON.stringify(release.assets?.map((a) => a.name))}`);
     return new Response("Release asset not found.", { status: 404 });
   }
 
-  // Fetching the binary requires the assets API URL with an octet-stream
-  // Accept header — the browser_download_url only works for public repos.
-  const assetRes = await fetch(asset.url, {
-    headers: { ...githubHeaders, Accept: "application/octet-stream" },
-  });
-  if (!assetRes.ok || !assetRes.body) {
-    console.error(`GitHub asset download failed: ${assetRes.status}`);
-    return new Response("Could not download the release file.", { status: 502 });
-  }
-
-  const headers = new Headers();
-  headers.set(
-    "Content-Type",
-    kind === "android" ? "application/vnd.android.package-archive" : "application/octet-stream",
-  );
-  headers.set("Content-Disposition", `attachment; filename="${asset.name}"`);
-  const contentLength = assetRes.headers.get("content-length");
-  if (contentLength) headers.set("Content-Length", contentLength);
-  headers.set("Cache-Control", "no-store");
-
-  return new Response(assetRes.body, { status: 200, headers });
+  // Public repo: browser_download_url is directly fetchable by anyone,
+  // no auth needed. Redirect the visitor straight to GitHub's CDN instead
+  // of streaming bytes through the Worker (faster, less Worker CPU/egress).
+  return Response.redirect(asset.browser_download_url, 302);
 }
 
 export default {
