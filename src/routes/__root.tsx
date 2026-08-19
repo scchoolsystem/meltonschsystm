@@ -69,6 +69,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
     ],
     links: [
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
       { rel: "stylesheet", href: appCss },
       {
         rel: "stylesheet",
