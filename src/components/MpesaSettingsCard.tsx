@@ -41,10 +41,13 @@ export function MpesaSettingsCard() {
     callback_token_set: false,
   });
 
+  const [schoolId, setSchoolId] = useState<string | null>(null);
+
   useEffect(() => {
     load({}).then((cfg) => {
       if (cfg) {
         setForm(f => ({ ...f, shortcode: cfg.shortcode ?? "", env: cfg.env ?? "sandbox", enabled: cfg.enabled ?? false }));
+        setSchoolId(cfg.schoolId ?? null);
         setSavedFlags({
           consumer_key_set: !!cfg.consumer_key_set,
           consumer_secret_set: !!cfg.consumer_secret_set,
@@ -69,7 +72,9 @@ export function MpesaSettingsCard() {
     }
   }
 
-  const callbackUrl = `${window.location.origin}/api/public/mpesa-callback?token=${form.callback_token}&school=YOUR_SCHOOL_ID`;
+  const callbackUrl = schoolId
+    ? `${window.location.origin}/api/public/mpesa-callback?token=${form.callback_token || "<save to generate>"}&school=${schoolId}`
+    : null;
 
   if (loading) return (
     <Card>
@@ -196,14 +201,17 @@ export function MpesaSettingsCard() {
           {showSecrets ? "Hide" : "Show"} credentials
         </button>
 
-        {/* Callback URL to register in Daraja */}
-        <div className="rounded-lg bg-muted p-3 text-xs space-y-1">
-          <p className="font-medium text-foreground">Register this Callback URL in your Daraja app:</p>
-          <p className="font-mono break-all text-muted-foreground">{callbackUrl}</p>
-          <p className="text-muted-foreground mt-1">
-            Go to <strong>Daraja portal → Your App → Edit → CallBack URL</strong> and paste the URL above.
-          </p>
-        </div>
+        {/* Callback URL — informational only */}
+        {callbackUrl && (
+          <div className="rounded-lg bg-muted p-3 text-xs space-y-1">
+            <p className="font-medium text-foreground">Your callback URL (for reference/debugging):</p>
+            <p className="font-mono break-all text-muted-foreground">{callbackUrl}</p>
+            <p className="text-muted-foreground mt-1">
+              This is sent automatically with every STK push — you don't need to register it
+              in the Daraja portal (that's only required for the separate C2B Register URL API).
+            </p>
+          </div>
+        )}
 
         {/* How to get credentials */}
         <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground space-y-1">
@@ -213,7 +221,6 @@ export function MpesaSettingsCard() {
             <li>Create an app → copy Consumer Key and Consumer Secret</li>
             <li>Go to <strong>Lipa na M-Pesa Online</strong> → copy the Passkey</li>
             <li>Set your Shortcode to your Paybill or Till number</li>
-            <li>Paste the Callback URL above into your Daraja app</li>
             <li>Switch Environment to <strong>Production</strong> when ready</li>
           </ol>
         </div>
