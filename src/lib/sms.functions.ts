@@ -79,6 +79,116 @@ async function resolvePhones(
   return raw.map(toE164Kenya).filter((n): n is string => n !== null);
 }
 
+// ── Save per-school Crowdcomm config ─────────────────────────────────────────
+export const saveSmsConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        sender_id: z.string().min(2, "Sender ID / shortcode required"),
+        api_key: z.string().optional().default(""),
+        service_id: z.string().optional().default("0"),
+        enabled: z.boolean(),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+
+    const { data: schoolIdRaw } = await supabase.rpc("current_user_school");
+    const schoolId = schoolIdRaw as unknown as string | null;
+    if (!schoolId) throw new Error("No school found for your account");
+
+    // The API key arrives blank when the admin didn't change it (the client
+    // never receives the real key back). Keep whatever is already stored
+    // instead of overwriting with "".
+    const { data: existing } = await (supabase as any)
+      .from("school_sms_config")
+      .select("api_key")
+      .eq("school_id", schoolId)
+      .maybeSingle();
+
+    const api_key = data.api_key || existing?.api_key || "";
+
+    if (data.enabled && !api_key) {
+      throw new Error("A Crowdcomm API key is required to enable your own SMS account.");
+    }
+
+    const { error } = await (supabase as any)
+      .from("school_sms_config")
+      .upsert(
+        {
+          school_id: schoolId,
+          provider: "crowdcomm",
+          sender_id: data.sender_id,
+          api_key,
+          service_id: data.service_id || "0",
+          enabled: data.enabled,
+        },
+        { onConflict: "school_id" }
+      );
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── Load per-school Crowdcomm config (for settings page) ────────────────────
+export const loadSmsConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+
+    const { data: schoolIdRaw } = await supabase.rpc("current_user_school");
+    const schoolId = schoolIdRaw as unknown as string | null;
+    if (!schoolId) return null;
+
+    const { data, error } = await (supabase as any)
+      .from("school_sms_config")
+      .select("sender_id, service_id, api_key, enabled")
+      .eq("school_id", schoolId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+
+    // Never send the raw key to the browser — only whether one is set.
+    return {
+      sender_id: data.sender_id,
+      service_id: data.service_id,
+      enabled: data.enabled,
+      api_key_set: !!data.api_key,
+    };
+  });
+
+// ── Resolve which Crowdcomm account sends this school's SMS ────────────────
+// Each school can register its own Crowdcomm partner account (its own
+// sender_id / api_key) via Admin → Settings → SMS. If a school hasn't
+// enabled its own account, we fall back to SmartDev's shared Crowdcomm
+// account so SMS keeps working out of the box, just sent "from" SmartDev's
+// own approved sender ID instead of the school's name.
+async function resolveSmsSender(schoolId: string): Promise<{
+  senderId: string;
+  apiKey: string;
+  serviceId: string;
+  ownAccount: boolean;
+} | null> {
+  const { data: cfg } = await (supabaseAdmin as any)
+    .rpc("get_school_sms_config", { p_school_id: schoolId })
+    .maybeSingle();
+
+  if (cfg?.enabled && cfg.api_key && cfg.sender_id) {
+    return { senderId: cfg.sender_id, apiKey: cfg.api_key, serviceId: cfg.service_id ?? "0", ownAccount: true };
+  }
+
+  const fallbackKey = process.env.CROWDCOMM_API_KEY;
+  const fallbackSender = process.env.CROWDCOMM_SENDER_ID;
+  if (fallbackKey && fallbackSender) {
+    return { senderId: fallbackSender, apiKey: fallbackKey, serviceId: process.env.CROWDCOMM_SERVICE_ID ?? "0", ownAccount: false };
+  }
+
+  return null;
+}
+
 export const sendBulkSms = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
@@ -99,58 +209,66 @@ export const sendBulkSms = createServerFn({ method: "POST" })
     let failed = 0;
     let sendError: string | null = null;
 
+    const sender = numbers.length > 0 ? await resolveSmsSender(schoolId) : null;
+
     if (numbers.length === 0) {
       status = "failed";
       sendError = "No recipient phone numbers resolved";
-    } else if (process.env.AFRICAS_TALKING_API_KEY && process.env.AFRICAS_TALKING_USERNAME) {
+    } else if (sender) {
       try {
-        const params = new URLSearchParams({
-          username: process.env.AFRICAS_TALKING_USERNAME,
-          to: numbers.join(","),
+        // Crowdcomm expects local/254 formats without the leading "+";
+        // toE164Kenya() already normalized to +254XXXXXXXXX.
+        const messages = numbers.map((n, i) => ({
+          mobile: n.replace(/^\+/, ""),
           message: data.message,
-        });
-        if (process.env.AFRICAS_TALKING_SENDER_ID) {
-          params.append("from", process.env.AFRICAS_TALKING_SENDER_ID);
-        }
-        const res = await fetch("https://api.africastalking.com/version1/messaging", {
+          client_ref: i,
+        }));
+        const res = await fetch("https://sms.crowdcomm.co.ke/sms/v3/sendmultiple", {
           method: "POST",
-          headers: {
-            apiKey: process.env.AFRICAS_TALKING_API_KEY,
-            Accept: "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: sender.apiKey,
+            serviceId: sender.serviceId,
+            from: sender.senderId,
+            messages,
+          }),
         });
         const bodyText = await res.text();
         if (res.ok) {
-          status = "sent";
-          sent = numbers.length;
-          // Africa's Talking returns 200/201 even for per-recipient
-          // rejections (e.g. invalid number, insufficient balance) — the
-          // real outcome is nested in the response body, not the HTTP
-          // status. Surface it so "sent" isn't a false positive.
           try {
             const parsed = JSON.parse(bodyText);
-            const recipients = parsed?.SMSMessageData?.Recipients ?? [];
-            const rejected = recipients.filter((r: any) => r.status !== "Success");
-            if (rejected.length > 0) {
-              status = rejected.length === recipients.length ? "failed" : "partial";
-              sent = recipients.length - rejected.length;
+            // status_code "1000" = accepted; per-recipient outcome is in
+            // schedule_details, same "2xx but check the body" shape as the
+            // Daraja/Africa's Talking integrations elsewhere in this file.
+            const schedule = parsed?.schedule_details ?? [];
+            const rejected = schedule.filter((r: any) => String(r.schedule_status) !== "1");
+            if (String(parsed?.status_code) !== "1000") {
+              status = "failed";
+              failed = numbers.length;
+              sendError = parsed?.status_desc || `Crowdcomm error ${parsed?.status_code}`;
+            } else if (rejected.length > 0) {
+              status = rejected.length === schedule.length ? "failed" : "partial";
+              sent = schedule.length - rejected.length;
               failed = rejected.length;
-              sendError = rejected.map((r: any) => `${r.number}: ${r.status}`).slice(0, 5).join("; ");
+              sendError = rejected.map((r: any) => `${r.mobile}: ${r.schedule_desc}`).slice(0, 5).join("; ");
+            } else {
+              status = "sent";
+              sent = numbers.length;
             }
           } catch {
-            // Non-JSON 2xx body — treat as sent, nothing more to extract.
+            status = "failed";
+            failed = numbers.length;
+            sendError = `Crowdcomm returned a non-JSON response: ${bodyText.slice(0, 300)}`;
           }
         } else {
           status = "failed";
           failed = numbers.length;
-          sendError = `Africa's Talking ${res.status}: ${bodyText.slice(0, 300)}`;
+          sendError = `Crowdcomm ${res.status}: ${bodyText.slice(0, 300)}`;
         }
       } catch (e: any) {
         status = "failed";
         failed = numbers.length;
-        sendError = e?.message?.slice(0, 300) ?? "Network error calling Africa's Talking";
+        sendError = e?.message?.slice(0, 300) ?? "Network error calling Crowdcomm";
       }
     } else {
       // No SMS provider configured — nothing was actually sent, and there's
@@ -160,7 +278,7 @@ export const sendBulkSms = createServerFn({ method: "POST" })
       // "queued" badge that would never resolve.
       status = "failed";
       failed = numbers.length;
-      sendError = "SMS provider not configured (AFRICAS_TALKING_API_KEY missing)";
+      sendError = "SMS provider not configured (no school Crowdcomm account and CROWDCOMM_API_KEY missing)";
     }
 
     await (supabaseAdmin as any).from("sms_queue").insert({
