@@ -243,6 +243,82 @@ export const platformSetSchoolStatus = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+// ── Assign a school's Crowdcomm sender name (Path A: billed through
+// SmartDev's own shared CROWDCOMM_API_KEY, not the school's) ────────────────
+export const platformSetSmsSender = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      school_id: z.string().uuid(),
+      sender_id: z.string().min(2).max(11, "Crowdcomm sender IDs are max 11 chars"),
+      enabled: z.boolean(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireCaller(context.supabase, context.userId);
+
+    const { data: school, error: schoolErr } = await supabaseAdmin
+      .from("schools")
+      .select("name")
+      .eq("id", data.school_id)
+      .maybeSingle();
+    if (schoolErr) throw new Error(schoolErr.message);
+    if (!school) throw new Error("School not found");
+
+    // Deliberately does NOT touch api_key — leaving it null means this
+    // school's SMS is billed through CROWDCOMM_API_KEY (SmartDev's shared
+    // account), just sent under the school's own approved sender name.
+    // If a school later brings its own Crowdcomm account via the self-serve
+    // SmsSettingsCard (which does set api_key), that takes priority — see
+    // resolveSmsSender() in sms.functions.ts.
+    const { error } = await (supabaseAdmin as any)
+      .from("school_sms_config")
+      .upsert(
+        {
+          school_id: data.school_id,
+          provider: "crowdcomm",
+          sender_id: data.sender_id,
+          service_id: "0",
+          enabled: data.enabled,
+        },
+        { onConflict: "school_id", ignoreDuplicates: false }
+      );
+    if (error) throw new Error(error.message);
+
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    await logAudit({
+      actor_user_id: context.userId,
+      actor_email: authUser?.user?.email ?? null,
+      action: "sms_sender_assigned",
+      target_type: "school",
+      target_id: data.school_id,
+      school_id: data.school_id,
+      details: { school_name: school.name, sender_id: data.sender_id, enabled: data.enabled },
+    });
+
+    return { success: true };
+  });
+
+export const platformLoadSmsSender = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ school_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await requireCaller(context.supabase, context.userId);
+    const { data: cfg, error } = await (supabaseAdmin as any)
+      .from("school_sms_config")
+      .select("sender_id, enabled, api_key")
+      .eq("school_id", data.school_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return {
+      sender_id: cfg?.sender_id ?? "",
+      enabled: cfg?.enabled ?? false,
+      // Surfaced so the platform UI can show "school has its own Crowdcomm
+      // account" and warn that editing the sender here won't change billing.
+      has_own_account: !!cfg?.api_key,
+    };
+  });
+
 export const platformSetAnnouncement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
