@@ -22,7 +22,23 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env.MPESA_CALLBACK_TOKEN;
+        const url = new URL(request.url);
+        const schoolId = url.searchParams.get("school");
+
+        // Per-school token: each school can generate its own Callback Secret
+        // Token under Admin → Settings → M-Pesa. Look that up first; only
+        // fall back to the single platform-wide MPESA_CALLBACK_TOKEN when a
+        // school ID wasn't present (older/manually-registered URLs, or the
+        // env-var/platform-shared credential path).
+        let expected: string | undefined | null = null;
+        if (schoolId) {
+          const { data: cfg } = await supabaseAdmin
+            .rpc("get_school_mpesa_config", { p_school_id: schoolId })
+            .maybeSingle();
+          expected = cfg?.callback_token ?? process.env.MPESA_CALLBACK_TOKEN;
+        } else {
+          expected = process.env.MPESA_CALLBACK_TOKEN;
+        }
         if (!expected) {
           return new Response("Callback not configured", { status: 503 });
         }
@@ -30,7 +46,6 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         // Accept the token via header OR query string. Query string is the
         // only option Safaricom itself can actually use; header is kept for
         // trusted internal/manual callers.
-        const url = new URL(request.url);
         const provided =
           request.headers.get("x-callback-token") ?? url.searchParams.get("token") ?? "";
         if (provided !== expected) {
@@ -82,12 +97,15 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         if (dup) return new Response("ok");
 
         // accountRef is the first 12 chars of an invoice UUID — require an
-        // unambiguous single match to prevent collision.
-        const { data: matches } = await supabaseAdmin
+        // unambiguous single match to prevent collision. Scope to the
+        // school from the callback URL when we have one, since two schools
+        // could otherwise share a 12-char UUID prefix.
+        let matchQuery = supabaseAdmin
           .from("invoices")
           .select("id")
-          .like("id", `${accountRef}%`)
-          .limit(2);
+          .like("id", `${accountRef}%`);
+        if (schoolId) matchQuery = matchQuery.eq("school_id", schoolId);
+        const { data: matches } = await matchQuery.limit(2);
         if (!matches || matches.length !== 1) {
           await supabaseAdmin.from("activity_logs").insert({
             action: "mpesa.ambiguous_ref",
