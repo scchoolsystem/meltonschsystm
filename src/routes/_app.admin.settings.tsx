@@ -1,4 +1,5 @@
 import { MpesaSettingsCard } from "@/components/MpesaSettingsCard.tsx";
+import { SmsSettingsCard } from "@/components/SmsSettingsCard.tsx";
 import { ReportCardSettingsCard } from "@/components/ReportCardSettingsCard.tsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -194,6 +195,7 @@ function SettingsPage() {
       </Card>
 
       <MpesaSettingsCard />
+      <SmsSettingsCard />
       <ReportCardSettingsCard />
     </div>
   );
