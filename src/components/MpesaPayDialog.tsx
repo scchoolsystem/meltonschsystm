@@ -30,9 +30,16 @@ export function MpesaPayDialog({ invoiceId, outstanding, defaultPhone = "", trig
     setBusy(true);
     try {
       const r = await initiate({ data: { invoice_id: invoiceId, phone, amount: Number(amount) } });
-      toast.success(r.message ?? "STK push sent");
-      setOpen(false);
-      onPaid?.();
+      if (r.demo) {
+        // Nothing was actually sent to Safaricom — surface this as a
+        // warning, not a success, so parents/admins don't think a real
+        // STK push went to the phone.
+        toast.warning(r.message ?? "M-Pesa is not fully configured yet.");
+      } else {
+        toast.success(r.message ?? "STK push sent");
+        setOpen(false);
+        onPaid?.();
+      }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to initiate payment");
     } finally {
