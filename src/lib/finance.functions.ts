@@ -182,7 +182,7 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
 
     const { data: inv, error: invErr } = await supabaseAdmin
       .from("invoices")
-      .select("id, amount, paid, status, school_id")
+      .select("id, invoice_no, amount, paid, status, school_id, student_id")
       .eq("id", data.invoice_id)
       .eq("school_id", schoolId)
       .single();
@@ -192,6 +192,17 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
     if (data.amount > outstanding + 0.01) {
       throw new Error(`Amount exceeds outstanding balance of KES ${outstanding.toLocaleString()}`);
     }
+
+    // Same 12/13-char Safaricom limits as initiateMpesaPayment — see the
+    // comment there for why the school name can't also be fit in.
+    const { data: student } = await supabaseAdmin
+      .from("students")
+      .select("first_name, last_name")
+      .eq("id", inv.student_id)
+      .maybeSingle();
+    const studentName = student ? `${student.first_name} ${student.last_name}`.trim() : "";
+    const accountReference = (studentName || inv.invoice_no || inv.id).slice(0, 12);
+    const transactionDesc = (inv.invoice_no || "School Fees").slice(0, 13);
 
     // Load this school's own Daraja credentials first — each school has
     // (or should have) its own Paybill/Till configured under Admin →
@@ -264,11 +275,26 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
         PartyB: shortcode,
         PhoneNumber: phone,
         CallBackURL: `${callbackBase}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}&school=${schoolId}`,
-        AccountReference: data.invoice_id.slice(0, 12),
-        TransactionDesc: "School fees",
+        AccountReference: accountReference,
+        TransactionDesc: transactionDesc,
       }),
     });
     const stk = await stkRes.json();
     if (!stkRes.ok) throw new Error(`STK push failed: ${JSON.stringify(stk)}`);
+
+    // Record the intent so the callback can reconcile via CheckoutRequestID
+    // instead of parsing AccountReference (which is now a name, not an
+    // invoice ID prefix).
+    if (stk.CheckoutRequestID) {
+      await supabaseAdmin.from("mpesa_payment_intents").insert({
+        school_id: schoolId,
+        invoice_id: inv.id,
+        phone,
+        amount: data.amount,
+        status: "sent",
+        checkout_request_id: stk.CheckoutRequestID,
+        initiated_by: context.userId,
+      } as any);
+    }
     return stk;
   });
