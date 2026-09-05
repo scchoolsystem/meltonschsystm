@@ -37,11 +37,26 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
     // Confirm the invoice exists and the caller can see it (RLS enforced).
     const { data: inv, error: invErr } = await supabase
       .from("invoices")
-      .select("id, amount, paid, status, school_id")
+      .select("id, invoice_no, amount, paid, status, school_id, student_id")
       .eq("id", data.invoice_id)
       .maybeSingle();
     if (invErr || !inv) throw new Error("Invoice not found");
     if (inv.status === "paid") throw new Error("Invoice is already paid");
+
+    // Student name is what actually helps a parent recognise the STK
+    // prompt — Safaricom hard-caps AccountReference at 12 chars and
+    // TransactionDesc at 13, so there's no room to also fit the school
+    // name here (and the school's own business name isn't something this
+    // API can set anyway — that's whatever's registered against the
+    // shortcode with Safaricom, fixed to a generic name in sandbox).
+    const { data: student } = await supabaseAdmin
+      .from("students")
+      .select("first_name, last_name")
+      .eq("id", inv.student_id)
+      .maybeSingle();
+    const studentName = student ? `${student.first_name} ${student.last_name}`.trim() : "";
+    const accountReference = (studentName || inv.invoice_no || inv.id).slice(0, 12);
+    const transactionDesc = (inv.invoice_no || "School Fees").slice(0, 13);
 
     const outstanding = Number(inv.amount) - Number(inv.paid);
     if (data.amount > outstanding + 0.001) {
@@ -141,8 +156,8 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
           PartyB: shortcode,
           PhoneNumber: phone,
           CallBackURL: callbackUrl,
-          AccountReference: inv.id.slice(0, 12),
-          TransactionDesc: `Fee invoice ${inv.id.slice(0, 8)}`,
+          AccountReference: accountReference,
+          TransactionDesc: transactionDesc,
         }),
       });
 
