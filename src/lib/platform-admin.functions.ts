@@ -243,14 +243,19 @@ export const platformSetSchoolStatus = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-// ── Assign a school's Crowdcomm sender name (Path A: billed through
-// SmartDev's own shared CROWDCOMM_API_KEY, not the school's) ────────────────
+// ── Assign / manage a school's Crowdcomm SMS config from platform admin ────
+// Covers both modes: leave api_key blank to bill through SmartDev's shared
+// CROWDCOMM_API_KEY under this school's own sender name (Path A), or fill
+// in the school's own Crowdcomm partner key to bill directly to them
+// (Path B) — see resolveSmsSender() in sms.functions.ts for the priority.
 export const platformSetSmsSender = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
     z.object({
       school_id: z.string().uuid(),
       sender_id: z.string().min(2).max(11, "Crowdcomm sender IDs are max 11 chars"),
+      service_id: z.string().optional().default("0"),
+      api_key: z.string().optional().default(""),
       enabled: z.boolean(),
     }).parse(input),
   )
@@ -265,12 +270,16 @@ export const platformSetSmsSender = createServerFn({ method: "POST" })
     if (schoolErr) throw new Error(schoolErr.message);
     if (!school) throw new Error("School not found");
 
-    // Deliberately does NOT touch api_key — leaving it null means this
-    // school's SMS is billed through CROWDCOMM_API_KEY (SmartDev's shared
-    // account), just sent under the school's own approved sender name.
-    // If a school later brings its own Crowdcomm account via the self-serve
-    // SmsSettingsCard (which does set api_key), that takes priority — see
-    // resolveSmsSender() in sms.functions.ts.
+    // API key arrives blank when the platform admin didn't change it (the
+    // client never receives the real key back) — keep whatever is already
+    // stored rather than overwriting with "".
+    const { data: existing } = await (supabaseAdmin as any)
+      .from("school_sms_config")
+      .select("api_key")
+      .eq("school_id", data.school_id)
+      .maybeSingle();
+    const api_key = data.api_key || existing?.api_key || null;
+
     const { error } = await (supabaseAdmin as any)
       .from("school_sms_config")
       .upsert(
@@ -278,10 +287,11 @@ export const platformSetSmsSender = createServerFn({ method: "POST" })
           school_id: data.school_id,
           provider: "crowdcomm",
           sender_id: data.sender_id,
-          service_id: "0",
+          service_id: data.service_id || "0",
+          api_key,
           enabled: data.enabled,
         },
-        { onConflict: "school_id", ignoreDuplicates: false }
+        { onConflict: "school_id" }
       );
     if (error) throw new Error(error.message);
 
@@ -293,7 +303,7 @@ export const platformSetSmsSender = createServerFn({ method: "POST" })
       target_type: "school",
       target_id: data.school_id,
       school_id: data.school_id,
-      details: { school_name: school.name, sender_id: data.sender_id, enabled: data.enabled },
+      details: { school_name: school.name, sender_id: data.sender_id, enabled: data.enabled, own_account: !!api_key },
     });
 
     return { success: true };
@@ -306,18 +316,19 @@ export const platformLoadSmsSender = createServerFn({ method: "GET" })
     await requireCaller(context.supabase, context.userId);
     const { data: cfg, error } = await (supabaseAdmin as any)
       .from("school_sms_config")
-      .select("sender_id, enabled, api_key")
+      .select("sender_id, service_id, enabled, api_key")
       .eq("school_id", data.school_id)
       .maybeSingle();
     if (error) throw new Error(error.message);
     return {
       sender_id: cfg?.sender_id ?? "",
+      service_id: cfg?.service_id ?? "0",
       enabled: cfg?.enabled ?? false,
-      // Surfaced so the platform UI can show "school has its own Crowdcomm
-      // account" and warn that editing the sender here won't change billing.
-      has_own_account: !!cfg?.api_key,
+      // Never send the raw key to the browser — only whether one is set.
+      api_key_set: !!cfg?.api_key,
     };
   });
+
 
 export const platformSetAnnouncement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
