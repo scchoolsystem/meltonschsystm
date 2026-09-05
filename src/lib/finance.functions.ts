@@ -211,11 +211,24 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
     const callbackBase = process.env.MPESA_CALLBACK_URL; // e.g. https://app.smartdev.co.ke
 
     if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackBase || !callbackToken) {
-      throw new Error(
-        cfg
-          ? "M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it."
-          : "M-Pesa not configured. Add MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL, MPESA_CALLBACK_TOKEN secrets, or configure this school's own credentials under Admin → Settings → M-Pesa."
-      );
+      let reason: string;
+      if (!callbackBase) {
+        reason = "M-Pesa is not fully configured on the server: MPESA_CALLBACK_URL is not set. Ask your platform administrator to configure it.";
+      } else if (!cfg) {
+        reason = "M-Pesa not configured. Add MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_URL, MPESA_CALLBACK_TOKEN secrets, or configure this school's own credentials under Admin → Settings → M-Pesa.";
+      } else if (!cfg.enabled) {
+        reason = "M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it.";
+      } else {
+        const missing = [
+          !consumerKey && "Consumer Key",
+          !consumerSecret && "Consumer Secret",
+          !shortcode && "Paybill/Till Number",
+          !passkey && "Passkey",
+          !callbackToken && "Callback Secret Token",
+        ].filter(Boolean).join(", ");
+        reason = `Missing Daraja field(s): ${missing}. Go to Admin → Settings → M-Pesa to complete them.`;
+      }
+      throw new Error(reason);
     }
 
     const base = env === "live" || env === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
