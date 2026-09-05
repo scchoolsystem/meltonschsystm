@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { provisionSchoolAdmin } from "@/lib/school-admin.functions";
-import { platformSetSchoolStatus } from "@/lib/platform-admin.functions";
+import { platformSetSchoolStatus, platformSetSmsSender, platformLoadSmsSender } from "@/lib/platform-admin.functions";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -865,6 +865,8 @@ function PlatformSchoolDetail() {
         </Card>
       </div>
 
+      <SmsSenderCard schoolId={id} isOwner={isOwner} />
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
@@ -959,5 +961,94 @@ function CopyRow({ label, value, mono }: { label: string; value: string; mono?: 
         <Copy className="h-3 w-3" />
       </Button>
     </div>
+  );
+}
+
+// ── Bulk SMS sender assignment (Path A: SmartDev's own Crowdcomm account,
+// billed to us, sent under this school's own approved sender name) ─────────
+function SmsSenderCard({ schoolId, isOwner }: { schoolId: string; isOwner: boolean }) {
+  const qc = useQueryClient();
+  const load = useServerFn(platformLoadSmsSender);
+  const save = useServerFn(platformSetSmsSender);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["platform-sms-sender", schoolId],
+    queryFn: () => load({ data: { school_id: schoolId } }),
+  });
+
+  const [senderId, setSenderId] = useState("");
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setSenderId(data.sender_id ?? "");
+      setEnabled(data.enabled ?? false);
+    }
+  }, [data]);
+
+  const mutate = useMutation({
+    mutationFn: (vars: { sender_id: string; enabled: boolean }) =>
+      save({ data: { school_id: schoolId, sender_id: vars.sender_id, enabled: vars.enabled } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["platform-sms-sender", schoolId] });
+      toast.success("SMS sender name saved");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Bulk SMS sender name</CardTitle>
+        <CardDescription>
+          The name this school's SMS appear "From". Requires the name be approved on our
+          Crowdcomm partner account first — messages are billed to SmartDev, not the school,
+          unless this school has registered its own Crowdcomm account (see below).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : data?.has_own_account ? (
+          <p className="text-sm text-muted-foreground">
+            This school has its own Crowdcomm account configured (Admin → Settings → SMS on their
+            side). That takes priority over anything set here — editing the sender name below
+            will have no effect until they disable their own account.
+          </p>
+        ) : (
+          <>
+            <div className="grid gap-2">
+              <Label>Sender ID / Shortcode (max 11 chars)</Label>
+              <Input
+                value={senderId}
+                maxLength={11}
+                onChange={(e) => setSenderId(e.target.value.toUpperCase())}
+                placeholder="e.g. GREENFIELD"
+                disabled={!isOwner}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">Send as this school's own name</p>
+                <p className="text-xs text-muted-foreground">
+                  {enabled ? `Currently sending as "${senderId || "—"}"` : "Currently sending as SmartDev's default sender"}
+                </p>
+              </div>
+              <Switch checked={enabled} disabled={!isOwner} onCheckedChange={setEnabled} />
+            </div>
+            {isOwner && (
+              <Button
+                size="sm"
+                onClick={() => mutate.mutate({ sender_id: senderId, enabled })}
+                disabled={mutate.isPending || (enabled && senderId.trim().length < 2)}
+              >
+                <Save className="h-4 w-4 mr-1" />
+                {mutate.isPending ? "Saving..." : "Save"}
+              </Button>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
