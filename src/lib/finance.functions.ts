@@ -263,7 +263,7 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
         PartyA: phone,
         PartyB: shortcode,
         PhoneNumber: phone,
-        CallBackURL: `${callbackBase}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}`,
+        CallBackURL: `${callbackBase}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}&school=${schoolId}`,
         AccountReference: data.invoice_id.slice(0, 12),
         TransactionDesc: "School fees",
       }),
