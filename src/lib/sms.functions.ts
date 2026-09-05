@@ -176,14 +176,31 @@ async function resolveSmsSender(schoolId: string): Promise<{
     .rpc("get_school_sms_config", { p_school_id: schoolId })
     .maybeSingle();
 
-  if (cfg?.enabled && cfg.api_key && cfg.sender_id) {
-    return { senderId: cfg.sender_id, apiKey: cfg.api_key, serviceId: cfg.service_id ?? "0", ownAccount: true };
+  const fallbackKey = process.env.CROWDCOMM_API_KEY;
+  const fallbackServiceId = process.env.CROWDCOMM_SERVICE_ID ?? "0";
+
+  // A school's own name is used whenever one is enabled — whether that
+  // name is billed through the school's own Crowdcomm account (api_key
+  // set, Path B / self-service) or through SmartDev's shared account on
+  // the school's behalf (api_key blank, Path A / platform-assigned).
+  if (cfg?.enabled && cfg.sender_id) {
+    const apiKey = cfg.api_key || fallbackKey;
+    if (apiKey) {
+      return {
+        senderId: cfg.sender_id,
+        apiKey,
+        serviceId: cfg.service_id || fallbackServiceId,
+        ownAccount: !!cfg.api_key,
+      };
+    }
+    // enabled + sender_id but no key anywhere (school self-served without
+    // an API key, and SmartDev's own fallback key isn't configured) — fall
+    // through to the generic SmartDev sender below rather than failing.
   }
 
-  const fallbackKey = process.env.CROWDCOMM_API_KEY;
   const fallbackSender = process.env.CROWDCOMM_SENDER_ID;
   if (fallbackKey && fallbackSender) {
-    return { senderId: fallbackSender, apiKey: fallbackKey, serviceId: process.env.CROWDCOMM_SERVICE_ID ?? "0", ownAccount: false };
+    return { senderId: fallbackSender, apiKey: fallbackKey, serviceId: fallbackServiceId, ownAccount: false };
   }
 
   return null;
