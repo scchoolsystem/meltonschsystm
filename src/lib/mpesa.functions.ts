@@ -79,18 +79,30 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
     const schoolEnabled   = cfg?.enabled ?? false;
 
     // Demo mode: no credentials configured OR school has not enabled MPesa yet
-    if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackToken || !publicHost || (!schoolEnabled && !process.env.MPESA_CONSUMER_KEY)) {
+    const usingEnvFallback = !schoolEnabled && !!process.env.MPESA_CONSUMER_KEY;
+    if (!consumerKey || !consumerSecret || !shortcode || !passkey || !callbackToken || !publicHost || (!schoolEnabled && !usingEnvFallback)) {
+      let reason: string;
+      if (!publicHost) {
+        reason = "Demo mode: PUBLIC_HOST is not set on the server. Ask your platform administrator to configure it.";
+      } else if (!cfg) {
+        reason = "Demo mode: STK push not configured. The school admin must configure Daraja credentials.";
+      } else if (!schoolEnabled) {
+        reason = "Demo mode: M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it.";
+      } else {
+        const missing = [
+          !consumerKey && "Consumer Key",
+          !consumerSecret && "Consumer Secret",
+          !shortcode && "Paybill/Till Number",
+          !passkey && "Passkey",
+          !callbackToken && "Callback Secret Token",
+        ].filter(Boolean).join(", ");
+        reason = `Demo mode: missing Daraja field(s): ${missing}. Go to Admin → Settings → M-Pesa to complete them.`;
+      }
       await supabase
         .from("mpesa_payment_intents")
         .update({ status: "pending", error: "STK push not configured (demo mode)" })
         .eq("id", intent.id);
-      return {
-        ok: true,
-        demo: true,
-        message: cfg
-          ? "Demo mode: M-Pesa is not enabled for this school yet. Go to Admin → Settings → M-Pesa to enable it."
-          : "Demo mode: STK push not configured. The school admin must configure Daraja credentials.",
-      };
+      return { ok: true, demo: true, message: reason };
     }
 
     // ── Fire real STK push ───────────────────────────────────────────────────
