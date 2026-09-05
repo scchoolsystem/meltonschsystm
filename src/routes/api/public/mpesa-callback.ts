@@ -80,9 +80,49 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         const amount = Number(get("Amount") ?? 0);
         const receipt = String(get("MpesaReceiptNumber") ?? "");
         const phone = String(get("PhoneNumber") ?? "");
+        const checkoutRequestId: string = stk.CheckoutRequestID || "";
         const accountRef: string = stk.AccountReference || "";
 
-        if (!receipt || !amount || !accountRef) {
+        if (!receipt || !amount) {
+          return new Response("ok");
+        }
+
+        // Reconcile primarily via CheckoutRequestID against the intent we
+        // recorded when the STK push was sent — this works no matter what
+        // human-readable text ended up in AccountReference (student name,
+        // invoice number, etc.), unlike the old approach of parsing an
+        // invoice ID back out of AccountReference.
+        let invoiceId: string | null = null;
+        if (checkoutRequestId) {
+          const { data: intent } = await supabaseAdmin
+            .from("mpesa_payment_intents")
+            .select("invoice_id")
+            .eq("checkout_request_id", checkoutRequestId)
+            .maybeSingle();
+          invoiceId = intent?.invoice_id ?? null;
+        }
+
+        // Fallback for any in-flight transaction that predates recording an
+        // intent (or somehow has no CheckoutRequestID match): try the old
+        // accountRef-as-invoice-ID-prefix approach, scoped to the school
+        // from the callback URL when available to avoid cross-tenant
+        // collisions.
+        if (!invoiceId && accountRef) {
+          let matchQuery = supabaseAdmin
+            .from("invoices")
+            .select("id")
+            .like("id", `${accountRef}%`);
+          if (schoolId) matchQuery = matchQuery.eq("school_id", schoolId);
+          const { data: matches } = await matchQuery.limit(2);
+          if (matches && matches.length === 1) invoiceId = matches[0].id;
+        }
+
+        if (!invoiceId) {
+          await supabaseAdmin.from("activity_logs").insert({
+            action: "mpesa.unmatched_callback",
+            entity: "payment",
+            metadata: { checkoutRequestId, accountRef, receipt },
+          } as any);
           return new Response("ok");
         }
 
@@ -96,28 +136,8 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           .maybeSingle();
         if (dup) return new Response("ok");
 
-        // accountRef is the first 12 chars of an invoice UUID — require an
-        // unambiguous single match to prevent collision. Scope to the
-        // school from the callback URL when we have one, since two schools
-        // could otherwise share a 12-char UUID prefix.
-        let matchQuery = supabaseAdmin
-          .from("invoices")
-          .select("id")
-          .like("id", `${accountRef}%`);
-        if (schoolId) matchQuery = matchQuery.eq("school_id", schoolId);
-        const { data: matches } = await matchQuery.limit(2);
-        if (!matches || matches.length !== 1) {
-          await supabaseAdmin.from("activity_logs").insert({
-            action: "mpesa.ambiguous_ref",
-            entity: "payment",
-            metadata: { accountRef, receipt, matchCount: matches?.length ?? 0 },
-          } as any);
-          return new Response("ok");
-        }
-        const inv = matches[0];
-
         const { error: insErr } = await supabaseAdmin.from("payments").insert({
-          invoice_id: inv.id,
+          invoice_id: invoiceId,
           amount,
           method: "mpesa",
           reference: `${receipt} (${phone})`,
@@ -128,6 +148,13 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
             entity: "payment",
             metadata: { receipt, error: insErr.message },
           } as any);
+        }
+
+        if (checkoutRequestId) {
+          await supabaseAdmin
+            .from("mpesa_payment_intents")
+            .update({ status: "completed" })
+            .eq("checkout_request_id", checkoutRequestId);
         }
 
         return new Response("ok");
