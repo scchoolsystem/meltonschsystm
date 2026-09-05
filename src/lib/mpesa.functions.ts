@@ -249,6 +249,7 @@ export const loadMpesaConfig = createServerFn({ method: "GET" })
     // Never send raw secrets to the browser. The settings UI only needs to
     // know whether each credential is already set, plus the non-secret fields.
     return {
+      schoolId,
       shortcode: data.shortcode,
       env: data.env,
       enabled: data.enabled,
