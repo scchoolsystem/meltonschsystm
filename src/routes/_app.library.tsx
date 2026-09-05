@@ -107,7 +107,11 @@ function Page() {
       const { error } = await supabase.from("book_loans").update({ status: "returned", returned_on: today }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["library-loans"] }); toast.success("Book returned"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["library-loans"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-admin-pending-actions"] });
+      toast.success("Book returned");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
