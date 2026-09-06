@@ -15,10 +15,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Receipt, UserX, GraduationCap, Download } from "lucide-react";
+import { Receipt, UserX, GraduationCap, Download, Upload } from "lucide-react";
 import { sendBulkSms, sendEmailBlast } from "@/lib/sms.functions";
 import { notifyFeeDue, notifyAttendanceAlert, notifyResultsPublished } from "@/lib/notifications.functions";
 import { downloadCsv } from "@/lib/export-utils";
+import { extractPhones, extractEmails } from "@/lib/contact-import";
+import { AudienceStudentPicker } from "@/components/AudienceStudentPicker";
 import { FeatureGate } from "@/components/FeatureGate";
 
 export const Route = createFileRoute("/_app/admin/communications")({
@@ -29,7 +31,7 @@ export const Route = createFileRoute("/_app/admin/communications")({
   ),
 });
 
-type AudienceType = "all_students" | "all_parents" | "class" | "custom";
+type AudienceType = "all_students" | "all_parents" | "class" | "students" | "custom";
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
@@ -42,13 +44,48 @@ function statusBadge(status: string) {
   return <span className={`px-2 py-0.5 rounded text-xs ${map[status] ?? "bg-muted"}`}>{status}</span>;
 }
 
+function ImportContactsButton({
+  mode,
+  onImported,
+}: {
+  mode: "phone" | "email";
+  onImported: (values: string[]) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline cursor-pointer">
+      <Upload className="w-3.5 h-3.5" />
+      Import from file (.csv, .txt)
+      <input
+        type="file"
+        accept=".csv,.txt,.tsv"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ""; // allow re-selecting the same file later
+          if (!file) return;
+          const text = await file.text();
+          const found = mode === "phone" ? extractPhones(text) : extractEmails(text);
+          if (found.length === 0) {
+            toast.error(`No ${mode === "phone" ? "phone numbers" : "email addresses"} found in that file`);
+            return;
+          }
+          onImported(found);
+          toast.success(`Imported ${found.length} ${mode === "phone" ? "number" : "email"}${found.length !== 1 ? "s" : ""}`);
+        }}
+      />
+    </label>
+  );
+}
+
 function AudiencePicker({
-  type, setType, classId, setClassId, custom, setCustom, classes,
+  type, setType, classId, setClassId, studentIds, setStudentIds, custom, setCustom, classes, mode,
 }: {
   type: AudienceType; setType: (t: AudienceType) => void;
   classId: string; setClassId: (s: string) => void;
+  studentIds: string[]; setStudentIds: (ids: string[]) => void;
   custom: string; setCustom: (s: string) => void;
   classes: any[];
+  mode: "phone" | "email";
 }) {
   return (
     <div className="space-y-2">
@@ -59,7 +96,8 @@ function AudiencePicker({
           <SelectItem value="all_students">All students</SelectItem>
           <SelectItem value="all_parents">All parents</SelectItem>
           <SelectItem value="class">Specific class</SelectItem>
-          <SelectItem value="custom">Paste phone list</SelectItem>
+          <SelectItem value="students">Specific students / parents</SelectItem>
+          <SelectItem value="custom">Paste or import a contact list</SelectItem>
         </SelectContent>
       </Select>
       {type === "class" && (
@@ -72,13 +110,30 @@ function AudiencePicker({
           </SelectContent>
         </Select>
       )}
+      {type === "students" && (
+        <AudienceStudentPicker value={studentIds} onChange={setStudentIds} classes={classes} />
+      )}
       {type === "custom" && (
-        <Textarea
-          placeholder="Numbers separated by comma or newline"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          rows={3}
-        />
+        <div className="space-y-1.5">
+          <Textarea
+            placeholder={mode === "phone" ? "Numbers separated by comma or newline" : "Emails separated by comma or newline"}
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            rows={3}
+          />
+          <div className="flex items-center justify-between">
+            <ImportContactsButton
+              mode={mode}
+              onImported={(values) => setCustom((prev) => {
+                const existing = parseCustom(prev);
+                return Array.from(new Set([...existing, ...values])).join("\n");
+              })}
+            />
+            {custom.trim() && (
+              <span className="text-xs text-muted-foreground">{parseCustom(custom).length} contact{parseCustom(custom).length !== 1 ? "s" : ""}</span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -103,6 +158,7 @@ function CommunicationsPage() {
   const [smsMsg, setSmsMsg] = useState("");
   const [smsAud, setSmsAud] = useState<AudienceType>("all_parents");
   const [smsClass, setSmsClass] = useState("");
+  const [smsStudentIds, setSmsStudentIds] = useState<string[]>([]);
   const [smsCustom, setSmsCustom] = useState("");
   const sendSms = useServerFn(sendBulkSms);
   const smsMutation = useMutation({
@@ -113,6 +169,7 @@ function CommunicationsPage() {
           audience: {
             type: smsAud,
             classId: smsAud === "class" ? smsClass : undefined,
+            studentIds: smsAud === "students" ? smsStudentIds : undefined,
             phones: smsAud === "custom" ? parseCustom(smsCustom) : undefined,
           },
         },
@@ -140,6 +197,7 @@ function CommunicationsPage() {
   const [emBody, setEmBody] = useState("");
   const [emAud, setEmAud] = useState<AudienceType>("all_parents");
   const [emClass, setEmClass] = useState("");
+  const [emStudentIds, setEmStudentIds] = useState<string[]>([]);
   const [emCustom, setEmCustom] = useState("");
   const sendEm = useServerFn(sendEmailBlast);
   const emMutation = useMutation({
@@ -151,6 +209,7 @@ function CommunicationsPage() {
           audience: {
             type: emAud,
             classId: emAud === "class" ? emClass : undefined,
+            studentIds: emAud === "students" ? emStudentIds : undefined,
             phones: emAud === "custom" ? parseCustom(emCustom) : undefined,
           },
         },
@@ -257,7 +316,13 @@ function CommunicationsPage() {
                 <Textarea maxLength={160} value={smsMsg} onChange={(e) => setSmsMsg(e.target.value)} rows={4} />
                 <p className="text-xs text-muted-foreground mt-1">{smsMsg.length} / 160</p>
               </div>
-              <AudiencePicker type={smsAud} setType={setSmsAud} classId={smsClass} setClassId={setSmsClass} custom={smsCustom} setCustom={setSmsCustom} classes={classes} />
+              <AudiencePicker
+                type={smsAud} setType={setSmsAud}
+                classId={smsClass} setClassId={setSmsClass}
+                studentIds={smsStudentIds} setStudentIds={setSmsStudentIds}
+                custom={smsCustom} setCustom={setSmsCustom}
+                classes={classes} mode="phone"
+              />
               <Button onClick={() => smsMutation.mutate()} disabled={!smsMsg.trim() || smsMutation.isPending}>
                 {smsMutation.isPending ? "Sending..." : "Send SMS"}
               </Button>
@@ -305,7 +370,13 @@ function CommunicationsPage() {
                 <Label>Body</Label>
                 <Textarea value={emBody} onChange={(e) => setEmBody(e.target.value)} rows={6} />
               </div>
-              <AudiencePicker type={emAud} setType={setEmAud} classId={emClass} setClassId={setEmClass} custom={emCustom} setCustom={setEmCustom} classes={classes} />
+              <AudiencePicker
+                type={emAud} setType={setEmAud}
+                classId={emClass} setClassId={setEmClass}
+                studentIds={emStudentIds} setStudentIds={setEmStudentIds}
+                custom={emCustom} setCustom={setEmCustom}
+                classes={classes} mode="email"
+              />
               <Button onClick={() => emMutation.mutate()} disabled={!emSub.trim() || !emBody.trim() || emMutation.isPending}>
                 {emMutation.isPending ? "Sending..." : "Send Email"}
               </Button>
