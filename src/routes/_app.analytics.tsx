@@ -627,14 +627,21 @@ function LibraryTab() {
   const { data: loans = [] } = useQuery({
     queryKey: ["analytics-library-loans"],
     queryFn: async () => {
-      const { data } = await supabase.from("library_loans").select("id, returned, due_date, created_at, book_id, student_id");
+      // Was reading from "library_loans" — a table that doesn't exist in any
+      // tracked migration and isn't used anywhere else in the app (leftover
+      // from the pre-book_loans prototype). The real table every other
+      // library screen reads from is book_loans, with status/due_on, not
+      // returned/due_date.
+      const { data } = await supabase
+        .from("book_loans")
+        .select("id, status, due_on, created_at, book_id, student_id");
       return data ?? [];
     },
   });
 
-  const active = loans.filter((l: any) => !l.returned).length;
-  const overdue = loans.filter((l: any) => !l.returned && l.due_date && new Date(l.due_date) < new Date()).length;
-  const returned = loans.filter((l: any) => l.returned).length;
+  const active = loans.filter((l: any) => l.status === "active").length;
+  const overdue = loans.filter((l: any) => l.status === "active" && l.due_on && new Date(l.due_on) < new Date()).length;
+  const returned = loans.filter((l: any) => l.status === "returned").length;
 
   const monthly = (() => {
     const m = new Map<string, number>();
