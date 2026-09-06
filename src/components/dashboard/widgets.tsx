@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/hooks/use-tenant";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -764,19 +765,22 @@ export function AdminAttendanceTodayWidget() {
 }
 
 export function AdminPendingActionsWidget() {
+  const { school } = useTenant();
+  const schoolId = school?.id;
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-admin-pending-actions"],
+    queryKey: ["dashboard-admin-pending-actions", schoolId],
+    enabled: !!schoolId,
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
       const [gp, tickets, disc, loans] = await Promise.all([
-        supabase.from("gate_passes").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
+        supabase.from("gate_passes").select("id", { count: "exact", head: true }).eq("school_id", schoolId!).eq("status", "pending"),
+        supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("school_id", schoolId!).in("status", ["open", "in_progress"]),
         // NOTE: "parent_notified" column does not exist on discipline_records.
         // Original query was broken (always 400'd). Until a real notified-flag
         // is added to the schema, this counts all discipline records in the
         // last 7 days as a rough placeholder for "needs attention".
-        supabase.from("discipline_records").select("id", { count: "exact", head: true }).gte("incident_date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
-        supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("status", "active").lt("due_on", today),
+        supabase.from("discipline_records").select("id", { count: "exact", head: true }).eq("school_id", schoolId!).gte("incident_date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+        supabase.from("book_loans").select("id", { count: "exact", head: true }).eq("school_id", schoolId!).eq("status", "active").lt("due_on", today),
       ]);
       return {
         gatePasses: gp.count ?? 0,
