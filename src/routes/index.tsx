@@ -883,8 +883,8 @@ function MissionScene({ goTo, mission }: { goTo: (p: Page) => void; mission: any
           </button>
           <div className="mt-10 sm:mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-2xl mx-auto">
             {[
-              { icon: GraduationCap, value: 13, suffix: "+", label: "Schools onboarded" },
-              { icon: Users, value: 12000, suffix: "+", label: "Students managed" },
+              { icon: GraduationCap, value: 3, suffix: "+", label: "Schools onboarded" },
+              { icon: Users, value: 1200, suffix: "+", label: "Students managed" },
               { icon: Cloud, value: 99, suffix: "%", label: "Platform uptime" },
               { icon: Zap, value: 3, suffix: "s", label: "Avg. M-Pesa confirmation" },
             ].map((s) => (
