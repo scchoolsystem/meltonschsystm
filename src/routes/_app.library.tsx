@@ -55,14 +55,34 @@ function Page() {
     queryKey: ["library-books"],
     queryFn: async () => (await supabase.from("books").select("*").order("title")).data ?? [],
   });
+  const today = format(new Date(), "yyyy-MM-dd");
   const { data: loans = [], isLoading: lLoading } = useQuery({
     queryKey: ["library-loans"],
     queryFn: async () => (await supabase.from("book_loans").select("*, books(id,title,author,category), students(id,first_name,last_name,admission_no), staff(id,first_name,last_name,employee_no,position_title)").order("borrowed_on", { ascending: false }).limit(500)).data ?? [],
   });
-
-  const today = format(new Date(), "yyyy-MM-dd");
+  // Deliberately a SEPARATE query, not derived from `loans` above. The
+  // general loans list is capped at 500 rows ordered by most-recently-
+  // borrowed — fine for browsing recent activity, but it means an old
+  // overdue loan (old borrowed_on) silently falls outside that window once
+  // a school accumulates more than 500 total loan records over time. The
+  // dashboard's "Overdue library loans" count has no such cap (it's a plain
+  // Postgres count), which is exactly why it could show a number this tab
+  // never did. Fetching overdue loans with their own targeted query — same
+  // predicate the dashboard uses — keeps the two in agreement regardless of
+  // how much loan history has piled up.
+  const { data: overdueLoans = [] } = useQuery({
+    queryKey: ["library-loans-overdue", today],
+    queryFn: async () =>
+      (await supabase
+        .from("book_loans")
+        .select("*, books(id,title,author,category), students(id,first_name,last_name,admission_no), staff(id,first_name,last_name,employee_no,position_title)")
+        .eq("status", "active")
+        .lt("due_on", today)
+        .order("due_on", { ascending: true })
+        .limit(1000)
+      ).data ?? [],
+  });
   const activeLoansSet = useMemo(() => new Set((loans as any[]).filter(l => l.status === "active").map(l => l.book_id)), [loans]);
-  const overdueLoans = useMemo(() => (loans as any[]).filter(l => l.status === "active" && l.due_on < today), [loans, today]);
 
   const filteredBooks = useMemo(() => {
     if (!bookSearch.trim()) return books as any[];
@@ -86,7 +106,11 @@ function Page() {
       const { error } = await supabase.from("book_loans").update({ reminder_sent: true, reminder_sent_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["library-loans"] }); toast.success("Reminder marked as sent"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["library-loans"] });
+      qc.invalidateQueries({ queryKey: ["library-loans-overdue"] });
+      toast.success("Reminder marked as sent");
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -98,7 +122,11 @@ function Page() {
       if (error) throw error;
       return ids.length;
     },
-    onSuccess: (count) => { qc.invalidateQueries({ queryKey: ["library-loans"] }); toast.success(`${count} overdue reminders marked as sent`); },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["library-loans"] });
+      qc.invalidateQueries({ queryKey: ["library-loans-overdue"] });
+      toast.success(`${count} overdue reminders marked as sent`);
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -109,6 +137,7 @@ function Page() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["library-loans"] });
+      qc.invalidateQueries({ queryKey: ["library-loans-overdue"] });
       qc.invalidateQueries({ queryKey: ["dashboard-admin-pending-actions"] });
       toast.success("Book returned");
     },
