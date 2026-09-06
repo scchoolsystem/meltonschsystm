@@ -4,8 +4,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const AudienceSchema = z.object({
-  type: z.enum(["all_students", "all_parents", "class", "custom"]),
+  type: z.enum(["all_students", "all_parents", "class", "students", "custom"]),
   classId: z.string().uuid().optional(),
+  studentIds: z.array(z.string().uuid()).optional(),
   phones: z.array(z.string()).optional(),
 });
 
@@ -49,13 +50,19 @@ async function resolvePhones(
 ): Promise<string[]> {
   let rows: any[] = [];
   if (audience.type === "all_students") {
+    // "All students" = the student's own phone (distinct from "All
+    // parents", which texts the guardian). Was previously selecting
+    // parent_phone while filtering on phone — a mismatch that silently
+    // dropped any student whose own phone was blank even if their
+    // parent_phone was set, and could include a stale parent_phone for a
+    // row where only the student's own phone happened to be set.
     const { data } = await supabaseAdmin
       .from("students")
-      .select("parent_phone")
+      .select("phone")
       .eq("school_id", schoolId)
       .eq("status", "active")
       .not("phone", "is", null);
-    rows = (data ?? []).map((r) => r.parent_phone);
+    rows = (data ?? []).map((r) => r.phone);
   } else if (audience.type === "all_parents") {
     const { data } = await supabaseAdmin
       .from("students")
@@ -70,7 +77,18 @@ async function resolvePhones(
       .select("parent_phone")
       .eq("school_id", schoolId)
       .eq("class_id", audience.classId)
-      .not("phone", "is", null);
+      .not("parent_phone", "is", null);
+    rows = (data ?? []).map((r) => r.parent_phone);
+  } else if (audience.type === "students" && audience.studentIds?.length) {
+    // school_id filter here isn't just tenant hygiene — it's the only
+    // thing stopping a crafted request from reaching another school's
+    // parents by student id, since studentIds come straight from the client.
+    const { data } = await supabaseAdmin
+      .from("students")
+      .select("parent_phone")
+      .eq("school_id", schoolId)
+      .in("id", audience.studentIds)
+      .not("parent_phone", "is", null);
     rows = (data ?? []).map((r) => r.parent_phone);
   } else if (audience.type === "custom") {
     rows = audience.phones ?? [];
@@ -334,7 +352,15 @@ async function resolveEmails(
   audience: z.infer<typeof AudienceSchema>
 ): Promise<string[]> {
   let rows: any[] = [];
-  if (audience.type === "all_students" || audience.type === "all_parents") {
+  if (audience.type === "all_students") {
+    const { data } = await supabaseAdmin
+      .from("students")
+      .select("email")
+      .eq("school_id", schoolId)
+      .eq("status", "active")
+      .not("email", "is", null);
+    rows = (data ?? []).map((r) => r.email);
+  } else if (audience.type === "all_parents") {
     const { data } = await supabaseAdmin
       .from("students")
       .select("parent_email")
@@ -348,6 +374,14 @@ async function resolveEmails(
       .select("parent_email")
       .eq("school_id", schoolId)
       .eq("class_id", audience.classId)
+      .not("parent_email", "is", null);
+    rows = (data ?? []).map((r) => r.parent_email);
+  } else if (audience.type === "students" && audience.studentIds?.length) {
+    const { data } = await supabaseAdmin
+      .from("students")
+      .select("parent_email")
+      .eq("school_id", schoolId)
+      .in("id", audience.studentIds)
       .not("parent_email", "is", null);
     rows = (data ?? []).map((r) => r.parent_email);
   } else if (audience.type === "custom") {
