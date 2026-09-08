@@ -5,7 +5,6 @@
   "identifier": "ke.co.smartdev",
   "build": {
     "frontendDist": "../dist-desktop",
-    "devUrl": "http://localhost:8080",
     "beforeDevCommand": "pnpm desktop:frontend",
     "beforeBuildCommand": "pnpm desktop:frontend"
   },
