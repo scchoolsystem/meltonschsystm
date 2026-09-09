@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
+import { getDefaultPlatformRoute } from "@/routes/platform";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert } from "lucide-react";
 
@@ -41,6 +42,7 @@ export function PlatformScopeGuard({
   if (!rolesLoaded) return null;
 
   if (!isAllowed(requirement, roles as any, scopes)) {
+    const homeRoute = getDefaultPlatformRoute(roles as any, scopes);
     return (
       <div className="min-h-[60vh] grid place-items-center p-6">
         <div className="max-w-md text-center space-y-4">
@@ -50,7 +52,7 @@ export function PlatformScopeGuard({
             Your platform access is restricted. If you need this, ask a platform owner to grant it from Team &amp; Access.
           </p>
           <Button asChild variant="outline">
-            <Link to="/platform/dashboard">Back to dashboard</Link>
+            <Link to={homeRoute}>Back to your dashboard</Link>
           </Button>
         </div>
       </div>
