@@ -154,10 +154,28 @@ export const platformGrantRole = createServerFn({ method: "POST" })
     // team but shouldn't be able to add more people, including themselves.
     await requireCaller(context.supabase, context.userId, { ownerOnly: true });
 
-    const { error: insErr } = await (supabaseAdmin as any)
+    // NOTE: we avoid .upsert(..., { onConflict: "user_id,role" }) here.
+    // user_roles' unique constraint is (user_id, role, school_id) — there is
+    // no constraint on just (user_id, role) — so that onConflict target
+    // doesn't match anything and Postgres rejects it with "there is no
+    // unique or exclusion constraint matching the ON CONFLICT specification".
+    // Platform-level grants always have school_id = NULL, so we check for an
+    // existing row explicitly instead of relying on ON CONFLICT.
+    const { data: existingGrant, error: existErr } = await (supabaseAdmin as any)
       .from("user_roles")
-      .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
-    if (insErr) throw new Error(insErr.message);
+      .select("id")
+      .eq("user_id", data.user_id)
+      .eq("role", data.role)
+      .is("school_id", null)
+      .maybeSingle();
+    if (existErr) throw new Error(existErr.message);
+
+    if (!existingGrant) {
+      const { error: insErr } = await (supabaseAdmin as any)
+        .from("user_roles")
+        .insert({ user_id: data.user_id, role: data.role, school_id: null });
+      if (insErr) throw new Error(insErr.message);
+    }
 
     // Re-sync scopes (delete then insert) so re-granting with a different
     // scope set replaces the old one instead of stacking. Only applies to
