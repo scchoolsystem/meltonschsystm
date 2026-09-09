@@ -15,12 +15,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
   Upload, Loader2, Save, GripVertical, ShoppingBag, Handshake,
   Facebook, Twitter, Instagram, Linkedin, Link2, Youtube, MessageSquare,
-  Newspaper, Video, Camera,
+  Newspaper, Video, Camera, ShieldCheck,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/website")({
@@ -895,9 +896,76 @@ function diffEditableFields(a: MediaItem, b: MediaItem): Partial<EditableMediaFi
   return diff;
 }
 
+// Step-up re-authentication before a story actually goes live. Being logged
+// in with the right role gets someone into the editor at all, but that's a
+// standing session that could be left open, shared, or (per a role
+// misassignment) broader than intended — so the moment that actually flips
+// something public (Publish / Approve & publish) asks the current user to
+// re-enter their password right then. A wrong password fails outright; we
+// never fall back to "just let it through".
+function usePublishStepUp() {
+  const { session } = useAuth();
+  const [pending, setPending] = useState<{ label: string; run: () => void } | null>(null);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const requestConfirm = (label: string, run: () => void) => {
+    setPassword("");
+    setPending({ label, run });
+  };
+
+  const confirm = async () => {
+    if (!session?.user?.email || !password) return;
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: session.user.email,
+      password,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error("Wrong password — this story was not published.");
+      return;
+    }
+    const run = pending?.run;
+    setPending(null);
+    setPassword("");
+    run?.();
+  };
+
+  const dialog = (
+    <Dialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="w-5 h-5" /> Confirm it's you</DialogTitle>
+          <DialogDescription>
+            {pending?.label} Re-enter your password to confirm — this goes live on the public site immediately after.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          type="password"
+          autoFocus
+          value={password}
+          placeholder="Your password"
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && password && !busy) confirm(); }}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPending(null)} disabled={busy}>Cancel</Button>
+          <Button onClick={confirm} disabled={busy || !password}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm & publish"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  return { requestConfirm, dialog };
+}
+
 function MediaEditor() {
   const { roles, session } = useAuth();
   const isOwner = roles.includes("platform_owner" as any);
+  const { requestConfirm, dialog: stepUpDialog } = usePublishStepUp();
   const fallback = { items: [] as MediaItem[] };
   const { data, isLoading, save } = useLandingSection("media_items", fallback);
   // `saved` mirrors exactly what's on the server — the baseline we diff
@@ -976,7 +1044,7 @@ function MediaEditor() {
   // already-published slot — those still need "Save changes" to go through
   // the pending-review check above. The target slot itself uses `items` so
   // whatever the person just typed into this new story is included.
-  const publishItem = (i: number) => {
+  const publishItemConfirmed = (i: number) => {
     const n = items.map((it, idx) => {
       if (idx === i) return { ...it, status: "published" as const };
       // Ignore unsaved edits sitting in any OTHER already-known slot — those
@@ -990,8 +1058,14 @@ function MediaEditor() {
     setSaved(n);
     save.mutate({ items: n });
   };
+  const publishItem = (i: number) => {
+    requestConfirm(
+      `Publishing "${items[i]?.title || "this story"}" puts it on the public Media page right away.`,
+      () => publishItemConfirmed(i),
+    );
+  };
 
-  const approvePending = (i: number) => {
+  const approvePendingConfirmed = (i: number) => {
     const it = items[i];
     if (!it.pending) return;
     const n = items.map((x, idx) =>
@@ -999,6 +1073,13 @@ function MediaEditor() {
     );
     setItems(n);
     save.mutate({ items: n });
+  };
+  const approvePending = (i: number) => {
+    if (!items[i]?.pending) return;
+    requestConfirm(
+      `Approving the pending edit to "${items[i].title || "this story"}" makes it live, replacing what's published now.`,
+      () => approvePendingConfirmed(i),
+    );
   };
 
   const rejectPending = (i: number) => {
@@ -1111,6 +1192,7 @@ function MediaEditor() {
           </>
         )}
       </CardContent>
+      {stepUpDialog}
     </Card>
   );
 }
