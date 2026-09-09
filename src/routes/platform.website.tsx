@@ -120,16 +120,32 @@ function ImagePicker({ label, value, onChange, folder }: { label: string; value:
 // ---------------------------------------------------------------------------
 
 function WebsiteEditor() {
-  const { roles } = useAuth();
+  const { roles, hasPlatformSection } = useAuth();
   const isOwner = roles.includes("platform_owner");
+  const canMedia = hasPlatformSection("website_media");
 
-  if (!isOwner) {
+  if (!isOwner && !canMedia) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-muted-foreground">
           Only the platform owner can edit the public website content.
         </CardContent>
       </Card>
+    );
+  }
+
+  // A restricted support user (owner=false, canMedia=true) only ever sees
+  // the Media/Stories editor — no TabsList, no way to navigate anywhere
+  // else on this page.
+  if (!isOwner && canMedia) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2"><Globe className="h-6 w-6" /> Media & Stories</h1>
+          <p className="text-sm text-muted-foreground mt-1">Company updates, press mentions, videos and photo stories shown on the public Media page.</p>
+        </div>
+        <MediaEditor />
+      </div>
     );
   }
 
