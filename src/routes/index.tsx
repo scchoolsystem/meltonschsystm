@@ -19,6 +19,7 @@ import {
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
   Coins, ShoppingBag, ExternalLink, Handshake,
   ParkingSquare, ScanLine, Car, UserCheck, LogIn, MessageSquareWarning,
+  Facebook, Twitter, Instagram, Linkedin, Link2,
 } from "lucide-react";
 import mpesaShot from "@/assets/portals/mpesa.png";
 import parentShot from "@/assets/portals/parent.png";
@@ -1139,6 +1140,71 @@ function ModulesPage() {
 // STORY PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
+type FounderItemPublic = {
+  name: string; role: string; photo_url: string | null; bio: string;
+  social_facebook?: string; social_twitter?: string; social_instagram?: string; social_linkedin?: string; social_other?: string;
+};
+
+const FOUNDER_SOCIAL_BLANK = { social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "", social_other: "" };
+
+const BIO_PREVIEW_LENGTH = 140;
+
+function socialHref(handle: string) {
+  const v = handle.trim();
+  if (!v) return "";
+  return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^@/, "")}`;
+}
+
+function FounderCard({ f }: { f: FounderItemPublic }) {
+  const [expanded, setExpanded] = useState(false);
+  const bio = f.bio ?? "";
+  const isLong = bio.length > BIO_PREVIEW_LENGTH;
+  const preview = isLong ? `${bio.slice(0, BIO_PREVIEW_LENGTH).trim()}…` : bio;
+
+  const socials: { icon: typeof Facebook; href: string; label: string }[] = [
+    { icon: Facebook, href: socialHref(f.social_facebook ?? ""), label: "Facebook" },
+    { icon: Twitter, href: socialHref(f.social_twitter ?? ""), label: "Twitter / X" },
+    { icon: Instagram, href: socialHref(f.social_instagram ?? ""), label: "Instagram" },
+    { icon: Linkedin, href: socialHref(f.social_linkedin ?? ""), label: "LinkedIn" },
+    { icon: Link2, href: socialHref(f.social_other ?? ""), label: "Link" },
+  ].filter((s) => s.href);
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
+        {f.photo_url ? (
+          <img src={f.photo_url} alt={f.name} className="w-full h-full object-cover" />
+        ) : (
+          <GraduationCap className="w-16 h-16 text-muted-foreground/40" />
+        )}
+      </div>
+      <div className="p-5 text-center">
+        <div className="font-bold text-lg">{f.name}</div>
+        <div className="text-sm text-primary mb-2">{f.role}</div>
+        <p className="text-sm text-muted-foreground">{expanded ? bio : preview}</p>
+        {isLong && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            {expanded ? <>Show less <ChevronUp className="w-3.5 h-3.5" /></> : <>Read more <ChevronDown className="w-3.5 h-3.5" /></>}
+          </button>
+        )}
+        {socials.length > 0 && (
+          <div className="mt-4 flex items-center justify-center gap-3">
+            {socials.map((s, i) => (
+              <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" title={s.label} className="text-muted-foreground hover:text-primary transition-colors">
+                <s.icon className="w-4 h-4" />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StoryPage() {
   const site = useSiteMeta();
   const intro = useLandingContent("story_intro", {
@@ -1159,8 +1225,10 @@ function StoryPage() {
     photo_url: null as string | null,
     bio: "Melton Konchella founded and personally built SmartDev ERP — designing, developing and maintaining every module of the platform, from the academic and finance systems to the Android and Windows apps.",
   });
-  const foundersData = useLandingContent("founders", { items: [] as { name: string; role: string; photo_url: string | null; bio: string }[] });
-  const founders = foundersData.items?.length ? foundersData.items : [legacyFounder];
+  const foundersData = useLandingContent("founders", { items: [] as FounderItemPublic[] });
+  const founders: FounderItemPublic[] = foundersData.items?.length
+    ? foundersData.items.map((f: any) => ({ ...FOUNDER_SOCIAL_BLANK, ...f }))
+    : [{ ...FOUNDER_SOCIAL_BLANK, ...legacyFounder }];
   const storyHeroPhotos = useGalleryPhotos("story_hero", [{ src: intro.hero_image_url || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=450&fit=crop" }]);
 
   return (
@@ -1254,20 +1322,7 @@ function StoryPage() {
           <h2 className="text-2xl font-bold text-center mb-8">{founders.length > 1 ? "Meet the team" : "Meet the founder"}</h2>
           <div className={`grid gap-6 mx-auto ${founders.length > 1 ? "sm:grid-cols-2 md:grid-cols-3 max-w-4xl" : "max-w-md"}`}>
             {founders.map((f, i) => (
-              <div key={`${f.name}-${i}`} className="rounded-xl border bg-card overflow-hidden">
-                <div className="w-full aspect-square bg-muted flex items-center justify-center overflow-hidden">
-                  {f.photo_url ? (
-                    <img src={f.photo_url} alt={f.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <GraduationCap className="w-16 h-16 text-muted-foreground/40" />
-                  )}
-                </div>
-                <div className="p-5 text-center">
-                  <div className="font-bold text-lg">{f.name}</div>
-                  <div className="text-sm text-primary mb-2">{f.role}</div>
-                  <p className="text-sm text-muted-foreground">{f.bio}</p>
-                </div>
-              </div>
+              <FounderCard key={`${f.name}-${i}`} f={f} />
             ))}
           </div>
         </div>
