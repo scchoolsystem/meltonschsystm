@@ -11,10 +11,8 @@ import { ShieldAlert } from "lucide-react";
 // separate wrapper component — see usage below), so a scoped-out user gets
 // a blocked screen instead of the page's data ever being requested.
 export type PlatformScopeRequirement =
-  | "owner"          // platform_owner only
-  | "dashboard"      // owner, or fully-unrestricted platform_support
-  | "school"         // owner, unrestricted support, or support with any school scope
-  | { section: string }; // owner, unrestricted support, or support scoped to this section
+  | "owner"               // platform_owner only
+  | { section: string };  // owner, unrestricted support, or support scoped to this section
 
 function isAllowed(
   requirement: PlatformScopeRequirement,
@@ -26,8 +24,6 @@ function isAllowed(
 
   const unrestricted = scopes.length === 0;
   if (requirement === "owner") return false;
-  if (requirement === "dashboard") return unrestricted;
-  if (requirement === "school") return unrestricted || scopes.some((s) => s.scope_type === "school");
   return unrestricted || scopes.some((s) => s.scope_type === "section" && s.section === requirement.section);
 }
 
