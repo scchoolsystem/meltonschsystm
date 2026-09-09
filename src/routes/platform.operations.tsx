@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { canAccess, NAV_REGISTRY } from "@/core/rbac";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,8 @@ type UsageRow = { school_id: string; school_name: string; module: string; distin
 function PlatformOperations() {
   const [schoolFilter, setSchoolFilter] = useState<string>("all");
   const [windowDays, setWindowDays] = useState<string>("30");
+  const queryClient = useQueryClient();
+  const [live, setLive] = useState(false);
 
   const { data: roleMatrix = [], isLoading: rolesLoading } = useQuery({
     queryKey: ["platform-role-matrix"],
@@ -48,6 +50,35 @@ function PlatformOperations() {
       return (data ?? []) as UsageRow[];
     },
   });
+
+  // Live updates: module_usage_daily changes every time any user, at any
+  // school, navigates somewhere new (see use-module-usage-tracker.ts). A
+  // busy platform could fire several of those a second, so this coalesces
+  // bursts into one refetch roughly every 2s instead of hammering the RPC
+  // on every single row change — still feels "live" without thrashing.
+  useEffect(() => {
+    const debounceRef: { timer: ReturnType<typeof setTimeout> | null } = { timer: null };
+    const scheduleRefetch = () => {
+      if (debounceRef.timer) clearTimeout(debounceRef.timer);
+      debounceRef.timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["platform-module-usage"] });
+      }, 2000);
+    };
+
+    const channel = supabase
+      .channel("platform-operations-usage")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "module_usage_daily" },
+        () => scheduleRefetch(),
+      )
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+
+    return () => {
+      if (debounceRef.timer) clearTimeout(debounceRef.timer);
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const loading = rolesLoading || usageLoading;
 
@@ -114,7 +145,13 @@ function PlatformOperations() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Operations &amp; Usage</h1>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            Operations &amp; Usage
+            <Badge variant={live ? "default" : "outline"} className="text-[10px] gap-1 font-normal">
+              <span className={`w-1.5 h-1.5 rounded-full ${live ? "bg-current animate-pulse" : "bg-muted-foreground"}`} />
+              {live ? "Live" : "Connecting…"}
+            </Badge>
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Who's eligible for each part of the system, and who's actually using it — per school.
           </p>
