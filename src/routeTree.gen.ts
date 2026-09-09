@@ -11,10 +11,17 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyRouteImport } from './routes/verify'
 import { Route as UnsubscribeRouteImport } from './routes/unsubscribe'
+import { Route as StoryRouteImport } from './routes/story'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PlatformRouteImport } from './routes/platform'
+import { Route as ModulesRouteImport } from './routes/modules'
+import { Route as MerchRouteImport } from './routes/merch'
+import { Route as MediaRouteImport } from './routes/media'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LegalRouteImport } from './routes/legal'
+import { Route as DownloadRouteImport } from './routes/download'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SysControlRoomRouteImport } from './routes/sys.control-room'
@@ -22,11 +29,15 @@ import { Route as PlatformWebsiteRouteImport } from './routes/platform.website'
 import { Route as PlatformSupportRouteImport } from './routes/platform.support'
 import { Route as PlatformSchoolsRouteImport } from './routes/platform.schools'
 import { Route as PlatformPlansRouteImport } from './routes/platform.plans'
+import { Route as PlatformOperationsRouteImport } from './routes/platform.operations'
 import { Route as PlatformLoginRouteImport } from './routes/platform.login'
 import { Route as PlatformInvoicesRouteImport } from './routes/platform.invoices'
 import { Route as PlatformDashboardRouteImport } from './routes/platform.dashboard'
+import { Route as MediaSlugRouteImport } from './routes/media_.$slug'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as ApiJaasTokenRouteImport } from './routes/api/jaas-token'
+import { Route as ApiAiRemarkRouteImport } from './routes/api/ai-remark'
+import { Route as ApiAiAssignmentExtractRouteImport } from './routes/api/ai-assignment-extract'
 import { Route as AppTransportRouteImport } from './routes/_app.transport'
 import { Route as AppTimetableRouteImport } from './routes/_app.timetable'
 import { Route as AppStudentsRouteImport } from './routes/_app.students'
@@ -49,11 +60,14 @@ import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAssignmentsRouteImport } from './routes/_app.assignments'
 import { Route as AppAnnouncementsRouteImport } from './routes/_app.announcements'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
+import { Route as AppAlumniRouteImport } from './routes/_app.alumni'
+import { Route as PlatformTeamRouteImport } from './routes/Platform.team'
 import { Route as PlatformSchoolsIdRouteImport } from './routes/platform.schools.$id'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as ApiPublicPlatformMpesaStkRouteImport } from './routes/api/public/platform-mpesa-stk'
 import { Route as ApiPublicPlatformMpesaCallbackRouteImport } from './routes/api/public/platform-mpesa-callback'
 import { Route as ApiPublicMpesaCallbackRouteImport } from './routes/api/public/mpesa-callback'
+import { Route as AppTimetableTodayRouteImport } from './routes/_app.timetable.today'
 import { Route as AppTimetableGenerateRouteImport } from './routes/_app.timetable.generate'
 import { Route as AppStudentsIdRouteImport } from './routes/_app.students_.$id'
 import { Route as AppStaffPayslipsRouteImport } from './routes/_app.staff_.payslips'
@@ -92,6 +106,7 @@ import { Route as AppAdminIctRouteImport } from './routes/_app.admin.ict'
 import { Route as AppAdminGradingRouteImport } from './routes/_app.admin.grading'
 import { Route as AppAdminFieldEditsRouteImport } from './routes/_app.admin.field-edits'
 import { Route as AppAdminFeaturesRouteImport } from './routes/_app.admin.features'
+import { Route as AppAdminDepartmentsRouteImport } from './routes/_app.admin.departments'
 import { Route as AppAdminComplianceRouteImport } from './routes/_app.admin.compliance'
 import { Route as AppAdminCommunicationsRouteImport } from './routes/_app.admin.communications'
 import { Route as AppAdminClassStructureRouteImport } from './routes/_app.admin.class-structure'
@@ -106,6 +121,7 @@ import { Route as AppAcademicsOversightRouteImport } from './routes/_app.academi
 import { Route as AppAcademicsMarksRouteImport } from './routes/_app.academics.marks'
 import { Route as AppAcademicsExamsRouteImport } from './routes/_app.academics.exams'
 import { Route as AppAcademicsEntryRouteImport } from './routes/_app.academics.entry'
+import { Route as AppAcademicsClassRankingRouteImport } from './routes/_app.academics.class-ranking'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -114,6 +130,8 @@ import { Route as AppIdsStudentIdRouteImport } from './routes/_app.ids.student.$
 import { Route as AppIdsStaffIdRouteImport } from './routes/_app.ids.staff.$id'
 import { Route as AppFinanceReceiptIdRouteImport } from './routes/_app.finance.receipt.$id'
 import { Route as AppAdminLeavingCertificateIdRouteImport } from './routes/_app.admin.leaving-certificate.$id'
+import { Route as AppAcademicsReportCardsBulkRouteImport } from './routes/_app.academics.report-cards_.bulk'
+import { Route as AppAcademicsClassRankingBulkRouteImport } from './routes/_app.academics.class-ranking_.bulk'
 import { Route as AppAcademicsReportCardStudentIdExamIdRouteImport } from './routes/_app.academics.report-card.$studentId.$examId'
 
 const VerifyRoute = VerifyRouteImport.update({
@@ -126,14 +144,39 @@ const UnsubscribeRoute = UnsubscribeRouteImport.update({
   path: '/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StoryRoute = StoryRouteImport.update({
+  id: '/story',
+  path: '/story',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformRoute = PlatformRouteImport.update({
   id: '/platform',
   path: '/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModulesRoute = ModulesRouteImport.update({
+  id: '/modules',
+  path: '/modules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MerchRoute = MerchRouteImport.update({
+  id: '/merch',
+  path: '/merch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediaRoute = MediaRouteImport.update({
+  id: '/media',
+  path: '/media',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -144,6 +187,16 @@ const LoginRoute = LoginRouteImport.update({
 const LegalRoute = LegalRouteImport.update({
   id: '/legal',
   path: '/legal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -180,6 +233,11 @@ const PlatformPlansRoute = PlatformPlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => PlatformRoute,
 } as any)
+const PlatformOperationsRoute = PlatformOperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
+  getParentRoute: () => PlatformRoute,
+} as any)
 const PlatformLoginRoute = PlatformLoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -195,6 +253,11 @@ const PlatformDashboardRoute = PlatformDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => PlatformRoute,
 } as any)
+const MediaSlugRoute = MediaSlugRouteImport.update({
+  id: '/media_/$slug',
+  path: '/media/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
   id: '/email/unsubscribe',
   path: '/email/unsubscribe',
@@ -203,6 +266,16 @@ const EmailUnsubscribeRoute = EmailUnsubscribeRouteImport.update({
 const ApiJaasTokenRoute = ApiJaasTokenRouteImport.update({
   id: '/api/jaas-token',
   path: '/api/jaas-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiRemarkRoute = ApiAiRemarkRouteImport.update({
+  id: '/api/ai-remark',
+  path: '/api/ai-remark',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiAssignmentExtractRoute = ApiAiAssignmentExtractRouteImport.update({
+  id: '/api/ai-assignment-extract',
+  path: '/api/ai-assignment-extract',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransportRoute = AppTransportRouteImport.update({
@@ -315,6 +388,16 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAlumniRoute = AppAlumniRouteImport.update({
+  id: '/alumni',
+  path: '/alumni',
+  getParentRoute: () => AppRoute,
+} as any)
+const PlatformTeamRoute = PlatformTeamRouteImport.update({
+  id: '/Platform/team',
+  path: '/Platform/team',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlatformSchoolsIdRoute = PlatformSchoolsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -341,6 +424,11 @@ const ApiPublicMpesaCallbackRoute = ApiPublicMpesaCallbackRouteImport.update({
   id: '/api/public/mpesa-callback',
   path: '/api/public/mpesa-callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppTimetableTodayRoute = AppTimetableTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AppTimetableRoute,
 } as any)
 const AppTimetableGenerateRoute = AppTimetableGenerateRouteImport.update({
   id: '/generate',
@@ -535,6 +623,11 @@ const AppAdminFeaturesRoute = AppAdminFeaturesRouteImport.update({
   path: '/admin/features',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
+  id: '/admin/departments',
+  path: '/admin/departments',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminComplianceRoute = AppAdminComplianceRouteImport.update({
   id: '/admin/compliance',
   path: '/admin/compliance',
@@ -605,6 +698,12 @@ const AppAcademicsEntryRoute = AppAcademicsEntryRouteImport.update({
   path: '/academics/entry',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAcademicsClassRankingRoute =
+  AppAcademicsClassRankingRouteImport.update({
+    id: '/academics/class-ranking',
+    path: '/academics/class-ranking',
+    getParentRoute: () => AppRoute,
+  } as any)
 const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
     id: '/lovable/email/transactional/send',
@@ -650,6 +749,18 @@ const AppAdminLeavingCertificateIdRoute =
     path: '/admin/leaving-certificate/$id',
     getParentRoute: () => AppRoute,
   } as any)
+const AppAcademicsReportCardsBulkRoute =
+  AppAcademicsReportCardsBulkRouteImport.update({
+    id: '/academics/report-cards_/bulk',
+    path: '/academics/report-cards/bulk',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppAcademicsClassRankingBulkRoute =
+  AppAcademicsClassRankingBulkRouteImport.update({
+    id: '/academics/class-ranking_/bulk',
+    path: '/academics/class-ranking/bulk',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppAcademicsReportCardStudentIdExamIdRoute =
   AppAcademicsReportCardStudentIdExamIdRouteImport.update({
     id: '/academics/report-card/$studentId/$examId',
@@ -659,12 +770,21 @@ const AppAcademicsReportCardStudentIdExamIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
+  '/media': typeof MediaRoute
+  '/merch': typeof MerchRoute
+  '/modules': typeof ModulesRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/story': typeof StoryRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/verify': typeof VerifyRoute
+  '/Platform/team': typeof PlatformTeamRoute
+  '/alumni': typeof AppAlumniRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/assignments': typeof AppAssignmentsRoute
@@ -687,16 +807,21 @@ export interface FileRoutesByFullPath {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/api/ai-assignment-extract': typeof ApiAiAssignmentExtractRoute
+  '/api/ai-remark': typeof ApiAiRemarkRoute
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/media/$slug': typeof MediaSlugRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/operations': typeof PlatformOperationsRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/academics/class-ranking': typeof AppAcademicsClassRankingRoute
   '/academics/entry': typeof AppAcademicsEntryRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -711,6 +836,7 @@ export interface FileRoutesByFullPath {
   '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
   '/admin/compliance': typeof AppAdminComplianceRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -749,11 +875,14 @@ export interface FileRoutesByFullPath {
   '/staff/payslips': typeof AppStaffPayslipsRoute
   '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
+  '/timetable/today': typeof AppTimetableTodayRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/api/public/platform-mpesa-callback': typeof ApiPublicPlatformMpesaCallbackRoute
   '/api/public/platform-mpesa-stk': typeof ApiPublicPlatformMpesaStkRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/academics/class-ranking/bulk': typeof AppAcademicsClassRankingBulkRoute
+  '/academics/report-cards/bulk': typeof AppAcademicsReportCardsBulkRoute
   '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -766,12 +895,21 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
+  '/media': typeof MediaRoute
+  '/merch': typeof MerchRoute
+  '/modules': typeof ModulesRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/story': typeof StoryRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/verify': typeof VerifyRoute
+  '/Platform/team': typeof PlatformTeamRoute
+  '/alumni': typeof AppAlumniRoute
   '/analytics': typeof AppAnalyticsRoute
   '/announcements': typeof AppAnnouncementsRoute
   '/assignments': typeof AppAssignmentsRoute
@@ -794,16 +932,21 @@ export interface FileRoutesByTo {
   '/students': typeof AppStudentsRoute
   '/timetable': typeof AppTimetableRouteWithChildren
   '/transport': typeof AppTransportRoute
+  '/api/ai-assignment-extract': typeof ApiAiAssignmentExtractRoute
+  '/api/ai-remark': typeof ApiAiRemarkRoute
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/media/$slug': typeof MediaSlugRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/operations': typeof PlatformOperationsRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/academics/class-ranking': typeof AppAcademicsClassRankingRoute
   '/academics/entry': typeof AppAcademicsEntryRoute
   '/academics/exams': typeof AppAcademicsExamsRoute
   '/academics/marks': typeof AppAcademicsMarksRoute
@@ -818,6 +961,7 @@ export interface FileRoutesByTo {
   '/admin/class-structure': typeof AppAdminClassStructureRoute
   '/admin/communications': typeof AppAdminCommunicationsRoute
   '/admin/compliance': typeof AppAdminComplianceRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/features': typeof AppAdminFeaturesRoute
   '/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/admin/grading': typeof AppAdminGradingRoute
@@ -856,11 +1000,14 @@ export interface FileRoutesByTo {
   '/staff/payslips': typeof AppStaffPayslipsRoute
   '/students/$id': typeof AppStudentsIdRoute
   '/timetable/generate': typeof AppTimetableGenerateRoute
+  '/timetable/today': typeof AppTimetableTodayRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/api/public/platform-mpesa-callback': typeof ApiPublicPlatformMpesaCallbackRoute
   '/api/public/platform-mpesa-stk': typeof ApiPublicPlatformMpesaStkRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/academics/class-ranking/bulk': typeof AppAcademicsClassRankingBulkRoute
+  '/academics/report-cards/bulk': typeof AppAcademicsReportCardsBulkRoute
   '/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -875,12 +1022,21 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/download': typeof DownloadRoute
   '/legal': typeof LegalRoute
   '/login': typeof LoginRoute
+  '/media': typeof MediaRoute
+  '/merch': typeof MerchRoute
+  '/modules': typeof ModulesRoute
   '/platform': typeof PlatformRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/story': typeof StoryRoute
   '/unsubscribe': typeof UnsubscribeRoute
   '/verify': typeof VerifyRoute
+  '/Platform/team': typeof PlatformTeamRoute
+  '/_app/alumni': typeof AppAlumniRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/announcements': typeof AppAnnouncementsRoute
   '/_app/assignments': typeof AppAssignmentsRoute
@@ -903,16 +1059,21 @@ export interface FileRoutesById {
   '/_app/students': typeof AppStudentsRoute
   '/_app/timetable': typeof AppTimetableRouteWithChildren
   '/_app/transport': typeof AppTransportRoute
+  '/api/ai-assignment-extract': typeof ApiAiAssignmentExtractRoute
+  '/api/ai-remark': typeof ApiAiRemarkRoute
   '/api/jaas-token': typeof ApiJaasTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
+  '/media_/$slug': typeof MediaSlugRoute
   '/platform/dashboard': typeof PlatformDashboardRoute
   '/platform/invoices': typeof PlatformInvoicesRoute
   '/platform/login': typeof PlatformLoginRoute
+  '/platform/operations': typeof PlatformOperationsRoute
   '/platform/plans': typeof PlatformPlansRoute
   '/platform/schools': typeof PlatformSchoolsRouteWithChildren
   '/platform/support': typeof PlatformSupportRoute
   '/platform/website': typeof PlatformWebsiteRoute
   '/sys/control-room': typeof SysControlRoomRoute
+  '/_app/academics/class-ranking': typeof AppAcademicsClassRankingRoute
   '/_app/academics/entry': typeof AppAcademicsEntryRoute
   '/_app/academics/exams': typeof AppAcademicsExamsRoute
   '/_app/academics/marks': typeof AppAcademicsMarksRoute
@@ -927,6 +1088,7 @@ export interface FileRoutesById {
   '/_app/admin/class-structure': typeof AppAdminClassStructureRoute
   '/_app/admin/communications': typeof AppAdminCommunicationsRoute
   '/_app/admin/compliance': typeof AppAdminComplianceRoute
+  '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/features': typeof AppAdminFeaturesRoute
   '/_app/admin/field-edits': typeof AppAdminFieldEditsRoute
   '/_app/admin/grading': typeof AppAdminGradingRoute
@@ -965,11 +1127,14 @@ export interface FileRoutesById {
   '/_app/staff_/payslips': typeof AppStaffPayslipsRoute
   '/_app/students_/$id': typeof AppStudentsIdRoute
   '/_app/timetable/generate': typeof AppTimetableGenerateRoute
+  '/_app/timetable/today': typeof AppTimetableTodayRoute
   '/api/public/mpesa-callback': typeof ApiPublicMpesaCallbackRoute
   '/api/public/platform-mpesa-callback': typeof ApiPublicPlatformMpesaCallbackRoute
   '/api/public/platform-mpesa-stk': typeof ApiPublicPlatformMpesaStkRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/platform/schools/$id': typeof PlatformSchoolsIdRoute
+  '/_app/academics/class-ranking_/bulk': typeof AppAcademicsClassRankingBulkRoute
+  '/_app/academics/report-cards_/bulk': typeof AppAcademicsReportCardsBulkRoute
   '/_app/admin/leaving-certificate/$id': typeof AppAdminLeavingCertificateIdRoute
   '/_app/finance/receipt/$id': typeof AppFinanceReceiptIdRoute
   '/_app/ids/staff/$id': typeof AppIdsStaffIdRoute
@@ -984,12 +1149,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/contact'
+    | '/download'
     | '/legal'
     | '/login'
+    | '/media'
+    | '/merch'
+    | '/modules'
     | '/platform'
+    | '/pricing'
     | '/reset-password'
+    | '/story'
     | '/unsubscribe'
     | '/verify'
+    | '/Platform/team'
+    | '/alumni'
     | '/analytics'
     | '/announcements'
     | '/assignments'
@@ -1012,16 +1186,21 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/api/ai-assignment-extract'
+    | '/api/ai-remark'
     | '/api/jaas-token'
     | '/email/unsubscribe'
+    | '/media/$slug'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/operations'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/academics/class-ranking'
     | '/academics/entry'
     | '/academics/exams'
     | '/academics/marks'
@@ -1036,6 +1215,7 @@ export interface FileRouteTypes {
     | '/admin/class-structure'
     | '/admin/communications'
     | '/admin/compliance'
+    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -1074,11 +1254,14 @@ export interface FileRouteTypes {
     | '/staff/payslips'
     | '/students/$id'
     | '/timetable/generate'
+    | '/timetable/today'
     | '/api/public/mpesa-callback'
     | '/api/public/platform-mpesa-callback'
     | '/api/public/platform-mpesa-stk'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/academics/class-ranking/bulk'
+    | '/academics/report-cards/bulk'
     | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -1091,12 +1274,21 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/contact'
+    | '/download'
     | '/legal'
     | '/login'
+    | '/media'
+    | '/merch'
+    | '/modules'
     | '/platform'
+    | '/pricing'
     | '/reset-password'
+    | '/story'
     | '/unsubscribe'
     | '/verify'
+    | '/Platform/team'
+    | '/alumni'
     | '/analytics'
     | '/announcements'
     | '/assignments'
@@ -1119,16 +1311,21 @@ export interface FileRouteTypes {
     | '/students'
     | '/timetable'
     | '/transport'
+    | '/api/ai-assignment-extract'
+    | '/api/ai-remark'
     | '/api/jaas-token'
     | '/email/unsubscribe'
+    | '/media/$slug'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/operations'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/academics/class-ranking'
     | '/academics/entry'
     | '/academics/exams'
     | '/academics/marks'
@@ -1143,6 +1340,7 @@ export interface FileRouteTypes {
     | '/admin/class-structure'
     | '/admin/communications'
     | '/admin/compliance'
+    | '/admin/departments'
     | '/admin/features'
     | '/admin/field-edits'
     | '/admin/grading'
@@ -1181,11 +1379,14 @@ export interface FileRouteTypes {
     | '/staff/payslips'
     | '/students/$id'
     | '/timetable/generate'
+    | '/timetable/today'
     | '/api/public/mpesa-callback'
     | '/api/public/platform-mpesa-callback'
     | '/api/public/platform-mpesa-stk'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/academics/class-ranking/bulk'
+    | '/academics/report-cards/bulk'
     | '/admin/leaving-certificate/$id'
     | '/finance/receipt/$id'
     | '/ids/staff/$id'
@@ -1199,12 +1400,21 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_app'
+    | '/contact'
+    | '/download'
     | '/legal'
     | '/login'
+    | '/media'
+    | '/merch'
+    | '/modules'
     | '/platform'
+    | '/pricing'
     | '/reset-password'
+    | '/story'
     | '/unsubscribe'
     | '/verify'
+    | '/Platform/team'
+    | '/_app/alumni'
     | '/_app/analytics'
     | '/_app/announcements'
     | '/_app/assignments'
@@ -1227,16 +1437,21 @@ export interface FileRouteTypes {
     | '/_app/students'
     | '/_app/timetable'
     | '/_app/transport'
+    | '/api/ai-assignment-extract'
+    | '/api/ai-remark'
     | '/api/jaas-token'
     | '/email/unsubscribe'
+    | '/media_/$slug'
     | '/platform/dashboard'
     | '/platform/invoices'
     | '/platform/login'
+    | '/platform/operations'
     | '/platform/plans'
     | '/platform/schools'
     | '/platform/support'
     | '/platform/website'
     | '/sys/control-room'
+    | '/_app/academics/class-ranking'
     | '/_app/academics/entry'
     | '/_app/academics/exams'
     | '/_app/academics/marks'
@@ -1251,6 +1466,7 @@ export interface FileRouteTypes {
     | '/_app/admin/class-structure'
     | '/_app/admin/communications'
     | '/_app/admin/compliance'
+    | '/_app/admin/departments'
     | '/_app/admin/features'
     | '/_app/admin/field-edits'
     | '/_app/admin/grading'
@@ -1289,11 +1505,14 @@ export interface FileRouteTypes {
     | '/_app/staff_/payslips'
     | '/_app/students_/$id'
     | '/_app/timetable/generate'
+    | '/_app/timetable/today'
     | '/api/public/mpesa-callback'
     | '/api/public/platform-mpesa-callback'
     | '/api/public/platform-mpesa-stk'
     | '/lovable/email/suppression'
     | '/platform/schools/$id'
+    | '/_app/academics/class-ranking_/bulk'
+    | '/_app/academics/report-cards_/bulk'
     | '/_app/admin/leaving-certificate/$id'
     | '/_app/finance/receipt/$id'
     | '/_app/ids/staff/$id'
@@ -1308,14 +1527,25 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  ContactRoute: typeof ContactRoute
+  DownloadRoute: typeof DownloadRoute
   LegalRoute: typeof LegalRoute
   LoginRoute: typeof LoginRoute
+  MediaRoute: typeof MediaRoute
+  MerchRoute: typeof MerchRoute
+  ModulesRoute: typeof ModulesRoute
   PlatformRoute: typeof PlatformRouteWithChildren
+  PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  StoryRoute: typeof StoryRoute
   UnsubscribeRoute: typeof UnsubscribeRoute
   VerifyRoute: typeof VerifyRoute
+  PlatformTeamRoute: typeof PlatformTeamRoute
+  ApiAiAssignmentExtractRoute: typeof ApiAiAssignmentExtractRoute
+  ApiAiRemarkRoute: typeof ApiAiRemarkRoute
   ApiJaasTokenRoute: typeof ApiJaasTokenRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
+  MediaSlugRoute: typeof MediaSlugRoute
   SysControlRoomRoute: typeof SysControlRoomRoute
   ApiPublicMpesaCallbackRoute: typeof ApiPublicMpesaCallbackRoute
   ApiPublicPlatformMpesaCallbackRoute: typeof ApiPublicPlatformMpesaCallbackRoute
@@ -1342,6 +1572,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/story': {
+      id: '/story'
+      path: '/story'
+      fullPath: '/story'
+      preLoaderRoute: typeof StoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -1349,11 +1586,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform': {
       id: '/platform'
       path: '/platform'
       fullPath: '/platform'
       preLoaderRoute: typeof PlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/modules': {
+      id: '/modules'
+      path: '/modules'
+      fullPath: '/modules'
+      preLoaderRoute: typeof ModulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/merch': {
+      id: '/merch'
+      path: '/merch'
+      fullPath: '/merch'
+      preLoaderRoute: typeof MerchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/media': {
+      id: '/media'
+      path: '/media'
+      fullPath: '/media'
+      preLoaderRoute: typeof MediaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1368,6 +1633,20 @@ declare module '@tanstack/react-router' {
       path: '/legal'
       fullPath: '/legal'
       preLoaderRoute: typeof LegalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -1419,6 +1698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformPlansRouteImport
       parentRoute: typeof PlatformRoute
     }
+    '/platform/operations': {
+      id: '/platform/operations'
+      path: '/operations'
+      fullPath: '/platform/operations'
+      preLoaderRoute: typeof PlatformOperationsRouteImport
+      parentRoute: typeof PlatformRoute
+    }
     '/platform/login': {
       id: '/platform/login'
       path: '/login'
@@ -1440,6 +1726,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlatformDashboardRouteImport
       parentRoute: typeof PlatformRoute
     }
+    '/media_/$slug': {
+      id: '/media_/$slug'
+      path: '/media/$slug'
+      fullPath: '/media/$slug'
+      preLoaderRoute: typeof MediaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/email/unsubscribe': {
       id: '/email/unsubscribe'
       path: '/email/unsubscribe'
@@ -1452,6 +1745,20 @@ declare module '@tanstack/react-router' {
       path: '/api/jaas-token'
       fullPath: '/api/jaas-token'
       preLoaderRoute: typeof ApiJaasTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai-remark': {
+      id: '/api/ai-remark'
+      path: '/api/ai-remark'
+      fullPath: '/api/ai-remark'
+      preLoaderRoute: typeof ApiAiRemarkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai-assignment-extract': {
+      id: '/api/ai-assignment-extract'
+      path: '/api/ai-assignment-extract'
+      fullPath: '/api/ai-assignment-extract'
+      preLoaderRoute: typeof ApiAiAssignmentExtractRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/transport': {
@@ -1608,6 +1915,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/alumni': {
+      id: '/_app/alumni'
+      path: '/alumni'
+      fullPath: '/alumni'
+      preLoaderRoute: typeof AppAlumniRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/Platform/team': {
+      id: '/Platform/team'
+      path: '/Platform/team'
+      fullPath: '/Platform/team'
+      preLoaderRoute: typeof PlatformTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/platform/schools/$id': {
       id: '/platform/schools/$id'
       path: '/$id'
@@ -1642,6 +1963,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/mpesa-callback'
       preLoaderRoute: typeof ApiPublicMpesaCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/timetable/today': {
+      id: '/_app/timetable/today'
+      path: '/today'
+      fullPath: '/timetable/today'
+      preLoaderRoute: typeof AppTimetableTodayRouteImport
+      parentRoute: typeof AppTimetableRoute
     }
     '/_app/timetable/generate': {
       id: '/_app/timetable/generate'
@@ -1909,6 +2237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminFeaturesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/departments': {
+      id: '/_app/admin/departments'
+      path: '/admin/departments'
+      fullPath: '/admin/departments'
+      preLoaderRoute: typeof AppAdminDepartmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/compliance': {
       id: '/_app/admin/compliance'
       path: '/admin/compliance'
@@ -2007,6 +2342,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAcademicsEntryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/class-ranking': {
+      id: '/_app/academics/class-ranking'
+      path: '/academics/class-ranking'
+      fullPath: '/academics/class-ranking'
+      preLoaderRoute: typeof AppAcademicsClassRankingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/lovable/email/transactional/send': {
       id: '/lovable/email/transactional/send'
       path: '/lovable/email/transactional/send'
@@ -2063,6 +2405,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLeavingCertificateIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/academics/report-cards_/bulk': {
+      id: '/_app/academics/report-cards_/bulk'
+      path: '/academics/report-cards/bulk'
+      fullPath: '/academics/report-cards/bulk'
+      preLoaderRoute: typeof AppAcademicsReportCardsBulkRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/academics/class-ranking_/bulk': {
+      id: '/_app/academics/class-ranking_/bulk'
+      path: '/academics/class-ranking/bulk'
+      fullPath: '/academics/class-ranking/bulk'
+      preLoaderRoute: typeof AppAcademicsClassRankingBulkRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/academics/report-card/$studentId/$examId': {
       id: '/_app/academics/report-card/$studentId/$examId'
       path: '/academics/report-card/$studentId/$examId'
@@ -2097,10 +2453,12 @@ const AppLiveRouteWithChildren =
 
 interface AppTimetableRouteChildren {
   AppTimetableGenerateRoute: typeof AppTimetableGenerateRoute
+  AppTimetableTodayRoute: typeof AppTimetableTodayRoute
 }
 
 const AppTimetableRouteChildren: AppTimetableRouteChildren = {
   AppTimetableGenerateRoute: AppTimetableGenerateRoute,
+  AppTimetableTodayRoute: AppTimetableTodayRoute,
 }
 
 const AppTimetableRouteWithChildren = AppTimetableRoute._addFileChildren(
@@ -2108,6 +2466,7 @@ const AppTimetableRouteWithChildren = AppTimetableRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppAlumniRoute: typeof AppAlumniRoute
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAnnouncementsRoute: typeof AppAnnouncementsRoute
   AppAssignmentsRoute: typeof AppAssignmentsRoute
@@ -2130,6 +2489,7 @@ interface AppRouteChildren {
   AppStudentsRoute: typeof AppStudentsRoute
   AppTimetableRoute: typeof AppTimetableRouteWithChildren
   AppTransportRoute: typeof AppTransportRoute
+  AppAcademicsClassRankingRoute: typeof AppAcademicsClassRankingRoute
   AppAcademicsEntryRoute: typeof AppAcademicsEntryRoute
   AppAcademicsExamsRoute: typeof AppAcademicsExamsRoute
   AppAcademicsMarksRoute: typeof AppAcademicsMarksRoute
@@ -2144,6 +2504,7 @@ interface AppRouteChildren {
   AppAdminClassStructureRoute: typeof AppAdminClassStructureRoute
   AppAdminCommunicationsRoute: typeof AppAdminCommunicationsRoute
   AppAdminComplianceRoute: typeof AppAdminComplianceRoute
+  AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminFeaturesRoute: typeof AppAdminFeaturesRoute
   AppAdminFieldEditsRoute: typeof AppAdminFieldEditsRoute
   AppAdminGradingRoute: typeof AppAdminGradingRoute
@@ -2180,6 +2541,8 @@ interface AppRouteChildren {
   AppStaffIdRoute: typeof AppStaffIdRoute
   AppStaffPayslipsRoute: typeof AppStaffPayslipsRoute
   AppStudentsIdRoute: typeof AppStudentsIdRoute
+  AppAcademicsClassRankingBulkRoute: typeof AppAcademicsClassRankingBulkRoute
+  AppAcademicsReportCardsBulkRoute: typeof AppAcademicsReportCardsBulkRoute
   AppAdminLeavingCertificateIdRoute: typeof AppAdminLeavingCertificateIdRoute
   AppFinanceReceiptIdRoute: typeof AppFinanceReceiptIdRoute
   AppIdsStaffIdRoute: typeof AppIdsStaffIdRoute
@@ -2188,6 +2551,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAlumniRoute: AppAlumniRoute,
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppAnnouncementsRoute: AppAnnouncementsRoute,
   AppAssignmentsRoute: AppAssignmentsRoute,
@@ -2210,6 +2574,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppStudentsRoute: AppStudentsRoute,
   AppTimetableRoute: AppTimetableRouteWithChildren,
   AppTransportRoute: AppTransportRoute,
+  AppAcademicsClassRankingRoute: AppAcademicsClassRankingRoute,
   AppAcademicsEntryRoute: AppAcademicsEntryRoute,
   AppAcademicsExamsRoute: AppAcademicsExamsRoute,
   AppAcademicsMarksRoute: AppAcademicsMarksRoute,
@@ -2224,6 +2589,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminClassStructureRoute: AppAdminClassStructureRoute,
   AppAdminCommunicationsRoute: AppAdminCommunicationsRoute,
   AppAdminComplianceRoute: AppAdminComplianceRoute,
+  AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminFeaturesRoute: AppAdminFeaturesRoute,
   AppAdminFieldEditsRoute: AppAdminFieldEditsRoute,
   AppAdminGradingRoute: AppAdminGradingRoute,
@@ -2260,6 +2626,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppStaffIdRoute: AppStaffIdRoute,
   AppStaffPayslipsRoute: AppStaffPayslipsRoute,
   AppStudentsIdRoute: AppStudentsIdRoute,
+  AppAcademicsClassRankingBulkRoute: AppAcademicsClassRankingBulkRoute,
+  AppAcademicsReportCardsBulkRoute: AppAcademicsReportCardsBulkRoute,
   AppAdminLeavingCertificateIdRoute: AppAdminLeavingCertificateIdRoute,
   AppFinanceReceiptIdRoute: AppFinanceReceiptIdRoute,
   AppIdsStaffIdRoute: AppIdsStaffIdRoute,
@@ -2286,6 +2654,7 @@ interface PlatformRouteChildren {
   PlatformDashboardRoute: typeof PlatformDashboardRoute
   PlatformInvoicesRoute: typeof PlatformInvoicesRoute
   PlatformLoginRoute: typeof PlatformLoginRoute
+  PlatformOperationsRoute: typeof PlatformOperationsRoute
   PlatformPlansRoute: typeof PlatformPlansRoute
   PlatformSchoolsRoute: typeof PlatformSchoolsRouteWithChildren
   PlatformSupportRoute: typeof PlatformSupportRoute
@@ -2296,6 +2665,7 @@ const PlatformRouteChildren: PlatformRouteChildren = {
   PlatformDashboardRoute: PlatformDashboardRoute,
   PlatformInvoicesRoute: PlatformInvoicesRoute,
   PlatformLoginRoute: PlatformLoginRoute,
+  PlatformOperationsRoute: PlatformOperationsRoute,
   PlatformPlansRoute: PlatformPlansRoute,
   PlatformSchoolsRoute: PlatformSchoolsRouteWithChildren,
   PlatformSupportRoute: PlatformSupportRoute,
@@ -2309,14 +2679,25 @@ const PlatformRouteWithChildren = PlatformRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  ContactRoute: ContactRoute,
+  DownloadRoute: DownloadRoute,
   LegalRoute: LegalRoute,
   LoginRoute: LoginRoute,
+  MediaRoute: MediaRoute,
+  MerchRoute: MerchRoute,
+  ModulesRoute: ModulesRoute,
   PlatformRoute: PlatformRouteWithChildren,
+  PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  StoryRoute: StoryRoute,
   UnsubscribeRoute: UnsubscribeRoute,
   VerifyRoute: VerifyRoute,
+  PlatformTeamRoute: PlatformTeamRoute,
+  ApiAiAssignmentExtractRoute: ApiAiAssignmentExtractRoute,
+  ApiAiRemarkRoute: ApiAiRemarkRoute,
   ApiJaasTokenRoute: ApiJaasTokenRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
+  MediaSlugRoute: MediaSlugRoute,
   SysControlRoomRoute: SysControlRoomRoute,
   ApiPublicMpesaCallbackRoute: ApiPublicMpesaCallbackRoute,
   ApiPublicPlatformMpesaCallbackRoute: ApiPublicPlatformMpesaCallbackRoute,
