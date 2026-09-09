@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import {
   Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
   Upload, Loader2, Save, GripVertical, ShoppingBag, Handshake,
+  Facebook, Twitter, Instagram, Linkedin, Link2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/website")({
@@ -263,15 +264,22 @@ function HeroEditor() {
 // Founders section (supports one or many — add, edit, remove, reorder)
 // ---------------------------------------------------------------------------
 
-type FounderItem = { name: string; role: string; photo_url: string | null; bio: string };
+type FounderItem = {
+  name: string; role: string; photo_url: string | null; bio: string;
+  social_facebook: string; social_twitter: string; social_instagram: string; social_linkedin: string; social_other: string;
+};
 
-const FOUNDER_BLANK: FounderItem = { name: "", role: "", photo_url: null, bio: "" };
+const FOUNDER_BLANK: FounderItem = {
+  name: "", role: "", photo_url: null, bio: "",
+  social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "", social_other: "",
+};
 
 const LEGACY_FOUNDER_FALLBACK: FounderItem = {
   name: "Melton Konchella",
   role: "Founder & Developer",
   photo_url: null,
   bio: "",
+  social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "", social_other: "",
 };
 
 function FoundersEditor() {
@@ -287,7 +295,8 @@ function FoundersEditor() {
   useEffect(() => {
     if (isLoading || legacyLoading || seeded) return;
     if (data.items?.length) {
-      setItems(data.items);
+      // Normalize older saved records that predate the social-handle fields.
+      setItems(data.items.map((f: any) => ({ ...FOUNDER_BLANK, ...f })));
     } else if (legacy?.name) {
       // First time opening this editor — carry the existing founder over as slot 1.
       setItems([{ ...LEGACY_FOUNDER_FALLBACK, ...legacy }]);
@@ -340,7 +349,23 @@ function FoundersEditor() {
                   <ImagePicker label="Photo (optional)" value={f.photo_url} onChange={(url) => updateItem(i, { photo_url: url })} folder="founder" />
                   <div><Label>Name</Label><Input value={f.name} onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
                   <div><Label>Role / title</Label><Input value={f.role} onChange={(e) => updateItem(i, { role: e.target.value })} /></div>
-                  <div><Label>Bio</Label><Textarea rows={3} value={f.bio} onChange={(e) => updateItem(i, { bio: e.target.value })} /></div>
+                  <div>
+                    <Label>Bio</Label>
+                    <Textarea rows={6} value={f.bio} onChange={(e) => updateItem(i, { bio: e.target.value })} placeholder="Write as long a story as you like — the public page shows only the first couple of lines with a 'Read more' link." />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      On the site, visitors see the name, role and a short preview of this bio, then can click "Read more" to expand the full story.
+                    </p>
+                  </div>
+                  <div className="space-y-2 rounded-md border p-3">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Social media (optional)</Label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center gap-2"><Facebook className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_facebook} placeholder="Facebook URL or @handle" onChange={(e) => updateItem(i, { social_facebook: e.target.value })} /></div>
+                      <div className="flex items-center gap-2"><Twitter className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_twitter} placeholder="Twitter / X URL or @handle" onChange={(e) => updateItem(i, { social_twitter: e.target.value })} /></div>
+                      <div className="flex items-center gap-2"><Instagram className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_instagram} placeholder="Instagram URL or @handle" onChange={(e) => updateItem(i, { social_instagram: e.target.value })} /></div>
+                      <div className="flex items-center gap-2"><Linkedin className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_linkedin} placeholder="LinkedIn URL" onChange={(e) => updateItem(i, { social_linkedin: e.target.value })} /></div>
+                      <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_other} placeholder="Any other link (website, TikTok, WhatsApp...)" onChange={(e) => updateItem(i, { social_other: e.target.value })} /></div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
