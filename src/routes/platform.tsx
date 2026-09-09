@@ -68,6 +68,7 @@ function PlatformLayout() {
   const { loading, session, roles, scopes, rolesLoaded, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Login page renders standalone (no sidebar / no auth chrome)
   if (location.pathname === "/platform/login") {
@@ -101,7 +102,6 @@ function PlatformLayout() {
   }
 
   const visibleNav = filterNav(NAV, roles, scopes);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
