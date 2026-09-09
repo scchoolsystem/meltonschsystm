@@ -3,6 +3,29 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+function generatePassword(len = 14): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%&*?";
+  const all = upper + lower + digits + symbols;
+  const buf = new Uint32Array(1);
+  const randInt = (maxExclusive: number) => {
+    const limit = Math.floor(0xffffffff / maxExclusive) * maxExclusive;
+    let n: number;
+    do { crypto.getRandomValues(buf); n = buf[0]; } while (n >= limit);
+    return n % maxExclusive;
+  };
+  const pick = (s: string) => s[randInt(s.length)];
+  const out = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  while (out.length < len) out.push(pick(all));
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out.join("");
+}
+
 const PLATFORM_ROLES = ["platform_owner", "platform_support"] as const;
 type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
@@ -219,6 +242,132 @@ export const platformGrantRole = createServerFn({ method: "POST" })
     });
 
     return { success: true };
+  });
+
+/**
+ * Adds someone straight from an email address: reuses their account if one
+ * already exists (matched case-insensitively, same as platformSearchUser),
+ * otherwise creates a brand-new auth user on the spot, then grants the
+ * platform role. Owner-only, same as platformGrantRole.
+ *
+ * Returns a one-time temp_password when a new account was created — there's
+ * no invite-email flow wired up here, so the owner needs to relay it to the
+ * new person directly. Existing accounts never return a password.
+ */
+export const platformInviteAndGrant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      email: z.string().email(),
+      full_name: z.string().trim().min(1).optional(),
+      role: z.enum(PLATFORM_ROLES),
+      scopes: z
+        .object({
+          sections: z.array(z.string()).default([]),
+          school_ids: z.array(z.string().uuid()).default([]),
+        })
+        .optional(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireCaller(context.supabase, context.userId, { ownerOnly: true });
+
+    const targetEmail = data.email.trim().toLowerCase();
+
+    // 1. Find an existing account by email (paged, same approach as
+    //    platformSearchUser — supabase-js has no direct getUserByEmail).
+    let userId: string | null = null;
+    let created = false;
+    let page = 1;
+    const perPage = 1000;
+    for (let i = 0; i < 20; i++) {
+      const { data: page_, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+      if (error) throw new Error(error.message);
+      const found = page_.users.find((u) => (u.email ?? "").toLowerCase() === targetEmail);
+      if (found) { userId = found.id; break; }
+      if (page_.users.length < perPage) break;
+      page++;
+    }
+
+    let tempPassword: string | null = null;
+
+    // 2. Create the account if it doesn't exist yet.
+    if (!userId) {
+      tempPassword = generatePassword(14);
+      const { data: createdUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: data.email.trim(),
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: data.full_name ? { full_name: data.full_name } : undefined,
+      });
+      if (createErr || !createdUser?.user) {
+        throw new Error(createErr?.message ?? "Failed to create account");
+      }
+      userId = createdUser.user.id;
+      created = true;
+    }
+
+    // 3. Ensure a profile row exists (harmless no-op for existing accounts
+    //    that already have one; fills it in for brand-new accounts).
+    if (data.full_name) {
+      await supabaseAdmin
+        .from("profiles")
+        .upsert({ id: userId, full_name: data.full_name }, { onConflict: "id" });
+    }
+
+    // 4. Grant the platform role — same conflict-safe logic as
+    //    platformGrantRole (see the comment there for why this can't use
+    //    .upsert(..., { onConflict: "user_id,role" })).
+    const { data: existingGrant, error: existErr } = await (supabaseAdmin as any)
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("role", data.role)
+      .is("school_id", null)
+      .maybeSingle();
+    if (existErr) throw new Error(existErr.message);
+
+    if (!existingGrant) {
+      const { error: insErr } = await (supabaseAdmin as any)
+        .from("user_roles")
+        .insert({ user_id: userId, role: data.role, school_id: null });
+      if (insErr) throw new Error(insErr.message);
+    }
+
+    if (data.role === "platform_support") {
+      const { error: delErr } = await supabaseAdmin
+        .from("platform_access_scopes")
+        .delete()
+        .eq("user_id", userId);
+      if (delErr) throw new Error(delErr.message);
+
+      const rows = [
+        ...(data.scopes?.sections ?? []).map((section) => ({
+          user_id: userId, scope_type: "section", section, created_by: context.userId,
+        })),
+        ...(data.scopes?.school_ids ?? []).map((school_id) => ({
+          user_id: userId, scope_type: "school", school_id, created_by: context.userId,
+        })),
+      ];
+      if (rows.length > 0) {
+        const { error: scopeErr } = await (supabaseAdmin as any)
+          .from("platform_access_scopes")
+          .insert(rows);
+        if (scopeErr) throw new Error(scopeErr.message);
+      }
+    }
+
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(context.userId);
+    await logAudit({
+      actor_user_id: context.userId,
+      actor_email: authUser?.user?.email ?? null,
+      action: created ? "platform_account_created_and_role_granted" : "platform_role_granted",
+      target_type: "user",
+      target_id: userId,
+      details: { role: data.role, target_email: data.email.trim(), scopes: data.scopes ?? null, created },
+    });
+
+    return { user_id: userId, email: data.email.trim(), created, temp_password: tempPassword };
   });
 
 export const platformRevokeRole = createServerFn({ method: "POST" })
