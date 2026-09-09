@@ -401,6 +401,34 @@ type PlanSelection = {
   total: number;
 };
 
+// Each route file (pricing.tsx, contact.tsx, ...) renders its own <IndexPage>,
+// which mounts a fresh <Landing>. So navigating /pricing -> /contact fully
+// unmounts the Landing instance that held the picked plan in useState, and
+// mounts a brand-new one with no memory of it. sessionStorage survives that
+// unmount/remount (and a hard refresh), so it's the actual carrier here —
+// useState alone silently loses the selection on every cross-route nav.
+const PLAN_SELECTION_KEY = "smartdev_plan_selection";
+
+function readStoredPlanSelection(): PlanSelection | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PLAN_SELECTION_KEY);
+    return raw ? (JSON.parse(raw) as PlanSelection) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredPlanSelection(selection: PlanSelection) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(PLAN_SELECTION_KEY, JSON.stringify(selection));
+  } catch {
+    // sessionStorage unavailable (private mode, etc.) — selection just won't
+    // survive navigation in that case, same as the old broken behavior.
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN LANDING COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -411,7 +439,11 @@ function Landing({ initialPage = "home" }: { initialPage?: Page } = {}) {
   const navigate = useNavigate();
   const page = initialPage;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [planSelection, setPlanSelection] = useState<PlanSelection | null>(null);
+  const [planSelection, setPlanSelectionState] = useState<PlanSelection | null>(() => readStoredPlanSelection());
+  const setPlanSelection = (selection: PlanSelection) => {
+    writeStoredPlanSelection(selection);
+    setPlanSelectionState(selection);
+  };
   const site = useSiteMeta();
 
   useEffect(() => {
