@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import {
   platformListTeam,
   platformSearchUser,
@@ -31,7 +32,11 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/platform/team")({
-  component: TeamPage,
+  component: () => (
+    <PlatformScopeGuard requirement="owner">
+      <TeamPage />
+    </PlatformScopeGuard>
+  ),
 });
 
 function TeamPage() {
@@ -59,11 +64,17 @@ function TeamPage() {
 
 // ---------------------------------------------------------------------------
 
-// Sections that can be granted on their own. Add more here as you carve up
-// other platform pages the same way (each new entry needs a matching
-// platform_has_section() check wired into that page's RLS + tab gating).
+// Sections that can be granted on their own — one per platform admin page.
+// Add more here as new pages get carved out (each new entry needs a
+// matching "section:*" key on the right NAV row in platform.tsx, and a
+// PlatformScopeGuard requirement={{ section: "..." }} on that page's route).
 const PLATFORM_SECTIONS = [
-  { key: "website_media", label: "Media & Stories only" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "schools", label: "Schools" },
+  { key: "invoices", label: "Billing / Invoices" },
+  { key: "support", label: "Support tickets" },
+  { key: "plans", label: "Plans & pricing" },
+  { key: "website_media", label: "Website Content (Media & Stories)" },
 ];
 
 function TeamTab() {
@@ -84,17 +95,6 @@ function TeamTab() {
   // Restriction picker state — only relevant when role === "platform_support"
   const [restricted, setRestricted] = useState(false);
   const [sections, setSections] = useState<string[]>([]);
-  const [schoolIds, setSchoolIds] = useState<string[]>([]);
-
-  const { data: schools } = useQuery({
-    queryKey: ["platform-team-schools"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("schools").select("id, name").order("name");
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: isOwner, // only the owner-only "Add someone" card below needs this
-  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["platform-team"],
@@ -119,7 +119,7 @@ function TeamTab() {
           email,
           full_name: fullName || undefined,
           role,
-          scopes: role === "platform_support" && restricted ? { sections, school_ids: schoolIds } : undefined,
+          scopes: role === "platform_support" && restricted ? { sections, school_ids: [] } : undefined,
         },
       }),
     onSuccess: (res) => {
@@ -130,7 +130,7 @@ function TeamTab() {
         toast.success(`Granted ${role.replace("platform_", "")} access`);
       }
       setEmail(""); setFullName(""); setFound(undefined);
-      setRestricted(false); setSections([]); setSchoolIds([]);
+      setRestricted(false); setSections([]);
       qc.invalidateQueries({ queryKey: ["platform-team"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -148,8 +148,6 @@ function TeamTab() {
 
   const toggleSection = (key: string) =>
     setSections((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
-  const toggleSchool = (id: string) =>
-    setSchoolIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   return (
     <div className="space-y-4">
@@ -230,7 +228,7 @@ function TeamTab() {
               {role === "platform_support" && restricted && (
                 <div className="space-y-3 pl-1">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Sections</Label>
+                    <Label className="text-xs text-muted-foreground">Pages they can access</Label>
                     <div className="flex flex-col gap-1 mt-1">
                       {PLATFORM_SECTIONS.map((s) => (
                         <div key={s.key} className="flex items-center gap-2">
@@ -244,23 +242,8 @@ function TeamTab() {
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Schools (Schools / Support / Billing tabs)</Label>
-                    <div className="flex flex-col gap-1 mt-1 max-h-40 overflow-auto">
-                      {(schools ?? []).map((s) => (
-                        <div key={s.id} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`sch-${s.id}`}
-                            checked={schoolIds.includes(s.id)}
-                            onCheckedChange={() => toggleSchool(s.id)}
-                          />
-                          <Label htmlFor={`sch-${s.id}`} className="text-sm font-normal cursor-pointer">{s.name}</Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {sections.length === 0 && schoolIds.length === 0 && (
-                    <p className="text-xs text-destructive">Pick at least one section or school, or this person will have no access at all.</p>
+                  {sections.length === 0 && (
+                    <p className="text-xs text-destructive">Pick at least one page, or this person will have no access at all.</p>
                   )}
                 </div>
               )}
@@ -270,7 +253,7 @@ function TeamTab() {
                 onClick={() => addByEmail.mutate()}
                 disabled={
                   !email || addByEmail.isPending ||
-                  (role === "platform_support" && restricted && sections.length === 0 && schoolIds.length === 0)
+                  (role === "platform_support" && restricted && sections.length === 0)
                 }
               >
                 {addByEmail.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserPlus className="w-4 h-4 mr-1" />}
