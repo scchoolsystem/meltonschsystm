@@ -2,20 +2,25 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
   <url><loc>https://smartdev.co.ke/</loc></url>
-  <url><loc>https://smartdev.co.ke/__root</loc></url>
 
+  <url><loc>https://smartdev.co.ke/academics/class-ranking</loc></url>
+  <url><loc>https://smartdev.co.ke/academics/class-ranking/bulk</loc></url>
   <url><loc>https://smartdev.co.ke/academics/exams</loc></url>
   <url><loc>https://smartdev.co.ke/academics/marks</loc></url>
+  <url><loc>https://smartdev.co.ke/academics/oversight</loc></url>
+  <url><loc>https://smartdev.co.ke/academics/remarks</loc></url>
   <url><loc>https://smartdev.co.ke/academics/report-card/$studentId/$examId</loc></url>
   <url><loc>https://smartdev.co.ke/academics/report-cards</loc></url>
+  <url><loc>https://smartdev.co.ke/academics/report-cards/bulk</loc></url>
   <url><loc>https://smartdev.co.ke/academics/results</loc></url>
   <url><loc>https://smartdev.co.ke/academics/subjects</loc></url>
 
   <url><loc>https://smartdev.co.ke/admin/activity</loc></url>
   <url><loc>https://smartdev.co.ke/admin/billing</loc></url>
   <url><loc>https://smartdev.co.ke/admin/brain</loc></url>
+  <url><loc>https://smartdev.co.ke/admin/class-structure</loc></url>
   <url><loc>https://smartdev.co.ke/admin/communications</loc></url>
-  <url><loc>https://smartdev.co.ke/admin/departments</loc></url>
+  <url><loc>https://smartdev.co.ke/admin/compliance</loc></url>
   <url><loc>https://smartdev.co.ke/admin/features</loc></url>
   <url><loc>https://smartdev.co.ke/admin/field-edits</loc></url>
   <url><loc>https://smartdev.co.ke/admin/grading</loc></url>
@@ -29,6 +34,8 @@
   <url><loc>https://smartdev.co.ke/admin/overrides</loc></url>
   <url><loc>https://smartdev.co.ke/admin/periods</loc></url>
   <url><loc>https://smartdev.co.ke/admin/permissions</loc></url>
+  <url><loc>https://smartdev.co.ke/admin/promotion</loc></url>
+  <url><loc>https://smartdev.co.ke/admin/promotion-settings</loc></url>
   <url><loc>https://smartdev.co.ke/admin/roles</loc></url>
   <url><loc>https://smartdev.co.ke/admin/rooms</loc></url>
   <url><loc>https://smartdev.co.ke/admin/schools</loc></url>
@@ -37,26 +44,114 @@
   <url><loc>https://smartdev.co.ke/admin/support</loc></url>
   <url><loc>https://smartdev.co.ke/admin/users</loc></url>
 
+  <url><loc>https://smartdev.co.ke/alumni</loc></url>
+
   <url><loc>https://smartdev.co.ke/analytics</loc></url>
+
   <url><loc>https://smartdev.co.ke/announcements</loc></url>
+
+  <url><loc>https://smartdev.co.ke/api/ai-assignment-extract</loc></url>
+  <url><loc>https://smartdev.co.ke/api/ai-remark</loc></url>
+  <url><loc>https://smartdev.co.ke/api/jaas-token</loc></url>
   <url><loc>https://smartdev.co.ke/api/public/mpesa-callback</loc></url>
-  <url><loc>https://smartdev.co.ke/attendance</loc></url>
+  <url><loc>https://smartdev.co.ke/api/public/platform-mpesa-callback</loc></url>
+  <url><loc>https://smartdev.co.ke/api/public/platform-mpesa-stk</loc></url>
+
+  <url><loc>https://smartdev.co.ke/assignments</loc></url>
+
+  <url><loc>https://smartdev.co.ke/attendance/mark</loc></url>
+
   <url><loc>https://smartdev.co.ke/boarding</loc></url>
 
   <url><loc>https://smartdev.co.ke/classes</loc></url>
+
   <url><loc>https://smartdev.co.ke/classroom</loc></url>
+
   <url><loc>https://smartdev.co.ke/clinic</loc></url>
+
   <url><loc>https://smartdev.co.ke/cocurricular</loc></url>
 
   <url><loc>https://smartdev.co.ke/dashboard</loc></url>
+
   <url><loc>https://smartdev.co.ke/department</loc></url>
+
   <url><loc>https://smartdev.co.ke/discipline</loc></url>
 
   <url><loc>https://smartdev.co.ke/email/unsubscribe</loc></url>
 
+  <url><loc>https://smartdev.co.ke/finance/analytics</loc></url>
+  <url><loc>https://smartdev.co.ke/finance/budget</loc></url>
+  <url><loc>https://smartdev.co.ke/finance/expenses</loc></url>
   <url><loc>https://smartdev.co.ke/finance/fees</loc></url>
   <url><loc>https://smartdev.co.ke/finance/generate</loc></url>
   <url><loc>https://smartdev.co.ke/finance/invoices</loc></url>
   <url><loc>https://smartdev.co.ke/finance/payments</loc></url>
+  <url><loc>https://smartdev.co.ke/finance/receipt/$id</loc></url>
+
+  <url><loc>https://smartdev.co.ke/ids/bulk</loc></url>
+  <url><loc>https://smartdev.co.ke/ids/staff/$id</loc></url>
+  <url><loc>https://smartdev.co.ke/ids/student/$id</loc></url>
+  <url><loc>https://smartdev.co.ke/ids/verify</loc></url>
+
+  <url><loc>https://smartdev.co.ke/inventory</loc></url>
+
+  <url><loc>https://smartdev.co.ke/kitchen</loc></url>
+
+  <url><loc>https://smartdev.co.ke/legal</loc></url>
+
+  <url><loc>https://smartdev.co.ke/library</loc></url>
+
+  <url><loc>https://smartdev.co.ke/live</loc></url>
+  <url><loc>https://smartdev.co.ke/live/$sessionId</loc></url>
+  <url><loc>https://smartdev.co.ke/live/$sessionId/attendance</loc></url>
+
+  <url><loc>https://smartdev.co.ke/login</loc></url>
+
+  <url><loc>https://smartdev.co.ke/lovable/email/queue/process</loc></url>
+  <url><loc>https://smartdev.co.ke/lovable/email/suppression</loc></url>
+  <url><loc>https://smartdev.co.ke/lovable/email/transactional/preview</loc></url>
+  <url><loc>https://smartdev.co.ke/lovable/email/transactional/send</loc></url>
+
+  <url><loc>https://smartdev.co.ke/media/$slug</loc></url>
+
+  <url><loc>https://smartdev.co.ke/platform</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/dashboard</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/invoices</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/login</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/operations</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/plans</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/schools</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/schools/$id</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/support</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/team</loc></url>
+  <url><loc>https://smartdev.co.ke/platform/website</loc></url>
+
+  <url><loc>https://smartdev.co.ke/portal</loc></url>
+  <url><loc>https://smartdev.co.ke/portal/me</loc></url>
+  <url><loc>https://smartdev.co.ke/portal/parent</loc></url>
+  <url><loc>https://smartdev.co.ke/portal/student</loc></url>
+
+  <url><loc>https://smartdev.co.ke/reset-password</loc></url>
+
+  <url><loc>https://smartdev.co.ke/security</loc></url>
+
+  <url><loc>https://smartdev.co.ke/staff</loc></url>
+  <url><loc>https://smartdev.co.ke/staff/$id</loc></url>
+  <url><loc>https://smartdev.co.ke/staff/payslips</loc></url>
+
+  <url><loc>https://smartdev.co.ke/students</loc></url>
+  <url><loc>https://smartdev.co.ke/students/$id</loc></url>
+
+  <url><loc>https://smartdev.co.ke/sys/control-room</loc></url>
+
+  <url><loc>https://smartdev.co.ke/timetable</loc></url>
+  <url><loc>https://smartdev.co.ke/timetable/generate</loc></url>
+  <url><loc>https://smartdev.co.ke/timetable/today</loc></url>
+
+  <url><loc>https://smartdev.co.ke/transport</loc></url>
+
+  <url><loc>https://smartdev.co.ke/unsubscribe</loc></url>
+
+  <url><loc>https://smartdev.co.ke/verify</loc></url>
 
 </urlset>
