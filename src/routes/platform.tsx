@@ -23,13 +23,14 @@ export const Route = createFileRoute("/platform")({
 // `key` drives visibility for a *scoped* platform_support user (see
 // filterNav below). platform_owner and unrestricted platform_support
 // (zero rows in platform_access_scopes) always see everything regardless
-// of key.
+// of key. Every page below is independently grantable as its own
+// "section:*" scope — see PLATFORM_SECTIONS in Platform.team.tsx.
 const NAV = [
-  { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
-  { to: "/platform/schools", label: "Schools", icon: Building2, key: "school" },
-  { to: "/platform/invoices", label: "Billing", icon: Receipt, key: "school" },
-  { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "school" },
-  { to: "/platform/plans", label: "Plans", icon: Package, key: "dashboard" },
+  { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard, key: "section:dashboard" },
+  { to: "/platform/schools", label: "Schools", icon: Building2, key: "section:schools" },
+  { to: "/platform/invoices", label: "Billing", icon: Receipt, key: "section:invoices" },
+  { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "section:support" },
+  { to: "/platform/plans", label: "Plans", icon: Package, key: "section:plans" },
   { to: "/platform/website", label: "Website Content", icon: Globe, key: "section:website_media" },
   { to: "/platform/team", label: "Team & Access", icon: Users, key: "owner" },
 ] as const;
@@ -39,15 +40,13 @@ function filterNav(nav: typeof NAV, roles: string[], scopes: { scope_type: strin
   if (!roles.includes("platform_support")) return [];
   if (scopes.length === 0) return nav.filter((n) => n.key !== "owner"); // unrestricted support: everything but Team & Access
 
-  const hasAnySchool = scopes.some((s) => s.scope_type === "school");
   const sectionKeys = new Set(scopes.filter((s) => s.scope_type === "section").map((s) => s.section));
 
   return nav.filter((n) => {
     if (n.key === "owner") return false;
-    if (n.key === "school") return hasAnySchool;
-    if (n.key === "dashboard") return false; // platform-wide numbers - not part of any scoped grant
     if (n.key.startsWith("section:")) return sectionKeys.has(n.key.slice("section:".length));
     return false;
+
   });
 }
 
