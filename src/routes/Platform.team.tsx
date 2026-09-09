@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   platformListTeam,
   platformSearchUser,
-  platformGrantRole,
+  platformInviteAndGrant,
   platformRevokeRole,
   platformSetAnnouncement,
 } from "@/lib/platform-admin.functions";
@@ -72,12 +72,14 @@ function TeamTab() {
   const qc = useQueryClient();
   const listTeam = useServerFn(platformListTeam);
   const searchUser = useServerFn(platformSearchUser);
-  const grantRole = useServerFn(platformGrantRole);
+  const inviteAndGrant = useServerFn(platformInviteAndGrant);
   const revokeRole = useServerFn(platformRevokeRole);
 
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"platform_owner" | "platform_support">("platform_support");
   const [found, setFound] = useState<{ user_id: string; email: string; full_name: string } | null | undefined>(undefined);
+  const [newAccountResult, setNewAccountResult] = useState<{ email: string; temp_password: string } | null>(null);
 
   // Restriction picker state — only relevant when role === "platform_support"
   const [restricted, setRestricted] = useState(false);
@@ -108,18 +110,26 @@ function TeamTab() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const grant = useMutation({
+  // One-step add: works whether or not the person already has an account.
+  // Creates it on the spot if not, then grants the role either way.
+  const addByEmail = useMutation({
     mutationFn: async () =>
-      grantRole({
+      inviteAndGrant({
         data: {
-          user_id: found!.user_id,
+          email,
+          full_name: fullName || undefined,
           role,
           scopes: role === "platform_support" && restricted ? { sections, school_ids: schoolIds } : undefined,
         },
       }),
-    onSuccess: () => {
-      toast.success(`Granted ${role.replace("platform_", "")} access`);
-      setEmail(""); setFound(undefined);
+    onSuccess: (res) => {
+      if (res.created) {
+        toast.success(`Account created and granted ${role.replace("platform_", "")} access`);
+        setNewAccountResult({ email: res.email, temp_password: res.temp_password! });
+      } else {
+        toast.success(`Granted ${role.replace("platform_", "")} access`);
+      }
+      setEmail(""); setFullName(""); setFound(undefined);
       setRestricted(false); setSections([]); setSchoolIds([]);
       qc.invalidateQueries({ queryKey: ["platform-team"] });
     },
@@ -147,92 +157,126 @@ function TeamTab() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Add someone</CardTitle>
-            <CardDescription>They must already have an account (any role, any school, or none) — this only adds platform access on top of it.</CardDescription>
+            <CardDescription>Type their email and grant access directly — if they don't have an account yet, one is created for them automatically.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-2">
+            {newAccountResult && (
+              <div className="p-3 rounded-md border border-primary/30 bg-primary/5 text-sm space-y-1">
+                <p className="font-medium">New account created for {newAccountResult.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  One-time temporary password — share it with them now, this won't be shown again:
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono">{newAccountResult.temp_password}</code>
+                  <Button
+                    size="sm" variant="ghost"
+                    onClick={() => { navigator.clipboard.writeText(newAccountResult.temp_password); toast.success("Copied"); }}
+                  >
+                    Copy
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setNewAccountResult(null)}>Dismiss</Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 flex-wrap">
               <Input
                 placeholder="their.email@example.com"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setFound(undefined); }}
                 className="max-w-sm"
               />
-              <Button variant="outline" onClick={() => search.mutate()} disabled={!email || search.isPending}>
+              <Input
+                placeholder="Full name (optional)"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="max-w-xs"
+              />
+              <Button
+                variant="outline"
+                onClick={() => search.mutate()}
+                disabled={!email || search.isPending}
+                title="Check whether this email already has an account"
+              >
                 {search.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               </Button>
             </div>
-            {found && (
-              <div className="space-y-3 p-3 rounded-md border bg-muted/40">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="text-sm">
-                    <div className="font-medium">{found.full_name || found.email}</div>
-                    <div className="text-xs text-muted-foreground">{found.email}</div>
-                  </div>
-                  <Select value={role} onValueChange={(v) => { setRole(v as any); setRestricted(false); }}>
-                    <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="platform_support">Platform support</SelectItem>
-                      <SelectItem value="platform_owner">Platform owner</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {role === "platform_support" && (
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="restrict" checked={restricted} onCheckedChange={(v) => setRestricted(!!v)} />
-                    <Label htmlFor="restrict" className="text-sm font-normal cursor-pointer">
-                      Restrict this person to specific areas (default is full support access)
-                    </Label>
-                  </div>
-                )}
-
-                {role === "platform_support" && restricted && (
-                  <div className="space-y-3 pl-1">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Sections</Label>
-                      <div className="flex flex-col gap-1 mt-1">
-                        {PLATFORM_SECTIONS.map((s) => (
-                          <div key={s.key} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`sec-${s.key}`}
-                              checked={sections.includes(s.key)}
-                              onCheckedChange={() => toggleSection(s.key)}
-                            />
-                            <Label htmlFor={`sec-${s.key}`} className="text-sm font-normal cursor-pointer">{s.label}</Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Schools (Schools / Support / Billing tabs)</Label>
-                      <div className="flex flex-col gap-1 mt-1 max-h-40 overflow-auto">
-                        {(schools ?? []).map((s) => (
-                          <div key={s.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`sch-${s.id}`}
-                              checked={schoolIds.includes(s.id)}
-                              onCheckedChange={() => toggleSchool(s.id)}
-                            />
-                            <Label htmlFor={`sch-${s.id}`} className="text-sm font-normal cursor-pointer">{s.name}</Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {sections.length === 0 && schoolIds.length === 0 && (
-                      <p className="text-xs text-destructive">Pick at least one section or school, or this person will have no access at all.</p>
-                    )}
-                  </div>
-                )}
-
-                <Button
-                  size="sm"
-                  onClick={() => grant.mutate()}
-                  disabled={grant.isPending || (role === "platform_support" && restricted && sections.length === 0 && schoolIds.length === 0)}
-                >
-                  <UserPlus className="w-4 h-4 mr-1" /> Grant access
-                </Button>
-              </div>
+            {found !== undefined && (
+              <p className="text-xs text-muted-foreground">
+                {found
+                  ? `Existing account found: ${found.full_name || found.email}. Granting access below won't create a new one.`
+                  : "No existing account with that email — one will be created automatically when you grant access."}
+              </p>
             )}
+
+            <div className="space-y-3 p-3 rounded-md border bg-muted/40">
+              <Select value={role} onValueChange={(v) => { setRole(v as any); setRestricted(false); }}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="platform_support">Platform support</SelectItem>
+                  <SelectItem value="platform_owner">Platform owner</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {role === "platform_support" && (
+                <div className="flex items-center gap-2">
+                  <Checkbox id="restrict" checked={restricted} onCheckedChange={(v) => setRestricted(!!v)} />
+                  <Label htmlFor="restrict" className="text-sm font-normal cursor-pointer">
+                    Restrict this person to specific areas (default is full support access)
+                  </Label>
+                </div>
+              )}
+
+              {role === "platform_support" && restricted && (
+                <div className="space-y-3 pl-1">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Sections</Label>
+                    <div className="flex flex-col gap-1 mt-1">
+                      {PLATFORM_SECTIONS.map((s) => (
+                        <div key={s.key} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`sec-${s.key}`}
+                            checked={sections.includes(s.key)}
+                            onCheckedChange={() => toggleSection(s.key)}
+                          />
+                          <Label htmlFor={`sec-${s.key}`} className="text-sm font-normal cursor-pointer">{s.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Schools (Schools / Support / Billing tabs)</Label>
+                    <div className="flex flex-col gap-1 mt-1 max-h-40 overflow-auto">
+                      {(schools ?? []).map((s) => (
+                        <div key={s.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`sch-${s.id}`}
+                            checked={schoolIds.includes(s.id)}
+                            onCheckedChange={() => toggleSchool(s.id)}
+                          />
+                          <Label htmlFor={`sch-${s.id}`} className="text-sm font-normal cursor-pointer">{s.name}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {sections.length === 0 && schoolIds.length === 0 && (
+                    <p className="text-xs text-destructive">Pick at least one section or school, or this person will have no access at all.</p>
+                  )}
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                onClick={() => addByEmail.mutate()}
+                disabled={
+                  !email || addByEmail.isPending ||
+                  (role === "platform_support" && restricted && sections.length === 0 && schoolIds.length === 0)
+                }
+              >
+                {addByEmail.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <UserPlus className="w-4 h-4 mr-1" />}
+                Add & grant access
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
