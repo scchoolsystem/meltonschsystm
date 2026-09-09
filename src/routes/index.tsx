@@ -19,7 +19,8 @@ import {
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
   Coins, ShoppingBag, ExternalLink, Handshake,
   ParkingSquare, ScanLine, Car, UserCheck, LogIn, MessageSquareWarning,
-  Facebook, Twitter, Instagram, Linkedin, Link2,
+  Facebook, Twitter, Instagram, Linkedin, Link2, Youtube,
+  Newspaper, Video, Camera,
 } from "lucide-react";
 import mpesaShot from "@/assets/portals/mpesa.png";
 import parentShot from "@/assets/portals/parent.png";
@@ -65,6 +66,13 @@ const SITE_DEFAULTS = {
   phone_primary: "+254 792 991 222",
   phone_support: "+254 792 991 222",
   location: "Nairobi, Kenya",
+  social_facebook: "",
+  social_twitter: "",
+  social_instagram: "",
+  social_linkedin: "",
+  social_youtube: "",
+  social_tiktok: "",
+  social_whatsapp: "",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -361,7 +369,7 @@ const GALLERY_PHOTOS = [
   { src: "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=600&h=400&fit=crop", caption: "Sports and co-curricular" },
 ];
 
-type Page = "home" | "modules" | "story" | "pricing" | "download" | "merch" | "contact" | "legal";
+type Page = "home" | "modules" | "story" | "media" | "pricing" | "download" | "merch" | "contact" | "legal";
 
 // A confirmed plan + add-on selection, carried from the pricing page to the
 // contact page so a customer's picks aren't lost when they hit "Get started".
@@ -393,7 +401,7 @@ function Landing() {
   // Handle hash-based routing for deep links
   useEffect(() => {
     const hash = window.location.hash.replace("#", "") as Page;
-    if (hash && ["home","modules","story","pricing","download","merch","contact","legal"].includes(hash)) {
+    if (hash && ["home","modules","story","media","pricing","download","merch","contact","legal"].includes(hash)) {
       setPage(hash);
     }
   }, []);
@@ -409,6 +417,7 @@ function Landing() {
     { label: "Home", page: "home" },
     { label: "Modules", page: "modules" },
     { label: "Our Story", page: "story" },
+    { label: "Media", page: "media" },
     { label: "Pricing", page: "pricing" },
     { label: "Download", page: "download" },
     { label: "Merch", page: "merch" },
@@ -477,6 +486,7 @@ function Landing() {
         {page === "home" && <HomePage goTo={goTo} site={site} />}
         {page === "modules" && <ModulesPage />}
         {page === "story" && <StoryPage />}
+        {page === "media" && <MediaPage />}
         {page === "pricing" && <PricingPage goTo={goTo} site={site} onProceed={setPlanSelection} />}
         {page === "download" && <DownloadPage site={site} />}
         {page === "merch" && <MerchPage site={site} />}
@@ -504,6 +514,7 @@ function Landing() {
                   <Phone className="w-3 h-3" />{site.phone_primary}
                 </a>
               </div>
+              <FooterSocialLinks site={site} />
             </div>
             <div>
               <div className="font-semibold text-sm mb-3">Platform</div>
@@ -516,8 +527,8 @@ function Landing() {
             <div>
               <div className="font-semibold text-sm mb-3">Company</div>
               <div className="flex flex-col gap-2">
-                {(["story","contact"] as Page[]).map(p => (
-                  <button key={p} type="button" onClick={() => goTo(p)} className="text-xs text-muted-foreground hover:text-foreground text-left">{p === "story" ? "Our Story" : "Contact Us"}</button>
+                {(["story","media","contact"] as Page[]).map(p => (
+                  <button key={p} type="button" onClick={() => goTo(p)} className="text-xs text-muted-foreground hover:text-foreground text-left">{p === "story" ? "Our Story" : p === "media" ? "Media" : "Contact Us"}</button>
                 ))}
                 <button type="button" onClick={() => goTo("legal")} className="text-xs text-muted-foreground hover:text-foreground text-left">Legal & Compliance</button>
               </div>
@@ -1155,6 +1166,38 @@ function socialHref(handle: string) {
   return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^@/, "")}`;
 }
 
+function whatsappHref(value: string) {
+  const v = value.trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  const digits = v.replace(/[^\d]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+}
+
+function FooterSocialLinks({ site }: { site: typeof SITE_DEFAULTS }) {
+  const links: { icon: typeof Facebook; href: string; label: string }[] = [
+    { icon: Facebook, href: socialHref(site.social_facebook), label: "Facebook" },
+    { icon: Twitter, href: socialHref(site.social_twitter), label: "Twitter / X" },
+    { icon: Instagram, href: socialHref(site.social_instagram), label: "Instagram" },
+    { icon: Linkedin, href: socialHref(site.social_linkedin), label: "LinkedIn" },
+    { icon: Youtube, href: socialHref(site.social_youtube), label: "YouTube" },
+    { icon: Link2, href: socialHref(site.social_tiktok), label: "TikTok" },
+    { icon: MessageSquare, href: whatsappHref(site.social_whatsapp), label: "WhatsApp" },
+  ].filter((s) => s.href);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="mt-4 flex items-center gap-3">
+      {links.map((s, i) => (
+        <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" title={s.label} className="text-muted-foreground hover:text-primary transition-colors">
+          <s.icon className="w-4 h-4" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function FounderCard({ f }: { f: FounderItemPublic }) {
   const [expanded, setExpanded] = useState(false);
   const bio = f.bio ?? "";
@@ -1341,6 +1384,112 @@ function StoryPage() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEDIA / STORIES PAGE — company updates, press mentions, videos and photo
+// stories. Cards show a short preview with "Read more" to expand the full
+// story, plus an optional external link (press article, YouTube video, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type MediaItemPublic = {
+  title: string;
+  type: "update" | "press" | "video" | "photo";
+  cover_image_url: string | null;
+  date: string;
+  summary: string;
+  body: string;
+  external_url: string;
+};
+
+const MEDIA_TYPE_META: Record<MediaItemPublic["type"], { label: string; icon: typeof Newspaper }> = {
+  update: { label: "Company update", icon: Newspaper },
+  press: { label: "Press mention", icon: Newspaper },
+  video: { label: "Video", icon: Video },
+  photo: { label: "Photo story", icon: Camera },
+};
+
+function MediaCard({ m }: { m: MediaItemPublic }) {
+  const [expanded, setExpanded] = useState(false);
+  const meta = MEDIA_TYPE_META[m.type] ?? MEDIA_TYPE_META.update;
+  const body = m.body ?? "";
+  const hasFullStory = body.trim().length > 0;
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden flex flex-col">
+      <div className="w-full aspect-video bg-muted flex items-center justify-center overflow-hidden">
+        {m.cover_image_url ? (
+          <img src={m.cover_image_url} alt={m.title} className="w-full h-full object-cover" />
+        ) : (
+          <meta.icon className="w-10 h-10 text-muted-foreground/40" />
+        )}
+      </div>
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide bg-primary/10 text-primary rounded-full px-2 py-0.5">
+            <meta.icon className="w-3 h-3" /> {meta.label}
+          </span>
+          {m.date && <span className="text-xs text-muted-foreground">{m.date}</span>}
+        </div>
+        <div className="font-bold text-lg">{m.title}</div>
+        <p className="text-sm text-muted-foreground mt-2">{m.summary}</p>
+        {expanded && hasFullStory && (
+          <p className="text-sm text-muted-foreground mt-3 whitespace-pre-line">{body}</p>
+        )}
+        <div className="mt-4 flex items-center gap-4">
+          {hasFullStory && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              {expanded ? <>Show less <ChevronUp className="w-3.5 h-3.5" /></> : <>Read more <ChevronDown className="w-3.5 h-3.5" /></>}
+            </button>
+          )}
+          {m.external_url && (
+            <a href={m.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              View source <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MediaPage() {
+  const site = useSiteMeta();
+  const mediaData = useLandingContent("media_items", { items: [] as MediaItemPublic[] });
+  const items = mediaData.items ?? [];
+
+  return (
+    <div className="py-12">
+      <div className="container mx-auto px-6 max-w-6xl">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs font-medium mb-4">
+            <Newspaper className="w-3.5 h-3.5" /> Media
+          </div>
+          <h1 className="text-4xl font-bold">Stories from SmartDev</h1>
+          <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-lg">
+            Company updates, press mentions, videos and photo stories — more about who we are and the schools we work with.
+          </p>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="rounded-2xl border bg-card p-12 text-center text-muted-foreground">
+            No stories published yet — check back shortly, or follow us on social media for updates.
+            <div className="flex justify-center"><FooterSocialLinks site={site} /></div>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {items.map((m, i) => (
+              <MediaCard key={`${m.title}-${i}`} m={m} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
