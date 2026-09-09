@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -65,7 +66,11 @@ function PlatformSchoolsLayout() {
 }
 
 export const Route = createFileRoute("/platform/schools")({
-  component: PlatformSchoolsLayout,
+  component: () => (
+    <PlatformScopeGuard requirement={{ section: "schools" }}>
+      <PlatformSchoolsLayout />
+    </PlatformScopeGuard>
+  ),
 });
 
 const FEATURE_KEYS = [
