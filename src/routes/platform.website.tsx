@@ -862,11 +862,20 @@ type MediaItem = {
   status: "draft" | "published";
   // Verification workflow: once published, an edit by anyone other than a
   // platform owner doesn't touch the live fields above — it's stashed here
-  // and the story is locked until an owner approves or rejects it.
+  // and the story is locked until an owner approves or rejects it. The same
+  // lock also covers a non-owner's FIRST publish of a brand-new draft (see
+  // pending_publish) — a non-owner submitting a new story is no different
+  // from one editing a live story: either way it doesn't go public without
+  // an owner looking at it.
   locked: boolean;
   pending: Partial<EditableMediaFields> | null;
   pending_by: string | null;
   pending_at: string | null;
+  // True when `pending` represents a non-owner's request to publish this
+  // draft for the first time (as opposed to a proposed edit to an already-
+  // live story). Approving it also flips status to "published"; rejecting
+  // it just unlocks and leaves it a draft.
+  pending_publish: boolean;
 };
 
 // Fields a story editor actually edits (i.e. everything except the
@@ -881,7 +890,7 @@ const EDITABLE_FIELDS: (keyof EditableMediaFields)[] = [
 
 const MEDIA_BLANK: MediaItem = {
   title: "", type: "update", cover_image_url: null, date: "", summary: "", body: "", external_url: "",
-  status: "draft", locked: false, pending: null, pending_by: null, pending_at: null,
+  status: "draft", locked: false, pending: null, pending_by: null, pending_at: null, pending_publish: false,
 };
 
 const MEDIA_TYPE_LABELS: Record<MediaItem["type"], string> = {
@@ -894,6 +903,12 @@ function diffEditableFields(a: MediaItem, b: MediaItem): Partial<EditableMediaFi
     if (a[f] !== b[f]) (diff as any)[f] = b[f];
   }
   return diff;
+}
+
+function snapshotEditableFields(item: MediaItem): EditableMediaFields {
+  const snap = {} as EditableMediaFields;
+  for (const f of EDITABLE_FIELDS) (snap as any)[f] = item[f];
+  return snap;
 }
 
 // Step-up re-authentication before a story actually goes live. Being logged
@@ -1037,10 +1052,12 @@ function MediaEditor() {
     );
   };
 
-  // Publishing a draft is never gated — only editing something already
-  // published is. Built off `saved` (not `items`) for every OTHER slot so
-  // that clicking Publish on one new story can't accidentally push through
-  // a non-owner's unsaved, not-yet-reviewed edits sitting in a different,
+  // An owner publishing is never gated by the pending-review flow — it goes
+  // straight live (behind the password step-up above). A non-owner's
+  // publish click is intercepted earlier, in publishItem below, before this
+  // ever runs. Built off `saved` (not `items`) for every OTHER slot so that
+  // clicking Publish on one new story can't accidentally push through a
+  // non-owner's unsaved, not-yet-reviewed edits sitting in a different,
   // already-published slot — those still need "Save changes" to go through
   // the pending-review check above. The target slot itself uses `items` so
   // whatever the person just typed into this new story is included.
@@ -1058,7 +1075,45 @@ function MediaEditor() {
     setSaved(n);
     save.mutate({ items: n });
   };
+
+  // A non-owner's draft doesn't go live on click — it gets locked and
+  // handed to a platform owner as a pending-publish request, exactly like
+  // a non-owner's edit to an already-live story does. No password step-up
+  // here: the submitter isn't the one making anything public, so there's
+  // nothing to confirm on their end. The owner's own "Approve & publish"
+  // is still the gated, password-confirmed action.
+  const submitDraftForApproval = (i: number) => {
+    const item = items[i];
+    const n = items.map((it, idx) =>
+      idx === i
+        ? {
+            ...it,
+            locked: true,
+            pending: diffEditableFields(MEDIA_BLANK, item),
+            pending_by: session?.user?.email ?? "team member",
+            pending_at: new Date().toISOString(),
+            pending_publish: true,
+          }
+        : it,
+    );
+    setItems(n);
+    setSaved(n);
+    save.mutate(
+      { items: n },
+      {
+        onSuccess: () => {
+          toast.dismiss();
+          toast.success("Submitted — a platform owner needs to approve this before it's published");
+        },
+      },
+    );
+  };
+
   const publishItem = (i: number) => {
+    if (!isOwner) {
+      submitDraftForApproval(i);
+      return;
+    }
     requestConfirm(
       `Publishing "${items[i]?.title || "this story"}" puts it on the public Media page right away.`,
       () => publishItemConfirmed(i),
@@ -1069,22 +1124,36 @@ function MediaEditor() {
     const it = items[i];
     if (!it.pending) return;
     const n = items.map((x, idx) =>
-      idx === i ? { ...x, ...it.pending, locked: false, pending: null, pending_by: null, pending_at: null } : x,
+      idx === i
+        ? {
+            ...x,
+            ...it.pending,
+            status: it.pending_publish ? ("published" as const) : x.status,
+            locked: false,
+            pending: null,
+            pending_by: null,
+            pending_at: null,
+            pending_publish: false,
+          }
+        : x,
     );
     setItems(n);
     save.mutate({ items: n });
   };
   const approvePending = (i: number) => {
     if (!items[i]?.pending) return;
+    const isNewStory = items[i].pending_publish;
     requestConfirm(
-      `Approving the pending edit to "${items[i].title || "this story"}" makes it live, replacing what's published now.`,
+      isNewStory
+        ? `Approving "${items[i].title || "this story"}" publishes it on the public Media page right away.`
+        : `Approving the pending edit to "${items[i].title || "this story"}" makes it live, replacing what's published now.`,
       () => approvePendingConfirmed(i),
     );
   };
 
   const rejectPending = (i: number) => {
     const n = items.map((x, idx) =>
-      idx === i ? { ...x, locked: false, pending: null, pending_by: null, pending_at: null } : x,
+      idx === i ? { ...x, locked: false, pending: null, pending_by: null, pending_at: null, pending_publish: false } : x,
     );
     setItems(n);
     save.mutate({ items: n });
@@ -1109,7 +1178,7 @@ function MediaEditor() {
           Company updates, press mentions, videos and photo stories shown on the public "Media" page.
           Write as long a story as you like in "Full story" — visitors see the title and a short preview, then can click "Read more".
           "External link" is optional — use it for a press article on another site or a YouTube video; leave it blank for a story that lives entirely on this page.
-          {!isOwner && " Once a story is published, editing it here submits a pending change — it only goes live once a platform owner verifies it."}
+          {!isOwner && " New stories and edits to already-published stories both need a platform owner's approval before they go live."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1142,7 +1211,9 @@ function MediaEditor() {
 
                   {m.locked && isOwner && m.pending && (
                     <div className="rounded-md border border-amber-400/60 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
-                      <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Proposed changes awaiting your verification</p>
+                      <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                        {m.pending_publish ? "New story awaiting your approval to publish" : "Proposed changes awaiting your verification"}
+                      </p>
                       <ul className="text-xs text-muted-foreground space-y-1">
                         {Object.entries(m.pending).map(([k, v]) => (
                           <li key={k}><span className="font-medium capitalize">{k.replace(/_/g, " ")}:</span> {String(v).slice(0, 120) || "(empty)"}</li>
@@ -1176,11 +1247,17 @@ function MediaEditor() {
                     <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
                   </fieldset>
 
-                  {m.status === "draft" && (
-                    <Button size="sm" variant="outline" onClick={() => publishItem(i)}>Publish</Button>
+                  {m.status === "draft" && !m.locked && (
+                    <Button size="sm" variant="outline" onClick={() => publishItem(i)}>
+                      {isOwner ? "Publish" : "Submit for approval"}
+                    </Button>
                   )}
-                  {fieldsDisabled && (
-                    <p className="text-xs text-muted-foreground">Locked until a platform owner verifies the pending edit above.</p>
+                  {m.locked && !isOwner && (
+                    <p className="text-xs text-muted-foreground">
+                      {m.pending_publish
+                        ? "Submitted — locked until a platform owner approves it for publishing."
+                        : "Locked until a platform owner verifies the pending edit above."}
+                    </p>
                   )}
                 </div>
               );})}
