@@ -17,7 +17,7 @@ import {
   ClipboardList, Settings, Globe, Zap, CheckCircle, ChevronDown, ChevronUp,
   Target, Heart, Star, ArrowRight, MapPin, Menu, X,
   TrendingUp, Award, Layers, Database, Cpu, Cloud, Package, Briefcase,
-  Coins, ShoppingBag, ExternalLink,
+  Coins, ShoppingBag, ExternalLink, Handshake,
   ParkingSquare, ScanLine, Car, UserCheck, LogIn, MessageSquareWarning,
 } from "lucide-react";
 import mpesaShot from "@/assets/portals/mpesa.png";
@@ -822,6 +822,51 @@ function CampusScene({ photos }: { photos: { src: string; caption?: string }[] }
   );
 }
 
+// ── Section 4b: Partners logo strip ──────────────────────────────────────
+type PartnerItemPublic = { name: string; logo_url: string | null; website_url: string };
+
+function PartnersStrip() {
+  const partners = useLandingContent("partners", { items: [] as PartnerItemPublic[] });
+  const items = (partners.items ?? []).filter((p) => p.logo_url);
+  if (items.length === 0) return null;
+
+  return (
+    <section className="relative bg-background py-14 sm:py-20 border-t">
+      <div className="container mx-auto px-6">
+        <Reveal className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary px-4 py-1.5 text-xs font-medium mb-3">
+            <Handshake className="w-3.5 h-3.5" /> Our Partners
+          </div>
+          <h2 className="font-serif text-2xl sm:text-3xl font-semibold">Trusted alongside great partners</h2>
+        </Reveal>
+        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+          {items.map((p, i) => {
+            const logo = (
+              <img
+                src={p.logo_url as string}
+                alt={p.name || "Partner logo"}
+                loading="lazy"
+                className="h-12 sm:h-14 w-auto object-contain grayscale hover:grayscale-0 opacity-80 hover:opacity-100 transition-all duration-300"
+              />
+            );
+            return (
+              <Reveal key={`${p.name}-${i}`} delay={i * 0.05}>
+                {p.website_url ? (
+                  <a href={p.website_url} target="_blank" rel="noopener noreferrer" title={p.name} className="block">
+                    {logo}
+                  </a>
+                ) : (
+                  <span title={p.name}>{logo}</span>
+                )}
+              </Reveal>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Section 5: Portals ───────────────────────────────────────────────────
 function PortalsScene() {
   const portals = [
@@ -953,6 +998,7 @@ function HomePage({ goTo, site }: { goTo: (p: Page) => void; site: typeof SITE_D
       <ModulesScene goTo={goTo} categories={moduleCategories} />
       <FinanceScene goTo={goTo} />
       <CampusScene photos={galleryPhotos} />
+      <PartnersStrip />
       <PortalsScene />
       <MissionScene goTo={goTo} mission={mission} />
       <FinalScene goTo={goTo} site={site} />
