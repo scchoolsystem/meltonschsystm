@@ -6,9 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, Receipt, LifeBuoy, DollarSign, TrendingUp, Filter, ShieldAlert, ShieldCheck } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 
 export const Route = createFileRoute("/platform/dashboard")({
-  component: PlatformDashboard,
+  component: () => (
+    <PlatformScopeGuard requirement={{ section: "dashboard" }}>
+      <PlatformDashboard />
+    </PlatformScopeGuard>
+  ),
 });
 
 function PlatformDashboard() {
