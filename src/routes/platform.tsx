@@ -50,6 +50,18 @@ function filterNav(nav: typeof NAV, roles: string[], scopes: { scope_type: strin
   });
 }
 
+// The page a person should land on right after login, or when a
+// PlatformScopeGuard sends them "back" from a page they can't see — the
+// first thing in their own filtered nav, not a hardcoded /platform/dashboard
+// that a restricted person might not even be able to open.
+export function getDefaultPlatformRoute(
+  roles: string[],
+  scopes: { scope_type: string; section: string | null; school_id: string | null }[],
+): string {
+  const visible = filterNav(NAV, roles, scopes);
+  return visible[0]?.to ?? "/platform/dashboard";
+}
+
 function PlatformLayout() {
   const { loading, session, roles, scopes, rolesLoaded, signOut } = useAuth();
   const navigate = useNavigate();
