@@ -20,18 +20,39 @@ export const Route = createFileRoute("/platform")({
   component: PlatformLayout,
 });
 
+// `key` drives visibility for a *scoped* platform_support user (see
+// filterNav below). platform_owner and unrestricted platform_support
+// (zero rows in platform_access_scopes) always see everything regardless
+// of key.
 const NAV = [
-  { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/platform/schools", label: "Schools", icon: Building2 },
-  { to: "/platform/invoices", label: "Billing", icon: Receipt },
-  { to: "/platform/support", label: "Support", icon: LifeBuoy },
-  { to: "/platform/plans", label: "Plans", icon: Package },
-  { to: "/platform/website", label: "Website Content", icon: Globe },
-  { to: "/platform/team", label: "Team & Access", icon: Users },
+  { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { to: "/platform/schools", label: "Schools", icon: Building2, key: "school" },
+  { to: "/platform/invoices", label: "Billing", icon: Receipt, key: "school" },
+  { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "school" },
+  { to: "/platform/plans", label: "Plans", icon: Package, key: "dashboard" },
+  { to: "/platform/website", label: "Website Content", icon: Globe, key: "section:website_media" },
+  { to: "/platform/team", label: "Team & Access", icon: Users, key: "owner" },
 ] as const;
 
+function filterNav(nav: typeof NAV, roles: string[], scopes: { scope_type: string; section: string | null; school_id: string | null }[]) {
+  if (roles.includes("platform_owner")) return nav;
+  if (!roles.includes("platform_support")) return [];
+  if (scopes.length === 0) return nav.filter((n) => n.key !== "owner"); // unrestricted support: everything but Team & Access
+
+  const hasAnySchool = scopes.some((s) => s.scope_type === "school");
+  const sectionKeys = new Set(scopes.filter((s) => s.scope_type === "section").map((s) => s.section));
+
+  return nav.filter((n) => {
+    if (n.key === "owner") return false;
+    if (n.key === "school") return hasAnySchool;
+    if (n.key === "dashboard") return false; // platform-wide numbers - not part of any scoped grant
+    if (n.key.startsWith("section:")) return sectionKeys.has(n.key.slice("section:".length));
+    return false;
+  });
+}
+
 function PlatformLayout() {
-  const { loading, session, roles, rolesLoaded, signOut } = useAuth();
+  const { loading, session, roles, scopes, rolesLoaded, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,6 +87,8 @@ function PlatformLayout() {
     );
   }
 
+  const visibleNav = filterNav(NAV, roles, scopes);
+
   return (
     <div className="min-h-screen flex w-full bg-background">
       <aside className="w-60 border-r bg-card/40 flex flex-col">
@@ -79,7 +102,7 @@ function PlatformLayout() {
           </div>
         </div>
         <nav className="flex-1 p-2 space-y-1">
-          {NAV.map((n) => {
+          {visibleNav.map((n) => {
             const active = location.pathname.startsWith(n.to);
             return (
               <Link
