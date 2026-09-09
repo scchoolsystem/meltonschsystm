@@ -18,10 +18,17 @@ type AppRole =
   | "ict_admin" | "discipline_admin"
   | "platform_owner" | "platform_support";
 
+// One row per grant from platform_access_scopes. A platform_support user
+// with zero rows here has full (legacy) access — see platform_has_section /
+// platform_has_school in the DB, which this mirrors client-side for UI
+// purposes only (the DB functions are the real enforcement).
+type PlatformScope = { scope_type: "section" | "school"; section: string | null; school_id: string | null };
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
   roles: AppRole[];
+  scopes: PlatformScope[];
   fullName: string;
   loading: boolean;
   rolesLoaded: boolean;
@@ -37,6 +44,12 @@ interface AuthCtx {
   sessionChecked: boolean;
   hasRole: (r: AppRole) => boolean;
   isAdmin: boolean;
+  // Platform-panel helpers. Both are true for platform_owner unconditionally,
+  // and true for platform_support with zero scope rows (unrestricted legacy
+  // support). Once a platform_support user has ANY scope row, they only
+  // return true for what was explicitly granted.
+  hasPlatformSection: (section: string) => boolean;
+  hasPlatformSchool: (schoolId: string) => boolean;
   signOut: () => Promise<void>;
 }
 
@@ -61,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [scopes, setScopes] = useState<PlatformScope[]>([]);
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(true);
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -82,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 0);
       } else {
         setRoles([]);
+        setScopes([]);
         setFullName("");
         setRolesLoaded(false);
         setLoading(false);
@@ -145,6 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const profilePromise = supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle()
       .then(({ data }) => setFullName(data?.full_name ?? ""))
       .catch((err) => console.error("[useAuth] profile query failed:", err));
+    // Only matters for platform_owner/platform_support accounts, but cheap
+    // enough (own rows only, RLS-scoped) to just always fetch — an empty
+    // result for a non-platform user is a no-op.
+    const scopesPromise = supabase.from("platform_access_scopes").select("scope_type, section, school_id").eq("user_id", uid)
+      .then(({ data }) => setScopes((data ?? []) as PlatformScope[]))
+      .catch((err) => console.error("[useAuth] scopes query failed:", err));
 
     // But don't block the UI on them past 4s — `rolesLoaded` flips to true
     // (with whatever roles have arrived so far, possibly still empty) so
@@ -152,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // when the failsafe below would otherwise be the only thing unblocking
     // it 2+ seconds later. Whichever query is still in flight keeps running
     // in the background and updates state the moment it resolves.
-    await withTimeout(Promise.all([rolesPromise, profilePromise]), 4000, undefined);
+    await withTimeout(Promise.all([rolesPromise, profilePromise, scopesPromise]), 4000, undefined);
     setRolesLoaded(true);
   }
 
@@ -174,6 +195,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => roles.includes("super_admin") || roles.includes("principal") || roles.includes("platform_owner"),
     [roles],
   );
+
+  // Mirrors public.platform_has_section() — owner always true; support with
+  // no scope rows at all is unrestricted (today's behaviour); support with
+  // scope rows needs an explicit 'section' match.
+  const hasPlatformSection = useCallback((section: string) => {
+    if (roles.includes("platform_owner")) return true;
+    if (!roles.includes("platform_support")) return false;
+    if (scopes.length === 0) return true;
+    return scopes.some((s) => s.scope_type === "section" && s.section === section);
+  }, [roles, scopes]);
+
+  // Mirrors public.platform_has_school(). Note: a support user scoped ONLY
+  // by section (e.g. stories-only) has zero 'school' rows, so this
+  // correctly returns false for every school for them.
+  const hasPlatformSchool = useCallback((schoolId: string) => {
+    if (roles.includes("platform_owner")) return true;
+    if (!roles.includes("platform_support")) return false;
+    if (!scopes.some((s) => s.scope_type === "school")) {
+      // No school-scope rows at all: unrestricted support (zero rows total)
+      // sees every school; a user restricted by section only sees none.
+      return scopes.length === 0;
+    }
+    return scopes.some((s) => s.scope_type === "school" && s.school_id === schoolId);
+  }, [scopes]);
+
   const signOut = useCallback(async () => {
     await unregisterPushToken();
     await supabase.auth.signOut();
@@ -184,14 +230,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user: session?.user ?? null,
     roles,
+    scopes,
     fullName,
     loading,
     rolesLoaded,
     sessionChecked,
     hasRole,
     isAdmin,
+    hasPlatformSection,
+    hasPlatformSchool,
     signOut,
-  }), [session, roles, fullName, loading, rolesLoaded, sessionChecked, hasRole, isAdmin, signOut]);
+  }), [session, roles, scopes, fullName, loading, rolesLoaded, sessionChecked, hasRole, isAdmin, hasPlatformSection, hasPlatformSchool, signOut]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
