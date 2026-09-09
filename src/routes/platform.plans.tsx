@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,11 @@ import { toast } from "sonner";
 import { Package, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/platform/plans")({
-  component: PlatformPlans,
+  component: () => (
+    <PlatformScopeGuard requirement={{ section: "plans" }}>
+      <PlatformPlans />
+    </PlatformScopeGuard>
+  ),
 });
 
 function PlatformPlans() {
