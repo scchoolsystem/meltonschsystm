@@ -70,6 +70,7 @@ function TeamPage() {
 // PlatformScopeGuard requirement={{ section: "..." }} on that page's route).
 const PLATFORM_SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "operations", label: "Operations & Usage" },
   { key: "schools", label: "Schools" },
   { key: "invoices", label: "Billing / Invoices" },
   { key: "support", label: "Support tickets" },
