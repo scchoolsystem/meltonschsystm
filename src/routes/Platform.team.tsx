@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,6 +59,13 @@ function TeamPage() {
 
 // ---------------------------------------------------------------------------
 
+// Sections that can be granted on their own. Add more here as you carve up
+// other platform pages the same way (each new entry needs a matching
+// platform_has_section() check wired into that page's RLS + tab gating).
+const PLATFORM_SECTIONS = [
+  { key: "website_media", label: "Media & Stories only" },
+];
+
 function TeamTab() {
   const { roles } = useAuth();
   const isOwner = roles.includes("platform_owner" as any);
@@ -70,6 +78,21 @@ function TeamTab() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"platform_owner" | "platform_support">("platform_support");
   const [found, setFound] = useState<{ user_id: string; email: string; full_name: string } | null | undefined>(undefined);
+
+  // Restriction picker state — only relevant when role === "platform_support"
+  const [restricted, setRestricted] = useState(false);
+  const [sections, setSections] = useState<string[]>([]);
+  const [schoolIds, setSchoolIds] = useState<string[]>([]);
+
+  const { data: schools } = useQuery({
+    queryKey: ["platform-team-schools"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("schools").select("id, name").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: isOwner, // only the owner-only "Add someone" card below needs this
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["platform-team"],
@@ -86,10 +109,18 @@ function TeamTab() {
   });
 
   const grant = useMutation({
-    mutationFn: async () => grantRole({ data: { user_id: found!.user_id, role } }),
+    mutationFn: async () =>
+      grantRole({
+        data: {
+          user_id: found!.user_id,
+          role,
+          scopes: role === "platform_support" && restricted ? { sections, school_ids: schoolIds } : undefined,
+        },
+      }),
     onSuccess: () => {
       toast.success(`Granted ${role.replace("platform_", "")} access`);
       setEmail(""); setFound(undefined);
+      setRestricted(false); setSections([]); setSchoolIds([]);
       qc.invalidateQueries({ queryKey: ["platform-team"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -104,6 +135,11 @@ function TeamTab() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const toggleSection = (key: string) =>
+    setSections((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
+  const toggleSchool = (id: string) =>
+    setSchoolIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   return (
     <div className="space-y-4">
@@ -126,19 +162,73 @@ function TeamTab() {
               </Button>
             </div>
             {found && (
-              <div className="flex items-center gap-3 flex-wrap p-3 rounded-md border bg-muted/40">
-                <div className="text-sm">
-                  <div className="font-medium">{found.full_name || found.email}</div>
-                  <div className="text-xs text-muted-foreground">{found.email}</div>
+              <div className="space-y-3 p-3 rounded-md border bg-muted/40">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="text-sm">
+                    <div className="font-medium">{found.full_name || found.email}</div>
+                    <div className="text-xs text-muted-foreground">{found.email}</div>
+                  </div>
+                  <Select value={role} onValueChange={(v) => { setRole(v as any); setRestricted(false); }}>
+                    <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="platform_support">Platform support</SelectItem>
+                      <SelectItem value="platform_owner">Platform owner</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={role} onValueChange={(v) => setRole(v as any)}>
-                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="platform_support">Platform support</SelectItem>
-                    <SelectItem value="platform_owner">Platform owner</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={() => grant.mutate()} disabled={grant.isPending}>
+
+                {role === "platform_support" && (
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="restrict" checked={restricted} onCheckedChange={(v) => setRestricted(!!v)} />
+                    <Label htmlFor="restrict" className="text-sm font-normal cursor-pointer">
+                      Restrict this person to specific areas (default is full support access)
+                    </Label>
+                  </div>
+                )}
+
+                {role === "platform_support" && restricted && (
+                  <div className="space-y-3 pl-1">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Sections</Label>
+                      <div className="flex flex-col gap-1 mt-1">
+                        {PLATFORM_SECTIONS.map((s) => (
+                          <div key={s.key} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`sec-${s.key}`}
+                              checked={sections.includes(s.key)}
+                              onCheckedChange={() => toggleSection(s.key)}
+                            />
+                            <Label htmlFor={`sec-${s.key}`} className="text-sm font-normal cursor-pointer">{s.label}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Schools (Schools / Support / Billing tabs)</Label>
+                      <div className="flex flex-col gap-1 mt-1 max-h-40 overflow-auto">
+                        {(schools ?? []).map((s) => (
+                          <div key={s.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`sch-${s.id}`}
+                              checked={schoolIds.includes(s.id)}
+                              onCheckedChange={() => toggleSchool(s.id)}
+                            />
+                            <Label htmlFor={`sch-${s.id}`} className="text-sm font-normal cursor-pointer">{s.name}</Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {sections.length === 0 && schoolIds.length === 0 && (
+                      <p className="text-xs text-destructive">Pick at least one section or school, or this person will have no access at all.</p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  size="sm"
+                  onClick={() => grant.mutate()}
+                  disabled={grant.isPending || (role === "platform_support" && restricted && sections.length === 0 && schoolIds.length === 0)}
+                >
                   <UserPlus className="w-4 h-4 mr-1" /> Grant access
                 </Button>
               </div>
@@ -169,7 +259,7 @@ function TeamTab() {
                     <TableCell>
                       <Badge variant={m.role === "platform_owner" ? "default" : "secondary"} className="inline-flex items-center gap-1">
                         {m.role === "platform_owner" ? <ShieldCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                        {m.role === "platform_owner" ? "Owner" : "Support"}
+                        {m.role === "platform_owner" ? "Owner" : (m.scopes?.length ? "Support (restricted)" : "Support")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{format(new Date(m.granted_at), "PP")}</TableCell>
