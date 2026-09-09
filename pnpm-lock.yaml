@@ -143,6 +143,9 @@ importers:
       '@tanstack/router-plugin':
         specifier: 1.168.18
         version: 1.168.18(@tanstack/react-router@1.168.25(react-dom@19.1.1(react@19.1.1))(react@19.1.1))(vite@7.3.1(@types/node@22.19.21)(jiti@1.21.7)(lightningcss@1.32.0))
+      '@types/dompurify':
+        specifier: ^3.0.5
+        version: 3.2.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -155,6 +158,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.4.0
+      dompurify:
+        specifier: ^3.4.15
+        version: 3.4.15
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.1.1)
@@ -2993,6 +2999,10 @@ packages:
   '@types/d3-timer@3.0.2':
     resolution: {integrity: sha512-Ps3T8E8dZDam6fUyNiMkekK3XUsaUEik+idO9/YjPtfj2qruF8tFBXS7XhtE4iIXBLxhmLjP3SXpLhVf21I9Lw==}
 
+  '@types/dompurify@3.2.0':
+    resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
+    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
+
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -3021,6 +3031,9 @@ packages:
 
   '@types/slice-ansi@4.0.0':
     resolution: {integrity: sha512-+OpjSaq85gvlZAYINyzKpLeiFkSC4EsC6IIiT6v6TLSU5k5U83fHGj9Lel8oKEXM0HqgrMVCjXPDPVICtxF7EQ==}
+
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -3723,6 +3736,9 @@ packages:
   domhandler@5.0.3:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
+
+  dompurify@3.4.15:
+    resolution: {integrity: sha512-EUBjM+B+lkDE41iE82DDSCfkoPGfXx8IxFxPMjNzm/Uk4xDet77rTN9wqlxlVg71kK7XGuUMv6wUxJUwwv+Xyw==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -8468,6 +8484,10 @@ snapshots:
 
   '@types/d3-timer@3.0.2': {}
 
+  '@types/dompurify@3.2.0':
+    dependencies:
+      dompurify: 3.4.15
+
   '@types/estree@1.0.9': {}
 
   '@types/fs-extra@8.1.5':
@@ -8493,6 +8513,9 @@ snapshots:
       csstype: 3.2.3
 
   '@types/slice-ansi@4.0.0': {}
+
+  '@types/trusted-types@2.0.7':
+    optional: true
 
   '@types/ws@8.18.1':
     dependencies:
@@ -9198,6 +9221,10 @@ snapshots:
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
+
+  dompurify@3.4.15:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
 
   domutils@2.8.0:
     dependencies:
