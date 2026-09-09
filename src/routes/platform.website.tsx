@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import {
   Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
   Upload, Loader2, Save, GripVertical, ShoppingBag, Handshake,
-  Facebook, Twitter, Instagram, Linkedin, Link2,
+  Facebook, Twitter, Instagram, Linkedin, Link2, Youtube, MessageSquare,
+  Newspaper, Video, Camera,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/website")({
@@ -149,6 +150,7 @@ function WebsiteEditor() {
           <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
           <TabsTrigger value="merch">Merch</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
+          <TabsTrigger value="media">Media</TabsTrigger>
           <TabsTrigger value="pricing">Pricing &amp; Modules</TabsTrigger>
         </TabsList>
 
@@ -160,6 +162,7 @@ function WebsiteEditor() {
         <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
         <TabsContent value="merch" className="mt-4"><MerchEditor /></TabsContent>
         <TabsContent value="partners" className="mt-4"><PartnersEditor /></TabsContent>
+        <TabsContent value="media" className="mt-4"><MediaEditor /></TabsContent>
         <TabsContent value="pricing" className="mt-4"><PricingEditor /></TabsContent>
       </Tabs>
     </div>
@@ -175,6 +178,8 @@ function SiteMetaEditor() {
     brand_name: "SMART DEV", tagline: "", footer_credit: "",
     email_hello: "", email_support: "", email_sales: "", email_legal: "", email_admin: "",
     phone_primary: "", phone_support: "", location: "Nairobi, Kenya",
+    social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "",
+    social_youtube: "", social_tiktok: "", social_whatsapp: "",
   };
   const { data, isLoading, save } = useLandingSection("site_meta", fallback);
   const [form, setForm] = useState(fallback);
@@ -207,6 +212,23 @@ function SiteMetaEditor() {
               <div><Label>Admin / legal email</Label><Input value={form.email_admin} onChange={(e) => { set("email_admin", e.target.value); set("email_legal", e.target.value); }} placeholder="admin@smartdev.co.ke" /></div>
             </div>
             <p className="text-xs text-muted-foreground">One phone number and one admin/legal email are used across the whole site to avoid mismatched contact details.</p>
+
+            <div className="space-y-3 rounded-md border p-4">
+              <div>
+                <Label className="text-sm font-semibold">SmartDev social media</Label>
+                <p className="text-xs text-muted-foreground">Shown as icons in the site footer. Leave any blank to hide that icon. URL or @handle both work.</p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2"><Facebook className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_facebook} placeholder="Facebook URL or @handle" onChange={(e) => set("social_facebook", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><Twitter className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_twitter} placeholder="Twitter / X URL or @handle" onChange={(e) => set("social_twitter", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><Instagram className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_instagram} placeholder="Instagram URL or @handle" onChange={(e) => set("social_instagram", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><Linkedin className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_linkedin} placeholder="LinkedIn URL" onChange={(e) => set("social_linkedin", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><Youtube className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_youtube} placeholder="YouTube channel URL" onChange={(e) => set("social_youtube", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_tiktok} placeholder="TikTok URL or @handle" onChange={(e) => set("social_tiktok", e.target.value)} /></div>
+                <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_whatsapp} placeholder="WhatsApp number (e.g. 254792991222) or wa.me link" onChange={(e) => set("social_whatsapp", e.target.value)} /></div>
+              </div>
+            </div>
+
             <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
           </>
         )}
@@ -696,6 +718,98 @@ function PartnersEditor() {
             </div>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...PARTNER_BLANK }])}>
               <Plus className="w-3.5 h-3.5" /> Add partner
+            </Button>
+            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Media / Stories — updates, press mentions, videos and photo stories shown
+// on the public "Media" page, so visitors can read more about the company.
+// ---------------------------------------------------------------------------
+
+type MediaItem = {
+  title: string;
+  type: "update" | "press" | "video" | "photo";
+  cover_image_url: string | null;
+  date: string;
+  summary: string;
+  body: string;
+  external_url: string; // optional — link to the original press article / video
+};
+
+const MEDIA_BLANK: MediaItem = {
+  title: "", type: "update", cover_image_url: null, date: "", summary: "", body: "", external_url: "",
+};
+
+const MEDIA_TYPE_LABELS: Record<MediaItem["type"], string> = {
+  update: "Company update", press: "Press mention", video: "Video", photo: "Photo story",
+};
+
+function MediaEditor() {
+  const fallback = { items: [] as MediaItem[] };
+  const { data, isLoading, save } = useLandingSection("media_items", fallback);
+  const [items, setItems] = useState<MediaItem[]>([]);
+  useEffect(() => { if (!isLoading) setItems((data.items ?? []).map((m: any) => ({ ...MEDIA_BLANK, ...m }))); }, [isLoading, data]);
+
+  const updateItem = (i: number, patch: Partial<MediaItem>) => {
+    const n = [...items];
+    n[i] = { ...n[i], ...patch };
+    setItems(n);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Newspaper className="w-5 h-5" /> Media &amp; Stories</CardTitle>
+        <CardDescription>
+          Company updates, press mentions, videos and photo stories shown on the public "Media" page.
+          Write as long a story as you like in "Full story" — visitors see the title and a short preview, then can click "Read more".
+          "External link" is optional — use it for a press article on another site or a YouTube video; leave it blank for a story that lives entirely on this page.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground">No media items yet. Click "Add story" below to create the first one.</p>
+            )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {items.map((m, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
+                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove story">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <ImagePicker label="Cover image" value={m.cover_image_url} onChange={(url) => updateItem(i, { cover_image_url: url })} folder="media" />
+                  <div><Label>Title</Label><Input value={m.title} placeholder="e.g. SmartDev featured on Citizen TV" onChange={(e) => updateItem(i, { title: e.target.value })} /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Type</Label>
+                      <select
+                        className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                        value={m.type}
+                        onChange={(e) => updateItem(i, { type: e.target.value as MediaItem["type"] })}
+                      >
+                        {Object.entries(MEDIA_TYPE_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                      </select>
+                    </div>
+                    <div><Label>Date (display text)</Label><Input value={m.date} placeholder="e.g. August 2026" onChange={(e) => updateItem(i, { date: e.target.value })} /></div>
+                  </div>
+                  <div><Label>Short preview</Label><Textarea rows={2} value={m.summary} placeholder="One or two sentences shown on the card before 'Read more'" onChange={(e) => updateItem(i, { summary: e.target.value })} /></div>
+                  <div><Label>Full story (optional)</Label><Textarea rows={5} value={m.body} placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link." onChange={(e) => updateItem(i, { body: e.target.value })} /></div>
+                  <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MEDIA_BLANK }])}>
+              <Plus className="w-3.5 h-3.5" /> Add story
             </Button>
             <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
           </>
