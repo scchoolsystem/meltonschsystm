@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
+import { useModuleUsageTracker } from "@/hooks/use-module-usage-tracker";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -82,6 +83,7 @@ function AppLayout() {
   const { school, loading: tenantLoading } = useTenant();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
+  useModuleUsageTracker(school?.id);
 
   // Once auth has finished loading client-side and there is genuinely no
   // session, send the user to login (this replaces the old server-side
