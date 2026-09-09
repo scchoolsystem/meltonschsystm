@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1243,7 +1244,15 @@ function MediaEditor() {
                       <div><Label>Date (display text)</Label><Input value={m.date} placeholder="e.g. August 2026" onChange={(e) => updateItem(i, { date: e.target.value })} /></div>
                     </div>
                     <div><Label>Short preview</Label><Textarea rows={2} value={m.summary} placeholder="One or two sentences shown on the card before 'Read more'" onChange={(e) => updateItem(i, { summary: e.target.value })} /></div>
-                    <div><Label>Full story (optional)</Label><Textarea rows={5} value={m.body} placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link." onChange={(e) => updateItem(i, { body: e.target.value })} /></div>
+                    <div>
+                      <Label>Full story (optional)</Label>
+                      <RichTextEditor
+                        rows={5}
+                        value={m.body}
+                        placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link."
+                        onChange={(html) => updateItem(i, { body: html })}
+                      />
+                    </div>
                     <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
                   </fieldset>
 
