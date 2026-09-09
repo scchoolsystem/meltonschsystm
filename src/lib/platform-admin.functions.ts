@@ -82,12 +82,19 @@ export const platformListTeam = createServerFn({ method: "POST" })
           .select("full_name")
           .eq("id", r.user_id)
           .maybeSingle();
+        // Scopes only apply to platform_support rows, but harmless (and
+        // simplest) to just look them up for every row here.
+        const { data: scopeRows } = await supabaseAdmin
+          .from("platform_access_scopes")
+          .select("scope_type, section, school_id")
+          .eq("user_id", r.user_id);
         return {
           user_id: r.user_id,
           role: r.role as PlatformRole,
           granted_at: r.created_at,
           email: authUser?.user?.email ?? "(unknown)",
           full_name: profile?.full_name ?? "",
+          scopes: scopeRows ?? [],
         };
       }),
     );
@@ -131,6 +138,15 @@ export const platformGrantRole = createServerFn({ method: "POST" })
     z.object({
       user_id: z.string().uuid(),
       role: z.enum(PLATFORM_ROLES),
+      // Optional. Leave out (or send both arrays empty) for full access —
+      // today's behaviour. Only meaningful for role === "platform_support";
+      // ignored for platform_owner (an owner is never restricted).
+      scopes: z
+        .object({
+          sections: z.array(z.string()).default([]),
+          school_ids: z.array(z.string().uuid()).default([]),
+        })
+        .optional(),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
@@ -143,6 +159,32 @@ export const platformGrantRole = createServerFn({ method: "POST" })
       .upsert({ user_id: data.user_id, role: data.role }, { onConflict: "user_id,role" });
     if (insErr) throw new Error(insErr.message);
 
+    // Re-sync scopes (delete then insert) so re-granting with a different
+    // scope set replaces the old one instead of stacking. Only applies to
+    // platform_support — an owner grant never touches scopes.
+    if (data.role === "platform_support") {
+      const { error: delErr } = await supabaseAdmin
+        .from("platform_access_scopes")
+        .delete()
+        .eq("user_id", data.user_id);
+      if (delErr) throw new Error(delErr.message);
+
+      const rows = [
+        ...(data.scopes?.sections ?? []).map((section) => ({
+          user_id: data.user_id, scope_type: "section", section, created_by: context.userId,
+        })),
+        ...(data.scopes?.school_ids ?? []).map((school_id) => ({
+          user_id: data.user_id, scope_type: "school", school_id, created_by: context.userId,
+        })),
+      ];
+      if (rows.length > 0) {
+        const { error: scopeErr } = await (supabaseAdmin as any)
+          .from("platform_access_scopes")
+          .insert(rows);
+        if (scopeErr) throw new Error(scopeErr.message);
+      }
+    }
+
     const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(context.userId);
     const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(data.user_id);
     await logAudit({
@@ -151,7 +193,11 @@ export const platformGrantRole = createServerFn({ method: "POST" })
       action: "platform_role_granted",
       target_type: "user",
       target_id: data.user_id,
-      details: { role: data.role, target_email: targetUser?.user?.email ?? null },
+      details: {
+        role: data.role,
+        target_email: targetUser?.user?.email ?? null,
+        scopes: data.scopes ?? null,
+      },
     });
 
     return { success: true };
@@ -188,6 +234,17 @@ export const platformRevokeRole = createServerFn({ method: "POST" })
       .eq("user_id", data.user_id)
       .eq("role", data.role);
     if (delErr) throw new Error(delErr.message);
+
+    // Clean up any scope grants along with the role — otherwise a stale
+    // scope row would silently apply if this person is ever re-granted
+    // platform_support later without an explicit new scope selection.
+    if (data.role === "platform_support") {
+      const { error: scopeDelErr } = await supabaseAdmin
+        .from("platform_access_scopes")
+        .delete()
+        .eq("user_id", data.user_id);
+      if (scopeDelErr) throw new Error(scopeDelErr.message);
+    }
 
     const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(context.userId);
     const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(data.user_id);
