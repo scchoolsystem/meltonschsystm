@@ -1,9 +1,11 @@
 import { createFileRoute, Outlet, Link, redirect, useNavigate, useLocation } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users,
+  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -99,52 +101,98 @@ function PlatformLayout() {
   }
 
   const visibleNav = filterNav(NAV, roles, scopes);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/platform/login" });
+  };
+
+  const brand = (
+    <div className="flex items-center gap-2.5">
+      <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground grid place-items-center shrink-0">
+        <Shield className="w-4 h-4" />
+      </div>
+      <div className="leading-tight">
+        <div className="text-sm font-semibold">Platform Admin</div>
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">SmartDev ERP</div>
+      </div>
+    </div>
+  );
+
+  const navLinks = (onNavigate?: () => void) => (
+    <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      {visibleNav.map((n) => {
+        const active = location.pathname.startsWith(n.to);
+        return (
+          <Link
+            key={n.to}
+            to={n.to}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+              active
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <n.icon className="w-4 h-4 shrink-0" />
+            <span className="truncate">{n.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
   return (
     <div className="min-h-screen flex w-full bg-background">
-      <aside className="w-60 border-r bg-card/40 flex flex-col">
-        <div className="h-14 px-4 flex items-center gap-2 border-b">
-          <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground grid place-items-center">
-            <Shield className="w-4 h-4" />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">Platform Admin</div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">SmartDev ERP</div>
-          </div>
-        </div>
-        <nav className="flex-1 p-2 space-y-1">
-          {visibleNav.map((n) => {
-            const active = location.pathname.startsWith(n.to);
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
-                  active ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <n.icon className="w-4 h-4" /> {n.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="p-2 border-t">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={async () => { await signOut(); navigate({ to: "/platform/login" }); }}
-          >
+      {/* Desktop sidebar — hidden below md, where the mobile top bar + drawer take over */}
+      <aside className="hidden md:flex w-60 shrink-0 border-r bg-card/40 flex-col">
+        <div className="h-14 px-4 flex items-center border-b">{brand}</div>
+        {navLinks()}
+        <div className="p-3 border-t">
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut}>
             <LogOut className="w-4 h-4 mr-2" /> Sign out
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-6">
-          <Outlet />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar */}
+        <div className="md:hidden h-14 px-3 flex items-center justify-between border-b bg-card/60 sticky top-0 z-30">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
+              <Menu className="w-5 h-5" />
+            </Button>
+            <div className="w-7 h-7 rounded-md bg-primary text-primary-foreground grid place-items-center shrink-0">
+              <Shield className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-sm font-semibold truncate">Platform Admin</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleSignOut} aria-label="Sign out">
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
-      </main>
+
+        {/* Mobile nav drawer */}
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetContent side="left" className="p-0 flex flex-col w-72 max-w-[85vw]">
+            <div className="h-14 px-4 flex items-center border-b">{brand}</div>
+            {navLinks(() => setMobileNavOpen(false))}
+            <div className="p-3 border-t">
+              <Button variant="ghost" size="sm" className="w-full justify-start" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4 mr-2" /> Sign out
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <main className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto p-4 sm:p-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
