@@ -12,6 +12,10 @@ export type MediaItemPublic = {
   summary: string;
   body: string;
   external_url: string;
+  // Publish/lock workflow (see platform.website.tsx MediaEditor). Optional
+  // so older stories saved before this field existed are treated as
+  // "published" — never hidden retroactively.
+  status?: "draft" | "published";
 };
 
 export const MEDIA_TYPE_LABELS: Record<MediaItemPublic["type"], string> = {
@@ -62,7 +66,11 @@ export async function fetchMediaItems(): Promise<MediaItemPublic[]> {
     .eq("section", "media_items")
     .maybeSingle();
   if (error) return [];
-  return (data?.content?.items ?? []) as MediaItemPublic[];
+  const items = (data?.content?.items ?? []) as MediaItemPublic[];
+  // Drafts (and anything still awaiting owner verification) never show on
+  // the public site — only fully published stories do. Items with no
+  // `status` at all predate this field and are treated as published.
+  return items.filter((m) => (m.status ?? "published") === "published");
 }
 
 export async function fetchSiteBrandName(): Promise<string> {
