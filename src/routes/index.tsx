@@ -1,5 +1,5 @@
 import React from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -20,8 +20,10 @@ import {
   Coins, ShoppingBag, ExternalLink, Handshake,
   ParkingSquare, ScanLine, Car, UserCheck, LogIn, MessageSquareWarning,
   Facebook, Twitter, Instagram, Linkedin, Link2, Youtube,
-  Newspaper, Video, Camera,
+  Newspaper, Video, Camera, Share2,
 } from "lucide-react";
+import { mediaItemSlug, type MediaItemPublic } from "@/lib/media-stories";
+import { toast } from "sonner";
 import mpesaShot from "@/assets/portals/mpesa.png";
 import parentShot from "@/assets/portals/parent.png";
 import studentShot from "@/assets/portals/student.png";
@@ -1395,16 +1397,6 @@ function StoryPage() {
 // story, plus an optional external link (press article, YouTube video, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 
-type MediaItemPublic = {
-  title: string;
-  type: "update" | "press" | "video" | "photo";
-  cover_image_url: string | null;
-  date: string;
-  summary: string;
-  body: string;
-  external_url: string;
-};
-
 const MEDIA_TYPE_META: Record<MediaItemPublic["type"], { label: string; icon: typeof Newspaper }> = {
   update: { label: "Company update", icon: Newspaper },
   press: { label: "Press mention", icon: Newspaper },
@@ -1412,14 +1404,40 @@ const MEDIA_TYPE_META: Record<MediaItemPublic["type"], { label: string; icon: ty
   photo: { label: "Photo story", icon: Camera },
 };
 
-function MediaCard({ m }: { m: MediaItemPublic }) {
-  const [expanded, setExpanded] = useState(false);
+// Each story is a tappable card: opening it navigates to its own shareable
+// page (/media/<slug>) with the logo, full title and a Share button, rather
+// than expanding inline — that page is what gets shared, and carries its
+// own OG/Twitter meta so link previews show the story's title and image.
+function MediaCard({ m, index }: { m: MediaItemPublic; index: number }) {
   const meta = MEDIA_TYPE_META[m.type] ?? MEDIA_TYPE_META.update;
-  const body = m.body ?? "";
-  const hasFullStory = body.trim().length > 0;
+  const slug = mediaItemSlug(m, index);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/media/${slug}`;
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await navigator.share({ title: m.title, text: m.summary, url });
+        return;
+      } catch {
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied to clipboard");
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
+  };
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden flex flex-col">
+    <Link
+      to="/media/$slug"
+      params={{ slug }}
+      className="rounded-xl border bg-card overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+    >
       <div className="w-full aspect-video bg-muted flex items-center justify-center overflow-hidden">
         {m.cover_image_url ? (
           <img src={m.cover_image_url} alt={m.title} className="w-full h-full object-cover" />
@@ -1436,27 +1454,20 @@ function MediaCard({ m }: { m: MediaItemPublic }) {
         </div>
         <div className="font-bold text-lg">{m.title}</div>
         <p className="text-sm text-muted-foreground mt-2">{m.summary}</p>
-        {expanded && hasFullStory && (
-          <p className="text-sm text-muted-foreground mt-3 whitespace-pre-line">{body}</p>
-        )}
         <div className="mt-4 flex items-center gap-4">
-          {hasFullStory && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
-              {expanded ? <>Show less <ChevronUp className="w-3.5 h-3.5" /></> : <>Read more <ChevronDown className="w-3.5 h-3.5" /></>}
-            </button>
-          )}
-          {m.external_url && (
-            <a href={m.external_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              View source <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
+            Read more <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+          </span>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <Share2 className="w-3.5 h-3.5" /> Share
+          </button>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -1486,7 +1497,7 @@ function MediaPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((m, i) => (
-              <MediaCard key={`${m.title}-${i}`} m={m} />
+              <MediaCard key={`${m.title}-${i}`} m={m} index={i} />
             ))}
           </div>
         )}
