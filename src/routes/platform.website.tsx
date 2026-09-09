@@ -147,6 +147,7 @@ function WebsiteEditor() {
           <TabsTrigger value="founder">Founders</TabsTrigger>
           <TabsTrigger value="story">Our Story</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
+          <TabsTrigger value="pages">Other Pages</TabsTrigger>
           <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
           <TabsTrigger value="merch">Merch</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
@@ -159,6 +160,7 @@ function WebsiteEditor() {
         <TabsContent value="founder" className="mt-4"><FoundersEditor /></TabsContent>
         <TabsContent value="story" className="mt-4"><StoryEditor /></TabsContent>
         <TabsContent value="milestones" className="mt-4"><MilestonesEditor /></TabsContent>
+        <TabsContent value="pages" className="mt-4"><PagesEditor /></TabsContent>
         <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
         <TabsContent value="merch" className="mt-4"><MerchEditor /></TabsContent>
         <TabsContent value="partners" className="mt-4"><PartnersEditor /></TabsContent>
@@ -481,6 +483,100 @@ function MilestonesEditor() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Other page text — Mission teaser (homepage), Download page, Contact page.
+// Their images/photos are handled by the Photo Gallery tab (placements
+// "contact" etc.) — this tab is just the editable text on those pages.
+// ---------------------------------------------------------------------------
+
+function MissionTeaserEditor() {
+  const fallback = {
+    heading: "Our mission: make every Kenyan school paperless by 2030",
+    body: "We believe schools should spend less time on administration and more time on education. SmartDev exists to make that possible for every school — regardless of size or budget.",
+  };
+  const { data, isLoading, save } = useLandingSection("mission_teaser", fallback);
+  const [form, setForm] = useState(fallback);
+  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Mission teaser (homepage)</CardTitle><CardDescription>The short mission statement block shown near the bottom of the homepage.</CardDescription></CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
+            <div><Label>Body</Label><Textarea rows={3} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} /></div>
+            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DownloadPageEditor() {
+  const fallback = {
+    heading: "Download SmartDev",
+    subheading: "Install on Android or Windows. Log in with your school credentials to get started immediately.",
+  };
+  const { data, isLoading, save } = useLandingSection("download_page", fallback);
+  const [form, setForm] = useState(fallback);
+  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Download page text</CardTitle><CardDescription>Heading and subheading at the top of the Download page. The Android/Windows feature lists and buttons are fixed.</CardDescription></CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
+            <div><Label>Subheading</Label><Textarea rows={2} value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
+            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ContactPageEditor() {
+  const fallback = {
+    heading: "Get in touch",
+    subheading: "We would love to set up SmartDev for your school. Reach out and we will get back to you same day.",
+    office_image_url: "",
+    business_hours: "Monday – Friday: 8:00am – 6:00pm EAT\nSaturday: 9:00am – 2:00pm EAT\nSupport available by email 24/7",
+  };
+  const { data, isLoading, save } = useLandingSection("contact_page", fallback);
+  const [form, setForm] = useState(fallback);
+  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Contact page text</CardTitle><CardDescription>Heading, subheading and business hours on the Contact page. The banner photo itself is edited in Photo Gallery → "Contact page image".</CardDescription></CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
+            <div><Label>Subheading</Label><Textarea rows={2} value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
+            <div><Label>Business hours</Label><Textarea rows={3} value={form.business_hours} onChange={(e) => setForm({ ...form, business_hours: e.target.value })} placeholder={"One line per day, e.g.\nMonday – Friday: 8:00am – 6:00pm EAT"} /></div>
+            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PagesEditor() {
+  return (
+    <div className="space-y-4">
+      <MissionTeaserEditor />
+      <DownloadPageEditor />
+      <ContactPageEditor />
+    </div>
   );
 }
 
