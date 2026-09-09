@@ -7,6 +7,7 @@ import {
 import {
   fetchMediaItems, fetchSiteBrandName, findMediaItemBySlug, type MediaItemPublic,
 } from "@/lib/media-stories";
+import { sanitizeStoryHtml } from "@/components/ui/rich-text-editor";
 
 // Public, top-level route — sits OUTSIDE the `_app` layout (like /verify),
 // so it loads for anyone with no login. This is the page a "Share" tap or
@@ -163,9 +164,18 @@ function MediaStoryPage() {
           )}
 
           {story.body && (
-            <div className="mt-6 text-base leading-relaxed whitespace-pre-line text-foreground/90">
-              {story.body}
-            </div>
+            <div
+              className="mt-6 text-base leading-relaxed text-foreground/90 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3"
+              // Stories written before the rich text editor was added are
+              // plain text with real newlines and no tags — convert those
+              // newlines to <br> so old stories still show their line
+              // breaks. Stories written with the editor are already HTML.
+              dangerouslySetInnerHTML={{
+                __html: sanitizeStoryHtml(
+                  /<[a-z][\s\S]*>/i.test(story.body) ? story.body : story.body.replace(/\n/g, "<br>"),
+                ),
+              }}
+            />
           )}
 
           <div className="mt-8 flex flex-wrap items-center gap-3 pt-6 border-t">
