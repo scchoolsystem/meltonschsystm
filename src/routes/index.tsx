@@ -143,7 +143,7 @@ function getOS() {
   return "other";
 }
 
-function IndexPage() {
+export function IndexPage({ initialPage = "home" }: { initialPage?: Page } = {}) {
   const { slug, loading } = useTenant();
   const navigate = useNavigate();
   // isNativeApp() reads window.__TAURI__ which Tauri injects after the document
@@ -183,7 +183,7 @@ function IndexPage() {
   if (loading || !nativeChecked) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   if ((native || isAppHost) && !slug) return <SchoolPicker onPicked={(s) => { if (s) navigate({ to: "/login" }); }} />;
   if (slug && slug !== "__platform__") return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  return <Landing />;
+  return <Landing initialPage={initialPage} />;
 }
 
 function DownloadButton({ size = "lg" }: { size?: "sm" | "lg" }) {
@@ -371,7 +371,26 @@ const GALLERY_PHOTOS = [
   { src: "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=600&h=400&fit=crop", caption: "Sports and co-curricular" },
 ];
 
-type Page = "home" | "modules" | "story" | "media" | "pricing" | "download" | "merch" | "contact" | "legal";
+export type Page = "home" | "modules" | "story" | "media" | "pricing" | "download" | "merch" | "contact" | "legal";
+
+// Every section used to live only behind a client-side hash (e.g. /#story),
+// which search engines don't index as a separate page. Each section now also
+// has its own real route (see src/routes/story.tsx, media.tsx, pricing.tsx,
+// etc.) that renders <IndexPage initialPage="..."> directly, so it's a real
+// crawlable/shareable URL. This map is the single source of truth for which
+// path each section lives at, used both for navigation and for redirecting
+// old #hash links to their new home.
+export const PAGE_PATHS: Record<Page, string> = {
+  home: "/",
+  modules: "/modules",
+  story: "/story",
+  media: "/media",
+  pricing: "/pricing",
+  download: "/download",
+  merch: "/merch",
+  contact: "/contact",
+  legal: "/legal",
+};
 
 // A confirmed plan + add-on selection, carried from the pricing page to the
 // contact page so a customer's picks aren't lost when they hit "Get started".
@@ -386,11 +405,11 @@ type PlanSelection = {
 // MAIN LANDING COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Landing() {
+function Landing({ initialPage = "home" }: { initialPage?: Page } = {}) {
   const { session, loading } = useAuth();
   const { isPlatformHost } = useTenant();
   const navigate = useNavigate();
-  const [page, setPage] = useState<Page>("home");
+  const page = initialPage;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [planSelection, setPlanSelection] = useState<PlanSelection | null>(null);
   const site = useSiteMeta();
@@ -400,19 +419,22 @@ function Landing() {
     if (!loading && session) navigate({ to: "/dashboard" });
   }, [session, loading, isPlatformHost, navigate]);
 
-  // Handle hash-based routing for deep links
+  // Every section used to be a client-side hash on "/" (e.g. /#story), which
+  // was never indexed or shareable as its own page. Each section now has a
+  // real route (see PAGE_PATHS), so an old #hash link just redirects
+  // straight to the real URL — bookmarks and shared links keep working.
   useEffect(() => {
     const hash = window.location.hash.replace("#", "") as Page;
-    if (hash && ["home","modules","story","media","pricing","download","merch","contact","legal"].includes(hash)) {
-      setPage(hash);
+    if (hash && hash !== initialPage && PAGE_PATHS[hash]) {
+      window.history.replaceState(null, "", window.location.pathname);
+      navigate({ to: PAGE_PATHS[hash] });
     }
   }, []);
 
   const goTo = (p: Page) => {
-    setPage(p);
     setMobileMenuOpen(false);
-    window.history.replaceState(null, "", `#${p}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate({ to: PAGE_PATHS[p] });
   };
 
   const navItems: { label: string; page: Page }[] = [
