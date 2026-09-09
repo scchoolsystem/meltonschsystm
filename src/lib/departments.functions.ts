@@ -1,1379 +1,175 @@
-import React from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
-import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
-import {
-  Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
-  Upload, Loader2, Save, GripVertical, ShoppingBag, Handshake,
-  Facebook, Twitter, Instagram, Linkedin, Link2, Youtube, MessageSquare,
-  Newspaper, Video, Camera,
-} from "lucide-react";
 
-export const Route = createFileRoute("/platform/website")({
-  component: () => (
-    <PlatformScopeGuard requirement={{ section: "website_media" }}>
-      <WebsiteEditor />
-    </PlatformScopeGuard>
-  ),
-});
+export type DeptRole = "head" | "coordinator" | "member";
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-function useLandingSection<T = any>(section: string, fallback: T) {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ["landing-content", section],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("landing_content")
-        .select("content")
-        .eq("section", section)
-        .maybeSingle();
-      if (error) throw error;
-      return (data?.content as T) ?? fallback;
-    },
-  });
-
-  const save = useMutation({
-    mutationFn: async (content: T) => {
-      const { error } = await (supabase as any)
-        .from("landing_content")
-        .upsert({ section, content }, { onConflict: "section" });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Saved — live on the website now");
-      qc.invalidateQueries({ queryKey: ["landing-content", section] });
-    },
-    onError: (e: any) => toast.error(e.message ?? "Save failed"),
-  });
-
-  return { data: data ?? fallback, isLoading, save };
-}
-
-async function uploadLandingImage(file: File, folder: string): Promise<string> {
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("landing-media").upload(path, file, {
-    upsert: true,
-    contentType: file.type,
-  });
-  if (error) throw error;
-  const { data } = supabase.storage.from("landing-media").getPublicUrl(path);
-  return data.publicUrl;
-}
-
-function ImagePicker({ label, value, onChange, folder }: { label: string; value: string | null | undefined; onChange: (url: string) => void; folder: string }) {
-  const [uploading, setUploading] = useState(false);
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  return (
-    <div className="space-y-2">
-      {label && <Label>{label}</Label>}
-      <div className="flex items-center gap-3">
-        <div className="w-20 h-20 rounded-lg border bg-muted overflow-hidden shrink-0 grid place-items-center">
-          {value ? <img src={value} alt={label || "Preview"} className="w-full h-full object-cover" /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
-        </div>
-        <div className="flex-1 space-y-2">
-          <Input value={value ?? ""} placeholder="Image URL (or upload below)" onChange={(e) => onChange(e.target.value)} />
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setUploading(true);
-              try {
-                const url = await uploadLandingImage(file, folder);
-                onChange(url);
-                toast.success("Image uploaded");
-              } catch (err: any) {
-                toast.error(err.message ?? "Upload failed");
-              } finally {
-                setUploading(false);
-                e.target.value = "";
-              }
-            }}
-          />
-          <Button type="button" variant="outline" size="sm" className="gap-2" disabled={uploading} onClick={() => inputRef.current?.click()}>
-            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} Upload image
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
-
-function WebsiteEditor() {
-  const { roles, hasPlatformSection } = useAuth();
-  const isOwner = roles.includes("platform_owner");
-  const canMedia = hasPlatformSection("website_media");
-
-  if (!isOwner && !canMedia) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Only the platform owner can edit the public website content.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // A restricted support user (owner=false, canMedia=true) only ever sees
-  // the Media/Stories editor — no TabsList, no way to navigate anywhere
-  // else on this page.
-  if (!isOwner && canMedia) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Globe className="h-6 w-6" /> Media & Stories</h1>
-          <p className="text-sm text-muted-foreground mt-1">Company updates, press mentions, videos and photo stories shown on the public Media page.</p>
-        </div>
-        <MediaEditor />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2"><Globe className="h-6 w-6" /> Website content</h1>
-        <p className="text-sm text-muted-foreground mt-1">Everything on smartdev.co.ke — text, images, story, pricing — editable here. Changes go live immediately.</p>
-      </div>
-
-      <Tabs defaultValue="site">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="site">Site &amp; Contact</TabsTrigger>
-          <TabsTrigger value="hero">Hero</TabsTrigger>
-          <TabsTrigger value="founder">Founders</TabsTrigger>
-          <TabsTrigger value="story">Our Story</TabsTrigger>
-          <TabsTrigger value="milestones">Milestones</TabsTrigger>
-          <TabsTrigger value="pages">Other Pages</TabsTrigger>
-          <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
-          <TabsTrigger value="merch">Merch</TabsTrigger>
-          <TabsTrigger value="partners">Partners</TabsTrigger>
-          <TabsTrigger value="media">Media</TabsTrigger>
-          <TabsTrigger value="pricing">Pricing &amp; Modules</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="site" className="mt-4"><SiteMetaEditor /></TabsContent>
-        <TabsContent value="hero" className="mt-4"><HeroEditor /></TabsContent>
-        <TabsContent value="founder" className="mt-4"><FoundersEditor /></TabsContent>
-        <TabsContent value="story" className="mt-4"><StoryEditor /></TabsContent>
-        <TabsContent value="milestones" className="mt-4"><MilestonesEditor /></TabsContent>
-        <TabsContent value="pages" className="mt-4"><PagesEditor /></TabsContent>
-        <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
-        <TabsContent value="merch" className="mt-4"><MerchEditor /></TabsContent>
-        <TabsContent value="partners" className="mt-4"><PartnersEditor /></TabsContent>
-        <TabsContent value="media" className="mt-4"><MediaEditor /></TabsContent>
-        <TabsContent value="pricing" className="mt-4"><PricingEditor /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Site identity + contact info (used across header, footer, every page)
-// ---------------------------------------------------------------------------
-
-function SiteMetaEditor() {
-  const fallback = {
-    brand_name: "SMART DEV", tagline: "", footer_credit: "",
-    email_hello: "", email_support: "", email_sales: "", email_legal: "", email_admin: "",
-    phone_primary: "", phone_support: "", location: "Nairobi, Kenya",
-    social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "",
-    social_youtube: "", social_tiktok: "", social_whatsapp: "",
-  };
-  const { data, isLoading, save } = useLandingSection("site_meta", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Site identity &amp; contact</CardTitle>
-        <CardDescription>Brand name, footer credit and the contact details shown on every page (header, footer, contact page, pricing CTAs). Use one consistent phone number everywhere.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>Brand name (shown in header/footer)</Label><Input value={form.brand_name} onChange={(e) => set("brand_name", e.target.value)} /></div>
-              <div><Label>Tagline</Label><Input value={form.tagline} onChange={(e) => set("tagline", e.target.value)} /></div>
-            </div>
-            <div><Label>Footer credit line</Label><Input value={form.footer_credit} onChange={(e) => set("footer_credit", e.target.value)} placeholder="Developed by Melton Konchella · Founder & Developer · Nairobi, Kenya" /></div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>Primary phone (used everywhere)</Label><Input value={form.phone_primary} onChange={(e) => { set("phone_primary", e.target.value); set("phone_support", e.target.value); }} placeholder="+254 792 991 222" /></div>
-              <div><Label>Location</Label><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>General enquiries email</Label><Input value={form.email_hello} onChange={(e) => set("email_hello", e.target.value)} /></div>
-              <div><Label>Sales email</Label><Input value={form.email_sales} onChange={(e) => set("email_sales", e.target.value)} /></div>
-              <div><Label>Support email</Label><Input value={form.email_support} onChange={(e) => set("email_support", e.target.value)} /></div>
-              <div><Label>Admin / legal email</Label><Input value={form.email_admin} onChange={(e) => { set("email_admin", e.target.value); set("email_legal", e.target.value); }} placeholder="admin@smartdev.co.ke" /></div>
-            </div>
-            <p className="text-xs text-muted-foreground">One phone number and one admin/legal email are used across the whole site to avoid mismatched contact details.</p>
-
-            <div className="space-y-3 rounded-md border p-4">
-              <div>
-                <Label className="text-sm font-semibold">SmartDev social media</Label>
-                <p className="text-xs text-muted-foreground">Shown as icons in the site footer. Leave any blank to hide that icon. URL or @handle both work.</p>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="flex items-center gap-2"><Facebook className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_facebook} placeholder="Facebook URL or @handle" onChange={(e) => set("social_facebook", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><Twitter className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_twitter} placeholder="Twitter / X URL or @handle" onChange={(e) => set("social_twitter", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><Instagram className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_instagram} placeholder="Instagram URL or @handle" onChange={(e) => set("social_instagram", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><Linkedin className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_linkedin} placeholder="LinkedIn URL" onChange={(e) => set("social_linkedin", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><Youtube className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_youtube} placeholder="YouTube channel URL" onChange={(e) => set("social_youtube", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_tiktok} placeholder="TikTok URL or @handle" onChange={(e) => set("social_tiktok", e.target.value)} /></div>
-                <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={form.social_whatsapp} placeholder="WhatsApp number (e.g. 254792991222) or wa.me link" onChange={(e) => set("social_whatsapp", e.target.value)} /></div>
-              </div>
-            </div>
-
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Hero section
-// ---------------------------------------------------------------------------
-
-function HeroEditor() {
-  const fallback = {
-    badge: "", heading_line1: "One platform to run your", heading_highlight: "entire school",
-    subheading: "", stats: [{ value: "40+", label: "Modules" }, { value: "40+", label: "User roles" }, { value: "M-Pesa", label: "Payments" }, { value: "100%", label: "Cloud-based" }],
-  };
-  const { data, isLoading, save } = useLandingSection("hero", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-  const { data: photos } = useGalleryPlacement("hero");
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader><CardTitle>Hero text</CardTitle><CardDescription>The big headline visitors see first. Make "SMART DEV" and the value proposition clear and visible.</CardDescription></CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <>
-              <div><Label>Badge text</Label><Input value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} /></div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div><Label>Heading (first line)</Label><Input value={form.heading_line1} onChange={(e) => setForm({ ...form, heading_line1: e.target.value })} /></div>
-                <div><Label>Heading (highlighted word/phrase)</Label><Input value={form.heading_highlight} onChange={(e) => setForm({ ...form, heading_highlight: e.target.value })} /></div>
-              </div>
-              <div><Label>Subheading</Label><Textarea value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {form.stats.map((s: any, i: number) => (
-                  <div key={i} className="space-y-1 rounded-lg border p-2">
-                    <Input value={s.value} onChange={(e) => { const next = [...form.stats]; next[i] = { ...s, value: e.target.value }; setForm({ ...form, stats: next }); }} placeholder="Value" className="text-center font-semibold" />
-                    <Input value={s.label} onChange={(e) => { const next = [...form.stats]; next[i] = { ...s, label: e.target.value }; setForm({ ...form, stats: next }); }} placeholder="Label" className="text-center text-xs" />
-                  </div>
-                ))}
-              </div>
-              <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
-      <GalleryPlacementEditor placement="hero" title="Hero background photos" description="Rotating background images on the homepage. Use real Kenyan school photos." folder="hero" />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Founders section (supports one or many — add, edit, remove, reorder)
-// ---------------------------------------------------------------------------
-
-type FounderItem = {
-  name: string; role: string; photo_url: string | null; bio: string;
-  social_facebook: string; social_twitter: string; social_instagram: string; social_linkedin: string; social_other: string;
-};
-
-const FOUNDER_BLANK: FounderItem = {
-  name: "", role: "", photo_url: null, bio: "",
-  social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "", social_other: "",
-};
-
-const LEGACY_FOUNDER_FALLBACK: FounderItem = {
-  name: "Melton Konchella",
-  role: "Founder & Developer",
-  photo_url: null,
-  bio: "",
-  social_facebook: "", social_twitter: "", social_instagram: "", social_linkedin: "", social_other: "",
-};
-
-function FoundersEditor() {
-  // Legacy single-founder record (from before this module supported multiple people).
-  // Used only to seed the new list the first time it's opened, so nothing is lost.
-  const { data: legacy, isLoading: legacyLoading } = useLandingSection("founder", LEGACY_FOUNDER_FALLBACK);
-
-  const fallback = { items: [] as FounderItem[] };
-  const { data, isLoading, save } = useLandingSection("founders", fallback);
-  const [items, setItems] = useState<FounderItem[]>([]);
-  const [seeded, setSeeded] = useState(false);
-
-  useEffect(() => {
-    if (isLoading || legacyLoading || seeded) return;
-    if (data.items?.length) {
-      // Normalize older saved records that predate the social-handle fields.
-      setItems(data.items.map((f: any) => ({ ...FOUNDER_BLANK, ...f })));
-    } else if (legacy?.name) {
-      // First time opening this editor — carry the existing founder over as slot 1.
-      setItems([{ ...LEGACY_FOUNDER_FALLBACK, ...legacy }]);
-    } else {
-      setItems([]);
-    }
-    setSeeded(true);
-  }, [isLoading, legacyLoading, seeded, data, legacy]);
-
-  const updateItem = (i: number, patch: Partial<FounderItem>) => {
-    const n = [...items];
-    n[i] = { ...n[i], ...patch };
-    setItems(n);
-  };
-
-  const move = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= items.length) return;
-    const n = [...items];
-    [n[i], n[j]] = [n[j], n[i]];
-    setItems(n);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Founders / team</CardTitle>
-        <CardDescription>Shown on the Our Story page. Add a slot for each founder or team member — leave a photo empty to show a placeholder icon until you're ready to add one.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading || legacyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">No founders added yet. Click "Add founder" below to create the first slot.</p>
-            )}
-            <div className="grid sm:grid-cols-2 gap-4">
-              {items.map((f, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
-                    <div className="flex items-center gap-1">
-                      <Button type="button" variant="ghost" size="icon" disabled={i === 0} onClick={() => move(i, -1)} title="Move up">
-                        <GripVertical className="w-4 h-4 rotate-90" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove founder">
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                  <ImagePicker label="Photo (optional)" value={f.photo_url} onChange={(url) => updateItem(i, { photo_url: url })} folder="founder" />
-                  <div><Label>Name</Label><Input value={f.name} onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
-                  <div><Label>Role / title</Label><Input value={f.role} onChange={(e) => updateItem(i, { role: e.target.value })} /></div>
-                  <div>
-                    <Label>Bio</Label>
-                    <Textarea rows={6} value={f.bio} onChange={(e) => updateItem(i, { bio: e.target.value })} placeholder="Write as long a story as you like — the public page shows only the first couple of lines with a 'Read more' link." />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      On the site, visitors see the name, role and a short preview of this bio, then can click "Read more" to expand the full story.
-                    </p>
-                  </div>
-                  <div className="space-y-2 rounded-md border p-3">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Social media (optional)</Label>
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="flex items-center gap-2"><Facebook className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_facebook} placeholder="Facebook URL or @handle" onChange={(e) => updateItem(i, { social_facebook: e.target.value })} /></div>
-                      <div className="flex items-center gap-2"><Twitter className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_twitter} placeholder="Twitter / X URL or @handle" onChange={(e) => updateItem(i, { social_twitter: e.target.value })} /></div>
-                      <div className="flex items-center gap-2"><Instagram className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_instagram} placeholder="Instagram URL or @handle" onChange={(e) => updateItem(i, { social_instagram: e.target.value })} /></div>
-                      <div className="flex items-center gap-2"><Linkedin className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_linkedin} placeholder="LinkedIn URL" onChange={(e) => updateItem(i, { social_linkedin: e.target.value })} /></div>
-                      <div className="flex items-center gap-2"><Link2 className="w-4 h-4 text-muted-foreground shrink-0" /><Input value={f.social_other} placeholder="Any other link (website, TikTok, WhatsApp...)" onChange={(e) => updateItem(i, { social_other: e.target.value })} /></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...FOUNDER_BLANK }])}>
-              <Plus className="w-3.5 h-3.5" /> Add founder
-            </Button>
-            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Our Story page intro / mission / vision
-// ---------------------------------------------------------------------------
-
-function StoryEditor() {
-  const fallback = {
-    badge: "Our Story", heading: "", subheading: "", hero_image_url: null as string | null,
-    mission_title: "Our Mission", mission_body: "", vision_title: "Our Vision", vision_body: "",
-  };
-  const { data, isLoading, save } = useLandingSection("story_intro", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>Our Story page</CardTitle><CardDescription>Intro heading, hero image, mission and vision text.</CardDescription></CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><Label>Badge text</Label><Input value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} /></div>
-              <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
-            </div>
-            <div><Label>Subheading</Label><Textarea value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
-            <ImagePicker label="Story hero image" value={form.hero_image_url} onChange={(url) => setForm({ ...form, hero_image_url: url })} folder="story" />
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Mission title</Label><Input value={form.mission_title} onChange={(e) => setForm({ ...form, mission_title: e.target.value })} />
-                <Label>Mission body</Label><Textarea rows={4} value={form.mission_body} onChange={(e) => setForm({ ...form, mission_body: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Vision title</Label><Input value={form.vision_title} onChange={(e) => setForm({ ...form, vision_title: e.target.value })} />
-                <Label>Vision body</Label><Textarea rows={4} value={form.vision_body} onChange={(e) => setForm({ ...form, vision_body: e.target.value })} />
-              </div>
-            </div>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Story timeline / milestones (add, edit, remove, reorder)
-// ---------------------------------------------------------------------------
-
-function MilestonesEditor() {
-  const fallback = { items: [] as { year: string; title: string; desc: string }[] };
-  const { data, isLoading, save } = useLandingSection("story_milestones", fallback);
-  const [items, setItems] = useState<{ year: string; title: string; desc: string }[]>([]);
-  useEffect(() => { if (!isLoading) setItems(data.items ?? []); }, [isLoading, data]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5" /> Timeline / milestones</CardTitle>
-        <CardDescription>The "How we got here" timeline on the Our Story page. Add, edit, remove or reorder entries.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            {items.map((m, i) => (
-              <div key={i} className="rounded-lg border p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <Input className="w-24" value={m.year} placeholder="Year" onChange={(e) => { const n = [...items]; n[i] = { ...m, year: e.target.value }; setItems(n); }} />
-                  <Input value={m.title} placeholder="Title" onChange={(e) => { const n = [...items]; n[i] = { ...m, title: e.target.value }; setItems(n); }} />
-                  <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                </div>
-                <Textarea value={m.desc} placeholder="Description" onChange={(e) => { const n = [...items]; n[i] = { ...m, desc: e.target.value }; setItems(n); }} />
-              </div>
-            ))}
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { year: "", title: "", desc: "" }])}><Plus className="w-3.5 h-3.5" /> Add milestone</Button>
-            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Other page text — Mission teaser (homepage), Download page, Contact page.
-// Their images/photos are handled by the Photo Gallery tab (placements
-// "contact" etc.) — this tab is just the editable text on those pages.
-// ---------------------------------------------------------------------------
-
-function MissionTeaserEditor() {
-  const fallback = {
-    heading: "Our mission: make every Kenyan school paperless by 2030",
-    body: "We believe schools should spend less time on administration and more time on education. SmartDev exists to make that possible for every school — regardless of size or budget.",
-  };
-  const { data, isLoading, save } = useLandingSection("mission_teaser", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>Mission teaser (homepage)</CardTitle><CardDescription>The short mission statement block shown near the bottom of the homepage.</CardDescription></CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
-            <div><Label>Body</Label><Textarea rows={3} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} /></div>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function DownloadPageEditor() {
-  const fallback = {
-    heading: "Download SmartDev",
-    subheading: "Install on Android or Windows. Log in with your school credentials to get started immediately.",
-  };
-  const { data, isLoading, save } = useLandingSection("download_page", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>Download page text</CardTitle><CardDescription>Heading and subheading at the top of the Download page. The Android/Windows feature lists and buttons are fixed.</CardDescription></CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
-            <div><Label>Subheading</Label><Textarea rows={2} value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ContactPageEditor() {
-  const fallback = {
-    heading: "Get in touch",
-    subheading: "We would love to set up SmartDev for your school. Reach out and we will get back to you same day.",
-    office_image_url: "",
-    business_hours: "Monday – Friday: 8:00am – 6:00pm EAT\nSaturday: 9:00am – 2:00pm EAT\nSupport available by email 24/7",
-  };
-  const { data, isLoading, save } = useLandingSection("contact_page", fallback);
-  const [form, setForm] = useState(fallback);
-  useEffect(() => { if (!isLoading) setForm({ ...fallback, ...data }); }, [isLoading, data]);
-
-  return (
-    <Card>
-      <CardHeader><CardTitle>Contact page text</CardTitle><CardDescription>Heading, subheading and business hours on the Contact page. The banner photo itself is edited in Photo Gallery → "Contact page image".</CardDescription></CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div><Label>Heading</Label><Input value={form.heading} onChange={(e) => setForm({ ...form, heading: e.target.value })} /></div>
-            <div><Label>Subheading</Label><Textarea rows={2} value={form.subheading} onChange={(e) => setForm({ ...form, subheading: e.target.value })} /></div>
-            <div><Label>Business hours</Label><Textarea rows={3} value={form.business_hours} onChange={(e) => setForm({ ...form, business_hours: e.target.value })} placeholder={"One line per day, e.g.\nMonday – Friday: 8:00am – 6:00pm EAT"} /></div>
-            <Button onClick={() => save.mutate(form)} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function PagesEditor() {
-  return (
-    <div className="space-y-4">
-      <MissionTeaserEditor />
-      <DownloadPageEditor />
-      <ContactPageEditor />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Photo gallery (generic, used for "gallery", "story_hero", "contact" too)
-// ---------------------------------------------------------------------------
-
-function useGalleryPlacement(placement: string) {
-  return useQuery({
-    queryKey: ["landing-gallery", placement],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("landing_gallery")
-        .select("*")
-        .eq("placement", placement)
-        .order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-}
-
-function GalleryPlacementEditor({ placement, title, description, folder }: { placement: string; title: string; description: string; folder: string }) {
-  const qc = useQueryClient();
-  const { data: photos, isLoading } = useGalleryPlacement(placement);
-
-  const update = useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
-      const { error } = await (supabase as any).from("landing_gallery").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["landing-gallery", placement] }),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const addSlot = useMutation({
-    mutationFn: async () => {
-      const nextOrder = (photos?.length ?? 0) + 1;
-      const { error } = await (supabase as any).from("landing_gallery").insert({ placement, sort_order: nextOrder, image_url: null, caption: "" });
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["landing-gallery", placement] }),
-  });
-
-  const removeSlot = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("landing_gallery").update({ is_active: false }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["landing-gallery", placement] }),
-  });
-
-  return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><ImageIcon className="w-5 h-5" /> {title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(photos ?? []).map((p: any) => (
-                <div key={p.id} className="rounded-lg border p-3 space-y-2">
-                  <ImagePicker label="" value={p.image_url} onChange={(url) => update.mutate({ id: p.id, patch: { image_url: url } })} folder={folder} />
-                  <Input
-                    defaultValue={p.caption ?? ""}
-                    placeholder="Caption (optional)"
-                    onBlur={(e) => { if (e.target.value !== (p.caption ?? "")) update.mutate({ id: p.id, patch: { caption: e.target.value } }); }}
-                  />
-                  <Button variant="ghost" size="sm" className="gap-2 text-destructive" onClick={() => removeSlot.mutate(p.id)}><Trash2 className="w-3.5 h-3.5" /> Remove slot</Button>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => addSlot.mutate()}><Plus className="w-3.5 h-3.5" /> Add photo slot</Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function GalleryEditor() {
-  return (
-    <div className="space-y-4">
-      <GalleryPlacementEditor placement="gallery" title="Homepage photo gallery" description="The 'Built for schools like yours' section. Use real Kenyan school photos." folder="gallery" />
-      <GalleryPlacementEditor placement="story_hero" title="Our Story hero image" description="Large banner image at the top of the Our Story page." folder="story" />
-      <GalleryPlacementEditor placement="contact" title="Contact page image" description="Banner image at the bottom of the Contact page." folder="contact" />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Merch — SmartDev-branded products, plus partner products (e.g. Stawear)
-// that hand off to an external store on click.
-// ---------------------------------------------------------------------------
-
-type MerchItem = {
+export interface Department {
+  id: string;
   name: string;
-  photo_url: string | null;
-  price_label: string;
-  description: string;
-  is_external: boolean;   // false = "Enquire to buy" (mailto), true = links out to a partner store
-  link_url: string;       // only used when is_external is true
-  partner_name: string;   // optional badge, e.g. "Stawear"
-};
-
-const MERCH_BLANK: MerchItem = {
-  name: "", photo_url: null, price_label: "", description: "",
-  is_external: false, link_url: "", partner_name: "",
-};
-
-function MerchEditor() {
-  const fallback = { items: [] as MerchItem[] };
-  const { data, isLoading, save } = useLandingSection("merch_items", fallback);
-  const [items, setItems] = useState<MerchItem[]>([]);
-  useEffect(() => { if (!isLoading) setItems(data.items ?? []); }, [isLoading, data]);
-
-  const updateItem = (i: number, patch: Partial<MerchItem>) => {
-    const n = [...items];
-    n[i] = { ...n[i], ...patch };
-    setItems(n);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><ShoppingBag className="w-5 h-5" /> Merchandise</CardTitle>
-        <CardDescription>
-          Water bottles, bags, notebooks, pens and any other branded merchandise, shown on the Merch page.
-          Leave "External store link" off for your own products — visitors will get an "Enquire to buy" button that emails your sales inbox.
-          Turn it on for a partner's products (e.g. Stawear) — clicking the card sends visitors straight to that partner's site to complete the purchase there.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">No merch added yet. Click "Add product" below to create the first slot.</p>
-            )}
-            <div className="grid sm:grid-cols-2 gap-4">
-              {items.map((m, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
-                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove product">
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <ImagePicker label="Photo" value={m.photo_url} onChange={(url) => updateItem(i, { photo_url: url })} folder="merch" />
-                  <div><Label>Product name</Label><Input value={m.name} placeholder="e.g. SmartDev Water Bottle" onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
-                  <div><Label>Price (display text)</Label><Input value={m.price_label} placeholder="e.g. KES 800" onChange={(e) => updateItem(i, { price_label: e.target.value })} /></div>
-                  <div><Label>Description</Label><Textarea rows={2} value={m.description} onChange={(e) => updateItem(i, { description: e.target.value })} /></div>
-
-                  <div className="flex items-center justify-between rounded-md border p-3">
-                    <div>
-                      <Label className="cursor-pointer">External store link</Label>
-                      <p className="text-xs text-muted-foreground">On = partner product, hands off to their site.</p>
-                    </div>
-                    <Switch checked={m.is_external} onCheckedChange={(v) => updateItem(i, { is_external: v })} />
-                  </div>
-
-                  {m.is_external ? (
-                    <>
-                      <div><Label>Store link (e.g. https://stawear.netlify.app)</Label><Input value={m.link_url} placeholder="https://stawear.netlify.app" onChange={(e) => updateItem(i, { link_url: e.target.value })} /></div>
-                      <div><Label>Partner name (optional badge, e.g. "Stawear")</Label><Input value={m.partner_name} onChange={(e) => updateItem(i, { partner_name: e.target.value })} /></div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Visitors will see an "Enquire to buy" button that opens a pre-filled email to your sales inbox.</p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MERCH_BLANK }])}>
-              <Plus className="w-3.5 h-3.5" /> Add product
-            </Button>
-            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+  kind: string;
+  created_at: string;
+  sub_departments?: SubDepartment[];
 }
 
-// ---------------------------------------------------------------------------
-// Partners — logo strip shown on the public site. Each logo links out to
-// the partner's own website when clicked.
-// ---------------------------------------------------------------------------
-
-type PartnerItem = {
+export interface SubDepartment {
+  id: string;
+  department_id: string;
   name: string;
-  logo_url: string | null;
-  website_url: string;
-};
-
-const PARTNER_BLANK: PartnerItem = { name: "", logo_url: null, website_url: "" };
-
-function PartnersEditor() {
-  const fallback = { items: [] as PartnerItem[] };
-  const { data, isLoading, save } = useLandingSection("partners", fallback);
-  const [items, setItems] = useState<PartnerItem[]>([]);
-  useEffect(() => { if (!isLoading) setItems(data.items ?? []); }, [isLoading, data]);
-
-  const updateItem = (i: number, patch: Partial<PartnerItem>) => {
-    const n = [...items];
-    n[i] = { ...n[i], ...patch };
-    setItems(n);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Handshake className="w-5 h-5" /> Partners</CardTitle>
-        <CardDescription>
-          Logos shown in the "Our Partners" strip on the public site. Clicking a logo opens that partner's website in a new tab.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">No partners added yet. Click "Add partner" below to create the first one.</p>
-            )}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((p, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
-                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove partner">
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <ImagePicker label="Logo" value={p.logo_url} onChange={(url) => updateItem(i, { logo_url: url })} folder="partners" />
-                  <div><Label>Partner name</Label><Input value={p.name} placeholder="e.g. Stawear" onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
-                  <div><Label>Website link</Label><Input value={p.website_url} placeholder="https://partner-site.com" onChange={(e) => updateItem(i, { website_url: e.target.value })} /></div>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...PARTNER_BLANK }])}>
-              <Plus className="w-3.5 h-3.5" /> Add partner
-            </Button>
-            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
-// ---------------------------------------------------------------------------
-// Media / Stories — updates, press mentions, videos and photo stories shown
-// on the public "Media" page, so visitors can read more about the company.
-// ---------------------------------------------------------------------------
+export interface DepartmentMember {
+  id: string;
+  department_id: string;
+  staff_id: string;
+  role: DeptRole;
+  joined_at: string;
+  staff?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    photo_url: string | null;
+    department_id: string | null;
+  };
+}
 
-type MediaItem = {
+export interface DepartmentCommunication {
+  id: string;
+  department_id: string;
+  sender_id: string;
   title: string;
-  type: "update" | "press" | "video" | "photo";
-  cover_image_url: string | null;
-  date: string;
-  summary: string;
-  body: string;
-  external_url: string; // optional — link to the original press article / video
-  status: "draft" | "published";
-  // Verification workflow: once published, an edit by anyone other than a
-  // platform owner doesn't touch the live fields above — it's stashed here
-  // and the story is locked until an owner approves or rejects it.
-  locked: boolean;
-  pending: Partial<EditableMediaFields> | null;
-  pending_by: string | null;
-  pending_at: string | null;
-};
+  content: string;
+  created_at: string;
+  staff?: {
+    first_name: string;
+    last_name: string;
+    photo_url: string | null;
+  };
+}
 
-// Fields a story editor actually edits (i.e. everything except the
-// workflow/status bookkeeping above) — this is the shape of a `pending` diff.
-type EditableMediaFields = Pick<
-  MediaItem,
-  "title" | "type" | "cover_image_url" | "date" | "summary" | "body" | "external_url"
->;
-const EDITABLE_FIELDS: (keyof EditableMediaFields)[] = [
-  "title", "type", "cover_image_url", "date", "summary", "body", "external_url",
-];
+/** All departments — used by admin/owner tier who can see everything */
+export async function getDepartments(): Promise<Department[]> {
+  const { data, error } = await supabase
+    .from("departments")
+    .select("*, sub_departments(id, name, department_id)")
+    .order("kind")
+    .order("name");
+  if (error) throw error;
+  return data ?? [];
+}
 
-const MEDIA_BLANK: MediaItem = {
-  title: "", type: "update", cover_image_url: null, date: "", summary: "", body: "", external_url: "",
-  status: "draft", locked: false, pending: null, pending_by: null, pending_at: null,
-};
+/** Create a new department. school_id defaults server-side via current_user_school(). */
+export async function createDepartment(
+  name: string,
+  kind: "academics" | "administration" | "co_curricular" | "support"
+): Promise<Department> {
+  const { data, error } = await supabase
+    .from("departments")
+    .insert({ name: name.trim(), kind })
+    .select("*, sub_departments(id, name, department_id)")
+    .single();
+  if (error) throw error;
+  return data;
+}
 
-const MEDIA_TYPE_LABELS: Record<MediaItem["type"], string> = {
-  update: "Company update", press: "Press mention", video: "Video", photo: "Photo story",
-};
+/**
+ * Departments scoped to the current user:
+ *  - Admin/owner tier → all departments (passed in via `isAdminTier` flag)
+ *  - HOD/coordinator  → their department_members rows
+ *  - Regular teacher  → their staff.department_id
+ *
+ * The caller resolves isAdminTier from their role list before calling this.
+ */
+export async function getMyDepartments(
+  userId: string,
+  isAdminTier: boolean
+): Promise<Department[]> {
+  if (isAdminTier) return getDepartments();
 
-function diffEditableFields(a: MediaItem, b: MediaItem): Partial<EditableMediaFields> {
-  const diff: Partial<EditableMediaFields> = {};
-  for (const f of EDITABLE_FIELDS) {
-    if (a[f] !== b[f]) (diff as any)[f] = b[f];
+  // 1. Find this user's staff row
+  const { data: staffRow } = await supabase
+    .from("staff")
+    .select("id, department_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const staffId = staffRow?.id ?? null;
+
+  const deptIds = new Set<string>();
+
+  // 2. Departments from department_members (covers HOD / coordinator roles)
+  if (staffId) {
+    const { data: memberships } = await supabase
+      .from("department_members")
+      .select("department_id")
+      .eq("staff_id", staffId);
+    (memberships ?? []).forEach((m) => deptIds.add(m.department_id));
   }
-  return diff;
+
+  // 3. Department from staff.department_id (regular teacher assignment)
+  if (staffRow?.department_id) {
+    deptIds.add(staffRow.department_id);
+  }
+
+  if (deptIds.size === 0) return [];
+
+  const { data, error } = await supabase
+    .from("departments")
+    .select("*, sub_departments(id, name, department_id)")
+    .in("id", Array.from(deptIds))
+    .order("kind")
+    .order("name");
+  if (error) throw error;
+  return data ?? [];
 }
 
-function MediaEditor() {
-  const { roles, session } = useAuth();
-  const isOwner = roles.includes("platform_owner" as any);
-  const fallback = { items: [] as MediaItem[] };
-  const { data, isLoading, save } = useLandingSection("media_items", fallback);
-  // `saved` mirrors exactly what's on the server — the baseline we diff
-  // local edits against so a non-owner's changes to an already-published
-  // story become a `pending` proposal instead of overwriting live content.
-  const [saved, setSaved] = useState<MediaItem[]>([]);
-  const [items, setItems] = useState<MediaItem[]>([]);
-  useEffect(() => {
-    if (!isLoading) {
-      // Stories saved before this workflow existed have no `status` field —
-      // they're already live, so treat missing status as "published" (not
-      // the "draft" default used for brand-new slots below), matching how
-      // the public site itself reads them (see fetchMediaItems).
-      const normalized = (data.items ?? []).map((m: any) => ({
-        ...MEDIA_BLANK,
-        ...m,
-        status: m?.status ?? "published",
-      }));
-      setSaved(normalized);
-      setItems(normalized);
-    }
-  }, [isLoading, data]);
-
-  const updateItem = (i: number, patch: Partial<EditableMediaFields>) => {
-    const n = [...items];
-    n[i] = { ...n[i], ...patch };
-    setItems(n);
-  };
-
-  // Builds the array that actually gets persisted, applying the lock rule:
-  // a non-owner editing a published, not-yet-locked story has their edits
-  // captured as `pending` instead of applied directly; the live fields stay
-  // exactly as last published. Owners always save straight through, and
-  // that same "save straight through" applies to a draft story regardless
-  // of who's editing it — the lock only ever engages once something is
-  // actually published.
-  const buildSavePayload = (): MediaItem[] =>
-    items.map((item, i) => {
-      const original = saved[i];
-      if (isOwner || !original || item.status !== "published" || original.locked) {
-        return item;
-      }
-      const diff = diffEditableFields(original, item);
-      if (Object.keys(diff).length === 0) return item;
-      return {
-        ...original,
-        locked: true,
-        pending: diff,
-        pending_by: session?.user?.email ?? "team member",
-        pending_at: new Date().toISOString(),
-      };
-    });
-
-  const handleSave = () => {
-    const payload = buildSavePayload();
-    const becameLocked = payload.some((it, i) => it.locked && !saved[i]?.locked);
-    save.mutate(
-      { items: payload },
-      {
-        onSuccess: () => {
-          if (becameLocked) {
-            // Override the hook's generic "live on the website now" toast —
-            // that's specifically not true for a pending edit.
-            toast.dismiss();
-            toast.success("Saved as a pending edit — a platform owner needs to verify it before it goes live");
-          }
-        },
-      },
-    );
-  };
-
-  // Publishing a draft is never gated — only editing something already
-  // published is. Built off `saved` (not `items`) for every OTHER slot so
-  // that clicking Publish on one new story can't accidentally push through
-  // a non-owner's unsaved, not-yet-reviewed edits sitting in a different,
-  // already-published slot — those still need "Save changes" to go through
-  // the pending-review check above. The target slot itself uses `items` so
-  // whatever the person just typed into this new story is included.
-  const publishItem = (i: number) => {
-    const n = items.map((it, idx) => {
-      if (idx === i) return { ...it, status: "published" as const };
-      // Ignore unsaved edits sitting in any OTHER already-known slot — those
-      // still need to go through "Save changes" (and its pending-review
-      // check) rather than riding along with this publish action. Slots
-      // added this session (beyond `saved`) have nothing to protect, so
-      // just carry them through as-is.
-      return idx < saved.length ? saved[idx] : it;
-    });
-    setItems(n);
-    setSaved(n);
-    save.mutate({ items: n });
-  };
-
-  const approvePending = (i: number) => {
-    const it = items[i];
-    if (!it.pending) return;
-    const n = items.map((x, idx) =>
-      idx === i ? { ...x, ...it.pending, locked: false, pending: null, pending_by: null, pending_at: null } : x,
-    );
-    setItems(n);
-    save.mutate({ items: n });
-  };
-
-  const rejectPending = (i: number) => {
-    const n = items.map((x, idx) =>
-      idx === i ? { ...x, locked: false, pending: null, pending_by: null, pending_at: null } : x,
-    );
-    setItems(n);
-    save.mutate({ items: n });
-  };
-
-  const removeItem = (i: number) => {
-    const it = items[i];
-    if (it.locked && !isOwner) {
-      toast.error("This story has a pending edit awaiting owner review — it can't be removed until that's resolved");
-      return;
-    }
-    const n = items.filter((_, idx) => idx !== i);
-    setItems(n);
-    save.mutate({ items: n });
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Newspaper className="w-5 h-5" /> Media &amp; Stories</CardTitle>
-        <CardDescription>
-          Company updates, press mentions, videos and photo stories shown on the public "Media" page.
-          Write as long a story as you like in "Full story" — visitors see the title and a short preview, then can click "Read more".
-          "External link" is optional — use it for a press article on another site or a YouTube video; leave it blank for a story that lives entirely on this page.
-          {!isOwner && " Once a story is published, editing it here submits a pending change — it only goes live once a platform owner verifies it."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-          <>
-            {items.length === 0 && (
-              <p className="text-sm text-muted-foreground">No media items yet. Click "Add story" below to create the first one.</p>
-            )}
-            <div className="grid sm:grid-cols-2 gap-4">
-              {items.map((m, i) => {
-                const fieldsDisabled = m.locked && !isOwner;
-                return (
-                <div key={i} className={cn("rounded-lg border p-4 space-y-3", m.locked && "border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/10")}>
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
-                      <Badge variant={m.status === "published" ? "default" : "secondary"}>
-                        {m.status === "published" ? "Published" : "Draft"}
-                      </Badge>
-                      {m.locked && (
-                        <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
-                          Pending review{m.pending_by ? ` — ${m.pending_by}` : ""}
-                        </Badge>
-                      )}
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeItem(i)} title="Remove story">
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-
-                  {m.locked && isOwner && m.pending && (
-                    <div className="rounded-md border border-amber-400/60 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
-                      <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Proposed changes awaiting your verification</p>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        {Object.entries(m.pending).map(([k, v]) => (
-                          <li key={k}><span className="font-medium capitalize">{k.replace(/_/g, " ")}:</span> {String(v).slice(0, 120) || "(empty)"}</li>
-                        ))}
-                      </ul>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => approvePending(i)}>Approve &amp; publish</Button>
-                        <Button size="sm" variant="outline" onClick={() => rejectPending(i)}>Reject</Button>
-                      </div>
-                    </div>
-                  )}
-
-                  <fieldset disabled={fieldsDisabled} className={cn("space-y-3", fieldsDisabled && "opacity-60")}>
-                    <ImagePicker label="Cover image" value={m.cover_image_url} onChange={(url) => updateItem(i, { cover_image_url: url })} folder="media" />
-                    <div><Label>Title</Label><Input value={m.title} placeholder="e.g. SmartDev featured on Citizen TV" onChange={(e) => updateItem(i, { title: e.target.value })} /></div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Type</Label>
-                        <select
-                          className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                          value={m.type}
-                          onChange={(e) => updateItem(i, { type: e.target.value as MediaItem["type"] })}
-                        >
-                          {Object.entries(MEDIA_TYPE_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-                        </select>
-                      </div>
-                      <div><Label>Date (display text)</Label><Input value={m.date} placeholder="e.g. August 2026" onChange={(e) => updateItem(i, { date: e.target.value })} /></div>
-                    </div>
-                    <div><Label>Short preview</Label><Textarea rows={2} value={m.summary} placeholder="One or two sentences shown on the card before 'Read more'" onChange={(e) => updateItem(i, { summary: e.target.value })} /></div>
-                    <div><Label>Full story (optional)</Label><Textarea rows={5} value={m.body} placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link." onChange={(e) => updateItem(i, { body: e.target.value })} /></div>
-                    <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
-                  </fieldset>
-
-                  {m.status === "draft" && (
-                    <Button size="sm" variant="outline" onClick={() => publishItem(i)}>Publish</Button>
-                  )}
-                  {fieldsDisabled && (
-                    <p className="text-xs text-muted-foreground">Locked until a platform owner verifies the pending edit above.</p>
-                  )}
-                </div>
-              );})}
-            </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MEDIA_BLANK }])}>
-              <Plus className="w-3.5 h-3.5" /> Add story
-            </Button>
-            <div><Button onClick={handleSave} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+export async function getDepartmentMembers(departmentId: string): Promise<DepartmentMember[]> {
+  const { data, error } = await supabase
+    .from("department_members")
+    .select("*, staff(id, first_name, last_name, email, photo_url, department_id)")
+    .eq("department_id", departmentId)
+    .order("role");
+  if (error) throw error;
+  return (data ?? []) as DepartmentMember[];
 }
 
-// ---------------------------------------------------------------------------
-// Pricing: base plans (subscription_plans) + per-module add-on pricing
-// ---------------------------------------------------------------------------
+export async function getDepartmentCommunications(departmentId: string): Promise<DepartmentCommunication[]> {
+  const { data, error } = await supabase
+    .from("department_communications")
+    .select("*, staff(first_name, last_name, photo_url)")
+    .eq("department_id", departmentId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DepartmentCommunication[];
+}
 
-function PricingEditor() {
-  const qc = useQueryClient();
+/** Add/update a department_member row. Upserts on (department_id, staff_id). */
+export async function upsertDepartmentMember(
+  departmentId: string,
+  staffId: string,
+  role: DeptRole
+): Promise<void> {
+  const { error } = await supabase
+    .from("department_members")
+    .upsert({ department_id: departmentId, staff_id: staffId, role }, { onConflict: "department_id,staff_id" });
+  if (error) throw error;
+}
 
-  const { data: plans, isLoading: plansLoading } = useQuery({
-    queryKey: ["all-plans-website"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subscription_plans").select("*").order("sort_order");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+/** Remove a member from a department */
+export async function removeDepartmentMember(memberId: string): Promise<void> {
+  const { error } = await supabase.from("department_members").delete().eq("id", memberId);
+  if (error) throw error;
+}
 
-  const { data: modules, isLoading: modulesLoading } = useQuery({
-    queryKey: ["module-addon-pricing"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).from("module_addon_pricing").select("*").order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-
-  // Which modules are free-included on which plan -- the single source of
-  // truth shared with the public pricing page (public-plans / public-module-pricing
-  // queries in routes/index.tsx). Keyed as "planId:featureKey".
-  const { data: inclusionRows, isLoading: inclusionLoading } = useQuery({
-    queryKey: ["plan-module-inclusion"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).from("plan_module_inclusion").select("*");
-      if (error) throw error;
-      return (data ?? []) as any[];
-    },
-  });
-  const inclusionMap = new Map(
-    (inclusionRows ?? []).map((r: any) => [r.plan_id + ":" + r.feature_key, Boolean(r.included)])
-  );
-  const isPlanModuleIncluded = (planId: string, featureKey: string) =>
-    inclusionMap.get(planId + ":" + featureKey) ?? false;
-
-  const updatePlan = useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
-      const { error } = await supabase.from("subscription_plans").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Plan updated"); qc.invalidateQueries({ queryKey: ["all-plans-website"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const updateModule = useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
-      const { error } = await (supabase as any).from("module_addon_pricing").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  // Add a brand-new module row. feature_key should match the key used by
-  // FeatureGate/school_features in the app when this is a real gated module,
-  // so plan inclusion here matches what actually unlocks for schools. For a
-  // marketing-only line item (nothing to gate), any unique slug works.
-  const addModule = useMutation({
-    mutationFn: async () => {
-      const nextSort = Math.max(0, ...(modules ?? []).map((m: any) => m.sort_order ?? 0)) + 1;
-      const featureKey = `new_module_${Date.now().toString(36)}`;
-      const { error } = await (supabase as any).from("module_addon_pricing").insert({
-        feature_key: featureKey,
-        display_name: "New module",
-        category: "general",
-        monthly_price: 0,
-        sort_order: nextSort,
-        is_active: true,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Module added — edit its name, category and key below"); qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deleteModule = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("module_addon_pricing").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Module removed from pricing & website"); qc.invalidateQueries({ queryKey: ["module-addon-pricing"] }); },
-    onError: (e: any) => toast.error(e.message ?? "Delete failed — schools may already be subscribed to this module's add-on"),
-  });
-
-  // Toggling a plan/module cell upserts the join row that both this editor
-  // and the public pricing page read — the two can no longer drift apart.
-  const setPlanModuleIncluded = useMutation({
-    mutationFn: async (vars: { planId: string; featureKey: string; included: boolean }) => {
-      const { error } = await (supabase as any)
-        .from("plan_module_inclusion")
-        .upsert(
-          { plan_id: vars.planId, feature_key: vars.featureKey, included: vars.included },
-          { onConflict: "plan_id,feature_key" }
-        );
-      if (error) throw error;
-    },
-    onMutate: async (vars: { planId: string; featureKey: string; included: boolean }) => {
-      await qc.cancelQueries({ queryKey: ["plan-module-inclusion"] });
-      const previous = qc.getQueryData<any[]>(["plan-module-inclusion"]);
-      qc.setQueryData<any[]>(["plan-module-inclusion"], (old = []) => {
-        const exists = old.some((r) => r.plan_id === vars.planId && r.feature_key === vars.featureKey);
-        if (exists) {
-          return old.map((r) =>
-            r.plan_id === vars.planId && r.feature_key === vars.featureKey ? { ...r, included: vars.included } : r
-          );
-        }
-        return [...old, { plan_id: vars.planId, feature_key: vars.featureKey, included: vars.included }];
-      });
-      return { previous };
-    },
-    onError: (e: any, _vars, ctx) => {
-      toast.error(e.message);
-      if (ctx?.previous) qc.setQueryData(["plan-module-inclusion"], ctx.previous);
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["plan-module-inclusion"] }),
-  });
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Base plans</CardTitle>
-          <CardDescription>
-            The base monthly fee for each plan. Modules already marked "included" below are free within that plan — every other module is billed as an add-on at the per-module price you set.
-            Set prices that cover your actual hosting, SMS and M-Pesa costs before profit — review your real costs before publishing.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {plansLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <div className="grid md:grid-cols-3 gap-4">
-              {(plans ?? []).map((p: any) => (
-                <div key={p.id} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Input className="font-semibold" defaultValue={p.name} onBlur={(e) => e.target.value !== p.name && updatePlan.mutate({ id: p.id, patch: { name: e.target.value } })} />
-                    <Switch checked={p.is_active} onCheckedChange={(v) => updatePlan.mutate({ id: p.id, patch: { is_active: v } })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Base monthly fee (KES)</Label>
-                    <Input type="number" defaultValue={p.monthly_fee} onBlur={(e) => Number(e.target.value) !== Number(p.monthly_fee) && updatePlan.mutate({ id: p.id, patch: { monthly_fee: Number(e.target.value) || 0 } })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Student limit (blank = unlimited)</Label>
-                    <Input type="number" defaultValue={p.student_limit ?? ""} placeholder="Unlimited" onBlur={(e) => updatePlan.mutate({ id: p.id, patch: { student_limit: e.target.value ? Number(e.target.value) : null } })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Badge (e.g. "Most Popular")</Label>
-                    <Input defaultValue={p.badge ?? ""} onBlur={(e) => e.target.value !== (p.badge ?? "") && updatePlan.mutate({ id: p.id, patch: { badge: e.target.value || null } })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Description</Label>
-                    <Textarea defaultValue={p.description ?? ""} onBlur={(e) => e.target.value !== (p.description ?? "") && updatePlan.mutate({ id: p.id, patch: { description: e.target.value } })} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5" /> Module add-on pricing</CardTitle>
-          <CardDescription>
-            Tick which plans already include each module for free, and set the monthly add-on price charged when a school on a plan that doesn't include it wants it anyway.
-            This table has one column per plan above, so it always matches exactly what shows on the public pricing page.
-            Adding a module here only controls pricing and the public website — it does not create the module in the app. The "Module key" should match an existing <code>FeatureGate</code> key (e.g. from Admin → Features) so plan inclusion actually unlocks the right thing for schools; for a marketing-only line with nothing to gate, any unique key works.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {modulesLoading || plansLoading || inclusionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 bg-card min-w-[220px]">Module</TableHead>
-                    {(plans ?? []).map((p: any) => (
-                      <TableHead key={p.id} className="text-center whitespace-nowrap">
-                        {p.name}
-                        {!p.is_active && <span className="block text-[10px] font-normal text-muted-foreground">(inactive)</span>}
-                      </TableHead>
-                    ))}
-                    <TableHead>Add-on price /mo (KES)</TableHead>
-                    <TableHead>Active</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(modules ?? []).map((m: any) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium sticky left-0 bg-card align-top">
-                        <Input
-                          className="font-medium mb-1"
-                          defaultValue={m.display_name}
-                          onBlur={(e) => e.target.value !== m.display_name && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { display_name: e.target.value.trim() } })}
-                        />
-                        <div className="flex items-center gap-2">
-                          <Input
-                            className="text-xs text-muted-foreground h-7"
-                            defaultValue={m.category}
-                            placeholder="Category"
-                            onBlur={(e) => e.target.value !== m.category && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { category: e.target.value.trim() } })}
-                          />
-                          <Input
-                            className="text-xs text-muted-foreground h-7 font-mono"
-                            defaultValue={m.feature_key}
-                            placeholder="module_key"
-                            onBlur={(e) => e.target.value !== m.feature_key && e.target.value.trim() && updateModule.mutate({ id: m.id, patch: { feature_key: e.target.value.trim() } })}
-                          />
-                        </div>
-                      </TableCell>
-                      {(plans ?? []).map((p: any) => (
-                        <TableCell key={p.id} className="text-center">
-                          <Switch
-                            checked={isPlanModuleIncluded(p.id, m.feature_key)}
-                            onCheckedChange={(v) => setPlanModuleIncluded.mutate({ planId: p.id, featureKey: m.feature_key, included: v })}
-                          />
-                        </TableCell>
-                      ))}
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-28"
-                          defaultValue={m.monthly_price}
-                          onBlur={(e) => Number(e.target.value) !== Number(m.monthly_price) && updateModule.mutate({ id: m.id, patch: { monthly_price: Number(e.target.value) || 0 } })}
-                        />
-                      </TableCell>
-                      <TableCell><Switch checked={m.is_active} onCheckedChange={(v) => updateModule.mutate({ id: m.id, patch: { is_active: v } })} /></TableCell>
-                      <TableCell>
-                        <Button
-                          type="button" variant="ghost" size="icon"
-                          className="text-destructive hover:text-destructive"
-                          disabled={deleteModule.isPending}
-                          onClick={() => {
-                            if (confirm(`Remove "${m.display_name}" from pricing and the public website? This does not remove it from the app itself.`)) {
-                              deleteModule.mutate(m.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          <Button type="button" variant="outline" size="sm" className="gap-2" disabled={addModule.isPending} onClick={() => addModule.mutate()}>
-            {addModule.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add module
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+/**
+ * Delete a department entirely. Admin tier only (enforced by RLS
+ * `departments_write` policy — is_member_of(school_id) AND is_admin()).
+ *
+ * Cascades at the DB level:
+ *  - sub_departments, department_members, department_communications,
+ *    department_subjects → ON DELETE CASCADE (wiped with the department)
+ *  - staff.department_id → ON DELETE SET NULL (staff are unassigned, not deleted)
+ */
+export async function deleteDepartment(departmentId: string): Promise<void> {
+  const { error } = await supabase.from("departments").delete().eq("id", departmentId);
+  if (error) throw error;
 }
