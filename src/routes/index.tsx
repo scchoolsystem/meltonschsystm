@@ -1474,7 +1474,10 @@ function MediaCard({ m, index }: { m: MediaItemPublic; index: number }) {
 function MediaPage() {
   const site = useSiteMeta();
   const mediaData = useLandingContent("media_items", { items: [] as MediaItemPublic[] });
-  const items = mediaData.items ?? [];
+  // Drafts and stories still awaiting owner verification never show
+  // publicly — only fully published ones do (items with no status at all
+  // predate this field and count as published).
+  const items = (mediaData.items ?? []).filter((m) => (m.status ?? "published") === "published");
 
   return (
     <div className="py-12">
