@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { cn } from "@/lib/utils";
 import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -857,26 +858,166 @@ type MediaItem = {
   summary: string;
   body: string;
   external_url: string; // optional — link to the original press article / video
+  status: "draft" | "published";
+  // Verification workflow: once published, an edit by anyone other than a
+  // platform owner doesn't touch the live fields above — it's stashed here
+  // and the story is locked until an owner approves or rejects it.
+  locked: boolean;
+  pending: Partial<EditableMediaFields> | null;
+  pending_by: string | null;
+  pending_at: string | null;
 };
+
+// Fields a story editor actually edits (i.e. everything except the
+// workflow/status bookkeeping above) — this is the shape of a `pending` diff.
+type EditableMediaFields = Pick<
+  MediaItem,
+  "title" | "type" | "cover_image_url" | "date" | "summary" | "body" | "external_url"
+>;
+const EDITABLE_FIELDS: (keyof EditableMediaFields)[] = [
+  "title", "type", "cover_image_url", "date", "summary", "body", "external_url",
+];
 
 const MEDIA_BLANK: MediaItem = {
   title: "", type: "update", cover_image_url: null, date: "", summary: "", body: "", external_url: "",
+  status: "draft", locked: false, pending: null, pending_by: null, pending_at: null,
 };
 
 const MEDIA_TYPE_LABELS: Record<MediaItem["type"], string> = {
   update: "Company update", press: "Press mention", video: "Video", photo: "Photo story",
 };
 
+function diffEditableFields(a: MediaItem, b: MediaItem): Partial<EditableMediaFields> {
+  const diff: Partial<EditableMediaFields> = {};
+  for (const f of EDITABLE_FIELDS) {
+    if (a[f] !== b[f]) (diff as any)[f] = b[f];
+  }
+  return diff;
+}
+
 function MediaEditor() {
+  const { roles, session } = useAuth();
+  const isOwner = roles.includes("platform_owner" as any);
   const fallback = { items: [] as MediaItem[] };
   const { data, isLoading, save } = useLandingSection("media_items", fallback);
+  // `saved` mirrors exactly what's on the server — the baseline we diff
+  // local edits against so a non-owner's changes to an already-published
+  // story become a `pending` proposal instead of overwriting live content.
+  const [saved, setSaved] = useState<MediaItem[]>([]);
   const [items, setItems] = useState<MediaItem[]>([]);
-  useEffect(() => { if (!isLoading) setItems((data.items ?? []).map((m: any) => ({ ...MEDIA_BLANK, ...m }))); }, [isLoading, data]);
+  useEffect(() => {
+    if (!isLoading) {
+      // Stories saved before this workflow existed have no `status` field —
+      // they're already live, so treat missing status as "published" (not
+      // the "draft" default used for brand-new slots below), matching how
+      // the public site itself reads them (see fetchMediaItems).
+      const normalized = (data.items ?? []).map((m: any) => ({
+        ...MEDIA_BLANK,
+        ...m,
+        status: m?.status ?? "published",
+      }));
+      setSaved(normalized);
+      setItems(normalized);
+    }
+  }, [isLoading, data]);
 
-  const updateItem = (i: number, patch: Partial<MediaItem>) => {
+  const updateItem = (i: number, patch: Partial<EditableMediaFields>) => {
     const n = [...items];
     n[i] = { ...n[i], ...patch };
     setItems(n);
+  };
+
+  // Builds the array that actually gets persisted, applying the lock rule:
+  // a non-owner editing a published, not-yet-locked story has their edits
+  // captured as `pending` instead of applied directly; the live fields stay
+  // exactly as last published. Owners always save straight through, and
+  // that same "save straight through" applies to a draft story regardless
+  // of who's editing it — the lock only ever engages once something is
+  // actually published.
+  const buildSavePayload = (): MediaItem[] =>
+    items.map((item, i) => {
+      const original = saved[i];
+      if (isOwner || !original || item.status !== "published" || original.locked) {
+        return item;
+      }
+      const diff = diffEditableFields(original, item);
+      if (Object.keys(diff).length === 0) return item;
+      return {
+        ...original,
+        locked: true,
+        pending: diff,
+        pending_by: session?.user?.email ?? "team member",
+        pending_at: new Date().toISOString(),
+      };
+    });
+
+  const handleSave = () => {
+    const payload = buildSavePayload();
+    const becameLocked = payload.some((it, i) => it.locked && !saved[i]?.locked);
+    save.mutate(
+      { items: payload },
+      {
+        onSuccess: () => {
+          if (becameLocked) {
+            // Override the hook's generic "live on the website now" toast —
+            // that's specifically not true for a pending edit.
+            toast.dismiss();
+            toast.success("Saved as a pending edit — a platform owner needs to verify it before it goes live");
+          }
+        },
+      },
+    );
+  };
+
+  // Publishing a draft is never gated — only editing something already
+  // published is. Built off `saved` (not `items`) for every OTHER slot so
+  // that clicking Publish on one new story can't accidentally push through
+  // a non-owner's unsaved, not-yet-reviewed edits sitting in a different,
+  // already-published slot — those still need "Save changes" to go through
+  // the pending-review check above. The target slot itself uses `items` so
+  // whatever the person just typed into this new story is included.
+  const publishItem = (i: number) => {
+    const n = items.map((it, idx) => {
+      if (idx === i) return { ...it, status: "published" as const };
+      // Ignore unsaved edits sitting in any OTHER already-known slot — those
+      // still need to go through "Save changes" (and its pending-review
+      // check) rather than riding along with this publish action. Slots
+      // added this session (beyond `saved`) have nothing to protect, so
+      // just carry them through as-is.
+      return idx < saved.length ? saved[idx] : it;
+    });
+    setItems(n);
+    setSaved(n);
+    save.mutate({ items: n });
+  };
+
+  const approvePending = (i: number) => {
+    const it = items[i];
+    if (!it.pending) return;
+    const n = items.map((x, idx) =>
+      idx === i ? { ...x, ...it.pending, locked: false, pending: null, pending_by: null, pending_at: null } : x,
+    );
+    setItems(n);
+    save.mutate({ items: n });
+  };
+
+  const rejectPending = (i: number) => {
+    const n = items.map((x, idx) =>
+      idx === i ? { ...x, locked: false, pending: null, pending_by: null, pending_at: null } : x,
+    );
+    setItems(n);
+    save.mutate({ items: n });
+  };
+
+  const removeItem = (i: number) => {
+    const it = items[i];
+    if (it.locked && !isOwner) {
+      toast.error("This story has a pending edit awaiting owner review — it can't be removed until that's resolved");
+      return;
+    }
+    const n = items.filter((_, idx) => idx !== i);
+    setItems(n);
+    save.mutate({ items: n });
   };
 
   return (
@@ -887,6 +1028,7 @@ function MediaEditor() {
           Company updates, press mentions, videos and photo stories shown on the public "Media" page.
           Write as long a story as you like in "Full story" — visitors see the title and a short preview, then can click "Read more".
           "External link" is optional — use it for a press article on another site or a YouTube video; leave it blank for a story that lives entirely on this page.
+          {!isOwner && " Once a story is published, editing it here submits a pending change — it only goes live once a platform owner verifies it."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -896,39 +1038,76 @@ function MediaEditor() {
               <p className="text-sm text-muted-foreground">No media items yet. Click "Add story" below to create the first one.</p>
             )}
             <div className="grid sm:grid-cols-2 gap-4">
-              {items.map((m, i) => (
-                <div key={i} className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
-                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove story">
+              {items.map((m, i) => {
+                const fieldsDisabled = m.locked && !isOwner;
+                return (
+                <div key={i} className={cn("rounded-lg border p-4 space-y-3", m.locked && "border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/10")}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
+                      <Badge variant={m.status === "published" ? "default" : "secondary"}>
+                        {m.status === "published" ? "Published" : "Draft"}
+                      </Badge>
+                      {m.locked && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
+                          Pending review{m.pending_by ? ` — ${m.pending_by}` : ""}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => removeItem(i)} title="Remove story">
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
-                  <ImagePicker label="Cover image" value={m.cover_image_url} onChange={(url) => updateItem(i, { cover_image_url: url })} folder="media" />
-                  <div><Label>Title</Label><Input value={m.title} placeholder="e.g. SmartDev featured on Citizen TV" onChange={(e) => updateItem(i, { title: e.target.value })} /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Type</Label>
-                      <select
-                        className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                        value={m.type}
-                        onChange={(e) => updateItem(i, { type: e.target.value as MediaItem["type"] })}
-                      >
-                        {Object.entries(MEDIA_TYPE_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-                      </select>
+
+                  {m.locked && isOwner && m.pending && (
+                    <div className="rounded-md border border-amber-400/60 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                      <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Proposed changes awaiting your verification</p>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {Object.entries(m.pending).map(([k, v]) => (
+                          <li key={k}><span className="font-medium capitalize">{k.replace(/_/g, " ")}:</span> {String(v).slice(0, 120) || "(empty)"}</li>
+                        ))}
+                      </ul>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => approvePending(i)}>Approve &amp; publish</Button>
+                        <Button size="sm" variant="outline" onClick={() => rejectPending(i)}>Reject</Button>
+                      </div>
                     </div>
-                    <div><Label>Date (display text)</Label><Input value={m.date} placeholder="e.g. August 2026" onChange={(e) => updateItem(i, { date: e.target.value })} /></div>
-                  </div>
-                  <div><Label>Short preview</Label><Textarea rows={2} value={m.summary} placeholder="One or two sentences shown on the card before 'Read more'" onChange={(e) => updateItem(i, { summary: e.target.value })} /></div>
-                  <div><Label>Full story (optional)</Label><Textarea rows={5} value={m.body} placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link." onChange={(e) => updateItem(i, { body: e.target.value })} /></div>
-                  <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
+                  )}
+
+                  <fieldset disabled={fieldsDisabled} className={cn("space-y-3", fieldsDisabled && "opacity-60")}>
+                    <ImagePicker label="Cover image" value={m.cover_image_url} onChange={(url) => updateItem(i, { cover_image_url: url })} folder="media" />
+                    <div><Label>Title</Label><Input value={m.title} placeholder="e.g. SmartDev featured on Citizen TV" onChange={(e) => updateItem(i, { title: e.target.value })} /></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Type</Label>
+                        <select
+                          className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                          value={m.type}
+                          onChange={(e) => updateItem(i, { type: e.target.value as MediaItem["type"] })}
+                        >
+                          {Object.entries(MEDIA_TYPE_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                        </select>
+                      </div>
+                      <div><Label>Date (display text)</Label><Input value={m.date} placeholder="e.g. August 2026" onChange={(e) => updateItem(i, { date: e.target.value })} /></div>
+                    </div>
+                    <div><Label>Short preview</Label><Textarea rows={2} value={m.summary} placeholder="One or two sentences shown on the card before 'Read more'" onChange={(e) => updateItem(i, { summary: e.target.value })} /></div>
+                    <div><Label>Full story (optional)</Label><Textarea rows={5} value={m.body} placeholder="The full story — shown when a visitor clicks 'Read more'. Leave blank if the story only lives on the external link." onChange={(e) => updateItem(i, { body: e.target.value })} /></div>
+                    <div><Label>External link (optional)</Label><Input value={m.external_url} placeholder="https://... (press article, YouTube video, etc.)" onChange={(e) => updateItem(i, { external_url: e.target.value })} /></div>
+                  </fieldset>
+
+                  {m.status === "draft" && (
+                    <Button size="sm" variant="outline" onClick={() => publishItem(i)}>Publish</Button>
+                  )}
+                  {fieldsDisabled && (
+                    <p className="text-xs text-muted-foreground">Locked until a platform owner verifies the pending edit above.</p>
+                  )}
                 </div>
-              ))}
+              );})}
             </div>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MEDIA_BLANK }])}>
               <Plus className="w-3.5 h-3.5" /> Add story
             </Button>
-            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
+            <div><Button onClick={handleSave} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
           </>
         )}
       </CardContent>
