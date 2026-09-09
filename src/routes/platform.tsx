@@ -5,7 +5,7 @@ import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu,
+  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/platform")({
 // "section:*" scope — see PLATFORM_SECTIONS in Platform.team.tsx.
 const NAV = [
   { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard, key: "section:dashboard" },
+  { to: "/platform/operations", label: "Operations & Usage", icon: Activity, key: "section:operations" },
   { to: "/platform/schools", label: "Schools", icon: Building2, key: "section:schools" },
   { to: "/platform/invoices", label: "Billing", icon: Receipt, key: "section:invoices" },
   { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "section:support" },
