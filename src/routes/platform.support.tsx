@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,11 @@ import { LifeBuoy } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/platform/support")({
-  component: PlatformSupport,
+  component: () => (
+    <PlatformScopeGuard requirement={{ section: "support" }}>
+      <PlatformSupport />
+    </PlatformScopeGuard>
+  ),
 });
 
 function PlatformSupport() {
