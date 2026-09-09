@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { getDefaultPlatformRoute } from "./platform";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,18 +16,18 @@ export const Route = createFileRoute("/platform/login")({
 
 function PlatformLoginPage() {
   const navigate = useNavigate();
-  const { session, roles, loading, rolesLoaded } = useAuth();
+  const { session, roles, scopes, loading, rolesLoaded } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!loading && session && rolesLoaded) {
-      const isPlatform = roles.includes("platform_owner") || roles.includes("platform_support");
-      if (isPlatform) navigate({ to: "/platform/dashboard" });
-      else navigate({ to: "/platform/dashboard" }); // let dashboard handle auth
+      // Land on whatever this person actually has access to, not a
+      // hardcoded /platform/dashboard they might be restricted out of.
+      navigate({ to: getDefaultPlatformRoute(roles as any, scopes) });
     }
-  }, [session, roles, loading, rolesLoaded, navigate]);
+  }, [session, roles, scopes, loading, rolesLoaded, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,6 +36,10 @@ function PlatformLoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pw });
       if (error) throw error;
       toast.success("Welcome back");
+      // Roles/scopes for the new session haven't loaded into useAuth yet at
+      // this exact instant — the effect above handles the real redirect
+      // once they have. This is just a temporary landing spot so the UI
+      // doesn't sit on the login form.
       navigate({ to: "/platform/dashboard" });
     } catch (err: any) {
       toast.error(err.message ?? "Login failed");
