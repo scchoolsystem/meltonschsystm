@@ -3,6 +3,14 @@
 
   <url><loc>https://smartdev.co.ke/</loc></url>
 
+  <url><loc>https://smartdev.co.ke/story</loc></url>
+  <url><loc>https://smartdev.co.ke/media</loc></url>
+  <url><loc>https://smartdev.co.ke/pricing</loc></url>
+  <url><loc>https://smartdev.co.ke/contact</loc></url>
+  <url><loc>https://smartdev.co.ke/modules</loc></url>
+  <url><loc>https://smartdev.co.ke/download</loc></url>
+  <url><loc>https://smartdev.co.ke/merch</loc></url>
+
   <url><loc>https://smartdev.co.ke/academics/class-ranking</loc></url>
   <url><loc>https://smartdev.co.ke/academics/class-ranking/bulk</loc></url>
   <url><loc>https://smartdev.co.ke/academics/exams</loc></url>
@@ -112,7 +120,8 @@
   <url><loc>https://smartdev.co.ke/lovable/email/transactional/preview</loc></url>
   <url><loc>https://smartdev.co.ke/lovable/email/transactional/send</loc></url>
 
-  <url><loc>https://smartdev.co.ke/media/$slug</loc></url>
+  <!-- MEDIA_STORIES_START: regenerate with `node scripts/generate-sitemap.mjs` -->
+  <!-- MEDIA_STORIES_END -->
 
   <url><loc>https://smartdev.co.ke/platform</loc></url>
   <url><loc>https://smartdev.co.ke/platform/dashboard</loc></url>
