@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import {
   Globe, Image as ImageIcon, Users, Clock, Mail, Layers, Plus, Trash2,
-  Upload, Loader2, Save, GripVertical, ShoppingBag,
+  Upload, Loader2, Save, GripVertical, ShoppingBag, Handshake,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/website")({
@@ -147,6 +147,7 @@ function WebsiteEditor() {
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
           <TabsTrigger value="gallery">Photo Gallery</TabsTrigger>
           <TabsTrigger value="merch">Merch</TabsTrigger>
+          <TabsTrigger value="partners">Partners</TabsTrigger>
           <TabsTrigger value="pricing">Pricing &amp; Modules</TabsTrigger>
         </TabsList>
 
@@ -157,6 +158,7 @@ function WebsiteEditor() {
         <TabsContent value="milestones" className="mt-4"><MilestonesEditor /></TabsContent>
         <TabsContent value="gallery" className="mt-4"><GalleryEditor /></TabsContent>
         <TabsContent value="merch" className="mt-4"><MerchEditor /></TabsContent>
+        <TabsContent value="partners" className="mt-4"><PartnersEditor /></TabsContent>
         <TabsContent value="pricing" className="mt-4"><PricingEditor /></TabsContent>
       </Tabs>
     </div>
@@ -604,6 +606,71 @@ function MerchEditor() {
             </div>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...MERCH_BLANK }])}>
               <Plus className="w-3.5 h-3.5" /> Add product
+            </Button>
+            <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Partners — logo strip shown on the public site. Each logo links out to
+// the partner's own website when clicked.
+// ---------------------------------------------------------------------------
+
+type PartnerItem = {
+  name: string;
+  logo_url: string | null;
+  website_url: string;
+};
+
+const PARTNER_BLANK: PartnerItem = { name: "", logo_url: null, website_url: "" };
+
+function PartnersEditor() {
+  const fallback = { items: [] as PartnerItem[] };
+  const { data, isLoading, save } = useLandingSection("partners", fallback);
+  const [items, setItems] = useState<PartnerItem[]>([]);
+  useEffect(() => { if (!isLoading) setItems(data.items ?? []); }, [isLoading, data]);
+
+  const updateItem = (i: number, patch: Partial<PartnerItem>) => {
+    const n = [...items];
+    n[i] = { ...n[i], ...patch };
+    setItems(n);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Handshake className="w-5 h-5" /> Partners</CardTitle>
+        <CardDescription>
+          Logos shown in the "Our Partners" strip on the public site. Clicking a logo opens that partner's website in a new tab.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+          <>
+            {items.length === 0 && (
+              <p className="text-sm text-muted-foreground">No partners added yet. Click "Add partner" below to create the first one.</p>
+            )}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((p, i) => (
+                <div key={i} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Slot {i + 1}</span>
+                    <Button variant="ghost" size="icon" onClick={() => setItems(items.filter((_, idx) => idx !== i))} title="Remove partner">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <ImagePicker label="Logo" value={p.logo_url} onChange={(url) => updateItem(i, { logo_url: url })} folder="partners" />
+                  <div><Label>Partner name</Label><Input value={p.name} placeholder="e.g. Stawear" onChange={(e) => updateItem(i, { name: e.target.value })} /></div>
+                  <div><Label>Website link</Label><Input value={p.website_url} placeholder="https://partner-site.com" onChange={(e) => updateItem(i, { website_url: e.target.value })} /></div>
+                </div>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setItems([...items, { ...PARTNER_BLANK }])}>
+              <Plus className="w-3.5 h-3.5" /> Add partner
             </Button>
             <div><Button onClick={() => save.mutate({ items })} disabled={save.isPending} className="gap-2"><Save className="w-4 h-4" /> Save changes</Button></div>
           </>
