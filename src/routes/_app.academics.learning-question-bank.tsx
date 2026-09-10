@@ -38,7 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Plus, Loader2, BookOpen, ListChecks, Trash2 } from "lucide-react";
+import { Plus, Loader2, BookOpen, ListChecks, Trash2, Pencil, Eye, EyeOff, Archive } from "lucide-react";
 
 export const Route = createFileRoute("/_app/academics/learning-question-bank")({
   component: () => (
