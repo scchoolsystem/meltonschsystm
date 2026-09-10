@@ -23,9 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   BookOpen, CheckCircle2, XCircle, Sparkles, Target, ArrowLeft,
-  ArrowRight, Loader2, TrendingUp, Globe, School,
+  ArrowRight, Loader2, TrendingUp, Globe, School, FileText, Video, Link2, Library,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AILearningInsight } from "@/components/learning/AILearningInsight";
@@ -69,6 +70,23 @@ type RecommendationRow = {
   priority: number;
 };
 
+type ContentRow = {
+  id: string;
+  content_type: "lesson" | "note" | "video" | "resource";
+  title: string;
+  body: string | null;
+  media_url: string | null;
+  content_scope: "universal" | "school" | "teacher" | "personal";
+  substrand_id: string | null;
+};
+
+const CONTENT_TYPE_ICON: Record<ContentRow["content_type"], JSX.Element> = {
+  lesson: <BookOpen className="w-3.5 h-3.5" />,
+  note: <FileText className="w-3.5 h-3.5" />,
+  video: <Video className="w-3.5 h-3.5" />,
+  resource: <Link2 className="w-3.5 h-3.5" />,
+};
+
 const statusColor: Record<string, string> = {
   strong: "bg-emerald-100 text-emerald-700 border-emerald-200",
   improving: "bg-amber-100 text-amber-700 border-amber-200",
@@ -81,6 +99,8 @@ export function StudentLearningPanel() {
 
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState<QuizRow[]>([]);
+  const [content, setContent] = useState<ContentRow[]>([]);
+  const [openContent, setOpenContent] = useState<ContentRow | null>(null);
   const [mastery, setMastery] = useState<MasteryRow[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendationRow[]>([]);
   // Own student_id — needed only to pass to the AI insight card (RLS scopes
@@ -110,6 +130,20 @@ export function StudentLearningPanel() {
         .limit(30);
       if (quizErr) throw quizErr;
       setQuizzes((quizData ?? []) as QuizRow[]);
+
+      // Same visibility rule as quizzes: RLS scopes this to the student's
+      // own school plus universal content; here we only add the
+      // status='published' filter, exactly like the quiz query above —
+      // draft content authored in learning-content.tsx / Platform.learning
+      // never reaches this list until someone publishes it.
+      const { data: contentData, error: contentErr } = await supabase
+        .from("learning_content")
+        .select("id, content_type, title, body, media_url, content_scope, substrand_id")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (contentErr) throw contentErr;
+      setContent((contentData ?? []) as ContentRow[]);
 
       const { data: masteryData, error: masteryErr } = await supabase
         .from("learning_mastery")
@@ -413,6 +447,42 @@ export function StudentLearningPanel() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Library className="w-4 h-4" /> Lessons, notes & resources
+            </CardTitle>
+            <CardDescription>Revision material from your school and SmartDev's shared library.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {content.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nothing published here yet.</p>
+            )}
+            {content.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => (c.content_type === "video" || c.content_type === "resource") && c.media_url
+                  ? window.open(c.media_url, "_blank", "noreferrer")
+                  : setOpenContent(c)}
+                className="w-full flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40 transition-colors text-left"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-sm flex items-center gap-1.5">
+                    {c.content_scope === "universal" ? (
+                      <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    ) : (
+                      <School className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    )}
+                    {CONTENT_TYPE_ICON[c.content_type]}
+                    <span className="truncate">{c.title}</span>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="text-[10px] shrink-0 capitalize">{c.content_type}</Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
