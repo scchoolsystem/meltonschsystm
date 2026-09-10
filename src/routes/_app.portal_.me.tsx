@@ -71,6 +71,12 @@ function MyWorkspace() {
   const isStudentOnly = hasRole("student") && !hasRole("staff") && !hasRole("teacher");
   const isParentOnly = hasRole("parent") && !hasRole("staff") && !hasRole("teacher");
 
+  // Sidebar links land here as e.g. /portal/me?tab=learning — honor it, same
+  // pattern as portal/student and portal/parent, instead of always
+  // defaulting to "day" and silently dropping the deep link.
+  const { tab: tabFromUrl } = Route.useSearch() as { tab?: string };
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "day");
+
   // Failsafe decoupled entirely from react-query and from withTimeout
   // above: if this component has been sitting on the loading branch for
   // 15s of real wall-clock time no matter *why*, offer an escape hatch.
@@ -447,7 +453,7 @@ function MyWorkspace() {
         <Stat label="Marks entered (10)" value={(data?.recentMarks ?? []).length} icon={ClipboardList} />
       </div>
 
-      <Tabs defaultValue="day">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="day">My day</TabsTrigger>
           <TabsTrigger value="myclasses">My Classes</TabsTrigger>
