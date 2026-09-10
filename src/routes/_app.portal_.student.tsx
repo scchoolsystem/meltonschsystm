@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, differenceInDays, subMonths } from "date-fns";
 import { MpesaPayDialog } from "@/components/MpesaPayDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttendanceHeatmap } from "@/components/AttendanceHeatmap";
 import {
   LineChart, Line, BarChart, Bar, RadarChart, Radar, PolarGrid,
@@ -1048,6 +1049,10 @@ function StudentPortal() {
   const [liveUpcoming, setLiveUpcoming] = useState<any[]>([]);
   const [liveAttendance, setLiveAttendance] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
+  // In-app viewer for the Documents tab — was window.open()'ing signed URLs
+  // into an external tab, which silently fails on the Tauri desktop build
+  // and the Android webview. Holds { url, label } for the currently-open doc.
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; label: string } | null>(null);
   const [transport, setTransport] = useState<any | null>(null);
   const [weekMeals, setWeekMeals] = useState<any[]>([]);
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
@@ -3357,8 +3362,8 @@ function StudentPortal() {
                           </div>
                         </div>
                         <Button variant="ghost" size="sm" onClick={async () => {
-                          const { data } = await supabase.storage.from("student-documents").createSignedUrl(d.file_path, 60);
-                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          const { data } = await supabase.storage.from("student-documents").createSignedUrl(d.file_path, 300);
+                          if (data?.signedUrl) setViewingDoc({ url: data.signedUrl, label: labels[d.document_type] ?? d.document_type });
                         }}>
                           <ExternalLink className="w-4 h-4 mr-1" /> Open
                         </Button>
@@ -3371,6 +3376,35 @@ function StudentPortal() {
           </GlassCard>
         </TabsContent>
       </Tabs>
+
+      {/* In-app document viewer for the Documents tab (see viewingDoc above) */}
+      <Dialog open={!!viewingDoc} onOpenChange={(v) => !v && setViewingDoc(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          {viewingDoc && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{viewingDoc.label}</DialogTitle>
+              </DialogHeader>
+              <iframe
+                src={viewingDoc.url}
+                title={viewingDoc.label}
+                className="w-full h-[70vh] rounded-lg border bg-muted"
+              />
+              {/* Fallback only, not the default action — some file types/hosts
+                  don't render in an iframe (e.g. certain PDFs on some
+                  mobile webviews). */}
+              <a
+                href={viewingDoc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <ExternalLink className="w-3 h-3" /> Not loading? Open in browser instead
+              </a>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
