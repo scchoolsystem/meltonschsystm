@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TeacherLearningAnalyticsPanel } from "@/components/learning/TeacherLearningAnalyticsPanel";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -450,6 +451,7 @@ function MyWorkspace() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="day">My day</TabsTrigger>
           <TabsTrigger value="myclasses">My Classes</TabsTrigger>
+          <TabsTrigger value="learning">Learning Analytics</TabsTrigger>
           <TabsTrigger value="timetable">My Timetable</TabsTrigger>
           <TabsTrigger value="classes">Classes & subjects</TabsTrigger>
           <TabsTrigger value="pending">Pending Marks</TabsTrigger>
@@ -492,6 +494,12 @@ function MyWorkspace() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="learning">
+          <TeacherLearningAnalyticsPanel
+            classes={(data?.myClasses ?? []).map((c: any) => ({ id: c.id, name: c.name }))}
+          />
         </TabsContent>
 
         <TabsContent value="timetable">
