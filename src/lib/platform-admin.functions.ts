@@ -585,3 +585,120 @@ export const platformSetAnnouncement = createServerFn({ method: "POST" })
 
     return { success: true };
   });
+
+// ────────────────────────────────────────────────────────────────────────
+// SmartDev Learning — AI question generation (platform admin only)
+//
+// Read-only w.r.t. official records, same as ai-learning-insight.ts: this
+// never touches exam_results/exams, and it never writes to the DB at all —
+// it only returns a batch of DRAFT question candidates for the admin to
+// review, edit, and explicitly save via the existing "add question" flow
+// in Platform.learning.tsx (which itself always inserts as content_scope
+// "universal" / status "draft" unless the admin ticks "publish now"). The
+// AI never publishes anything and never creates a quiz directly.
+//
+// Requires the same ANTHROPIC_API_KEY Cloudflare Worker secret as
+// ai-learning-insight.ts / ai-remark.ts.
+const AI_QUESTION_MODEL = "claude-sonnet-5";
+
+const GeneratedQuestionSchema = z.object({
+  question_type: z.enum(["mcq", "true_false", "short_answer"]),
+  question_text: z.string(),
+  options: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
+  correct_option: z.string().optional(),      // mcq: id from options
+  correct_bool: z.boolean().optional(),       // true_false
+  correct_text: z.string().optional(),        // short_answer
+  explanation: z.string().optional(),
+  marks: z.number().int().min(1).max(10).optional(),
+});
+
+export const platformGenerateLearningQuestions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      topic: z.string().trim().min(1),
+      subject: z.string().trim().optional(),
+      grade_level: z.string().trim().optional(),
+      difficulty: z.enum(["easy", "medium", "hard", "mixed"]).default("mixed"),
+      count: z.number().int().min(1).max(20).default(5),
+      question_types: z
+        .array(z.enum(["mcq", "true_false", "short_answer"]))
+        .min(1)
+        .default(["mcq"]),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await requireCaller(context.supabase, context.userId);
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error("AI question generation isn't configured yet — add the ANTHROPIC_API_KEY Cloudflare Worker secret.");
+    }
+
+    const prompt = `You are drafting exam-revision practice questions for a Kenyan school's SmartDev Learning
+question bank. These are practice/revision questions only — never official exam questions.
+
+Topic: ${data.topic}
+${data.subject ? `Subject: ${data.subject}\n` : ""}${data.grade_level ? `Grade / level: ${data.grade_level}\n` : ""}Difficulty: ${data.difficulty}
+Allowed question types: ${data.question_types.join(", ")}
+Generate exactly ${data.count} question(s), spread across the allowed types.
+
+For "mcq": provide 4 options with short ids "a","b","c","d" and set correct_option to the id of the right one.
+For "true_false": set correct_bool.
+For "short_answer": set correct_text to the accepted answer (a short exact phrase, graded case-insensitively).
+Every question needs a one-sentence explanation shown to the student after they answer, and a marks value (1-3,
+higher only for harder questions).
+
+Respond with ONLY raw JSON, no markdown fences, no preamble, in exactly this shape:
+{"questions": [
+  {"question_type": "mcq", "question_text": "...", "options": [{"id":"a","text":"..."},...], "correct_option": "a", "explanation": "...", "marks": 1},
+  {"question_type": "true_false", "question_text": "...", "correct_bool": true, "explanation": "...", "marks": 1},
+  {"question_type": "short_answer", "question_text": "...", "correct_text": "...", "explanation": "...", "marks": 1}
+]}`;
+
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: AI_QUESTION_MODEL,
+        max_tokens: 4000,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text().catch(() => "");
+      console.error("[platformGenerateLearningQuestions] Anthropic API error:", anthropicRes.status, errText);
+      let reason = "";
+      try { reason = JSON.parse(errText)?.error?.message ?? ""; } catch { reason = errText.slice(0, 300); }
+      throw new Error(reason ? `AI generation failed: ${reason}` : `AI generation failed (${anthropicRes.status})`);
+    }
+
+    const resData: any = await anthropicRes.json();
+    const text = (resData.content ?? []).find((b: any) => b.type === "text")?.text?.trim() ?? "";
+    const clean = text.replace(/^```json\s*|```$/g, "").trim();
+
+    let parsed: { questions?: unknown[] };
+    try {
+      parsed = JSON.parse(clean);
+    } catch {
+      throw new Error("AI returned an unexpected format — try again or reduce the question count.");
+    }
+
+    const candidates = (parsed.questions ?? [])
+      .map((q) => {
+        const result = GeneratedQuestionSchema.safeParse(q);
+        return result.success ? result.data : null;
+      })
+      .filter((q): q is z.infer<typeof GeneratedQuestionSchema> => q !== null);
+
+    if (candidates.length === 0) {
+      throw new Error("AI didn't return any usable questions — try a more specific topic.");
+    }
+
+    return { questions: candidates };
+  });
