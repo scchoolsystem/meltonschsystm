@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
+import { ParentLearningPanel } from "@/components/learning/ParentLearningPanel";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
@@ -62,6 +63,7 @@ function gradeLabel(score: number): { grade: string; color: string } {
 
 const PARENT_TABS: PortalTabConfig[] = [
   { value: "dashboard",    icon: <LayoutDashboard className="w-3.5 h-3.5" />, label: "Dashboard" },
+  { value: "learning",     icon: <BookOpen className="w-3.5 h-3.5" />,        label: "Learning Progress" },
   { value: "results",      icon: <Trophy className="w-3.5 h-3.5" />,          label: "Results" },
   { value: "reportcards",  icon: <ClipboardList className="w-3.5 h-3.5" />,   label: "Report Cards" },
   { value: "attendance",   icon: <CheckCircle className="w-3.5 h-3.5" />,     label: "Attendance" },
@@ -655,6 +657,10 @@ function ParentPortal() {
         </PortalTabContent>
 
         {/* ══ RESULTS ══════════════════════════════════════════════════════ */}
+        <PortalTabContent value="learning">
+          <ParentLearningPanel studentId={activeId} />
+        </PortalTabContent>
+
         <PortalTabContent value="results">
           <div className="space-y-4">
             {/* Per-subject bar chart */}
