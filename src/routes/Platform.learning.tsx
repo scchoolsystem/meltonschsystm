@@ -40,8 +40,10 @@
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { platformGenerateLearningQuestions } from "@/lib/platform-admin.functions";
 import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,7 +59,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Plus, Loader2, Trash2, ChevronRight, BookOpen, GraduationCap, FileText,
-  Video, Link2, Eye, EyeOff, Archive, ClipboardCheck, ListChecks,
+  Video, Link2, Eye, EyeOff, Archive, ClipboardCheck, ListChecks, Sparkles,
 } from "lucide-react";
 
 export const Route = createFileRoute("/platform/learning")({
@@ -669,6 +671,218 @@ function ContentManager() {
 // ────────────────────────────────────────────────────────────────────────
 const BLANK_OPTIONS = [{ id: "a", text: "" }, { id: "b", text: "" }];
 
+// ────────────────────────────────────────────────────────────────────────
+// AI question generator — drafts a batch of questions from a topic, admin
+// reviews/edits/deselects before anything is saved. Saved rows go through
+// the exact same insert path as the manual "Add question" form (draft by
+// default, content_scope "universal"), so the existing Approvals/publish
+// workflow is unchanged — this only makes filling the bank faster.
+// ────────────────────────────────────────────────────────────────────────
+type GeneratedQuestion = {
+  question_type: QuestionType;
+  question_text: string;
+  options?: { id: string; text: string }[];
+  correct_option?: string;
+  correct_bool?: boolean;
+  correct_text?: string;
+  explanation?: string;
+  marks?: number;
+};
+type GeneratedRow = GeneratedQuestion & { _selected: boolean };
+
+function AIQuestionGenerator({ substrands, onSaved }: { substrands: Substrand[]; onSaved: () => void }) {
+  const generateFn = useServerFn(platformGenerateLearningQuestions);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    topic: "", subject: "", grade_level: "", difficulty: "mixed" as "easy" | "medium" | "hard" | "mixed",
+    count: 5, question_types: ["mcq"] as QuestionType[], substrand_id: "none", publishNow: false,
+  });
+  const [generated, setGenerated] = useState<GeneratedRow[] | null>(null);
+
+  const toggleType = (t: QuestionType) =>
+    setForm((f) => ({
+      ...f,
+      question_types: f.question_types.includes(t) ? f.question_types.filter((x) => x !== t) : [...f.question_types, t],
+    }));
+
+  const generate = useMutation({
+    mutationFn: async () =>
+      generateFn({
+        data: {
+          topic: form.topic.trim(),
+          subject: form.subject.trim() || undefined,
+          grade_level: form.grade_level.trim() || undefined,
+          difficulty: form.difficulty,
+          count: form.count,
+          question_types: form.question_types.length ? form.question_types : ["mcq"],
+        },
+      }),
+    onSuccess: (res) => setGenerated((res.questions as GeneratedQuestion[]).map((q) => ({ ...q, _selected: true }))),
+    onError: (e: any) => toast.error(e.message || "AI generation failed"),
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const selected = (generated ?? []).filter((q) => q._selected);
+      const substrand_id = form.substrand_id === "none" ? null : form.substrand_id;
+      const status = form.publishNow ? "published" : "draft";
+      for (const q of selected) {
+        const { data: inserted, error } = await supabase
+          .from("learning_questions")
+          .insert([{
+            content_scope: "universal", school_id: null, substrand_id,
+            topic: form.topic.trim() || null, question_type: q.question_type,
+            question_text: q.question_text, options: q.options ?? null,
+            marks: q.marks ?? 1, status,
+          }])
+          .select("id").single();
+        if (error) throw error;
+
+        const correct_answer =
+          q.question_type === "mcq" ? { option: q.correct_option ?? "a" }
+          : q.question_type === "true_false" ? { value: !!q.correct_bool }
+          : { text: (q.correct_text ?? "").trim().toLowerCase() };
+
+        const { error: answerErr } = await supabase.from("learning_question_answers").insert([{
+          question_id: inserted.id, correct_answer, explanation: q.explanation ?? null,
+        }]);
+        if (answerErr) throw answerErr;
+      }
+      return selected.length;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} question${count === 1 ? "" : "s"} saved as ${form.publishNow ? "published" : "draft"}`);
+      setOpen(false);
+      setGenerated(null);
+      setForm({ topic: "", subject: "", grade_level: "", difficulty: "mixed", count: 5, question_types: ["mcq"], substrand_id: "none", publishNow: false });
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to save questions"),
+  });
+
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Sparkles className="w-4 h-4 mr-1" /> Generate with AI</Button>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setGenerated(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Generate questions with AI</DialogTitle></DialogHeader>
+
+          {!generated ? (
+            <div className="space-y-3">
+              <div><Label>Topic *</Label><Input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} placeholder="e.g. Photosynthesis" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Subject (optional)</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="e.g. Biology" /></div>
+                <div><Label>Grade / level (optional)</Label><Input value={form.grade_level} onChange={(e) => setForm({ ...form, grade_level: e.target.value })} placeholder="e.g. Grade 7" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Difficulty</Label>
+                  <Select value={form.difficulty} onValueChange={(v) => setForm({ ...form, difficulty: v as any })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="hard">Hard</SelectItem>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>How many (1-20)</Label><Input type="number" min={1} max={20} value={form.count} onChange={(e) => setForm({ ...form, count: Math.max(1, Math.min(20, Number(e.target.value) || 1)) })} /></div>
+              </div>
+              <div>
+                <Label>Question types</Label>
+                <div className="flex gap-4 mt-1">
+                  {(["mcq", "true_false", "short_answer"] as QuestionType[]).map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox checked={form.question_types.includes(t)} onCheckedChange={() => toggleType(t)} />
+                      {QUESTION_TYPE_LABELS[t]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label>Tag with sub-strand (optional — used for mastery-by-topic)</Label>
+                <Select value={form.substrand_id} onValueChange={(v) => setForm({ ...form, substrand_id: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No topic</SelectItem>
+                    {substrands.map((s) => <SelectItem key={s.id} value={s.id}>{substrandLabel(s)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => generate.mutate()}
+                  disabled={!form.topic.trim() || form.question_types.length === 0 || generate.isPending}
+                >
+                  {generate.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Generate
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Review each question below — untick anything you don't want, edit the wording if needed, then save. Nothing is written until you save.
+              </p>
+              <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+                {generated.map((q, i) => (
+                  <div key={i} className="flex gap-2 p-2 border rounded-md">
+                    <Checkbox
+                      className="mt-1"
+                      checked={q._selected}
+                      onCheckedChange={(v) => setGenerated((cur) => cur!.map((row, idx) => idx === i ? { ...row, _selected: !!v } : row))}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px]">{QUESTION_TYPE_LABELS[q.question_type]}</Badge>
+                        <span className="text-xs text-muted-foreground">{q.marks ?? 1} mark{(q.marks ?? 1) === 1 ? "" : "s"}</span>
+                      </div>
+                      <Textarea
+                        value={q.question_text}
+                        rows={2}
+                        className="text-sm"
+                        onChange={(e) => setGenerated((cur) => cur!.map((row, idx) => idx === i ? { ...row, question_text: e.target.value } : row))}
+                      />
+                      {q.question_type === "mcq" && q.options && (
+                        <p className="text-xs text-muted-foreground">
+                          {q.options.map((o) => `${o.id}) ${o.text}`).join("  ·  ")} — correct: {q.correct_option}
+                        </p>
+                      )}
+                      {q.question_type === "true_false" && (
+                        <p className="text-xs text-muted-foreground">Correct: {q.correct_bool ? "True" : "False"}</p>
+                      )}
+                      {q.question_type === "short_answer" && (
+                        <p className="text-xs text-muted-foreground">Accepted answer: {q.correct_text}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox id="ai-publish-now" checked={form.publishNow} onCheckedChange={(v) => setForm({ ...form, publishNow: !!v })} />
+                <Label htmlFor="ai-publish-now" className="text-sm font-normal cursor-pointer">
+                  Publish selected questions immediately (skip draft/review)
+                </Label>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setGenerated(null)}>Back</Button>
+                <Button
+                  onClick={() => save.mutate()}
+                  disabled={generated.filter((q) => q._selected).length === 0 || save.isPending}
+                >
+                  {save.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Save {generated.filter((q) => q._selected).length} question{generated.filter((q) => q._selected).length === 1 ? "" : "s"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function QuestionBank() {
   const qc = useQueryClient();
   const { data: substrands = [] } = useSubstrands();
@@ -767,7 +981,11 @@ function QuestionBank() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <AIQuestionGenerator substrands={substrands} onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["platform-learning-questions"] });
+          qc.invalidateQueries({ queryKey: ["platform-learning-approvals"] });
+        }} />
         <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="w-4 h-4 mr-1" /> Add question</Button>
       </div>
       <Card>
