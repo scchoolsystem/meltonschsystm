@@ -119,6 +119,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   student: [
     { group: "My School", items: [
       { title: "My Portal", url: "/portal" },
+      { title: "Learning", url: "/portal/student?tab=learning" },
       { title: "Performance", url: "/portal/student?tab=analytics" },
       { title: "Results", url: "/portal/student?tab=results" },
       { title: "Report Cards", url: "/portal/student?tab=reportcards" },
@@ -135,6 +136,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
   parent: [
     { group: "Parent Portal", items: [
       { title: "My Portal", url: "/portal" },
+      { title: "Learning Progress", url: "/portal/parent?tab=learning" },
       { title: "Child Performance", url: "/portal/parent" },
       { title: "Attendance", url: "/portal/parent?tab=attendance" },
       { title: "Fees", url: "/finance/invoices" },
@@ -163,6 +165,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Remark Templates", url: "/academics/remarks" },
       { title: "Learning: Content", url: "/academics/learning-content" },
       { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
+      { title: "Learning Analytics", url: "/portal/me?tab=learning" },
       { title: "Payslips", url: "/staff/payslips" },
     ]},
   ],
@@ -180,6 +183,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Remark Templates", url: "/academics/remarks" },
       { title: "Learning: Content", url: "/academics/learning-content" },
       { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
+      { title: "Learning Analytics", url: "/portal/me?tab=learning" },
       { title: "My Timetable", url: "/portal/me?tab=timetable" },
       { title: "Today's Lessons", url: "/timetable/today" },
       { title: "Classroom", url: "/classroom" },
@@ -202,6 +206,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Learning: Curriculum", url: "/academics/learning-curriculum" },
       { title: "Learning: Content", url: "/academics/learning-content" },
       { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
+      { title: "Learning Analytics", url: "/portal/me?tab=learning" },
       { title: "Analytics", url: "/analytics" },
       { title: "Announcements", url: "/announcements" },
       { title: "Today's Lessons", url: "/timetable/today" },
