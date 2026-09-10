@@ -28,6 +28,7 @@ import {
   ArrowRight, Loader2, TrendingUp, Globe, School,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AILearningInsight } from "@/components/learning/AILearningInsight";
 
 // ─── Types (mirrors the learning_* schema; kept local — no generated types
 // exist yet for these tables) ───────────────────────────────────────────
@@ -82,6 +83,10 @@ export function StudentLearningPanel() {
   const [quizzes, setQuizzes] = useState<QuizRow[]>([]);
   const [mastery, setMastery] = useState<MasteryRow[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendationRow[]>([]);
+  // Own student_id — needed only to pass to the AI insight card (RLS scopes
+  // every other query above implicitly, but learning_ai_context() takes an
+  // explicit _student_id argument).
+  const [ownStudentId, setOwnStudentId] = useState<string | null>(null);
 
   // active quiz-taking state
   const [activeQuiz, setActiveQuiz] = useState<QuizRow | null>(null);
@@ -132,6 +137,13 @@ export function StudentLearningPanel() {
   useEffect(() => {
     if (user) loadDashboard();
   }, [user, loadDashboard]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc("current_student_id").then(({ data, error }) => {
+      if (!error && data) setOwnStudentId(data as string);
+    });
+  }, [user]);
 
   const startQuiz = async (quiz: QuizRow) => {
     try {
@@ -381,6 +393,8 @@ export function StudentLearningPanel() {
 
   return (
     <div className="space-y-6">
+      <AILearningInsight studentId={ownStudentId} />
+
       {recommendations.length > 0 && (
         <Card className="border-violet-200 bg-violet-50/40">
           <CardHeader>
