@@ -1179,7 +1179,12 @@ function StudentPortal() {
     const { data: tr } = await withTimeout(
       (supabase as any)
         .from("transport_assignments")
-        .select("*, pickup_point, transport_routes(name, dropoff_point, driver_name, driver_phone, vehicle_reg, pickup_point)")
+        // transport_routes has no dropoff_point/pickup_point columns — pickup_point
+        // lives on transport_assignments itself (already covered by "*"), and
+        // there is currently no dropoff_point column anywhere in the schema.
+        // Selecting either as a nested transport_routes field caused a 400 from
+        // PostgREST ("column transport_routes.dropoff_point does not exist").
+        .select("*, transport_routes(name, driver_name, driver_phone, vehicle_reg)")
         .eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(),
       8000, EMPTY_SINGLE, "transport",
     );
@@ -1191,7 +1196,11 @@ function StudentPortal() {
     const { data: meals } = await withTimeout(
       supabase.from("meal_plans").select("*")
         .gte("meal_date", weekStart).lte("meal_date", weekEnd)
-        .order("meal_date", { ascending: true }).order("meal_type", { ascending: true }),
+        // meal_plans' real column is "meal" (see 20260516192421 migration —
+        // the later migration that tried to add "meal_type" instead was a
+        // no-op CREATE TABLE IF NOT EXISTS since the table already existed).
+        // Ordering/filtering by "meal_type" caused a 400 from PostgREST.
+        .order("meal_date", { ascending: true }).order("meal", { ascending: true }),
       8000, EMPTY, "weekMeals",
     );
     setWeekMeals(meals ?? []);
@@ -1261,7 +1270,7 @@ function StudentPortal() {
   const nextSlot = useMemo(() => todaySlots.find((s) => toMin(s.end_time) > nowMin) ?? null, [todaySlots, nowMin]);
   const currentSlot = useMemo(() => todaySlots.find((s) => toMin(s.start_time) <= nowMin && toMin(s.end_time) > nowMin) ?? null, [todaySlots, nowMin]);
   const todayMeals = useMemo(() => weekMeals.filter((m) => m.meal_date === todayStr), [weekMeals, todayStr]);
-  const mealFor = (type: string) => todayMeals.find((m) => m.meal_type === type);
+  const mealFor = (type: string) => todayMeals.find((m) => m.meal === type);
 
   const reportCardExams = useMemo(() => {
     const map = new Map<string, any>();
@@ -3047,7 +3056,7 @@ function StudentPortal() {
                       <div className="grid grid-cols-3 gap-2">
                         {weekMeals.filter((m) => m.meal_date === date).map((m) => (
                           <div key={m.id} className="border rounded-xl p-3 text-sm">
-                            <div className="text-xs text-muted-foreground capitalize font-medium">{m.meal_type}</div>
+                            <div className="text-xs text-muted-foreground capitalize font-medium">{m.meal}</div>
                             <div className="mt-1">{m.menu}</div>
                           </div>
                         ))}
@@ -3276,8 +3285,8 @@ function StudentPortal() {
                   <div className="flex items-center gap-2 text-base font-semibold"><Bus className="w-5 h-5 text-primary" />{transport.transport_routes?.name ?? "Route"}</div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Pickup", value: transport.pickup_point ?? transport.transport_routes?.pickup_point ?? "—" },
-                      { label: "Drop-off", value: transport.transport_routes?.dropoff_point ?? "—" },
+                      { label: "Pickup", value: transport.pickup_point ?? "—" },
+                      { label: "Drop-off", value: "—" }, // no dropoff_point column exists yet — see migration note above
                       { label: "Vehicle", value: transport.transport_routes?.vehicle_reg ?? "—" },
                       { label: "Driver", value: transport.transport_routes?.driver_name ?? "—", sub: transport.transport_routes?.driver_phone },
                     ].map((item, i) => (
