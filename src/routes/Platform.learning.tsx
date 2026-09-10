@@ -689,11 +689,11 @@ function QuestionBank() {
   const [addOpen, setAddOpen] = useState(false);
   const [qForm, setQForm] = useState({
     question_type: "mcq" as QuestionType, question_text: "", topic: "", substrand_id: "none", marks: 1,
-    options: BLANK_OPTIONS, correct: "a", correctBool: "true", correctText: "", explanation: "",
+    options: BLANK_OPTIONS, correct: "a", correctBool: "true", correctText: "", explanation: "", publishNow: false,
   });
   const resetQForm = () => setQForm({
     question_type: "mcq", question_text: "", topic: "", substrand_id: "none", marks: 1,
-    options: BLANK_OPTIONS, correct: "a", correctBool: "true", correctText: "", explanation: "",
+    options: BLANK_OPTIONS, correct: "a", correctBool: "true", correctText: "", explanation: "", publishNow: false,
   });
 
   const addQuestion = useMutation({
@@ -710,7 +710,7 @@ function QuestionBank() {
           question_text: qForm.question_text.trim(),
           options,
           marks: qForm.marks,
-          status: "draft",
+          status: qForm.publishNow ? "published" : "draft",
         }])
         .select("id").single();
       if (error) throw error;
@@ -726,7 +726,13 @@ function QuestionBank() {
       if (answerErr) throw answerErr;
     },
     onSuccess: () => {
-      toast.success("Question added as draft");
+      if (qForm.publishNow) {
+        toast.success("Question added and published");
+      } else {
+        toast.success("Question added as draft", {
+          description: "It won't reach schools yet — publish it here or from Approvals, then add it to a published quiz.",
+        });
+      }
       setAddOpen(false);
       resetQForm();
       qc.invalidateQueries({ queryKey: ["platform-learning-questions"] });
@@ -866,6 +872,12 @@ function QuestionBank() {
             )}
             <div><Label>Explanation (shown after answering)</Label><Textarea value={qForm.explanation} onChange={(e) => setQForm({ ...qForm, explanation: e.target.value })} /></div>
             <div className="w-24"><Label>Marks</Label><Input type="number" min={1} value={qForm.marks} onChange={(e) => setQForm({ ...qForm, marks: Number(e.target.value) || 1 })} /></div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="q-publish-now" checked={qForm.publishNow} onCheckedChange={(v) => setQForm({ ...qForm, publishNow: !!v })} />
+              <Label htmlFor="q-publish-now" className="text-sm font-normal cursor-pointer">
+                Publish immediately (skip the draft/review step)
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -875,7 +887,7 @@ function QuestionBank() {
               (qForm.question_type === "short_answer" && !qForm.correctText.trim()) ||
               addQuestion.isPending
             }>
-              {addQuestion.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Save as draft
+              {addQuestion.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} {qForm.publishNow ? "Save & publish" : "Save as draft"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -909,7 +921,7 @@ function Quizzes() {
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [quizForm, setQuizForm] = useState({ title: "", topic: "", mode: "practice", time_limit: "", max_attempts: "" });
+  const [quizForm, setQuizForm] = useState({ title: "", topic: "", mode: "practice", time_limit: "", max_attempts: "", publishNow: false });
   const [quizQuestionIds, setQuizQuestionIds] = useState<Set<string>>(new Set());
 
   const addQuiz = useMutation({
@@ -924,7 +936,7 @@ function Quizzes() {
           mode: quizForm.mode,
           time_limit_seconds: quizForm.time_limit ? Number(quizForm.time_limit) * 60 : null,
           max_attempts: quizForm.max_attempts ? Number(quizForm.max_attempts) : null,
-          status: "draft",
+          status: quizForm.publishNow ? "published" : "draft",
         }])
         .select("id").single();
       if (error) throw error;
@@ -935,9 +947,15 @@ function Quizzes() {
       }
     },
     onSuccess: () => {
-      toast.success("Quiz created as draft");
+      if (quizForm.publishNow) {
+        toast.success("Quiz created and published — students can see it now");
+      } else {
+        toast.success("Quiz created as draft", {
+          description: "Publish it here (the eye icon) or from Approvals before students can take it.",
+        });
+      }
       setAddOpen(false);
-      setQuizForm({ title: "", topic: "", mode: "practice", time_limit: "", max_attempts: "" });
+      setQuizForm({ title: "", topic: "", mode: "practice", time_limit: "", max_attempts: "", publishNow: false });
       setQuizQuestionIds(new Set());
       qc.invalidateQueries({ queryKey: ["platform-learning-quizzes"] });
       qc.invalidateQueries({ queryKey: ["platform-learning-approvals"] });
@@ -1040,11 +1058,22 @@ function Quizzes() {
                 ))}
               </div>
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="quiz-publish-now" checked={quizForm.publishNow} onCheckedChange={(v) => setQuizForm({ ...quizForm, publishNow: !!v })} />
+              <Label htmlFor="quiz-publish-now" className="text-sm font-normal cursor-pointer">
+                Publish immediately (skip the draft/review step)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Adding a question here does not publish it on its own — a quiz only reaches students once the
+              <span className="font-medium"> quiz itself</span> is published. Individual questions can stay in
+              draft; they're still usable inside a published quiz.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button onClick={() => addQuiz.mutate()} disabled={!quizForm.title.trim() || addQuiz.isPending}>
-              {addQuiz.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Create quiz
+              {addQuiz.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} {quizForm.publishNow ? "Create & publish" : "Create quiz"}
             </Button>
           </DialogFooter>
         </DialogContent>
