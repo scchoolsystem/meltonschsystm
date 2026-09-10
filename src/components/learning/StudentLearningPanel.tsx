@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   BookOpen, CheckCircle2, XCircle, Sparkles, Target, ArrowLeft,
   ArrowRight, Loader2, TrendingUp, Globe, School, FileText, Video, Link2, Library,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AILearningInsight } from "@/components/learning/AILearningInsight";
@@ -461,9 +462,12 @@ export function StudentLearningPanel() {
             {content.map((c) => (
               <button
                 key={c.id}
-                onClick={() => (c.content_type === "video" || c.content_type === "resource") && c.media_url
-                  ? window.open(c.media_url, "_blank", "noreferrer")
-                  : setOpenContent(c)}
+                // Everything opens in-app now — video/resource links used to
+                // window.open() into an external tab, which also just fails
+                // silently on the Tauri desktop build and the Android
+                // webview. Every content_type now routes through the same
+                // in-app viewer dialog below instead.
+                onClick={() => setOpenContent(c)}
                 className="w-full flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40 transition-colors text-left"
               >
                 <div className="min-w-0">
@@ -547,6 +551,53 @@ export function StudentLearningPanel() {
           </CardContent>
         </Card>
       </div>
+
+      {/* In-app content viewer. Previously `openContent` was set on click but
+          never actually rendered anywhere — lessons/notes were a dead click,
+          and videos/resources window.open()'d out of the app entirely. This
+          dialog now handles all four content_types without ever leaving the
+          app: lesson/note render their stored body text directly; video/
+          resource embed media_url in an iframe so it plays/loads inline. */}
+      <Dialog open={!!openContent} onOpenChange={(v) => !v && setOpenContent(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {openContent && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {CONTENT_TYPE_ICON[openContent.content_type]} {openContent.title}
+                </DialogTitle>
+              </DialogHeader>
+
+              {openContent.body && (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{openContent.body}</p>
+              )}
+
+              {openContent.media_url && (openContent.content_type === "video" || openContent.content_type === "resource") && (
+                <div className="space-y-2">
+                  <iframe
+                    src={openContent.media_url}
+                    title={openContent.title}
+                    className="w-full aspect-video rounded-lg border bg-muted"
+                    allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                  />
+                  {/* Fallback only — some hosts block embedding via
+                      X-Frame-Options/CSP, so this stays available but is
+                      never the default action anymore. */}
+                  <a
+                    href={openContent.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Not loading? Open in browser instead
+                  </a>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
