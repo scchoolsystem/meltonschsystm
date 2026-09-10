@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {
   BookOpen, CheckCircle2, XCircle, Sparkles, Target, ArrowLeft,
   ArrowRight, Loader2, TrendingUp, Globe, School,
@@ -87,7 +88,8 @@ export function StudentLearningPanel() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuizQuestionRow[]>([]);
   const [qIndex, setQIndex] = useState(0);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null); // mcq option id, or "true"/"false"
+  const [shortAnswerText, setShortAnswerText] = useState("");
   const [lastResult, setLastResult] = useState<{ correct: boolean; explanation: string | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [finalScore, setFinalScore] = useState<{ score: number; max: number; pct: number } | null>(null);
@@ -150,6 +152,7 @@ export function StudentLearningPanel() {
       setQuestions((qData ?? []) as unknown as QuizQuestionRow[]);
       setQIndex(0);
       setSelected(null);
+      setShortAnswerText("");
       setLastResult(null);
       setFinalScore(null);
     } catch (err: any) {
@@ -160,13 +163,30 @@ export function StudentLearningPanel() {
 
   const currentQuestion = questions[qIndex]?.learning_questions;
 
+  // Shape sent to learning_record_question_attempt must match what
+  // learning_question_answers.correct_answer was stored as for this
+  // question_type — {option}, {value}, or {text}. See
+  // _app.academics.learning-question-bank.tsx for the write side.
+  const buildSelectedAnswer = () => {
+    if (!currentQuestion) return null;
+    if (currentQuestion.question_type === "true_false") return { value: selected === "true" };
+    // lowercased to match the case-insensitive normalization applied when
+    // the correct answer was stored — see learning-question-bank.tsx
+    if (currentQuestion.question_type === "short_answer") return { text: shortAnswerText.trim().toLowerCase() };
+    return { option: selected };
+  };
+
+  const canSubmit =
+    !!currentQuestion &&
+    (currentQuestion.question_type === "short_answer" ? !!shortAnswerText.trim() : !!selected);
+
   const submitAnswer = async () => {
-    if (!currentQuestion || !selected || !attemptId) return;
+    if (!currentQuestion || !attemptId || !canSubmit) return;
     setSubmitting(true);
     try {
       const { data, error } = await supabase.rpc("learning_record_question_attempt", {
         _question_id: currentQuestion.id,
-        _selected_answer: { option: selected },
+        _selected_answer: buildSelectedAnswer(),
         _quiz_attempt_id: attemptId,
       });
       if (error) throw error;
@@ -184,6 +204,7 @@ export function StudentLearningPanel() {
     if (qIndex + 1 < questions.length) {
       setQIndex(qIndex + 1);
       setSelected(null);
+      setShortAnswerText("");
       setLastResult(null);
       return;
     }
@@ -258,26 +279,51 @@ export function StudentLearningPanel() {
           ) : (
             <>
               <p className="font-medium">{currentQuestion.question_text}</p>
-              <div className="space-y-2">
-                {(currentQuestion.options ?? []).map((opt) => {
-                  const isSelected = selected === opt.id;
-                  const showResult = !!lastResult;
-                  return (
+
+              {currentQuestion.question_type === "true_false" ? (
+                <div className="flex gap-2">
+                  {(["true", "false"] as const).map((v) => (
                     <button
-                      key={opt.id}
-                      disabled={showResult}
-                      onClick={() => setSelected(opt.id)}
-                      className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-input hover:bg-muted/50"
-                      } ${showResult ? "opacity-80" : ""}`}
+                      key={v}
+                      disabled={!!lastResult}
+                      onClick={() => setSelected(v)}
+                      className={`flex-1 text-center px-4 py-3 rounded-lg border text-sm capitalize transition-colors ${
+                        selected === v ? "border-primary bg-primary/5" : "border-input hover:bg-muted/50"
+                      } ${lastResult ? "opacity-80" : ""}`}
                     >
-                      {opt.text}
+                      {v}
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : currentQuestion.question_type === "short_answer" ? (
+                <Input
+                  value={shortAnswerText}
+                  onChange={(e) => setShortAnswerText(e.target.value)}
+                  disabled={!!lastResult}
+                  placeholder="Type your answer"
+                />
+              ) : (
+                <div className="space-y-2">
+                  {(currentQuestion.options ?? []).map((opt) => {
+                    const isSelected = selected === opt.id;
+                    const showResult = !!lastResult;
+                    return (
+                      <button
+                        key={opt.id}
+                        disabled={showResult}
+                        onClick={() => setSelected(opt.id)}
+                        className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary/5"
+                            : "border-input hover:bg-muted/50"
+                        } ${showResult ? "opacity-80" : ""}`}
+                      >
+                        {opt.text}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {lastResult && (
                 <div
@@ -304,7 +350,7 @@ export function StudentLearningPanel() {
                   <ArrowLeft className="w-4 h-4 mr-1" /> Exit
                 </Button>
                 {!lastResult ? (
-                  <Button onClick={submitAnswer} disabled={!selected || submitting}>
+                  <Button onClick={submitAnswer} disabled={!canSubmit || submitting}>
                     {submitting && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
                     Check answer
                   </Button>
