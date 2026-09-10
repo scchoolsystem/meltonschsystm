@@ -4,6 +4,7 @@
 // NO features removed. All existing analytics, tabs, and data flows intact.
 
 import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
+import { StudentLearningPanel } from "@/components/learning/StudentLearningPanel";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
@@ -1732,6 +1733,7 @@ function StudentPortal() {
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto flex-nowrap gap-0.5 p-1">
             {[
               { value: "dashboard", icon: <LayoutDashboard className="w-3.5 h-3.5" />, label: "Dashboard" },
+              { value: "learning", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Learning" },
               { value: "intelligence", icon: <Brain className="w-3.5 h-3.5" />, label: "AI Intelligence", pulse: true },
               { value: "twin", icon: <Dna className="w-3.5 h-3.5" />, label: "Digital Twin", pulse: true },
               { value: "forecast", icon: <Cap className="w-3.5 h-3.5" />, label: "Forecast", pulse: true },
@@ -1878,6 +1880,14 @@ function StudentPortal() {
             {myPercentile !== null && <motion.div variants={fadeUp}><InsightCard icon={<Crown className="w-5 h-5 text-violet-500" />} title="Class Standing" value={`${myPercentile}th Percentile`} detail={`Rank #${classRank} · Top ${100 - myPercentile}%`} color="violet" /></motion.div>}
             {totalDue > 0 && <motion.div variants={fadeUp}><InsightCard icon={<CreditCard className="w-5 h-5 text-destructive" />} title="Outstanding Fees" value={`KES ${totalDue.toLocaleString()}`} detail="Contact bursar to clear" color="red" /></motion.div>}
           </motion.div>
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════
+            LEARNING TAB (SmartDev Learning — revision only, separate from
+            official results)
+        ══════════════════════════════════════════════════════════════ */}
+        <TabsContent value="learning" className="mt-4 space-y-6">
+          <StudentLearningPanel />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════
