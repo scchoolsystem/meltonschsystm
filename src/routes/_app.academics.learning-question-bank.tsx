@@ -155,7 +155,12 @@ function Page() {
       const correct_answer =
         qForm.question_type === "mcq" ? { option: qForm.correct }
         : qForm.question_type === "true_false" ? { value: qForm.correctBool === "true" }
-        : { text: qForm.correctText.trim() };
+        // Normalized to lowercase+trimmed so this actually matches what the
+        // student submits — learning_record_question_attempt() does exact
+        // jsonb equality (v_correct_answer = _selected_answer), which is
+        // case-sensitive on the raw text. Case-insensitivity has to happen
+        // here and in StudentLearningPanel.tsx's submit, not in the SQL.
+        : { text: qForm.correctText.trim().toLowerCase() };
 
       const { error: answerErr } = await supabase.from("learning_question_answers").insert([{
         question_id: inserted.id,
