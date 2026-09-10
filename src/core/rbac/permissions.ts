@@ -52,6 +52,13 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   classes: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   // exams_admin also gets a Subjects link in their nav group.
   subjects: [...ADMIN_ROLES, ...TEACHING_ROLES, "academic_master", "exams_admin", "exams_user", "student", "parent"],
+  // SmartDev Learning — revision-only, kept separate from official
+  // academics permissions above. Same audience as `subjects` (school
+  // admins + teaching staff manage it; students/parents can browse). RLS
+  // is still the real enforcement of what each of these roles can write.
+  "learning-curriculum": [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  "learning-content": [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  "learning-question-bank": [...ADMIN_ROLES, ...TEACHING_ROLES],
   // SECURITY: exam ADMINISTRATION (create/edit exam windows). Students and
   // parents must never reach this — they see their own exams inside
   // portal.student / portal.parent, never this CRUD screen.
@@ -259,6 +266,9 @@ export function moduleForPath(pathname: string): string | null {
     if (seg[1] === "subjects") return "subjects";
     if (seg[1] === "oversight") return "exam-oversight";
     if (seg[1] === "remarks") return "remarks";
+    if (seg[1] === "learning-curriculum") return "learning-curriculum";
+    if (seg[1] === "learning-content") return "learning-content";
+    if (seg[1] === "learning-question-bank") return "learning-question-bank";
   }
   if (seg[0] === "finance") return "finance";
   if (seg[0] === "staff" && seg[1] === "payslips") return "staff.payslips";
