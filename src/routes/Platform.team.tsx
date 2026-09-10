@@ -76,6 +76,7 @@ const PLATFORM_SECTIONS = [
   { key: "support", label: "Support tickets" },
   { key: "plans", label: "Plans & pricing" },
   { key: "website_media", label: "Website Content (Media & Stories)" },
+  { key: "learning", label: "SmartDev Learning" },
 ];
 
 function TeamTab() {
