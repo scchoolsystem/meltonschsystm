@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, Target } from "lucide-react";
+import { AILearningInsight } from "@/components/learning/AILearningInsight";
 
 type MasteryRow = {
   substrand_id: string | null;
@@ -91,11 +92,13 @@ export function ParentLearningPanel({ studentId }: { studentId: string }) {
         </CardContent>
       </Card>
 
+      <AILearningInsight studentId={studentId} />
+
       {recommendations.length > 0 && (
         <Card className="border-violet-200 bg-violet-50/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="w-4 h-4 text-violet-600" /> AI recommendations
+              <Sparkles className="w-4 h-4 text-violet-600" /> Pending recommendations
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
