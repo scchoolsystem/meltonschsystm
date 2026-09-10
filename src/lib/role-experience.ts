@@ -34,6 +34,11 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Exams", url: "/academics/exams" },
     { title: "Subjects", url: "/academics/subjects" },
     { title: "Exam Oversight", url: "/academics/oversight" },
+    // SmartDev Learning — revision-only, separate from the above official
+    // academics workflow (see learning-curriculum.tsx header).
+    { title: "Learning: Curriculum", url: "/academics/learning-curriculum" },
+    { title: "Learning: Content", url: "/academics/learning-content" },
+    { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
   ]},
   { label: "Planning", items: [
     { title: "Timetable", url: "/timetable" },
@@ -156,6 +161,8 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Results", url: "/academics/results" },
       { title: "Class Ranking", url: "/academics/class-ranking" },
       { title: "Remark Templates", url: "/academics/remarks" },
+      { title: "Learning: Content", url: "/academics/learning-content" },
+      { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
       { title: "Payslips", url: "/staff/payslips" },
     ]},
   ],
@@ -171,6 +178,8 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Class Ranking", url: "/academics/class-ranking" },
       { title: "Report Cards", url: "/academics/report-cards" },
       { title: "Remark Templates", url: "/academics/remarks" },
+      { title: "Learning: Content", url: "/academics/learning-content" },
+      { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
       { title: "My Timetable", url: "/portal/me?tab=timetable" },
       { title: "Today's Lessons", url: "/timetable/today" },
       { title: "Classroom", url: "/classroom" },
@@ -190,6 +199,9 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Class Ranking", url: "/academics/class-ranking" },
       { title: "Report Cards", url: "/academics/report-cards" },
       { title: "Remarks", url: "/academics/remarks" },
+      { title: "Learning: Curriculum", url: "/academics/learning-curriculum" },
+      { title: "Learning: Content", url: "/academics/learning-content" },
+      { title: "Learning: Question Bank", url: "/academics/learning-question-bank" },
       { title: "Analytics", url: "/analytics" },
       { title: "Announcements", url: "/announcements" },
       { title: "Today's Lessons", url: "/timetable/today" },
@@ -444,6 +456,7 @@ export function buildNavigation(roles: string[], features?: Record<string, boole
 // if that's ever needed (none currently overlap).
 const NAV_FEATURE_BY_PREFIX: [prefix: string, feature: string][] = [
   ["/academics/subjects", "academics_subjects"],
+  ["/academics/learning-", "academics_subjects"],
   ["/academics/exams", "academics_exams"],
   ["/academics/entry", "academics_marks"],
   ["/academics/marks", "academics_marks"],
