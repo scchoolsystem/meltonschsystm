@@ -27,7 +27,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   BookOpen, CheckCircle2, XCircle, Sparkles, Target, ArrowLeft,
   ArrowRight, Loader2, TrendingUp, Globe, School, FileText, Video, Link2, Library,
-  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AILearningInsight } from "@/components/learning/AILearningInsight";
@@ -573,26 +572,13 @@ export function StudentLearningPanel() {
               )}
 
               {openContent.media_url && (openContent.content_type === "video" || openContent.content_type === "resource") && (
-                <div className="space-y-2">
-                  <iframe
-                    src={openContent.media_url}
-                    title={openContent.title}
-                    className="w-full aspect-video rounded-lg border bg-muted"
-                    allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                    allowFullScreen
-                  />
-                  {/* Fallback only — some hosts block embedding via
-                      X-Frame-Options/CSP, so this stays available but is
-                      never the default action anymore. */}
-                  <a
-                    href={openContent.media_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="w-3 h-3" /> Not loading? Open in browser instead
-                  </a>
-                </div>
+                <iframe
+                  src={openContent.media_url}
+                  title={openContent.title}
+                  className="w-full aspect-video rounded-lg border bg-muted"
+                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                />
               )}
             </>
           )}
