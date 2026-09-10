@@ -5,7 +5,7 @@ import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu, Activity,
+  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu, Activity, GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ const NAV = [
   { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "section:support" },
   { to: "/platform/plans", label: "Plans", icon: Package, key: "section:plans" },
   { to: "/platform/website", label: "Website Content", icon: Globe, key: "section:website_media" },
+  { to: "/platform/learning", label: "SmartDev Learning", icon: GraduationCap, key: "section:learning" },
   { to: "/platform/team", label: "Team & Access", icon: Users, key: "owner" },
 ] as const;
 
