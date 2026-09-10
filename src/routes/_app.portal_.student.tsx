@@ -3390,17 +3390,6 @@ function StudentPortal() {
                 title={viewingDoc.label}
                 className="w-full h-[70vh] rounded-lg border bg-muted"
               />
-              {/* Fallback only, not the default action — some file types/hosts
-                  don't render in an iframe (e.g. certain PDFs on some
-                  mobile webviews). */}
-              <a
-                href={viewingDoc.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <ExternalLink className="w-3 h-3" /> Not loading? Open in browser instead
-              </a>
             </>
           )}
         </DialogContent>
