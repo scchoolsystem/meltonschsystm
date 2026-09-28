@@ -1,6 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { reportSystemError, schoolIdForUser } from "@/lib/error-reporter.server";
+
+// Users must never see JaaS/Jitsi failure details. Every failure below is
+// logged for the platform owner + the school's allocated support via
+// reportSystemError(); the HTTP response only carries a generic message.
+async function report(
+  userId: string | undefined,
+  code: string,
+  message: string,
+  severity: "warning" | "error" | "critical",
+  context?: Record<string, unknown>,
+) {
+  await reportSystemError({
+    source: "jaas_token",
+    code,
+    severity,
+    message,
+    userId: userId ?? null,
+    schoolId: userId ? await schoolIdForUser(userId) : null,
+    context,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers — Web Crypto RS256 JWT signing (Cloudflare Workers compatible)
@@ -107,10 +129,15 @@ export const Route = createFileRoute("/api/jaas-token")({
         ].filter(Boolean);
 
         if (missing.length) {
+          await report(
+            (context as any)?.userId,
+            "JAAS_NOT_CONFIGURED",
+            `Live classes are not configured. Missing Cloudflare Worker secrets: ${missing.join(", ")}`,
+            "critical",
+            { missing },
+          );
           return new Response(
-            JSON.stringify({
-              error: `JaaS not configured — add these Cloudflare Worker secrets: ${missing.join(", ")}`,
-            }),
+            JSON.stringify({ error: "unavailable" }),
             { status: 503, headers: { "content-type": "application/json" } },
           );
         }
@@ -153,15 +180,17 @@ export const Route = createFileRoute("/api/jaas-token")({
 
         if (profileErr) {
           console.error("[jaas-token] profile fetch error:", profileErr);
-          return new Response(JSON.stringify({ error: "Failed to load user profile" }), {
+          await report(userId, "JAAS_PROFILE_FETCH_FAILED", `Profile lookup failed: ${profileErr.message}`, "error");
+          return new Response(JSON.stringify({ error: "unavailable" }), {
             status: 500,
             headers: { "content-type": "application/json" },
           });
         }
 
         if (!profile) {
+          await report(userId, "JAAS_PROFILE_MISSING", "User has no profile row, cannot issue a live-class token", "warning");
           return new Response(
-            JSON.stringify({ error: "User profile not found — contact your administrator" }),
+            JSON.stringify({ error: "unavailable" }),
             { status: 403, headers: { "content-type": "application/json" } },
           );
         }
@@ -171,6 +200,7 @@ export const Route = createFileRoute("/api/jaas-token")({
         const { data: authUserRes, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(userId);
         if (authUserErr) {
           console.error("[jaas-token] auth user fetch error:", authUserErr);
+          await report(userId, "JAAS_AUTH_USER_FETCH_FAILED", `auth.admin.getUserById failed: ${authUserErr.message}`, "warning");
         }
         const email = authUserRes?.user?.email ?? "";
 
@@ -191,6 +221,7 @@ export const Route = createFileRoute("/api/jaas-token")({
         );
         if (modErr) {
           console.error("[jaas-token] is_teaching RPC failed:", modErr);
+          await report(userId, "JAAS_MODERATOR_CHECK_FAILED", `is_teaching RPC failed: ${modErr.message}`, "warning");
         }
         const isModerator = isModeratorRpc === true;
 
@@ -238,8 +269,9 @@ export const Route = createFileRoute("/api/jaas-token")({
           key = await importPrivateKey(privateKey!);
         } catch (e: any) {
           console.error("[jaas-token] key import failed:", e?.message);
+          await report(userId, "JAAS_KEY_IMPORT_FAILED", e?.message ?? "Private key import failed", "critical");
           return new Response(
-            JSON.stringify({ error: e?.message ?? "Private key import failed" }),
+            JSON.stringify({ error: "unavailable" }),
             { status: 500, headers: { "content-type": "application/json" } },
           );
         }
@@ -252,7 +284,7 @@ export const Route = createFileRoute("/api/jaas-token")({
 
         const token = `${signingInput}.${base64urlEncode(signature)}`;
 
-        return new Response(JSON.stringify({ token }), {
+        return new Response(JSON.stringify({ token, appId }), {
           status: 200,
           headers: {
             "content-type": "application/json",
