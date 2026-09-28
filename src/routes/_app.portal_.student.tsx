@@ -4,7 +4,6 @@
 // NO features removed. All existing analytics, tabs, and data flows intact.
 
 import { StudentPerformanceCenter } from "@/components/students/StudentPerformanceCenter";
-import { StudentLearningPanel } from "@/components/learning/StudentLearningPanel";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
@@ -1054,6 +1053,7 @@ function StudentPortal() {
   // and the Android webview. Holds { url, label } for the currently-open doc.
   const [viewingDoc, setViewingDoc] = useState<{ url: string; label: string } | null>(null);
   const [transport, setTransport] = useState<any | null>(null);
+  const [insurance, setInsurance] = useState<any | null>(null);
   const [weekMeals, setWeekMeals] = useState<any[]>([]);
   const [coCurricular, setCoCurricular] = useState<any[]>([]);
   const [sportsAchievements, setSportsAchievements] = useState<any[]>([]);
@@ -1194,6 +1194,15 @@ function StudentPortal() {
       8000, EMPTY_SINGLE, "transport",
     );
     setTransport(tr ?? null);
+
+    const { data: ins } = await withTimeout(
+      (supabase as any)
+        .from("student_insurance")
+        .select("enrolled_on, insurance_policies(policy_name, provider, cover_amount, starts_on, ends_on)")
+        .eq("student_id", sid).order("enrolled_on", { ascending: false }).limit(1).maybeSingle(),
+      8000, EMPTY_SINGLE, "insurance",
+    );
+    setInsurance(ins ?? null);
 
     const today0 = new Date();
     const weekStart = format(startOfWeek(today0, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -1602,6 +1611,11 @@ function StudentPortal() {
               <span className="inline-flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5" />{student.classes?.name ?? "No class"}</span>
               {student.classes?.stream && <span className="inline-flex items-center gap-1.5"><Target className="w-3.5 h-3.5" />{student.classes.stream}</span>}
               {dorm?.dormitories?.name && <span className="inline-flex items-center gap-1.5"><Bed className="w-3.5 h-3.5" />{dorm.dormitories.name}{dorm.bed_no ? ` · Bed ${dorm.bed_no}` : ""}</span>}
+              {insurance?.insurance_policies?.policy_name && (
+                <span className="inline-flex items-center gap-1.5" title={`Provider: ${insurance.insurance_policies.provider ?? "—"}`}>
+                  <Shield className="w-3.5 h-3.5" />{insurance.insurance_policies.policy_name}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-3 mt-3">
               {myPercentile !== null && (
@@ -1746,8 +1760,8 @@ function StudentPortal() {
         <div className="overflow-x-auto pb-1">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 h-auto flex-nowrap gap-0.5 p-1">
             {[
+              // Learning moved out to its own page — see /learning
               { value: "dashboard", icon: <LayoutDashboard className="w-3.5 h-3.5" />, label: "Dashboard" },
-              { value: "learning", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Learning" },
               { value: "intelligence", icon: <Brain className="w-3.5 h-3.5" />, label: "AI Intelligence", pulse: true },
               { value: "twin", icon: <Dna className="w-3.5 h-3.5" />, label: "Digital Twin", pulse: true },
               { value: "forecast", icon: <Cap className="w-3.5 h-3.5" />, label: "Forecast", pulse: true },
@@ -1896,13 +1910,8 @@ function StudentPortal() {
           </motion.div>
         </TabsContent>
 
-        {/* ══════════════════════════════════════════════════════════════
-            LEARNING TAB (SmartDev Learning — revision only, separate from
-            official results)
-        ══════════════════════════════════════════════════════════════ */}
-        <TabsContent value="learning" className="mt-4 space-y-6">
-          <StudentLearningPanel />
-        </TabsContent>
+        {/* Learning tab removed — now its own page at /learning, linked from
+            the sidebar, instead of being buried in this portal's tabs. */}
 
         {/* ══════════════════════════════════════════════════════════════
             AI INTELLIGENCE CENTER TAB

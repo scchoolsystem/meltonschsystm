@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
-import { ParentLearningPanel } from "@/components/learning/ParentLearningPanel";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
@@ -63,7 +62,7 @@ function gradeLabel(score: number): { grade: string; color: string } {
 
 const PARENT_TABS: PortalTabConfig[] = [
   { value: "dashboard",    icon: <LayoutDashboard className="w-3.5 h-3.5" />, label: "Dashboard" },
-  { value: "learning",     icon: <BookOpen className="w-3.5 h-3.5" />,        label: "Learning Progress" },
+  // Learning tab removed — now its own page at /learning.
   { value: "results",      icon: <Trophy className="w-3.5 h-3.5" />,          label: "Results" },
   { value: "reportcards",  icon: <ClipboardList className="w-3.5 h-3.5" />,   label: "Report Cards" },
   { value: "attendance",   icon: <CheckCircle className="w-3.5 h-3.5" />,     label: "Attendance" },
@@ -214,7 +213,7 @@ function ParentPortal() {
       const EMPTY = { data: [] as any[], error: null } as any;
       const EMPTY_SINGLE = { data: null, error: null } as any;
 
-      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals, ach] = await Promise.all([
+      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals, ach, ins] = await Promise.all([
         withTimeout(supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
         withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
         withTimeout(supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
@@ -235,6 +234,7 @@ function ParentPortal() {
         withTimeout((supabase as any).from("student_documents").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "documents"),
         withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "weekMeals"),
         withTimeout(supabase.from("sports_achievements").select("id, description, award_level, achievement_date, co_curricular_activities(name)").eq("student_id", activeId).order("achievement_date", { ascending: false }).limit(20), 8000, EMPTY, "achievements"),
+        withTimeout((supabase as any).from("student_insurance").select("enrolled_on, insurance_policies(policy_name, provider, cover_amount, starts_on, ends_on)").eq("student_id", activeId).order("enrolled_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "insurance"),
       ]);
 
       setData({
@@ -254,6 +254,7 @@ function ParentPortal() {
         documents: docs.data ?? [],
         weekMeals: meals.data ?? [],
         achievements: ach.data ?? [],
+        insurance: (ins as any).data ?? null,
       });
       } catch (e: any) {
         console.error("Parent portal child data failed to load:", e);
@@ -656,10 +657,7 @@ function ParentPortal() {
           </div>
         </PortalTabContent>
 
-        {/* ══ RESULTS ══════════════════════════════════════════════════════ */}
-        <PortalTabContent value="learning">
-          <ParentLearningPanel studentId={activeId} />
-        </PortalTabContent>
+        {/* Learning tab removed — now its own page at /learning. */}
 
         <PortalTabContent value="results">
           <div className="space-y-4">
@@ -1031,6 +1029,25 @@ function ParentPortal() {
                 {c.treatment && <div className="text-sm"><span className="text-muted-foreground">Treatment:</span> {c.treatment}</div>}
               </div>
             ))}
+          </GlassCard>
+
+          <GlassCard className="p-6 mt-4">
+            <div className="font-medium inline-flex items-center gap-2 mb-2"><Shield className="w-4 h-4 text-primary" /> Insurance</div>
+            {!data.insurance ? (
+              <p className="text-sm text-muted-foreground">Not enrolled in a school insurance policy yet.</p>
+            ) : (
+              <div className="space-y-1 text-sm">
+                <div className="text-base font-medium">{data.insurance.insurance_policies?.policy_name}</div>
+                <div><span className="text-muted-foreground">Provider:</span> {data.insurance.insurance_policies?.provider ?? "—"}</div>
+                {data.insurance.insurance_policies?.cover_amount && (
+                  <div><span className="text-muted-foreground">Cover amount:</span> KES {Number(data.insurance.insurance_policies.cover_amount).toLocaleString()}</div>
+                )}
+                <div><span className="text-muted-foreground">Enrolled on:</span> {data.insurance.enrolled_on}</div>
+                {(data.insurance.insurance_policies?.starts_on || data.insurance.insurance_policies?.ends_on) && (
+                  <div><span className="text-muted-foreground">Policy period:</span> {data.insurance.insurance_policies?.starts_on ?? "—"} → {data.insurance.insurance_policies?.ends_on ?? "—"}</div>
+                )}
+              </div>
+            )}
           </GlassCard>
         </PortalTabContent>
 
