@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,8 +9,17 @@ import { cn } from "@/lib/utils";
 // restricts rows to platform_owner (all) / platform_support (schools they're
 // allocated to), so this naturally scopes itself per viewer — no extra
 // filtering needed here.
+//
+// Two of these can be mounted at once (desktop sidebar nav + the mobile
+// drawer, which stays mounted even while closed), each running its own
+// effect. Supabase's client dedupes channels by topic name — if two
+// instances both call supabase.channel("same-name"), the second .on() call
+// lands on the first instance's already-subscribed channel and throws
+// "cannot add postgres_changes callbacks after subscribe()". Suffixing the
+// topic with a per-mount id keeps every instance's channel distinct.
 function useOpenErrorCount() {
   const [count, setCount] = useState<number | null>(null);
+  const channelId = useRef(`system-error-badge-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,7 +34,7 @@ function useOpenErrorCount() {
 
     load();
     const ch = supabase
-      .channel("system-error-badge")
+      .channel(channelId.current)
       .on("postgres_changes", { event: "*", schema: "public", table: "system_error_logs" }, load)
       .subscribe();
 
