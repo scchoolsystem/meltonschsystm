@@ -143,6 +143,15 @@ function ParentPortal() {
   const [childLoading, setChildLoading] = useState(true);
   // Sidebar links land here as e.g. /portal/parent?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
+  // FIX: the line above only reads the URL on first mount. Since this
+  // portal route doesn't remount for a search-only navigation, clicking
+  // a different sidebar link (e.g. "/portal/student?tab=fees") while
+  // already on this page changed the URL but silently left the visible
+  // tab wherever it was. This keeps activeTab in sync with the URL on
+  // every navigation, not just the first one.
+  useEffect(() => {
+    if (tabFromUrl) setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
 
   // Independent, mount-tied failsafes for each loading phase below — not
   // driven by the queries themselves, so they fire no matter *why* a query

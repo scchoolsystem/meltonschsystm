@@ -75,6 +75,15 @@ function MyWorkspace() {
   // defaulting to "day" and silently dropping the deep link.
   const { tab: tabFromUrl } = Route.useSearch() as { tab?: string };
   const [activeTab, setActiveTab] = useState(tabFromUrl || "day");
+  // FIX: the line above only reads the URL on first mount. Since this
+  // portal route doesn't remount for a search-only navigation, clicking
+  // a different sidebar link (e.g. "/portal/student?tab=fees") while
+  // already on this page changed the URL but silently left the visible
+  // tab wherever it was. This keeps activeTab in sync with the URL on
+  // every navigation, not just the first one.
+  useEffect(() => {
+    if (tabFromUrl) setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
 
   // Failsafe decoupled entirely from react-query and from withTimeout
   // above: if this component has been sitting on the loading branch for

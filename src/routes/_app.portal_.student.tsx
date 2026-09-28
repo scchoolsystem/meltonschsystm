@@ -1070,6 +1070,15 @@ function StudentPortal() {
   }, []);
   // Sidebar links land here as e.g. /portal/student?tab=attendance — honor it.
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
+  // FIX: the line above only reads the URL on first mount. Since this
+  // portal route doesn't remount for a search-only navigation, clicking
+  // a different sidebar link (e.g. "/portal/student?tab=fees") while
+  // already on this page changed the URL but silently left the visible
+  // tab wherever it was. This keeps activeTab in sync with the URL on
+  // every navigation, not just the first one.
+  useEffect(() => {
+    if (tabFromUrl) setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
   const [securityVerified, setSecurityVerified] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
   const [filterPeriod, setFilterPeriod] = useState<"all" | "term" | "month">("all");
