@@ -161,6 +161,13 @@ export const MODULE_PERMISSIONS: Record<string, AppRole[]> = {
   // Wave 1, Fix C-4: register `live` (live classes / streaming) so the
   // teacher/student/parent sidebar entries stop bouncing to /dashboard.
   live: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
+  // Learning (SmartDev Learning revision/mastery) was pulled out of the
+  // student/parent/staff portal tabs into its own top-level page at
+  // /learning. Same fix as `live` above: a standalone route needs its own
+  // entry here or canAccess() silently falls back to admin-only, even
+  // though these roles could already reach the exact same content as a
+  // portal tab a moment ago.
+  learning: [...ADMIN_ROLES, ...TEACHING_ROLES, "student", "parent"],
   ids: [], // everyone authenticated — any staff member needs to verify a student/staff ID on the spot
   // Assignments: teachers create/grade, students submit. Page itself
   // branches internally on isTeacher/isStudent — was previously missing
