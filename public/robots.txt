@@ -1,4 +1,25 @@
 User-agent: *
 Allow: /
+# Keep crawlers out of the logged-in app, APIs and platform admin.
+Disallow: /api/
+Disallow: /lovable/
+Disallow: /sys/
+Disallow: /platform
+Disallow: /admin/
+Disallow: /portal
+Disallow: /dashboard
+Disallow: /login
+Disallow: /reset-password
+Disallow: /unsubscribe
+Disallow: /email/
+Disallow: /verify
+Disallow: /ids/
+Disallow: /academics/
+Disallow: /finance/
+Disallow: /students
+Disallow: /staff
+Disallow: /live
+Disallow: /timetable
+Disallow: /attendance/
 
 Sitemap: https://smartdev.co.ke/sitemap.xml
