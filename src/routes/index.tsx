@@ -30,16 +30,47 @@ import studentShot from "@/assets/portals/student.png";
 import teacherShot from "@/assets/portals/teacher.png";
 import financeShot from "@/assets/portals/finance.png";
 
+
+const SITE_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "SmartDev ERP",
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Web, Android, Windows",
+  url: "https://smartdev.co.ke/",
+  description: "SmartDev ERP: all-in-one school management for Kenya — academics, fees & M-Pesa, boarding, transport, clinic, library, security, live classes & parent portals.",
+  featureList: [
+    "Student records, admissions and class promotion",
+    "Exams, marks, report cards and class ranking",
+    "Timetable generation and attendance",
+    "Fees, invoicing and M-Pesa payments",
+    "Budgets, expenses and payroll",
+    "Boarding and dormitory management",
+    "Transport and kitchen / meals",
+    "School clinic and health records",
+    "Library and inventory",
+    "Gate security, visitor and vehicle management",
+    "Discipline and co-curricular activities",
+    "Live online classes, assignments and question bank",
+    "SMS and email communications",
+    "Student insurance and leaving certificates",
+    "Alumni management",
+    "Parent and student portals",
+    "Android and Windows desktop apps",
+  ],
+};
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "SmartDev ERP | School Management System Kenya" },
-      { name: "description", content: "SmartDev ERP is a modern school management system for handling students, exams, attendance, fees, and administration in one platform." },
+      { name: "description", content: "SmartDev ERP: all-in-one school management for Kenya — academics, fees & M-Pesa, boarding, transport, clinic, library, security, live classes & parent portals." },
       { property: "og:title", content: "SmartDev ERP | School Management System Kenya" },
-      { property: "og:description", content: "All-in-one school ERP for academics, finance, and administration." },
+      { property: "og:description", content: "SmartDev ERP: all-in-one school management for Kenya — academics, fees & M-Pesa, boarding, transport, clinic, library, security, live classes & parent portals." },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://smartdev.co.ke/" },
     ],
+    scripts: [{ type: "application/ld+json", children: JSON.stringify(SITE_JSONLD) }],
   }),
   component: IndexPage,
 });
