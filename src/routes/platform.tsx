@@ -5,9 +5,10 @@ import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu, Activity, GraduationCap,
+  LayoutDashboard, Building2, Receipt, LifeBuoy, Package, LogOut, Loader2, Shield, Globe, Users, Menu, Activity, GraduationCap, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PlatformErrorBadge, PlatformErrorBanner } from "@/components/PlatformErrorBadge";
 
 export const Route = createFileRoute("/platform")({
   beforeLoad: async ({ location }) => {
@@ -31,6 +32,7 @@ const NAV = [
   { to: "/platform/dashboard", label: "Dashboard", icon: LayoutDashboard, key: "section:dashboard" },
   { to: "/platform/operations", label: "Operations & Usage", icon: Activity, key: "section:operations" },
   { to: "/platform/schools", label: "Schools", icon: Building2, key: "section:schools" },
+  { to: "/platform/errors", label: "System errors", icon: AlertTriangle, key: "section:errors" },
   { to: "/platform/invoices", label: "Billing", icon: Receipt, key: "section:invoices" },
   { to: "/platform/support", label: "Support", icon: LifeBuoy, key: "section:support" },
   { to: "/platform/plans", label: "Plans", icon: Package, key: "section:plans" },
@@ -140,6 +142,7 @@ function PlatformLayout() {
           >
             <n.icon className="w-4 h-4 shrink-0" />
             <span className="truncate">{n.label}</span>
+            {n.to === "/platform/errors" && <PlatformErrorBadge />}
           </Link>
         );
       })}
@@ -188,6 +191,8 @@ function PlatformLayout() {
             </div>
           </SheetContent>
         </Sheet>
+
+        <PlatformErrorBanner />
 
         <main className="flex-1 overflow-auto">
           <div className="max-w-7xl mx-auto p-4 sm:p-6">

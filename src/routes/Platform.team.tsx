@@ -72,6 +72,7 @@ const PLATFORM_SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "operations", label: "Operations & Usage" },
   { key: "schools", label: "Schools" },
+  { key: "errors", label: "System errors" },
   { key: "invoices", label: "Billing / Invoices" },
   { key: "support", label: "Support tickets" },
   { key: "plans", label: "Plans & pricing" },

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, ArrowLeft, Video, Check, Clock, X } from "lucide-react";
 import { toast } from "sonner";
+import { reportError } from "@/lib/report-error";
 import { format, differenceInMinutes } from "date-fns";
 
 export const Route = createFileRoute("/_app/live/$sessionId")({
@@ -72,18 +73,32 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
       });
 
       if (!res.ok) {
-        let errMsg = res.statusText;
+        let detail = res.statusText;
         try {
           const body = await res.json();
-          errMsg = body.error ?? errMsg;
+          detail = body.error ?? detail;
         } catch {
           // ignore parse errors — keep statusText
         }
-        throw new Error(errMsg);
+        // Detail (e.g. which secret is missing) is for support only — never
+        // shown to the person trying to join a class.
+        reportError(new Error(detail), {
+          source: "live_class",
+          code: "MEETING_TOKEN_REQUEST_FAILED",
+          context: { room: roomName, status: res.status },
+        });
+        throw new Error("Couldn't start this class");
       }
 
       const { token, appId } = await res.json();
-      if (!token) throw new Error("Server returned empty token");
+      if (!token) {
+        reportError(new Error("Server returned empty token"), {
+          source: "live_class",
+          code: "EMPTY_MEETING_TOKEN",
+          context: { room: roomName },
+        });
+        throw new Error("Couldn't start this class");
+      }
       return { token: token as string, appId: (appId as string | undefined) ?? undefined };
     },
   });
@@ -119,7 +134,7 @@ function loadJitsiScript(appId: string): Promise<void> {
     script.onload = () => resolve();
     script.onerror = () => {
       jitsiScriptPromise = null; // allow retry
-      reject(new Error("Failed to load meeting library"));
+      reject(new Error("meeting library script failed to load"));
     };
     document.head.appendChild(script);
   });
@@ -203,7 +218,12 @@ function LiveRoom({
         // the student as never having joined, with no signal anything went
         // wrong. Now it surfaces directly.
         console.error("attendance insert failed", error);
-        toast.error(`Couldn't record your attendance: ${error.message}`);
+        reportError(error, {
+          source: "live_class",
+          code: "ATTENDANCE_INSERT_FAILED",
+          context: { sessionId, studentId },
+        });
+        toast.error("Couldn't record your attendance. Support has been notified.");
         return;
       }
       attendanceRef.current = { id: data?.id, joinedAt };
@@ -219,7 +239,10 @@ function LiveRoom({
         .update({ left_at: new Date().toISOString(), duration_seconds: dur })
         .eq("id", id)
         .then(({ error }) => {
-          if (error) console.error("attendance leave-update failed", error);
+          if (error) {
+            console.error("attendance leave-update failed", error);
+            reportError(error, { source: "live_class", code: "ATTENDANCE_LEAVE_UPDATE_FAILED", context: { sessionId } });
+          }
           qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
         });
     };
@@ -270,7 +293,8 @@ function LiveRoom({
         api.addEventListener("readyToClose", markLeft);
       })
       .catch((err: Error) => {
-        if (!cancelled) setLoadError(err.message);
+        reportError(err, { source: "live_class", code: "MEETING_LIBRARY_LOAD_FAILED", context: { sessionId } });
+        if (!cancelled) setLoadError("Couldn't load this class. Support has been notified.");
       });
 
     return () => {
@@ -528,9 +552,7 @@ function SessionRoom() {
         <Card>
           <CardContent className="py-10 text-center space-y-3">
             <p className="text-destructive text-sm font-medium">
-              {tokenError
-                ? `Could not get meeting token: ${(tokenError as Error).message}`
-                : "JaaS is not configured on the server. Set JAAS_APP_ID, JAAS_API_KEY and JAAS_PRIVATE_KEY as Cloudflare Worker secrets."}
+              Couldn't start this class. Support has been notified — please try again shortly.
             </p>
             <Button
               variant="outline"

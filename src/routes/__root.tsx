@@ -13,6 +13,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { TenantProvider } from "@/hooks/use-tenant";
 import { Toaster } from "@/components/ui/sonner";
+import { reportError } from "@/lib/report-error";
 
 function NotFoundComponent() {
   return (
@@ -33,6 +34,7 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
+  reportError(error, { source: "client", code: "ROUTE_ERROR_BOUNDARY" });
   const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
