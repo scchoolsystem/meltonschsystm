@@ -1,168 +1,286 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { FeatureGate } from "@/components/FeatureGate";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
-import { bulkGenerateInvoices, bulkGenerateComponentInvoices } from "@/lib/finance.functions";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Zap } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-export const Route = createFileRoute("/_app/finance/generate")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
+// ---------------------------------------------------------------------------
+// Helpers — Web Crypto RS256 JWT signing (Cloudflare Workers compatible)
+// ---------------------------------------------------------------------------
 
-function Page() {
-  const [source, setSource] = useState<"structure" | "component">("structure");
-  const generateFromStructure = useServerFn(bulkGenerateInvoices);
-  const generateFromComponent = useServerFn(bulkGenerateComponentInvoices);
-
-  const [feeId, setFeeId] = useState("");
-  const [classId, setClassId] = useState("all");
-  const [componentId, setComponentId] = useState("");
-  const [due, setDue] = useState("");
-
-  const { data: fees = [] } = useQuery({
-    queryKey: ["fees-min"],
-    queryFn: async () =>
-      (await supabase.from("fee_structures").select("id,name,term,year,amount,level").order("year", { ascending: false })).data ?? [],
-  });
-  const { data: classes = [] } = useQuery({
-    queryKey: ["classes-min"],
-    queryFn: async () => (await supabase.from("classes").select("id,name,level,year,stream").order("name")).data ?? [],
-  });
-  const { data: components = [] } = useQuery({
-    queryKey: ["class-fee-components-min"],
-    queryFn: async () =>
-      (await supabase
-        .from("class_fee_components")
-        .select("id,class_id,component,amount,term,year")
-        .order("year", { ascending: false })
-        .order("term")).data ?? [],
-  });
-
-  const classNameById = new Map((classes as any[]).map((c) => [c.id, `${c.name}${c.stream ? ` – ${c.stream}` : ""} (${c.level} ${c.year})`]));
-
-  const structureMutation = useMutation({
-    mutationFn: async () =>
-      generateFromStructure({
-        data: {
-          fee_structure_id: feeId,
-          class_id: classId === "all" ? undefined : classId,
-          due_date: due || undefined,
-        },
-      }),
-    onSuccess: (r) => toast.success(`Created ${r.created} invoice(s), skipped ${r.skipped} (already invoiced).`),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const componentMutation = useMutation({
-    mutationFn: async () =>
-      generateFromComponent({
-        data: {
-          class_fee_component_id: componentId,
-          due_date: due || undefined,
-        },
-      }),
-    onSuccess: (r) => toast.success(`Created ${r.created} invoice(s), skipped ${r.skipped} (already invoiced).`),
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const isComponent = source === "component";
-  const m = isComponent ? componentMutation : structureMutation;
-  const canGenerate = isComponent ? !!componentId : !!feeId;
-
-  return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Bulk Invoice Generation</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Issue invoices to every active student for a fee structure or a class fee component. Students already
-          invoiced for the same source are skipped.
-        </p>
-      </div>
-      <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="w-4 h-4" /> New batch</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Source</Label>
-            <Tabs value={source} onValueChange={(v) => setSource(v as "structure" | "component")}>
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="structure">Fee Structure</TabsTrigger>
-                <TabsTrigger value="component">Class Fee Component</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {!isComponent ? (
-            <>
-              <div>
-                <Label>Fee Structure</Label>
-                <Select value={feeId} onValueChange={setFeeId}>
-                  <SelectTrigger><SelectValue placeholder="Choose fee structure" /></SelectTrigger>
-                  <SelectContent>
-                    {(fees as any[]).length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">No fee structures yet.</div>
-                    )}
-                    {(fees as any[]).map(f => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name} – {f.term} {f.year} ({f.level}) – KES {Number(f.amount).toLocaleString()}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Class (optional)</Label>
-                <Select value={classId} onValueChange={setClassId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All active students</SelectItem>
-                    {(classes as any[]).map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name} – {c.level} {c.year}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          ) : (
-            <div>
-              <Label>Fee Component</Label>
-              <Select value={componentId} onValueChange={setComponentId}>
-                <SelectTrigger><SelectValue placeholder="Choose fee component" /></SelectTrigger>
-                <SelectContent>
-                  {(components as any[]).length === 0 && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">
-                      No fee components yet — add one on the Fees page.
-                    </div>
-                  )}
-                  {(components as any[]).map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {classNameById.get(c.class_id) ?? "Unknown class"} – {c.component} – {c.term} {c.year} – KES {Number(c.amount).toLocaleString()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Invoices only that component to active students in the class it was set up for.
-              </p>
-            </div>
-          )}
-
-          <div>
-            <Label>Due Date (optional)</Label>
-            <Input type="date" value={due} onChange={e => setDue(e.target.value)} />
-          </div>
-          <Button disabled={!canGenerate || m.isPending} onClick={() => m.mutate()}>
-            {m.isPending && <Loader2 className="mr-2 w-4 h-4 animate-spin" />}
-            Generate Invoices
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+function base64urlEncode(data: ArrayBuffer | Uint8Array): string {
+  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+  let str = "";
+  for (const b of bytes) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+function encodeJson(obj: object): string {
+  return base64urlEncode(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+/**
+ * Import an RSA private key for signing.
+ * Accepts both PKCS#8 ("BEGIN PRIVATE KEY") and legacy PKCS#1 ("BEGIN RSA PRIVATE KEY").
+ * Cloudflare Workers' Web Crypto only supports PKCS#8 natively; PKCS#1 keys must be
+ * converted first — this is done automatically via a minimal DER wrapping so you never
+ * need to convert your key offline.
+ */
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  const isPkcs1 = pem.includes("BEGIN RSA PRIVATE KEY");
+
+  const b64 = pem
+    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, "")
+    .replace(/-----END (RSA )?PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+
+  const der = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+  let keyData: ArrayBuffer;
+
+  if (isPkcs1) {
+    // Wrap PKCS#1 DER in a PKCS#8 container so Web Crypto can import it.
+    // PKCS#8 = SEQUENCE { version=0, algorithmIdentifier (rsaEncryption OID), OCTET STRING { pkcs1Der } }
+    const rsaOid = new Uint8Array([
+      0x30, 0x0d,                   // SEQUENCE (13 bytes)
+      0x06, 0x09,                   // OID (9 bytes)
+      0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, // rsaEncryption
+      0x05, 0x00,                   // NULL
+    ]);
+
+    // DER-encode the length of a field
+    function derLen(n: number): Uint8Array {
+      if (n < 0x80) return new Uint8Array([n]);
+      if (n < 0x100) return new Uint8Array([0x81, n]);
+      return new Uint8Array([0x82, (n >> 8) & 0xff, n & 0xff]);
+    }
+
+    // Build OCTET STRING containing the PKCS#1 DER
+    const octetLenBytes = derLen(der.length);
+    const octetString = new Uint8Array([0x04, ...octetLenBytes, ...der]);
+
+    // Build outer SEQUENCE
+    const seqContent = new Uint8Array([
+      0x02, 0x01, 0x00,             // INTEGER version = 0
+      ...rsaOid,
+      ...octetString,
+    ]);
+    const seqLenBytes = derLen(seqContent.length);
+    const pkcs8 = new Uint8Array([0x30, ...seqLenBytes, ...seqContent]);
+    keyData = pkcs8.buffer;
+  } else {
+    keyData = der.buffer;
+  }
+
+  try {
+    return await crypto.subtle.importKey(
+      "pkcs8",
+      keyData,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+  } catch (err: any) {
+    throw new Error(
+      `Private key import failed (${isPkcs1 ? "PKCS#1→PKCS#8 wrap" : "PKCS#8"}): ${err?.message ?? err}. ` +
+      `Make sure JAAS_PRIVATE_KEY is the full PEM including header/footer lines.`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Route — requires a valid Supabase session (Bearer token in Authorization header)
+// ---------------------------------------------------------------------------
+
+export const Route = createFileRoute("/api/jaas-token")({
+  server: {
+    middleware: [requireSupabaseAuth],
+    handlers: {
+      POST: async ({ request, context }) => {
+        // FIX: trim all three. A trailing space/newline pasted into a secret
+        // silently breaks JaaS auth for EVERY user: a dirty AppID makes the
+        // JWT `sub` not match the tenant, and a dirty key id makes the `kid`
+        // lookup fail. Both surface only as "Authentication failed - you're
+        // not allowed to join this call" inside the meeting.
+        const appId    = process.env.JAAS_APP_ID?.trim();
+        const apiKey   = process.env.JAAS_API_KEY?.trim();
+        // Some secret UIs store the PEM with literal "\n" instead of real
+        // newlines - normalise so both forms work.
+        const privateKey = process.env.JAAS_PRIVATE_KEY?.trim().replace(/\\n/g, "\n");
+
+        // Descriptive 503 so the developer knows exactly which vars to set
+        const missing = [
+          !appId     && "JAAS_APP_ID",
+          !apiKey    && "JAAS_API_KEY",
+          !privateKey && "JAAS_PRIVATE_KEY",
+        ].filter(Boolean);
+
+        if (missing.length) {
+          return new Response(
+            JSON.stringify({
+              error: `JaaS not configured — add these Cloudflare Worker secrets: ${missing.join(", ")}`,
+            }),
+            { status: 503, headers: { "content-type": "application/json" } },
+          );
+        }
+
+        const userId: string = (context as any).userId;
+
+        let body: { room?: string };
+        try {
+          body = await request.json();
+        } catch {
+          return new Response(JSON.stringify({ error: "Bad JSON body" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        const { room } = body;
+        if (!room || typeof room !== "string" || room.trim() === "") {
+          return new Response(JSON.stringify({ error: "room is required" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Sanitise room name — only allow UUID-like or slug chars
+        const safeRoom = room.trim().replace(/[^a-zA-Z0-9_\-]/g, "");
+        if (!safeRoom) {
+          return new Response(JSON.stringify({ error: "Invalid room name — only letters, digits, hyphens and underscores allowed" }), {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // Fetch real user identity from DB — never trust client-supplied values
+        const { data: profile, error: profileErr } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profileErr) {
+          console.error("[jaas-token] profile fetch error:", profileErr);
+          return new Response(JSON.stringify({ error: "Failed to load user profile" }), {
+            status: 500,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        if (!profile) {
+          return new Response(
+            JSON.stringify({ error: "User profile not found — contact your administrator" }),
+            { status: 403, headers: { "content-type": "application/json" } },
+          );
+        }
+
+        // Email lives on auth.users, not profiles — fetch it separately via the
+        // service-role admin client. Non-fatal if it errors; we just fall back to "".
+        const { data: authUserRes, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (authUserErr) {
+          console.error("[jaas-token] auth user fetch error:", authUserErr);
+        }
+        const email = authUserRes?.user?.email ?? "";
+
+        // Determine moderator status from DB role — never from request body.
+        // FIX: this used to check a single arbitrary role row (.maybeSingle())
+        // against a hand-rolled list that included a role literal ("admin")
+        // which doesn't exist anywhere in this system's role enum, and left out
+        // class_teacher / subject_teacher / hod / academic_master / super_admin /
+        // principal / deputy_principal entirely. In practice that meant almost
+        // no one who actually starts a live class ever got moderator rights in
+        // the meeting. is_teaching() is the same DB function the app's RLS
+        // policies already use to decide "can this person manage this class" —
+        // reusing it here keeps JaaS moderator status in sync with that instead
+        // of drifting out of it again.
+        const { data: isModeratorRpc, error: modErr } = await supabaseAdmin.rpc(
+          "is_teaching",
+          { _user_id: userId },
+        );
+        if (modErr) {
+          console.error("[jaas-token] is_teaching RPC failed:", modErr);
+        }
+        const isModerator = isModeratorRpc === true;
+
+        const now = Math.floor(Date.now() / 1000);
+
+        const jwtPayload = {
+          iss: "chat",
+          iat: now,
+          exp: now + 3600,
+          nbf: now - 10,
+          aud: "jitsi",
+          sub: appId,
+          room: safeRoom,
+          context: {
+            user: {
+              id: userId,
+              name: profile.full_name ?? "User",
+              email,
+              moderator: isModerator,
+            },
+            features: {
+              livestreaming: false,
+              recording: false,
+              transcription: false,
+              "outbound-call": false,
+            },
+          },
+        };
+
+        // FIX: JaaS's key-lookup service resolves the signing key by the
+        // *compound* id "{appId}/{keyId}" — not the bare key id alone. If
+        // JAAS_API_KEY was ever saved as just the short key id (a very easy
+        // mistake, since that's usually the label shown next to it in the
+        // JaaS console), every token this route issues gets silently
+        // rejected by JaaS's key lookup — no error here, just a broken
+        // meeting/moderator experience on the Jitsi side. This makes the
+        // header correct either way apiKey was saved.
+        const kid = apiKey!.includes("/") ? apiKey! : `${appId}/${apiKey}`;
+        const headerB64    = encodeJson({ alg: "RS256", typ: "JWT", kid });
+        const payloadB64   = encodeJson(jwtPayload);
+        const signingInput = `${headerB64}.${payloadB64}`;
+
+        let key: CryptoKey;
+        try {
+          key = await importPrivateKey(privateKey!);
+        } catch (e: any) {
+          console.error("[jaas-token] key import failed:", e?.message);
+          return new Response(
+            JSON.stringify({ error: e?.message ?? "Private key import failed" }),
+            { status: 500, headers: { "content-type": "application/json" } },
+          );
+        }
+
+        const signature = await crypto.subtle.sign(
+          "RSASSA-PKCS1-v1_5",
+          key,
+          new TextEncoder().encode(signingInput),
+        );
+
+        const token = `${signingInput}.${base64urlEncode(signature)}`;
+
+        // Safe diagnostics (no secrets) - visible in `wrangler tail` / Worker logs.
+        console.log("[jaas-token] issued", { sub: appId, kid, room: safeRoom, moderator: isModerator });
+        if (!appId!.startsWith("vpaas-magic-cookie-")) {
+          console.warn("[jaas-token] JAAS_APP_ID does not look like a JaaS AppID (expected vpaas-magic-cookie-...)");
+        }
+        if (!kid.startsWith(`${appId}/`)) {
+          console.warn("[jaas-token] kid does not start with the AppID - JAAS_API_KEY belongs to a different AppID?", { kid });
+        }
+
+        // FIX: return the AppID the token was actually signed for. The browser
+        // used to read a *separate* build-time VITE_JAAS_APP_ID for the meeting
+        // URL; if the two ever differed by even one character, JaaS rejected
+        // every user (admins included). Now the client uses this one, so they
+        // can never disagree.
+        return new Response(JSON.stringify({ token, appId }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+          },
+        });
+      },
+    },
+  },
+});
