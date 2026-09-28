@@ -47,6 +47,12 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
     // Token is valid 60 min — refetch at 50 min to be safe
     staleTime: 1000 * 60 * 50,
     retry: 2,
+    // A background refetch mints a brand-new JWT, which changes the `jwt`
+    // prop LiveRoom depends on and tears the whole meeting down and rebuilds
+    // it. Token stays valid for the full hour, so never refetch on
+    // focus/reconnect.
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     queryFn: async () => {
       // Always get a fresh session token before calling the API
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -76,9 +82,9 @@ function useJaasToken(roomName: string | undefined, enabled: boolean) {
         throw new Error(errMsg);
       }
 
-      const { token } = await res.json();
+      const { token, appId } = await res.json();
       if (!token) throw new Error("Server returned empty token");
-      return token as string;
+      return { token: token as string, appId: (appId as string | undefined) ?? undefined };
     },
   });
 }
@@ -421,13 +427,17 @@ function SessionRoom() {
   // JaaS token — only fetch when session is actually live
   const isLive = session?.status === "live";
   const {
-    data: jaasToken,
+    data: jaasData,
     isLoading: tokenLoading,
     error: tokenError,
   } = useJaasToken(session?.room_name, isLive);
+  const jaasToken = jaasData?.token;
 
-  // JaaS App ID from env (VITE_JAAS_APP_ID in .env / Cloudflare Pages vars)
-  const jaasAppId = import.meta.env.VITE_JAAS_APP_ID as string | undefined;
+  // The server returns the AppID it signed the token with - use that so the
+  // meeting URL and the JWT `sub` can never disagree. The build-time
+  // VITE_JAAS_APP_ID is now only a fallback for older server deployments.
+  const jaasAppId =
+    jaasData?.appId ?? (import.meta.env.VITE_JAAS_APP_ID as string | undefined);
 
   if (isLoading)
     return (
@@ -520,16 +530,8 @@ function SessionRoom() {
             <p className="text-destructive text-sm font-medium">
               {tokenError
                 ? `Could not get meeting token: ${(tokenError as Error).message}`
-                : "JaaS App ID not configured. VITE_JAAS_APP_ID is missing from this build."}
+                : "JaaS is not configured on the server. Set JAAS_APP_ID, JAAS_API_KEY and JAAS_PRIVATE_KEY as Cloudflare Worker secrets."}
             </p>
-            {!jaasAppId && (
-              <p className="text-xs text-muted-foreground">
-                Add <code className="bg-muted px-1 rounded">VITE_JAAS_APP_ID</code> as a GitHub Actions repository
-                secret (Settings → Secrets and variables → Actions), then push to <code className="bg-muted px-1 rounded">main</code> or
-                re-run the deploy workflow. It's baked into the bundle at build time — Cloudflare Worker/Pages
-                environment variables have no effect on this one.
-              </p>
-            )}
             <Button
               variant="outline"
               onClick={() => qc.invalidateQueries({ queryKey: ["jaas-token"] })}
