@@ -249,6 +249,48 @@ function LiveRoom({
 
     window.addEventListener("beforeunload", markLeft);
 
+    // Backstop for auth/connection failures Jitsi renders INSIDE its own
+    // iframe UI (e.g. "Authentication failed — you're not allowed to join
+    // this call") — these never throw out to our code and never fire
+    // videoConferenceJoined, so without this the raw Jitsi dialog is the
+    // only thing anyone ever sees, and we have no record of it happening.
+    let joined = false;
+    let handledFailure = false;
+    const JOIN_TIMEOUT_MS = 20_000;
+
+    const failMeeting = (code: string, message: string, context?: Record<string, unknown>) => {
+      if (handledFailure || joined || cancelled) return;
+      handledFailure = true;
+      reportError(new Error(message), { source: "live_class", code, severity: "critical", context: { sessionId, roomName, ...context } });
+      try { api?.dispose(); } catch { /* ignore */ }
+      if (containerRef.current) containerRef.current.innerHTML = ""; // hide Jitsi's own dialog
+      if (!cancelled) setLoadError("Couldn't start this class. Support has been notified.");
+    };
+
+    const joinTimeout = setTimeout(() => {
+      failMeeting("MEETING_JOIN_TIMEOUT", "Meeting did not join within timeout — likely an auth/connection failure inside the Jitsi UI");
+    }, JOIN_TIMEOUT_MS);
+
+    const handleJoined = () => {
+      joined = true;
+      clearTimeout(joinTimeout);
+      return markJoined();
+    };
+
+    // errorOccurred is the External API's real signal for exactly this class
+    // of failure (auth rejection, connection/conference errors) — type is
+    // 'CONFIG' | 'CONNECTION' | 'CONFERENCE', isFatal marks ones Jitsi itself
+    // treats as unrecoverable.
+    const handleErrorOccurred = (e: { type?: string; isFatal?: boolean; message?: string; name?: string }) => {
+      if (e?.isFatal || e?.type === "CONNECTION" || e?.type === "CONFERENCE") {
+        failMeeting("MEETING_AUTH_OR_CONNECTION_ERROR", e?.message || e?.name || "Meeting rejected by conferencing service", {
+          type: e?.type,
+          name: e?.name,
+          isFatal: e?.isFatal,
+        });
+      }
+    };
+
     loadJitsiScript(jaasAppId)
       .then(() => {
         if (cancelled || !containerRef.current) return;
@@ -288,24 +330,28 @@ function LiveRoom({
           },
         });
         apiRef.current = api;
-        api.addEventListener("videoConferenceJoined", markJoined);
+        api.addEventListener("videoConferenceJoined", handleJoined);
         api.addEventListener("videoConferenceLeft", markLeft);
         api.addEventListener("readyToClose", markLeft);
+        api.addEventListener("errorOccurred", handleErrorOccurred);
       })
       .catch((err: Error) => {
+        clearTimeout(joinTimeout);
         reportError(err, { source: "live_class", code: "MEETING_LIBRARY_LOAD_FAILED", context: { sessionId } });
         if (!cancelled) setLoadError("Couldn't load this class. Support has been notified.");
       });
 
     return () => {
       cancelled = true;
+      clearTimeout(joinTimeout);
       window.removeEventListener("beforeunload", markLeft);
       markLeft();
       if (api) {
         try {
-          api.removeEventListener("videoConferenceJoined", markJoined);
+          api.removeEventListener("videoConferenceJoined", handleJoined);
           api.removeEventListener("videoConferenceLeft", markLeft);
           api.removeEventListener("readyToClose", markLeft);
+          api.removeEventListener("errorOccurred", handleErrorOccurred);
           api.dispose();
         } catch {
           // ignore dispose errors on unmount
