@@ -30,6 +30,7 @@ interface AuthCtx {
   roles: AppRole[];
   scopes: PlatformScope[];
   fullName: string;
+  avatarUrl: string | null;
   loading: boolean;
   rolesLoaded: boolean;
   // True only once we have a *confirmed* answer to "is there a session or
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [scopes, setScopes] = useState<PlatformScope[]>([]);
   const [fullName, setFullName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [rolesLoaded, setRolesLoaded] = useState(false);
@@ -157,8 +159,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const rolesPromise = supabase.from("user_roles").select("role").eq("user_id", uid)
       .then(({ data }) => setRoles((data ?? []).map((r) => r.role as AppRole)))
       .catch((err) => console.error("[useAuth] roles query failed:", err));
-    const profilePromise = supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle()
-      .then(({ data }) => setFullName(data?.full_name ?? ""))
+    const profilePromise = supabase.from("profiles").select("full_name, photo_url, avatar_url").eq("id", uid).maybeSingle()
+      .then(async ({ data }) => {
+        setFullName(data?.full_name ?? "");
+        // Profile photo = the photo uploaded at admission/registration.
+        // Prefer the profile's own photo, then fall back to the linked
+        // student record, then the linked staff record.
+        let url: string | null = (data as any)?.photo_url || (data as any)?.avatar_url || null;
+        if (!url) {
+          const { data: link } = await supabase.from("student_user_links").select("student_id").eq("user_id", uid).maybeSingle();
+          if (link?.student_id) {
+            const { data: stu } = await supabase.from("students").select("photo_url").eq("id", link.student_id).maybeSingle();
+            url = (stu as any)?.photo_url ?? null;
+          }
+        }
+        if (!url) {
+          const { data: stf } = await supabase.from("staff").select("photo_url").eq("user_id", uid).maybeSingle();
+          url = (stf as any)?.photo_url ?? null;
+        }
+        setAvatarUrl(url);
+      })
       .catch((err) => console.error("[useAuth] profile query failed:", err));
     // Only matters for platform_owner/platform_support accounts, but cheap
     // enough (own rows only, RLS-scoped) to just always fetch — an empty
@@ -232,6 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     scopes,
     fullName,
+    avatarUrl,
     loading,
     rolesLoaded,
     sessionChecked,
@@ -240,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasPlatformSection,
     hasPlatformSchool,
     signOut,
-  }), [session, roles, scopes, fullName, loading, rolesLoaded, sessionChecked, hasRole, isAdmin, hasPlatformSection, hasPlatformSchool, signOut]);
+  }), [session, roles, scopes, fullName, avatarUrl, loading, rolesLoaded, sessionChecked, hasRole, isAdmin, hasPlatformSection, hasPlatformSchool, signOut]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
