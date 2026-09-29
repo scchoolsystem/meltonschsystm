@@ -187,6 +187,10 @@ function LiveRoom({
   // banked from earlier stays (so refresh / rejoin adds up instead of resetting).
   const attendanceRef = useRef<{ id?: string; segStart?: number; baseSeconds?: number }>({});
   const leftSentRef = useRef(false);
+  // True once the browser has started unloading the page (refresh / close /
+  // hard navigation). Any request started after this point can be cancelled,
+  // so it must be sent with keepalive and must not be reported as an error.
+  const unloadingRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -292,6 +296,30 @@ function LiveRoom({
       }, 20_000);
     };
 
+    // PATCH the attendance row with fetch(keepalive) so it survives the page
+    // unloading. Returns false if it couldn't be sent this way.
+    const keepalivePatch = (id: string, body: Record<string, unknown>): boolean => {
+      if (!accessTokenRef.current) return false;
+      try {
+        const base = (supabase as any).supabaseUrl as string;
+        const key = (supabase as any).supabaseKey as string;
+        fetch(`${base}/rest/v1/live_session_attendance?id=eq.${id}`, {
+          method: "PATCH",
+          keepalive: true,
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${accessTokenRef.current}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(body),
+        }).catch(() => { /* page may be going away; heartbeat already saved time */ });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     const markLeft = (ev?: any) => {
       const { id } = attendanceRef.current;
       if (!id || leftSentRef.current) return;
@@ -302,44 +330,47 @@ function LiveRoom({
       // stamp left_at. Just save last-seen + time so far. If they come back
       // (refresh), markJoined picks the same row up; if they don't, the
       // roster shows them as gone at last_seen_at once the heartbeat stops.
-      const closing = ev?.type === "beforeunload" || ev?.type === "pagehide";
+      const closing = unloadingRef.current || ev?.type === "beforeunload" || ev?.type === "pagehide";
       if (closing) {
-        if (!accessTokenRef.current) return;
-        try {
-          const base = (supabase as any).supabaseUrl as string;
-          const key = (supabase as any).supabaseKey as string;
-          fetch(`${base}/rest/v1/live_session_attendance?id=eq.${id}`, {
-            method: "PATCH",
-            keepalive: true,
-            headers: {
-              apikey: key,
-              Authorization: `Bearer ${accessTokenRef.current}`,
-              "Content-Type": "application/json",
-              Prefer: "return=minimal",
-            },
-            body: JSON.stringify({ last_seen_at: nowIso, duration_seconds: dur }),
-          }).catch(() => { /* page is closing */ });
-        } catch { /* ignore */ }
+        keepalivePatch(id, { last_seen_at: nowIso, duration_seconds: dur });
         return;
       }
 
       // Real leave: hung up in Jitsi, closed the meeting, or navigated away
-      // inside the app.
+      // inside the app. Send with keepalive first (survives the iframe /
+      // route teardown that used to cancel this request and produce
+      // "TypeError: Failed to fetch"); fall back to the normal client.
       leftSentRef.current = true;
       if (heartbeat) clearInterval(heartbeat);
+      const body = { left_at: nowIso, last_seen_at: nowIso, duration_seconds: dur };
+      if (keepalivePatch(id, body)) {
+        // Refresh the roster shortly after; the request is fire-and-forget.
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] }), 1500);
+        return;
+      }
       supabase
         .from("live_session_attendance")
-        .update({ left_at: nowIso, last_seen_at: nowIso, duration_seconds: dur } as any)
+        .update(body as any)
         .eq("id", id)
         .then(({ error }) => {
           if (error) {
-            console.error("attendance leave-update failed", error);
-            reportError(error, { source: "live_class", code: "ATTENDANCE_LEAVE_UPDATE_FAILED", context: { sessionId } });
+            // A cancelled/offline request isn't a real fault: the heartbeat
+            // already saved last_seen + time, so don't page support for it.
+            const benign = unloadingRef.current || (typeof navigator !== "undefined" && navigator.onLine === false) ||
+              /failed to fetch|networkerror|load failed/i.test(String((error as any)?.message ?? ""));
+            if (!benign) {
+              console.error("attendance leave-update failed", error);
+              reportError(error, { source: "live_class", code: "ATTENDANCE_LEAVE_UPDATE_FAILED", context: { sessionId } });
+            }
           }
           qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
         });
     };
 
+    const markUnloading = () => { unloadingRef.current = true; };
+    // Set the flag BEFORE markLeft runs on unload.
+    window.addEventListener("beforeunload", markUnloading);
+    window.addEventListener("pagehide", markUnloading);
     window.addEventListener("beforeunload", markLeft);
     window.addEventListener("pagehide", markLeft);
 
@@ -455,6 +486,8 @@ function LiveRoom({
       clearTimeout(joinTimeout);
       window.removeEventListener("beforeunload", markLeft);
       window.removeEventListener("pagehide", markLeft);
+      window.removeEventListener("beforeunload", markUnloading);
+      window.removeEventListener("pagehide", markUnloading);
       if (heartbeat) clearInterval(heartbeat);
       markLeft();
       if (api) {
