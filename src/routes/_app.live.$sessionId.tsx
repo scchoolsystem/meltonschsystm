@@ -183,7 +183,9 @@ function LiveRoom({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
-  const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  // segStart = when THIS stay in the room began; baseSeconds = minutes already
+  // banked from earlier stays (so refresh / rejoin adds up instead of resetting).
+  const attendanceRef = useRef<{ id?: string; segStart?: number; baseSeconds?: number }>({});
   const leftSentRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -193,63 +195,116 @@ function LiveRoom({
     let cancelled = false;
     let api: any;
 
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+    // Total seconds in class = banked from earlier stays + this stay so far.
+    const totalSeconds = () => {
+      const { segStart, baseSeconds = 0 } = attendanceRef.current;
+      return baseSeconds + Math.max(0, Math.round((Date.now() - (segStart ?? Date.now())) / 1000));
+    };
+
+    const attendanceFailed = (error: any, code: string) => {
+      console.error(code, error);
+      reportError(error, { source: "live_class", code, context: { sessionId, studentId } });
+      toast.error("Couldn't record your attendance. Support has been notified.");
+    };
+
     const markJoined = async () => {
       if (!isStudent || !studentId) return;
-      const joinedAt = Date.now();
-      const minsLate = differenceInMinutes(new Date(joinedAt), new Date(scheduledStart));
-      const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
-      const { data, error } = await supabase
+      const now = Date.now();
+      const nowIso = new Date(now).toISOString();
+
+      // Look for an existing row FIRST. Before, every join blindly overwrote
+      // joined_at / status / duration, so leaving and coming back (or a page
+      // refresh) restarted the record from the new time and could flip
+      // "present" to "late".
+      const { data: existing, error: readErr } = await supabase
         .from("live_session_attendance")
-        .upsert(
-          {
-            session_id: sessionId,
-            student_id: studentId,
-            user_id: userId ?? null,
-            joined_at: new Date(joinedAt).toISOString(),
-            left_at: null,
-            duration_seconds: null,
-            status: autoStatus,
-          } as any,
-          { onConflict: "session_id,student_id" },
-        )
-        .select("id")
+        .select("id, joined_at, status, duration_seconds, rejoin_count")
+        .eq("session_id", sessionId)
+        .eq("student_id", studentId)
         .maybeSingle();
-      if (error) {
-        // FIX: this used to be console.warn-only, so a failed write (e.g. an
-        // RLS or network hiccup) was invisible — the roster would just show
-        // the student as never having joined, with no signal anything went
-        // wrong. Now it surfaces directly.
-        console.error("attendance insert failed", error);
-        reportError(error, {
-          source: "live_class",
-          code: "ATTENDANCE_INSERT_FAILED",
-          context: { sessionId, studentId },
-        });
-        toast.error("Couldn't record your attendance. Support has been notified.");
-        return;
+      if (readErr) return attendanceFailed(readErr, "ATTENDANCE_READ_FAILED");
+
+      const ex = existing as any;
+      let rowId: string | undefined;
+      let base = 0;
+
+      if (ex && ex.joined_at && ex.status !== "absent") {
+        // Coming back: keep first join time + status, keep banked time,
+        // just reopen the row.
+        base = ex.duration_seconds ?? 0;
+        const { error } = await supabase
+          .from("live_session_attendance")
+          .update({ left_at: null, last_seen_at: nowIso, rejoin_count: (ex.rejoin_count ?? 0) + 1 } as any)
+          .eq("id", ex.id);
+        if (error) return attendanceFailed(error, "ATTENDANCE_REJOIN_FAILED");
+        rowId = ex.id;
+      } else {
+        // First real join (or teacher had them marked absent).
+        const minsLate = differenceInMinutes(new Date(now), new Date(scheduledStart));
+        const autoStatus: AttendStatus = minsLate > 5 ? "late" : "present";
+        const { data, error } = await supabase
+          .from("live_session_attendance")
+          .upsert(
+            {
+              session_id: sessionId,
+              student_id: studentId,
+              user_id: userId ?? null,
+              joined_at: nowIso,
+              left_at: null,
+              last_seen_at: nowIso,
+              duration_seconds: 0,
+              status: autoStatus,
+            } as any,
+            { onConflict: "session_id,student_id" },
+          )
+          .select("id")
+          .maybeSingle();
+        if (error) return attendanceFailed(error, "ATTENDANCE_INSERT_FAILED");
+        rowId = data?.id;
       }
-      attendanceRef.current = { id: data?.id, joinedAt };
+
+      attendanceRef.current = { id: rowId, segStart: now, baseSeconds: base };
       leftSentRef.current = false;
-      // Cache the access token so the leave update can be sent with
-      // fetch(keepalive) while the page is closing (no awaiting possible then).
+
+      // Cache the access token so the closing-tab update can be sent with
+      // fetch(keepalive) (no awaiting possible then).
       const { data: sd } = await supabase.auth.getSession();
       accessTokenRef.current = sd.session?.access_token ?? null;
       qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
+
+      // Heartbeat: while the student is in the room, keep last_seen_at and
+      // total time fresh. This is what lets a refresh / dropped connection
+      // count as "still here" instead of "left".
+      if (heartbeat) clearInterval(heartbeat);
+      heartbeat = setInterval(() => {
+        const { id } = attendanceRef.current;
+        if (!id || leftSentRef.current) return;
+        supabase.auth.getSession().then(({ data }) => {
+          accessTokenRef.current = data.session?.access_token ?? accessTokenRef.current;
+        });
+        supabase
+          .from("live_session_attendance")
+          .update({ last_seen_at: new Date().toISOString(), duration_seconds: totalSeconds(), left_at: null } as any)
+          .eq("id", id)
+          .then(() => { /* best effort */ });
+      }, 20_000);
     };
 
     const markLeft = (ev?: any) => {
-      const { id, joinedAt } = attendanceRef.current;
-      // Fire once per join: leave/close/unload/unmount can all trigger this.
-      if (!id || !joinedAt || leftSentRef.current) return;
-      leftSentRef.current = true;
-      const dur = Math.round((Date.now() - joinedAt) / 1000);
-      const leftAt = new Date().toISOString();
+      const { id } = attendanceRef.current;
+      if (!id || leftSentRef.current) return;
+      const dur = totalSeconds();
+      const nowIso = new Date().toISOString();
 
-      // While the tab is closing, a normal supabase-js request is cancelled by
-      // the browser and surfaces as "TypeError: Failed to fetch". keepalive
-      // lets the request finish after the page is gone.
+      // Tab closing OR refreshing (the browser can't tell us which): do NOT
+      // stamp left_at. Just save last-seen + time so far. If they come back
+      // (refresh), markJoined picks the same row up; if they don't, the
+      // roster shows them as gone at last_seen_at once the heartbeat stops.
       const closing = ev?.type === "beforeunload" || ev?.type === "pagehide";
-      if (closing && accessTokenRef.current) {
+      if (closing) {
+        if (!accessTokenRef.current) return;
         try {
           const base = (supabase as any).supabaseUrl as string;
           const key = (supabase as any).supabaseKey as string;
@@ -262,15 +317,19 @@ function LiveRoom({
               "Content-Type": "application/json",
               Prefer: "return=minimal",
             },
-            body: JSON.stringify({ left_at: leftAt, duration_seconds: dur }),
-          }).catch(() => { /* page is closing; nothing else to do */ });
+            body: JSON.stringify({ last_seen_at: nowIso, duration_seconds: dur }),
+          }).catch(() => { /* page is closing */ });
         } catch { /* ignore */ }
         return;
       }
 
+      // Real leave: hung up in Jitsi, closed the meeting, or navigated away
+      // inside the app.
+      leftSentRef.current = true;
+      if (heartbeat) clearInterval(heartbeat);
       supabase
         .from("live_session_attendance")
-        .update({ left_at: leftAt, duration_seconds: dur })
+        .update({ left_at: nowIso, last_seen_at: nowIso, duration_seconds: dur } as any)
         .eq("id", id)
         .then(({ error }) => {
           if (error) {
@@ -396,6 +455,7 @@ function LiveRoom({
       clearTimeout(joinTimeout);
       window.removeEventListener("beforeunload", markLeft);
       window.removeEventListener("pagehide", markLeft);
+      if (heartbeat) clearInterval(heartbeat);
       markLeft();
       if (api) {
         try {
@@ -730,6 +790,12 @@ function AttendanceRoster({
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  // Re-render every 15s so "In room" can flip to "last seen" when heartbeats stop.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
 
   const { data: roster = [], isLoading: rosterLoading } = useQuery({
     queryKey: ["class-roster", classId],
@@ -752,7 +818,7 @@ function AttendanceRoster({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("live_session_attendance")
-        .select("id, student_id, joined_at, left_at, duration_seconds, status")
+        .select("id, student_id, joined_at, left_at, last_seen_at, duration_seconds, status, rejoin_count")
         .eq("session_id", sessionId);
       if (error) throw error;
       return data || [];
@@ -912,7 +978,13 @@ function AttendanceRoster({
                       {a?.left_at ? (
                         format(new Date(a.left_at), "p")
                       ) : hasRecord && status !== "absent" ? (
-                        <Badge variant="secondary">In room</Badge>
+                        a?.last_seen_at && nowTick - new Date(a.last_seen_at).getTime() > 60_000 ? (
+                          <span className="text-muted-foreground" title="Connection dropped — last seen">
+                            {format(new Date(a.last_seen_at), "p")}
+                          </span>
+                        ) : (
+                          <Badge variant="secondary">In room</Badge>
+                        )
                       ) : (
                         "—"
                       )}
