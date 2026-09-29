@@ -199,7 +199,7 @@ export const Route = createFileRoute("/api/jaas-token")({
         // Fetch real user identity from DB — never trust client-supplied values
         const { data: profile, error: profileErr } = await supabaseAdmin
           .from("profiles")
-          .select("full_name")
+          .select("full_name, photo_url, avatar_url")
           .eq("id", userId)
           .maybeSingle();
 
@@ -250,6 +250,27 @@ export const Route = createFileRoute("/api/jaas-token")({
         }
         const isModerator = isModeratorRpc === true;
 
+        // Profile photo shown on the participant's tile in the live class:
+        // profile photo, else the linked student's admission photo, else the
+        // linked staff record's photo. Public URLs only.
+        let avatar: string | undefined =
+          (profile as any).photo_url || (profile as any).avatar_url || undefined;
+        if (!avatar) {
+          const { data: link } = await supabaseAdmin
+            .from("student_user_links").select("student_id").eq("user_id", userId).maybeSingle();
+          if (link?.student_id) {
+            const { data: stu } = await supabaseAdmin
+              .from("students").select("photo_url").eq("id", link.student_id).maybeSingle();
+            avatar = (stu as any)?.photo_url || undefined;
+          }
+        }
+        if (!avatar) {
+          const { data: stf } = await supabaseAdmin
+            .from("staff").select("photo_url").eq("user_id", userId).maybeSingle();
+          avatar = (stf as any)?.photo_url || undefined;
+        }
+        if (avatar && !/^https:\/\//i.test(avatar)) avatar = undefined;
+
         const now = Math.floor(Date.now() / 1000);
 
         const jwtPayload = {
@@ -265,6 +286,7 @@ export const Route = createFileRoute("/api/jaas-token")({
               id: userId,
               name: profile.full_name ?? "User",
               email,
+              avatar,
               moderator: isModerator,
             },
             features: {
