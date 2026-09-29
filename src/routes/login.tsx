@@ -91,9 +91,26 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: pw });
       if (error) { if (/invalid login|invalid credentials/i.test(error.message)) throw new Error("Invalid Unique ID or password."); throw error; }
       if (school?.id) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.rpc("set_default_school", { p_school_id: school.id });
+        // Enforce that the signed-in account actually belongs to the school
+        // picked on this screen. Unique-ID logins are already scoped by
+        // lookup_login_email, but email logins were not, so an account from
+        // School A could sign in under School B's portal. Platform staff are
+        // exempt. Fails closed: any error or mismatch signs the user out.
+        const [{ data: isMember, error: memErr }, { data: isPlatformUser, error: platErr }] = await Promise.all([
+          supabase.rpc("is_member_of", { _school_id: school.id }),
+          supabase.rpc("is_platform"),
+        ]);
+        if (memErr || platErr || (isMember !== true && isPlatformUser !== true)) {
+          await supabase.auth.signOut();
+          throw new Error("Your account is not linked to this school. Contact your school administrator.");
+        }
+        if (isMember === true) {
+          // Best effort: make this school the account's default so
+          // my_school_id() (used by RLS) matches the portal shown.
+          await supabase.rpc("set_default_school", { p_school_id: school.id }).then(
+            ({ error: dsErr }) => { if (dsErr) console.warn("[login] set_default_school failed:", dsErr.message); },
+            () => {},
+          );
         }
       }
       toast.success("Welcome back");
