@@ -12,13 +12,13 @@ import { useTenant } from "@/hooks/use-tenant";
 import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buildNavigation } from "@/lib/role-experience";
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { fullName, user, signOut, roles } = useAuth();
+  const { fullName, avatarUrl, user, signOut, roles } = useAuth();
   const { theme, toggle } = useTheme();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { school, features } = useTenant();
@@ -86,6 +86,7 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent">
                 <Avatar className="w-6 h-6">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName || "Profile"} className="object-cover" />}
                   <AvatarFallback className="text-[10px] bg-sidebar-primary text-sidebar-primary-foreground">
                     {(fullName || user?.email || "U").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
