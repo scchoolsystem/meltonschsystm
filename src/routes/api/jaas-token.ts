@@ -171,6 +171,31 @@ export const Route = createFileRoute("/api/jaas-token")({
           });
         }
 
+        // Authorization: only issue a token for a room this user is allowed to
+        // see. This query runs with the caller's own JWT (RLS applies), so it
+        // returns a row only if live_sessions RLS lets them view that session
+        // (their school + their class / a teacher / admin / linked parent).
+        // Without this, any signed-in user who knew a room name got a token.
+        const userDb = (context as any).supabase;
+        const { data: allowedSession, error: allowErr } = await userDb
+          .from("live_sessions")
+          .select("id")
+          .eq("room_name", safeRoom)
+          .maybeSingle();
+        if (allowErr || !allowedSession) {
+          await report(
+            (context as any)?.userId,
+            "JAAS_ROOM_NOT_ALLOWED",
+            `Token refused: user cannot access room ${safeRoom}${allowErr ? ` (${allowErr.message})` : ""}`,
+            "warning",
+            { room: safeRoom },
+          );
+          return new Response(JSON.stringify({ error: "forbidden" }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
         // Fetch real user identity from DB — never trust client-supplied values
         const { data: profile, error: profileErr } = await supabaseAdmin
           .from("profiles")
