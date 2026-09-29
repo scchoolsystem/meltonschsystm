@@ -184,6 +184,8 @@ function LiveRoom({
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
   const attendanceRef = useRef<{ id?: string; joinedAt?: number }>({});
+  const leftSentRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const qc = useQueryClient();
 
@@ -227,16 +229,48 @@ function LiveRoom({
         return;
       }
       attendanceRef.current = { id: data?.id, joinedAt };
+      leftSentRef.current = false;
+      // Cache the access token so the leave update can be sent with
+      // fetch(keepalive) while the page is closing (no awaiting possible then).
+      const { data: sd } = await supabase.auth.getSession();
+      accessTokenRef.current = sd.session?.access_token ?? null;
       qc.invalidateQueries({ queryKey: ["live-session-attendance", sessionId] });
     };
 
-    const markLeft = () => {
+    const markLeft = (ev?: any) => {
       const { id, joinedAt } = attendanceRef.current;
-      if (!id || !joinedAt) return;
+      // Fire once per join: leave/close/unload/unmount can all trigger this.
+      if (!id || !joinedAt || leftSentRef.current) return;
+      leftSentRef.current = true;
       const dur = Math.round((Date.now() - joinedAt) / 1000);
+      const leftAt = new Date().toISOString();
+
+      // While the tab is closing, a normal supabase-js request is cancelled by
+      // the browser and surfaces as "TypeError: Failed to fetch". keepalive
+      // lets the request finish after the page is gone.
+      const closing = ev?.type === "beforeunload" || ev?.type === "pagehide";
+      if (closing && accessTokenRef.current) {
+        try {
+          const base = (supabase as any).supabaseUrl as string;
+          const key = (supabase as any).supabaseKey as string;
+          fetch(`${base}/rest/v1/live_session_attendance?id=eq.${id}`, {
+            method: "PATCH",
+            keepalive: true,
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${accessTokenRef.current}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({ left_at: leftAt, duration_seconds: dur }),
+          }).catch(() => { /* page is closing; nothing else to do */ });
+        } catch { /* ignore */ }
+        return;
+      }
+
       supabase
         .from("live_session_attendance")
-        .update({ left_at: new Date().toISOString(), duration_seconds: dur })
+        .update({ left_at: leftAt, duration_seconds: dur })
         .eq("id", id)
         .then(({ error }) => {
           if (error) {
@@ -248,6 +282,7 @@ function LiveRoom({
     };
 
     window.addEventListener("beforeunload", markLeft);
+    window.addEventListener("pagehide", markLeft);
 
     // Backstop for auth/connection failures Jitsi renders INSIDE its own
     // iframe UI (e.g. "Authentication failed — you're not allowed to join
@@ -271,9 +306,24 @@ function LiveRoom({
       failMeeting("MEETING_JOIN_TIMEOUT", "Meeting did not join within timeout — likely an auth/connection failure inside the Jitsi UI");
     }, JOIN_TIMEOUT_MS);
 
+    // Profile photo for the participant tile: the token carries it (see
+    // /api/jaas-token). Also push it straight to Jitsi so it shows even if
+    // JaaS ignores the JWT avatar claim. The JWT payload is not secret.
+    const avatarFromJwt = (() => {
+      try {
+        const b64 = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const payload = JSON.parse(atob(b64));
+        const url = payload?.context?.user?.avatar;
+        return typeof url === "string" && /^https:\/\//i.test(url) ? url : null;
+      } catch { return null; }
+    })();
+
     const handleJoined = () => {
       joined = true;
       clearTimeout(joinTimeout);
+      if (avatarFromJwt) {
+        try { api?.executeCommand("avatarUrl", avatarFromJwt); } catch { /* ignore */ }
+      }
       return markJoined();
     };
 
@@ -345,6 +395,7 @@ function LiveRoom({
       cancelled = true;
       clearTimeout(joinTimeout);
       window.removeEventListener("beforeunload", markLeft);
+      window.removeEventListener("pagehide", markLeft);
       markLeft();
       if (api) {
         try {
