@@ -83,6 +83,9 @@ export const Route = createFileRoute("/")({
 // so visitors just get a file download from this domain.
 const APK_URL = "/dl/android";
 const WINDOWS_EXE_URL = "/dl/windows";
+const LINUX_URL = "/dl/linux";
+const LINUX_DEB_URL = "/dl/linux-deb";
+const LINUX_RPM_URL = "/dl/linux-rpm";
 
 // Defaults used until the editable site content loads (and as a safety net
 // if any field is left blank in the admin panel). The platform owner edits
@@ -171,6 +174,7 @@ function getOS() {
   if (/android/i.test(ua)) return "android";
   if (/windows/i.test(ua)) return "windows";
   if (/iphone|ipad|ipod/i.test(ua)) return "ios";
+  if (/linux|x11/i.test(ua)) return "linux"; // after android check (Android UAs contain "Linux")
   return "other";
 }
 
@@ -229,11 +233,19 @@ function DownloadButton({ size = "lg" }: { size?: "sm" | "lg" }) {
       <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Download for Windows</Button>
     </a>
   );
+  if (os === "linux") return (
+    <a href={LINUX_URL}>
+      <Button size={size} className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"><Monitor className="w-5 h-5" /> Download for Linux</Button>
+    </a>
+  );
   return (
     <div className="flex flex-wrap justify-center gap-3">
       <a href={APK_URL}><Button size={size} className="gap-2 bg-green-600 hover:bg-green-700 text-white"><Smartphone className="w-5 h-5" /> Android APK</Button></a>
       <a href={WINDOWS_EXE_URL}>
         <Button size={size} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><Monitor className="w-5 h-5" /> Windows Desktop</Button>
+      </a>
+      <a href={LINUX_URL}>
+        <Button size={size} className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"><Monitor className="w-5 h-5" /> Linux Desktop</Button>
       </a>
     </div>
   );
@@ -1810,7 +1822,7 @@ function PricingPage({ goTo, site, onProceed }: { goTo: (p: Page) => void; site:
 function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
   const dl = useLandingContent("download_page", {
     heading: "Download SmartDev",
-    subheading: "Install on Android or Windows. Log in with your school credentials to get started immediately.",
+    subheading: "Install on Android, Windows or Linux. Log in with your school credentials to get started immediately.",
   });
 
   return (
@@ -1821,7 +1833,7 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
           <p className="mt-3 text-muted-foreground">{dl.subheading}</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-12">
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
           <div className="rounded-2xl border bg-card p-8 flex flex-col items-center gap-5 text-center">
             <div className="w-20 h-20 rounded-2xl bg-green-100 flex items-center justify-center">
               <Smartphone className="w-10 h-10 text-green-600" />
@@ -1862,6 +1874,29 @@ function DownloadPage({ site }: { site: typeof SITE_DEFAULTS }) {
               </Button>
             </a>
             <p className="text-xs text-muted-foreground">Direct download — run the installer and follow the setup wizard.</p>
+          </div>
+
+          <div className="rounded-2xl border bg-card p-8 flex flex-col items-center gap-5 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-orange-100 flex items-center justify-center">
+              <Monitor className="w-10 h-10 text-orange-600" />
+            </div>
+            <div>
+              <div className="font-bold text-2xl">Linux Desktop</div>
+              <div className="text-sm text-muted-foreground mt-1">Ubuntu, Debian, Fedora & more (64-bit)</div>
+            </div>
+            <ul className="text-sm text-left w-full space-y-2">
+              {["AppImage runs on any major distro","Native .deb and .rpm packages","System notifications","Offline capability with sync","Same features as Windows desktop"].map(f => (
+                <li key={f} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-orange-600 shrink-0" />{f}</li>
+              ))}
+            </ul>
+            <a href={LINUX_URL} className="w-full">
+              <Button className="w-full gap-2 bg-orange-600 hover:bg-orange-700 text-white text-base py-6">
+                <Download className="w-5 h-5" /> Download AppImage
+              </Button>
+            </a>
+            <p className="text-xs text-muted-foreground">
+              Prefer a package? <a href={LINUX_DEB_URL} className="text-primary hover:underline">.deb</a> · <a href={LINUX_RPM_URL} className="text-primary hover:underline">.rpm</a>. For AppImage: <code>chmod +x</code> the file, then run it.
+            </p>
           </div>
         </div>
 

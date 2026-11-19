@@ -98,10 +98,22 @@ const RELEASES_GITHUB_REPO = "scchoolsystem/meltonschsystm";
 type GithubAsset = { name: string; browser_download_url: string };
 type GithubRelease = { assets: GithubAsset[] };
 
-function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): GithubAsset | undefined {
+type ReleaseKind = "android" | "windows" | "linux" | "linux-deb" | "linux-rpm";
+
+function pickReleaseAsset(assets: GithubAsset[], kind: ReleaseKind): GithubAsset | undefined {
   if (kind === "android") {
     return assets.find((a) => /\.apk$/i.test(a.name));
   }
+  if (kind === "linux") {
+    // Default Linux download: AppImage (runs on any distro), then .deb, then .rpm.
+    return (
+      assets.find((a) => /\.appimage$/i.test(a.name)) ??
+      assets.find((a) => /\.deb$/i.test(a.name)) ??
+      assets.find((a) => /\.rpm$/i.test(a.name))
+    );
+  }
+  if (kind === "linux-deb") return assets.find((a) => /\.deb$/i.test(a.name));
+  if (kind === "linux-rpm") return assets.find((a) => /\.rpm$/i.test(a.name));
   return (
     assets.find((a) => /setup\.exe$/i.test(a.name)) ??
     assets.find((a) => /\.exe$/i.test(a.name)) ??
@@ -109,7 +121,7 @@ function pickReleaseAsset(assets: GithubAsset[], kind: "android" | "windows"): G
   );
 }
 
-async function handleReleaseDownload(kind: "android" | "windows", _env: Env): Promise<Response> {
+async function handleReleaseDownload(kind: ReleaseKind, _env: Env): Promise<Response> {
   const githubHeaders: Record<string, string> = {
     Accept: "application/vnd.github+json",
     "User-Agent": "smartdev-erp-release-proxy",
@@ -161,6 +173,15 @@ export default {
     }
     if (url.pathname === "/dl/windows") {
       return handleReleaseDownload("windows", env as Env);
+    }
+    if (url.pathname === "/dl/linux") {
+      return handleReleaseDownload("linux", env as Env);
+    }
+    if (url.pathname === "/dl/linux-deb") {
+      return handleReleaseDownload("linux-deb", env as Env);
+    }
+    if (url.pathname === "/dl/linux-rpm") {
+      return handleReleaseDownload("linux-rpm", env as Env);
     }
 
     try {

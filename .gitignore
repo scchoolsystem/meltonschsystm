@@ -55,3 +55,7 @@ android-sdk/
 meltonschsystm/
 meltonschsystm-fresh/
 package-lock.json
+
+src-tauri/target/
+
+src-tauri/target/
