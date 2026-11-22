@@ -184,7 +184,7 @@ export const loadSmsConfig = createServerFn({ method: "GET" })
 // enabled its own account, we fall back to SmartDev's shared Crowdcomm
 // account so SMS keeps working out of the box, just sent "from" SmartDev's
 // own approved sender ID instead of the school's name.
-async function resolveSmsSender(schoolId: string): Promise<{
+export async function resolveSmsSender(schoolId: string): Promise<{
   senderId: string;
   apiKey: string;
   serviceId: string;
