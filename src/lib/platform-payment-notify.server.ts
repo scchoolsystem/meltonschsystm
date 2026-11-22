@@ -90,7 +90,8 @@ export async function sendPlatformPaymentConfirmation(paymentId: string, opts: {
         }
       }
     } catch (e: any) {
-      error = String(e?.message ?? e).slice(0, 300);
+      console.error("[notify] SMS exception", e);
+      error = `exception ${e?.name ?? ""}: ${e?.message ?? (typeof e === "string" ? e : JSON.stringify(e))}`.slice(0, 300);
     }
     await db.from("notifications_log").insert({
       school_id: inv.school_id, channel: "sms", subject: `Platform receipt ${p.receipt_no}`, body: smsText,
@@ -164,7 +165,8 @@ export async function sendPlatformPaymentConfirmation(paymentId: string, opts: {
         ids.push(messageId);
         emailCount++;
       } catch (e: any) {
-        error = String(e?.message ?? e).slice(0, 300);
+        console.error("[notify] SMS exception", e);
+      error = `exception ${e?.name ?? ""}: ${e?.message ?? (typeof e === "string" ? e : JSON.stringify(e))}`.slice(0, 300);
       }
     }
     await db.from("notifications_log").insert({

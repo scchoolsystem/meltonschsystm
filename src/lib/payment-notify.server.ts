@@ -102,7 +102,8 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
         }
       }
     } catch (e: any) {
-      error = String(e?.message ?? e).slice(0, 300);
+      console.error("[notify] SMS exception", e);
+      error = `exception ${e?.name ?? ""}: ${e?.message ?? (typeof e === "string" ? e : JSON.stringify(e))}`.slice(0, 300);
     }
     await db.from("notifications_log").insert({
       school_id: schoolId, channel: "sms", subject: `Receipt ${p.receipt_no}`, body: smsText,
@@ -169,7 +170,8 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
       emailCount = 1;
     } catch (e: any) {
       status = "failed";
-      error = String(e?.message ?? e).slice(0, 300);
+      console.error("[notify] SMS exception", e);
+      error = `exception ${e?.name ?? ""}: ${e?.message ?? (typeof e === "string" ? e : JSON.stringify(e))}`.slice(0, 300);
     }
     await db.from("notifications_log").insert({
       school_id: schoolId, channel: "email", subject: `Receipt ${p.receipt_no}`, body: text,
