@@ -56,8 +56,8 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
       .eq("id", inv.student_id)
       .maybeSingle();
     const studentName = student ? `${student.first_name} ${student.last_name}`.trim() : "";
-    const accountReference = (studentName || inv.invoice_no || inv.id).slice(0, 12);
-    const transactionDesc = (inv.invoice_no || "School Fees").slice(0, 13);
+    const accountReference = String(studentName || inv.invoice_no || inv.id).replace(/[^A-Za-z0-9 ]+/g, "").trim().slice(0, 12) || "SchoolFees";
+    const transactionDesc = String(inv.invoice_no || "School Fees").replace(/[^A-Za-z0-9 ]+/g, "").trim().slice(0, 13) || "School Fees";
 
     const outstanding = Number(inv.amount) - Number(inv.paid);
     if (data.amount > outstanding + 0.001) {
