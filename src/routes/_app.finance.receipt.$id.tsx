@@ -3,7 +3,11 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Printer, Loader2 } from "lucide-react";
+import { Printer, Loader2, Send } from "lucide-react";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { sendReceiptNotification } from "@/lib/receipt-notify.functions";
 import { useTenant } from "@/hooks/use-tenant";
 
 export const Route = createFileRoute("/_app/finance/receipt/$id")({ component: () => (<FeatureGate feature="finance"><Page /></FeatureGate>) });
@@ -58,6 +62,24 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Page() {
   const { id } = Route.useParams();
   const { school } = useTenant();
+  const send = useServerFn(sendReceiptNotification);
+  const [sending, setSending] = useState(false);
+
+  async function sendNow() {
+    setSending(true);
+    try {
+      const r: any = await send({ data: { payment_id: id } });
+      if (r.sms || r.email) {
+        toast.success(`Receipt sent${r.sms ? ` by SMS (${r.sms})` : ""}${r.email ? `${r.sms ? " and" : ""} by email (${r.email})` : ""}.`);
+      } else {
+        toast.error(r.skipped ? `Nothing sent: ${r.skipped}.` : "Nothing was sent. Check the parent's phone/email and SMS settings.");
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not send the receipt");
+    } finally {
+      setSending(false);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["receipt-full", id],
@@ -120,7 +142,12 @@ function Page() {
       <div className="max-w-2xl mx-auto px-4">
         <div className="flex items-center justify-between mb-4 print:hidden">
           <h1 className="text-2xl font-bold">Receipt</h1>
-          <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Print / Save as PDF</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={sendNow} disabled={sending}>
+              {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}Send SMS &amp; email
+            </Button>
+            <Button onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Print / Save as PDF</Button>
+          </div>
         </div>
 
         <div className="receipt-print bg-card border rounded-xl p-10 print:border-0 print:rounded-none print:shadow-none">
