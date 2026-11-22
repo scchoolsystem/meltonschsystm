@@ -27,6 +27,7 @@ export function MpesaSettingsCard() {
 
   const [form, setForm] = useState({
     shortcode:       "",
+    till_number:     "",
     consumer_key:    "",
     consumer_secret: "",
     passkey:         "",
@@ -46,7 +47,7 @@ export function MpesaSettingsCard() {
   useEffect(() => {
     load({}).then((cfg) => {
       if (cfg) {
-        setForm(f => ({ ...f, shortcode: cfg.shortcode ?? "", env: cfg.env ?? "sandbox", enabled: cfg.enabled ?? false }));
+        setForm(f => ({ ...f, shortcode: cfg.shortcode ?? "", till_number: cfg.till_number ?? "", env: cfg.env ?? "sandbox", enabled: cfg.enabled ?? false }));
         setSchoolId(cfg.schoolId ?? null);
         setSavedFlags({
           consumer_key_set: !!cfg.consumer_key_set,
@@ -115,11 +116,22 @@ export function MpesaSettingsCard() {
         <div className="grid md:grid-cols-2 gap-4">
           {/* Shortcode */}
           <div>
-            <Label>Paybill / Till Number</Label>
+            <Label>Shortcode (Paybill number, or Head Office number for a Till)</Label>
             <Input
               value={form.shortcode}
               onChange={e => set("shortcode", e.target.value)}
               placeholder="e.g. 174379"
+            />
+          </div>
+
+          {/* Till number */}
+          <div>
+            <Label>Till Number (leave blank if you use a Paybill)</Label>
+            <Input
+              value={form.till_number}
+              onChange={e => set("till_number", e.target.value.replace(/\D+/g, ""))}
+              placeholder="e.g. 5123456"
+              inputMode="numeric"
             />
           </div>
 
@@ -220,7 +232,7 @@ export function MpesaSettingsCard() {
             <li>Go to <strong>developer.safaricom.co.ke</strong> and log in</li>
             <li>Create an app → copy Consumer Key and Consumer Secret</li>
             <li>Go to <strong>Lipa na M-Pesa Online</strong> → copy the Passkey</li>
-            <li>Set your Shortcode to your Paybill or Till number</li>
+            <li>Paybill: put the Paybill number in Shortcode. Till: put the Head Office number in Shortcode and your Till number in Till Number</li>
             <li>Switch Environment to <strong>Production</strong> when ready</li>
           </ol>
         </div>
