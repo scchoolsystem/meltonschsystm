@@ -34,24 +34,41 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
           const resultDesc = stkCallback.ResultDesc;
 
           let mpesaReceipt: string | null = null;
+          let paidAmount = NaN;
           if (resultCode === 0) {
             const items = stkCallback.CallbackMetadata?.Item ?? [];
             const receiptItem = items.find((i: any) => i.Name === "MpesaReceiptNumber");
-            mpesaReceipt = receiptItem?.Value ?? null;
+            mpesaReceipt = receiptItem?.Value ? String(receiptItem.Value) : null;
+            paidAmount = Number(items.find((i: any) => i.Name === "Amount")?.Value);
           }
 
-          const newStatus = resultCode === 0 ? "success" : resultCode === 1032 ? "cancelled" : "failed";
+          // Only mark the invoice paid when the full amount AND a real M-Pesa receipt arrived.
+          let newStatus: string = resultCode === 0 ? "success" : resultCode === 1032 ? "cancelled" : "failed";
+          let note: string | null = resultDesc;
+          if (resultCode === 0) {
+            const { data: txn } = await admin
+              .from("platform_mpesa_transactions")
+              .select("amount, status")
+              .eq("checkout_request_id", checkoutRequestId)
+              .maybeSingle();
+            if (!txn || txn.status === "success") return Response.json({ ResultCode: 0, ResultDesc: "Accepted" });
+            if (!mpesaReceipt || !(paidAmount >= Number(txn.amount))) {
+              newStatus = "review";
+              note = !mpesaReceipt ? "No M-Pesa receipt received" : `Amount paid ${paidAmount} is less than ${txn.amount}`;
+            }
+          }
 
           const { error } = await admin
             .from("platform_mpesa_transactions")
             .update({
               status: newStatus,
               result_code: String(resultCode),
-              result_desc: resultDesc,
+              result_desc: note,
               mpesa_receipt: mpesaReceipt,
               raw_callback: body,
             })
-            .eq("checkout_request_id", checkoutRequestId);
+            .eq("checkout_request_id", checkoutRequestId)
+            .neq("status", "success");
 
           if (error) console.error("[platform-mpesa-callback] update error", error);
           return Response.json({ ResultCode: 0, ResultDesc: "Accepted" });
