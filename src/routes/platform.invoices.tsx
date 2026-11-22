@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Receipt } from "lucide-react";
 import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
+import { PlatformPaymentHistory } from "@/components/PlatformReceiptDialog";
 
 export const Route = createFileRoute("/platform/invoices")({
   component: () => (
@@ -63,6 +64,7 @@ function PlatformInvoices() {
       setPayOpen(false);
       setPayForm({ invoice_id: "", amount: "", method: "manual", reference: "", notes: "" });
       qc.invalidateQueries({ queryKey: ["all-platform-invoices"] });
+      qc.invalidateQueries({ queryKey: ["platform-payments"] });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -186,6 +188,8 @@ function PlatformInvoices() {
           </Table>
         </CardContent>
       </Card>
+
+      <PlatformPaymentHistory title="Payments & receipts" />
     </div>
   );
 }
