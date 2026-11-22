@@ -5456,6 +5456,7 @@ export type Database = {
         Row: {
           id: string
           shortcode: string
+          till_number: string | null
           consumer_secret: string
           passkey: string
           callback_token: string
@@ -5466,6 +5467,7 @@ export type Database = {
         Insert: {
           id?: string
           shortcode: string
+          till_number?: string | null
           consumer_secret: string
           passkey: string
           callback_token: string
@@ -5476,6 +5478,7 @@ export type Database = {
         Update: {
           id?: string
           shortcode?: string
+          till_number?: string | null
           consumer_secret?: string
           passkey?: string
           callback_token?: string
@@ -5541,6 +5544,7 @@ export type Database = {
           id: string
           school_id: string
           shortcode: string
+          till_number: string | null
           enabled: boolean
           updated_at: string
         }
@@ -5548,6 +5552,7 @@ export type Database = {
           id?: string
           school_id: string
           shortcode: string
+          till_number?: string | null
           enabled?: boolean
           updated_at?: string
         }
@@ -5555,6 +5560,7 @@ export type Database = {
           id?: string
           school_id?: string
           shortcode?: string
+          till_number?: string | null
           enabled?: boolean
           updated_at?: string
         }
