@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sendPaymentConfirmationSafely } from "@/lib/payment-notify.server";
 
 // ── helpers ─────────────────────────────────────────────────
 // NOTE: every export in this file reads/writes through `supabaseAdmin`
@@ -298,14 +299,16 @@ export const recordPayment = createServerFn({ method: "POST" })
     // trigger on payments recalculates invoices.paid/status itself from an
     // authoritative SUM(payments) after this insert — no need (and no
     // safe way, under concurrent payments) to also set it manually here.
-    const { error } = await supabaseAdmin.from("payments").insert({
+    const { data: newPay, error } = await supabaseAdmin.from("payments").insert({
       invoice_id: data.invoice_id,
       amount: data.amount,
       method: data.method,
       reference: data.reference ?? null,
       paid_on: data.paid_on ?? new Date().toISOString().slice(0, 10),
-    } as any);
+    } as any).select("id").maybeSingle();
     if (error) throw new Error(error.message);
+    // SMS + emailed receipt to the parent (never blocks or fails the payment).
+    if (newPay?.id) await sendPaymentConfirmationSafely(newPay.id as string);
   });
 
 // ── 14. Write-off invoice balance ────────────────────────────
