@@ -77,14 +77,16 @@ export async function sendPlatformPaymentConfirmation(paymentId: string, opts: {
             messages: numbers.map((n, i) => ({ mobile: n.replace(/^\+/, ""), message: smsText, client_ref: i })),
           }),
         });
-        const parsed: any = await res.json().catch(() => ({}));
+        const raw = await res.text().catch(() => "");
+        let parsed: any = {};
+        try { parsed = JSON.parse(raw); } catch { /* not JSON */ }
         if (res.ok && String(parsed?.status_code) === "1000") {
           const rejected = (parsed?.schedule_details ?? []).filter((r: any) => String(r.schedule_status) !== "1");
           smsCount = numbers.length - rejected.length;
           status = rejected.length === 0 ? "sent" : smsCount > 0 ? "partial" : "failed";
           if (rejected.length) error = rejected.map((r: any) => `${r.mobile}: ${r.schedule_desc}`).slice(0, 3).join("; ");
         } else {
-          error = parsed?.status_desc || `Crowdcomm ${res.status}`;
+          error = `HTTP ${res.status} code ${parsed?.status_code ?? "?"}: ${parsed?.status_desc ?? raw}`.slice(0, 300);
         }
       }
     } catch (e: any) {
