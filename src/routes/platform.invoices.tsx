@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { sendPlatformReceiptNotification } from "@/lib/platform-receipt-notify.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { PlatformScopeGuard } from "@/components/security/PlatformScopeGuard";
@@ -28,6 +30,7 @@ export const Route = createFileRoute("/platform/invoices")({
 function PlatformInvoices() {
   const { roles, user } = useAuth();
   const qc = useQueryClient();
+  const notifyPayment = useServerFn(sendPlatformReceiptNotification);
   const isOwner = roles.includes("platform_owner");
 
   const [payOpen, setPayOpen] = useState(false);
@@ -49,15 +52,17 @@ function PlatformInvoices() {
       const amount = parseFloat(payForm.amount);
       if (!amount || amount <= 0) throw new Error("Enter a valid amount");
       if (!payForm.invoice_id) throw new Error("Select an invoice");
-      const { error } = await supabase.from("platform_payments").insert({
+      const { data: newPay, error } = await supabase.from("platform_payments").insert({
         invoice_id: payForm.invoice_id,
         amount,
         method: payForm.method,
         reference: payForm.reference || null,
         notes: payForm.notes || null,
         recorded_by: user?.id ?? null,
-      });
+      }).select("id").single();
       if (error) throw error;
+      // SMS/email receipt to the school + alert to owners; never fails the payment itself.
+      try { if (newPay?.id) await notifyPayment({ data: { payment_id: newPay.id } }); } catch (e) { console.error("receipt notify", e); }
     },
     onSuccess: () => {
       toast.success("Payment recorded");
