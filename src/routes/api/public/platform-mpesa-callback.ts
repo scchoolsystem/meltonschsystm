@@ -1,6 +1,7 @@
 // Safaricom calls this URL after the customer completes (or cancels) the STK push prompt.
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
+import { sendPlatformPaymentConfirmationSafely } from "@/lib/platform-payment-notify.server";
 
 export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
   server: {
@@ -54,12 +55,14 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
           // Only mark the invoice paid when the full amount AND a real M-Pesa receipt arrived.
           let newStatus: string = resultCode === 0 ? "success" : resultCode === 1032 ? "cancelled" : "failed";
           let note: string | null = resultDesc;
+          let invoiceId: string | null = null;
           if (resultCode === 0) {
             const { data: txn } = await admin
               .from("platform_mpesa_transactions")
-              .select("amount, status, phone")
+              .select("amount, status, phone, invoice_id")
               .eq("checkout_request_id", checkoutRequestId)
               .maybeSingle();
+            invoiceId = txn?.invoice_id ?? null;
             if (!txn || txn.status === "success") return Response.json({ ResultCode: 0, ResultDesc: "Accepted" });
             // Safaricom may mask the number in the callback; keep the number we pushed to instead.
             if (!payerPhone || !/^\d{9,15}$/.test(payerPhone)) payerPhone = txn.phone ?? null;
@@ -86,7 +89,21 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
             .eq("checkout_request_id", checkoutRequestId)
             .neq("status", "success");
 
-          if (error) console.error("[platform-mpesa-callback] update error", error);
+          if (error) {
+            console.error("[platform-mpesa-callback] update error", error);
+          } else if (newStatus === "success" && invoiceId && mpesaReceipt) {
+            // The DB trigger has just created the platform_payments row: tell the school + SmartDev owners.
+            const { data: pay } = await admin
+              .from("platform_payments")
+              .select("id")
+              .eq("invoice_id", invoiceId)
+              .eq("reference", mpesaReceipt)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (pay?.id) await sendPlatformPaymentConfirmationSafely(pay.id as string);
+            else console.error("[platform-mpesa-callback] payment row not found for", mpesaReceipt);
+          }
           return Response.json({ ResultCode: 0, ResultDesc: "Accepted" });
         } catch (e: any) {
           console.error("[platform-mpesa-callback] error", e);
