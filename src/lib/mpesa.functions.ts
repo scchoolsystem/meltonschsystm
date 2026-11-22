@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { stkTarget } from "@/lib/daraja";
 
 /**
  * Record an M-Pesa STK push intent for an invoice.
@@ -89,6 +90,7 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
     const shortcode       = cfg?.shortcode        ?? process.env.MPESA_SHORTCODE;
     const passkey         = cfg?.passkey          ?? process.env.MPESA_PASSKEY;
     const callbackToken   = cfg?.callback_token   ?? process.env.MPESA_CALLBACK_TOKEN;
+    const tillNumber      = cfg?.till_number      ?? process.env.MPESA_TILL_NUMBER ?? null;
     const mpesaEnv        = cfg?.env              ?? process.env.MPESA_ENV ?? "sandbox";
     const publicHost      = process.env.PUBLIC_HOST;
     const schoolEnabled   = cfg?.enabled ?? false;
@@ -140,6 +142,7 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
       const password = btoa(`${shortcode}${passkey}${ts}`);
       const callbackUrl = `${publicHost.replace(/\/$/, "")}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}&school=${inv.school_id}`;
 
+      const target = stkTarget(shortcode, tillNumber);
       const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
         method: "POST",
         headers: {
@@ -150,10 +153,10 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
           BusinessShortCode: shortcode,
           Password: password,
           Timestamp: ts,
-          TransactionType: "CustomerPayBillOnline",
+          TransactionType: target.TransactionType,
           Amount: Math.round(data.amount),
           PartyA: phone,
-          PartyB: shortcode,
+          PartyB: target.PartyB,
           PhoneNumber: phone,
           CallBackURL: callbackUrl,
           AccountReference: accountReference,
@@ -191,6 +194,7 @@ export const saveMpesaConfig = createServerFn({ method: "POST" })
   .validator((input) =>
     z.object({
       shortcode:       z.string().min(4, "Shortcode required"),
+      till_number:     z.string().regex(/^\d*$/, "Till number must be digits only").optional().default(""),
       consumer_key:    z.string().optional().default(""),
       consumer_secret: z.string().optional().default(""),
       passkey:         z.string().optional().default(""),
@@ -230,6 +234,7 @@ export const saveMpesaConfig = createServerFn({ method: "POST" })
       .upsert({
         school_id:       schoolId,
         shortcode:       data.shortcode,
+        till_number:     data.till_number.trim() || null,
         consumer_key,
         consumer_secret,
         passkey,
@@ -254,7 +259,7 @@ export const loadMpesaConfig = createServerFn({ method: "GET" })
 
     const { data, error } = await supabase
       .from("school_mpesa_config")
-      .select("shortcode, consumer_key, consumer_secret, passkey, callback_token, env, enabled")
+      .select("shortcode, till_number, consumer_key, consumer_secret, passkey, callback_token, env, enabled")
       .eq("school_id", schoolId)
       .maybeSingle();
 
@@ -266,6 +271,7 @@ export const loadMpesaConfig = createServerFn({ method: "GET" })
     return {
       schoolId,
       shortcode: data.shortcode,
+      till_number: data.till_number ?? "",
       env: data.env,
       enabled: data.enabled,
       consumer_key_set: !!data.consumer_key,
