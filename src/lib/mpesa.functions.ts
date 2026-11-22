@@ -85,10 +85,10 @@ export const initiateMpesaPayment = createServerFn({ method: "POST" })
       .rpc("get_school_mpesa_config", { p_school_id: inv.school_id })
       .maybeSingle();
 
-    const consumerKey     = cfg?.consumer_key     ?? process.env.MPESA_CONSUMER_KEY;
-    const consumerSecret  = cfg?.consumer_secret  ?? process.env.MPESA_CONSUMER_SECRET;
-    const shortcode       = cfg?.shortcode        ?? process.env.MPESA_SHORTCODE;
-    const passkey         = cfg?.passkey          ?? process.env.MPESA_PASSKEY;
+    const consumerKey     = (cfg?.consumer_key     ?? process.env.MPESA_CONSUMER_KEY)?.trim();
+    const consumerSecret  = (cfg?.consumer_secret  ?? process.env.MPESA_CONSUMER_SECRET)?.trim();
+    const shortcode       = (cfg?.shortcode        ?? process.env.MPESA_SHORTCODE)?.trim();
+    const passkey         = (cfg?.passkey          ?? process.env.MPESA_PASSKEY)?.trim();
     const callbackToken   = cfg?.callback_token   ?? process.env.MPESA_CALLBACK_TOKEN;
     const tillNumber      = cfg?.till_number      ?? process.env.MPESA_TILL_NUMBER ?? null;
     const mpesaEnv        = cfg?.env              ?? process.env.MPESA_ENV ?? "sandbox";
@@ -193,8 +193,8 @@ export const saveMpesaConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
     z.object({
-      shortcode:       z.string().min(4, "Shortcode required"),
-      till_number:     z.string().regex(/^\d*$/, "Till number must be digits only").optional().default(""),
+      shortcode:       z.string().trim().min(4, "Shortcode required"),
+      till_number:     z.string().trim().regex(/^\d*$/, "Till number must be digits only").optional().default(""),
       consumer_key:    z.string().optional().default(""),
       consumer_secret: z.string().optional().default(""),
       passkey:         z.string().optional().default(""),
