@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { stkTarget } from "@/lib/daraja";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -158,6 +159,15 @@ export const bulkGenerateComponentInvoices = createServerFn({ method: "POST" })
     return { created: toInsert.length, skipped: students.length - toInsert.length };
   });
 
+// Normalise any common Kenyan format (0712…, 0112…, +254…, 254…, 712…, with spaces/dashes) to 254XXXXXXXXX.
+function normalizeKePhone(p: string): string {
+  let s = String(p ?? "").replace(/\D+/g, "");
+  if (/^0[17]\d{8}$/.test(s)) s = "254" + s.slice(1);
+  else if (/^[17]\d{8}$/.test(s)) s = "254" + s;
+  if (!/^254[17]\d{8}$/.test(s)) throw new Error("Enter a valid Safaricom number, e.g. 0712 345 678");
+  return s;
+}
+
 // ---- 2. M-Pesa STK Push (Daraja) ----
 export const mpesaStkPush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -213,10 +223,11 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
       .rpc("get_school_mpesa_config", { p_school_id: schoolId })
       .maybeSingle();
 
-    const consumerKey = cfg?.enabled ? cfg.consumer_key : process.env.MPESA_CONSUMER_KEY;
-    const consumerSecret = cfg?.enabled ? cfg.consumer_secret : process.env.MPESA_CONSUMER_SECRET;
-    const shortcode = cfg?.enabled ? cfg.shortcode : process.env.MPESA_SHORTCODE;
-    const passkey = cfg?.enabled ? cfg.passkey : process.env.MPESA_PASSKEY;
+    const consumerKey = (cfg?.enabled ? cfg.consumer_key : process.env.MPESA_CONSUMER_KEY)?.trim();
+    const consumerSecret = (cfg?.enabled ? cfg.consumer_secret : process.env.MPESA_CONSUMER_SECRET)?.trim();
+    const shortcode = (cfg?.enabled ? cfg.shortcode : process.env.MPESA_SHORTCODE)?.trim();
+    const passkey = (cfg?.enabled ? cfg.passkey : process.env.MPESA_PASSKEY)?.trim();
+    const tillNumber = cfg?.enabled ? cfg.till_number : (process.env.MPESA_TILL_NUMBER ?? null);
     const callbackToken = cfg?.enabled ? cfg.callback_token : process.env.MPESA_CALLBACK_TOKEN;
     const env = cfg?.enabled ? cfg.env : process.env.MPESA_ENV || "sandbox";
     const callbackBase = process.env.MPESA_CALLBACK_URL; // e.g. https://app.smartdev.co.ke
@@ -257,7 +268,8 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
       .replace(/[-T:.Z]/g, "")
       .slice(0, 14);
     const password = btoa(`${shortcode}${passkey}${ts}`);
-    const phone = data.phone.replace(/^\+/, "").replace(/^0/, "254");
+    const phone = normalizeKePhone(data.phone);
+    const target = stkTarget(shortcode, tillNumber);
 
     const stkRes = await fetch(`${base}/mpesa/stkpush/v1/processrequest`, {
       method: "POST",
@@ -269,10 +281,10 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
         BusinessShortCode: shortcode,
         Password: password,
         Timestamp: ts,
-        TransactionType: "CustomerPayBillOnline",
+        TransactionType: target.TransactionType,
         Amount: data.amount,
         PartyA: phone,
-        PartyB: shortcode,
+        PartyB: target.PartyB,
         PhoneNumber: phone,
         CallBackURL: `${callbackBase}/api/public/mpesa-callback?token=${encodeURIComponent(callbackToken)}&school=${schoolId}`,
         AccountReference: accountReference,
@@ -280,7 +292,9 @@ export const mpesaStkPush = createServerFn({ method: "POST" })
       }),
     });
     const stk = await stkRes.json();
-    if (!stkRes.ok) throw new Error(`STK push failed: ${JSON.stringify(stk)}`);
+    if (!stkRes.ok || stk.ResponseCode !== "0") {
+      throw new Error(String(stk.errorMessage ?? stk.ResponseDescription ?? "STK push failed"));
+    }
 
     // Record the intent so the callback can reconcile via CheckoutRequestID
     // instead of parsing AccountReference (which is now a name, not an
