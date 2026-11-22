@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Wallet, Building2 } from "lucide-react";
 import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
+import { PlatformPaymentHistory } from "@/components/PlatformReceiptDialog";
 
 export const Route = createFileRoute("/_app/admin/billing")({ component: BillingPage });
 
@@ -143,6 +144,8 @@ function BillingPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <PlatformPaymentHistory schoolId={schoolId} title="Payment history & receipts" />
     </div>
   );
 }
@@ -190,6 +193,7 @@ function PayNowButton({ invoice }: { invoice: any }) {
                 triggerLabel={`Pay KES ${balance.toLocaleString()} with M-Pesa`}
                 onPaid={() => {
                   qc.invalidateQueries({ queryKey: ["school-platform-invoices"] });
+                  qc.invalidateQueries({ queryKey: ["platform-payments"] });
                   setOpen(false);
                 }}
               />
