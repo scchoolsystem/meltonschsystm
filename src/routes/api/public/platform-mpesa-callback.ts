@@ -35,11 +35,20 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
 
           let mpesaReceipt: string | null = null;
           let paidAmount = NaN;
+          let payerPhone: string | null = null;
+          let transactionAt: string | null = null;
           if (resultCode === 0) {
             const items = stkCallback.CallbackMetadata?.Item ?? [];
             const receiptItem = items.find((i: any) => i.Name === "MpesaReceiptNumber");
             mpesaReceipt = receiptItem?.Value ? String(receiptItem.Value) : null;
             paidAmount = Number(items.find((i: any) => i.Name === "Amount")?.Value);
+            const ph = items.find((i: any) => i.Name === "PhoneNumber")?.Value;
+            payerPhone = ph ? String(ph) : null;
+            const rawDate = String(items.find((i: any) => i.Name === "TransactionDate")?.Value ?? "");
+            const d = rawDate.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+            transactionAt = d
+              ? new Date(`${d[1]}-${d[2]}-${d[3]}T${d[4]}:${d[5]}:${d[6]}+03:00`).toISOString()
+              : new Date().toISOString();
           }
 
           // Only mark the invoice paid when the full amount AND a real M-Pesa receipt arrived.
@@ -48,10 +57,12 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
           if (resultCode === 0) {
             const { data: txn } = await admin
               .from("platform_mpesa_transactions")
-              .select("amount, status")
+              .select("amount, status, phone")
               .eq("checkout_request_id", checkoutRequestId)
               .maybeSingle();
             if (!txn || txn.status === "success") return Response.json({ ResultCode: 0, ResultDesc: "Accepted" });
+            // Safaricom may mask the number in the callback; keep the number we pushed to instead.
+            if (!payerPhone || !/^\d{9,15}$/.test(payerPhone)) payerPhone = txn.phone ?? null;
             if (!mpesaReceipt || !(paidAmount >= Number(txn.amount))) {
               newStatus = "review";
               note = !mpesaReceipt ? "No M-Pesa receipt received" : `Amount paid ${paidAmount} is less than ${txn.amount}`;
@@ -65,6 +76,11 @@ export const Route = createFileRoute("/api/public/platform-mpesa-callback")({
               result_code: String(resultCode),
               result_desc: note,
               mpesa_receipt: mpesaReceipt,
+              payer_phone: payerPhone,
+              transaction_at: transactionAt,
+              paid_to: resultCode === 0
+                ? (cfg.till_number ? `Till ${cfg.till_number}` : `Paybill ${cfg.shortcode}`)
+                : null,
               raw_callback: body,
             })
             .eq("checkout_request_id", checkoutRequestId)
