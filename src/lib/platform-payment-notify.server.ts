@@ -3,7 +3,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { toE164Kenya } from "@/lib/sms.functions";
 
-export type PlatformNotifyResult = { sms: number; email: number; skipped?: string };
+export type PlatformNotifyResult = { sms: number; email: number; owner?: number; skipped?: string };
 
 const kes = (n: number) => `KES ${Number(n).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`;
 const esc = (s: unknown) =>
@@ -172,11 +172,48 @@ export async function sendPlatformPaymentConfirmation(paymentId: string, opts: {
     });
   }
 
-  if (smsCount > 0 || emailCount > 0) {
+  // ── Alert SmartDev platform owners that a school has paid ─────────────
+  let ownerCount = 0;
+  try {
+    const { data: ownerRoles } = await db.from("user_roles").select("user_id").eq("role", "platform_owner");
+    const ownerEmails = new Set<string>();
+    for (const r of ownerRoles ?? []) {
+      const { data: u } = await (supabaseAdmin as any).auth.admin.getUserById(r.user_id);
+      if (u?.user?.email) ownerEmails.add(String(u.user.email).trim().toLowerCase());
+    }
+    const ownerText =
+      `${schoolName} paid ${kes(amount)} via ${methodLabel}${p.reference ? ` (${p.reference})` : ""} on ${paidAt} EAT.\n` +
+      `Invoice ${inv.invoice_no} | Receipt ${p.receipt_no ?? "-"} | ${balance > 0 ? `Balance ${kes(balance)}` : "Fully paid"}`;
+    const ownerHtml = `<div style="font-family:Arial,sans-serif;max-width:520px"><h3>Payment received</h3><p>${esc(ownerText).replace(/\n/g, "<br/>")}</p></div>`;
+    const ownerIds: string[] = [];
+    for (const to of ownerEmails) {
+      const messageId = crypto.randomUUID();
+      const { error: qErr } = await db.rpc("enqueue_email", {
+        queue_name: "transactional_emails",
+        payload: {
+          message_id: messageId, to, from: "SmartDev ERP <noreply@smartdev.co.ke>",
+          subject: `Payment received: ${schoolName} - ${kes(amount)}`,
+          html: ownerHtml, text: ownerText, purpose: "receipt", label: "platform-owner-payment-alert",
+          idempotency_key: `platform-owner-alert-${p.id}-${to}`, queued_at: new Date().toISOString(),
+        },
+      });
+      if (!qErr) { ownerIds.push(messageId); ownerCount++; }
+    }
+    if (ownerEmails.size) {
+      await db.from("notifications_log").insert({
+        school_id: inv.school_id, channel: "email", subject: `Platform payment alert ${p.receipt_no ?? ""}`, body: ownerText,
+        recipient_count: ownerEmails.size, status: ownerCount ? "queued" : "failed", message_ids: ownerIds.length ? ownerIds : null,
+      });
+    }
+  } catch (e) {
+    console.error("[platform-payment-notify] owner alert", e);
+  }
+
+  if (smsCount > 0 || emailCount > 0 || ownerCount > 0) {
     await db.from("platform_payments").update({ receipt_notified_at: new Date().toISOString() }).eq("id", p.id);
   }
   const skipped = !numbers.length && !recipients.size ? "the school has no phone or email on file" : undefined;
-  return { sms: smsCount, email: emailCount, skipped };
+  return { sms: smsCount, email: emailCount, owner: ownerCount, skipped };
 }
 
 export async function sendPlatformPaymentConfirmationSafely(paymentId: string, timeoutMs = 5000) {
