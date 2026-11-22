@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { sendPaymentConfirmationSafely } from "@/lib/payment-notify.server";
 
 // Safaricom Daraja STK push callback.
 //
@@ -150,7 +151,7 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           .maybeSingle();
         if (dup) return new Response("ok");
 
-        const { error: insErr } = await supabaseAdmin.from("payments").insert({
+        const { data: newPay, error: insErr } = await supabaseAdmin.from("payments").insert({
           invoice_id: invoiceId,
           amount,
           method: "mpesa",
@@ -159,7 +160,7 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           payer_phone: phone || null,
           transaction_at: transactionAt,
           paid_to: paidTo,
-        } as any);
+        } as any).select("id").maybeSingle();
         if (insErr && !/duplicate key/i.test(insErr.message)) {
           await supabaseAdmin.from("activity_logs").insert({
             action: "mpesa.insert_failed",
@@ -174,6 +175,9 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
             .update({ status: "completed" })
             .eq("checkout_request_id", checkoutRequestId);
         }
+
+        // SMS + emailed receipt to the parent (never blocks or fails the callback).
+        if (newPay?.id) await sendPaymentConfirmationSafely(newPay.id as string);
 
         return new Response("ok");
       },
