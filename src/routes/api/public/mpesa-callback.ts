@@ -31,11 +31,17 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         // school ID wasn't present (older/manually-registered URLs, or the
         // env-var/platform-shared credential path).
         let expected: string | undefined | null = null;
+        let paidTo: string | null = null;
         if (schoolId) {
           const { data: cfg } = await supabaseAdmin
             .rpc("get_school_mpesa_config", { p_school_id: schoolId })
             .maybeSingle();
           expected = cfg?.callback_token ?? process.env.MPESA_CALLBACK_TOKEN;
+          paidTo = cfg?.till_number
+            ? `Till ${cfg.till_number}`
+            : cfg?.shortcode
+              ? `Paybill ${cfg.shortcode}`
+              : null;
         } else {
           expected = process.env.MPESA_CALLBACK_TOKEN;
         }
@@ -79,7 +85,13 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
 
         const amount = Number(get("Amount") ?? 0);
         const receipt = String(get("MpesaReceiptNumber") ?? "");
-        const phone = String(get("PhoneNumber") ?? "");
+        let phone = String(get("PhoneNumber") ?? "");
+        // "20261122154617" (Nairobi time) -> real timestamp
+        const rawDate = String(get("TransactionDate") ?? "");
+        const m = rawDate.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+        const transactionAt = m
+          ? new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+03:00`).toISOString()
+          : new Date().toISOString();
         const checkoutRequestId: string = stk.CheckoutRequestID || "";
         const accountRef: string = stk.AccountReference || "";
 
@@ -96,10 +108,12 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
         if (checkoutRequestId) {
           const { data: intent } = await supabaseAdmin
             .from("mpesa_payment_intents")
-            .select("invoice_id")
+            .select("invoice_id, phone")
             .eq("checkout_request_id", checkoutRequestId)
             .maybeSingle();
           invoiceId = intent?.invoice_id ?? null;
+          // Safaricom may mask the number in the callback; the intent holds the number we pushed to.
+          if ((!/^\d{9,15}$/.test(phone)) && intent?.phone) phone = String(intent.phone);
         }
 
         // Fallback for any in-flight transaction that predates recording an
@@ -141,6 +155,10 @@ export const Route = createFileRoute("/api/public/mpesa-callback")({
           amount,
           method: "mpesa",
           reference: `${receipt} (${phone})`,
+          mpesa_receipt: receipt,
+          payer_phone: phone || null,
+          transaction_at: transactionAt,
+          paid_to: paidTo,
         } as any);
         if (insErr && !/duplicate key/i.test(insErr.message)) {
           await supabaseAdmin.from("activity_logs").insert({
