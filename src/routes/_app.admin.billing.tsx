@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Wallet, Building2 } from "lucide-react";
-import { MpesaPayDialog } from "@/components/MpesaPayDialog";
+import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
 
 export const Route = createFileRoute("/_app/admin/billing")({ component: BillingPage });
 
@@ -184,7 +184,7 @@ function PayNowButton({ invoice }: { invoice: any }) {
               <p className="text-muted-foreground text-xs">
                 You'll get an M-Pesa prompt on your phone to enter your PIN and complete the payment.
               </p>
-              <MpesaPayDialog
+              <PlatformMpesaPayDialog
                 invoiceId={invoice.id}
                 outstanding={balance}
                 triggerLabel={`Pay KES ${balance.toLocaleString()} with M-Pesa`}

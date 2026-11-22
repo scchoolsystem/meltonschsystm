@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Receipt } from "lucide-react";
-import { MpesaPayDialog } from "@/components/MpesaPayDialog";
+import { PlatformMpesaPayDialog } from "@/components/PlatformMpesaPayDialog";
 
 export const Route = createFileRoute("/platform/invoices")({
   component: () => (
@@ -169,7 +169,7 @@ function PlatformInvoices() {
                   <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{i.notes ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     {!isOwner && i.status !== "paid" && (
-                      <MpesaPayDialog
+                      <PlatformMpesaPayDialog
                         invoiceId={i.id}
                         outstanding={Number(i.amount) - Number(i.paid)}
                         triggerLabel="Pay Now"
