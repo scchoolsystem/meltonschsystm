@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 
-type Source = "announcement" | "notification";
+type Source = "announcement" | "notification" | "user";
 type Item = {
   id: string;
   title: string;
@@ -21,6 +21,8 @@ type Item = {
   source: Source;
   /** URL to navigate to when clicked (optional) */
   link?: string;
+  /** Persisted read state (user notifications only) */
+  read?: boolean;
 };
 
 // ── Persistence keys ──────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ export function NotificationsBell() {
     const { data: schoolId } = await supabase.rpc("my_school_id");
     if (!schoolId) { setItems([]); setUnread(0); return; }
 
-    const [annRes, notifRes] = await Promise.all([
+    const [annRes, notifRes, userRes] = await Promise.all([
       supabase
         .from("announcements")
         .select("id,title,body,pinned,created_at,audience")
@@ -74,6 +76,15 @@ export function NotificationsBell() {
             .from("notifications_log")
             .select("id,subject,body,created_at,channel")
             .eq("school_id", schoolId as any)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as any[] }),
+      // Personal notifications (e.g. "Payment received"): RLS returns only this user's rows.
+      user
+        ? (supabase as any)
+            .from("user_notifications")
+            .select("id,title,body,link,kind,read_at,created_at")
+            .eq("user_id", user.id)
             .order("created_at", { ascending: false })
             .limit(20)
         : Promise.resolve({ data: [] as any[] }),
@@ -99,7 +110,18 @@ export function NotificationsBell() {
       source: "notification" as const,
     }));
 
-    const merged = [...announcements, ...notifs]
+    const personal: Item[] = ((userRes.data as any[]) || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      body: r.body ?? "",
+      created_at: r.created_at,
+      channel: r.kind,
+      source: "user" as const,
+      link: r.link ?? undefined,
+      read: !!r.read_at,
+    }));
+
+    const merged = [...personal, ...announcements, ...notifs]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 25);
 
@@ -111,7 +133,7 @@ export function NotificationsBell() {
     const last = Number(localStorage.getItem(SEEN_KEY) || 0);
     const readIds = getReadIds();
     const count = list.filter(
-      (r) => new Date(r.created_at).getTime() > last && !readIds.has(r.id)
+      (r) => (r.source === "user" ? !r.read : new Date(r.created_at).getTime() > last && !readIds.has(r.id))
     ).length;
     setUnread(count);
   }
@@ -122,6 +144,7 @@ export function NotificationsBell() {
       .channel("notif-feed")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "announcements" }, () => load())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications_log" }, () => load())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "user_notifications" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user?.id]);
@@ -131,22 +154,35 @@ export function NotificationsBell() {
     if (o) {
       // Mark all currently visible as seen at the time-level
       localStorage.setItem(SEEN_KEY, String(Date.now()));
-      setUnread(0);
+      setUnread(items.filter((i) => i.source === "user" && !i.read).length);
     }
+  }
+
+  async function persistRead(ids: string[]) {
+    if (!ids.length) return;
+    try {
+      await (supabase as any).from("user_notifications").update({ read_at: new Date().toISOString() }).in("id", ids).is("read_at", null);
+    } catch { /* non-fatal */ }
   }
 
   function handleItemClick(item: Item) {
     markItemRead(item.id);
-    setItems((prev) => [...prev]); // trigger re-render
-    computeUnread(items);
+    let next = items;
+    if (item.source === "user") {
+      next = items.map((i) => (i.id === item.id ? { ...i, read: true } : i));
+      persistRead([item.id]);
+    }
+    setItems(next);
+    computeUnread(next);
     if (item.link) window.location.href = item.link;
   }
 
   function markAllRead() {
     for (const item of items) markItemRead(item.id);
     localStorage.setItem(SEEN_KEY, String(Date.now()));
+    persistRead(items.filter((i) => i.source === "user" && !i.read).map((i) => i.id));
     setUnread(0);
-    setItems((prev) => [...prev]);
+    setItems((prev) => prev.map((i) => (i.source === "user" ? { ...i, read: true } : i)));
   }
 
   const readIds = getReadIds();
@@ -190,7 +226,7 @@ export function NotificationsBell() {
             <div className="p-4 text-xs text-muted-foreground text-center">Nothing yet.</div>
           )}
           {items.map((n) => {
-            const isRead = readIds.has(n.id);
+            const isRead = readIds.has(n.id) || !!n.read;
             return (
               <div
                 key={`${n.source}-${n.id}`}
