@@ -464,6 +464,7 @@ export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
 
     let updated = 0;
     let skipped = 0;
+    let notifyUnsent = 0;
 
     // Work out which invoices actually need a payment.
     const eligible = invoices.filter(
@@ -486,8 +487,20 @@ export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
         reference: data.reference ?? null,
         paid_on: paidOn,
       }));
-      const { error: payErr } = await supabaseAdmin.from("payments").insert(paymentsRows as any);
+      const { data: insertedPays, error: payErr } = await supabaseAdmin
+        .from("payments")
+        .insert(paymentsRows as any)
+        .select("id");
       if (payErr) throw new Error(payErr.message);
+
+      // SMS + emailed receipt to each parent. Each notification costs several
+      // subrequests, so cap how many go out inline to stay under the Worker
+      // limit; the rest can be sent from the receipt page ("Resend").
+      const BULK_NOTIFY_CAP = 8;
+      for (const pay of (insertedPays ?? []).slice(0, BULK_NOTIFY_CAP)) {
+        await sendPaymentConfirmationSafely(pay.id as string);
+      }
+      notifyUnsent = Math.max((insertedPays ?? []).length - BULK_NOTIFY_CAP, 0);
 
       // No follow-up invoice update needed: trg_upd_invoice_paid fires per
       // row on the insert above and recalculates each invoice's paid/status
@@ -496,5 +509,5 @@ export const bulkMarkInvoicesPaid = createServerFn({ method: "POST" })
       updated = eligible.length;
     }
 
-    return { updated, skipped };
+    return { updated, skipped, notifyUnsent };
   });
