@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useRouter } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 
 type Source = "announcement" | "notification" | "user";
@@ -55,6 +56,13 @@ function markItemRead(id: string) {
 
 export function NotificationsBell() {
   const { user } = useAuth();
+  const router = useRouter();
+  // In-app navigation keeps the live session (a full reload re-checks auth and can bounce to /login).
+  const openLink = (link: string) => {
+    setOpen(false);
+    if (link.startsWith("/")) router.history.push(link);
+    else window.location.href = link;
+  };
   scopeKeys(user?.id);
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
@@ -266,7 +274,7 @@ export function NotificationsBell() {
                       size="sm"
                       variant="outline"
                       className="h-6 text-[10px] gap-1"
-                      onClick={(e) => { e.stopPropagation(); window.location.href = n.link!; }}
+                      onClick={(e) => { e.stopPropagation(); openLink(n.link!); }}
                     >
                       <ExternalLink className="w-3 h-3" /> Open
                     </Button>
