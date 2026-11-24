@@ -179,7 +179,10 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
     });
   }
 
-  if (smsCount > 0 || emailCount > 0) {
+  // Only mark as notified when nothing was left unsent: if there were phone
+  // numbers but the SMS failed, leave it unmarked so it can be retried.
+  const smsFailed = numbers.length > 0 && smsCount === 0;
+  if ((smsCount > 0 || emailCount > 0) && !smsFailed) {
     await db.from("payments").update({ receipt_notified_at: new Date().toISOString() }).eq("id", p.id);
   }
   const skipped = !numbers.length && !to ? "no parent phone or email on file" : undefined;
