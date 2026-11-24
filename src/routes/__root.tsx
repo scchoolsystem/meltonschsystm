@@ -36,17 +36,22 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   reportError(error, { source: "client", code: "ROUTE_ERROR_BOUNDARY" });
   const router = useRouter();
+  // A stale tab after a deploy points at old hashed chunks that no longer
+  // exist; retrying the router can never fix that — only a full reload can.
+  const isStaleChunk = /dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically/i.test(error?.message ?? "");
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <img src="/favicon.ico" alt="Logo" className="mx-auto mb-6 h-16 w-16" />
-        <h1 className="text-xl font-semibold">This page didn't load</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <h1 className="text-xl font-semibold">{isStaleChunk ? "A new version is available" : "This page didn't load"}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {isStaleChunk ? "SmartDev was just updated. Reload to continue." : error.message}
+        </p>
         <div className="mt-6 flex justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => { if (isStaleChunk) { window.location.reload(); return; } router.invalidate(); reset(); }}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >Try again</button>
+          >{isStaleChunk ? "Reload" : "Try again"}</button>
           <a href="/" className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent">Home</a>
         </div>
       </div>
