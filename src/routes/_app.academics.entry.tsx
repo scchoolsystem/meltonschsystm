@@ -1,7 +1,7 @@
 /**
- * src/routes/_app.academics.remarks.tsx
+ * src/routes/_app.academics.entry.tsx
  *
- * SmartDev ERP V3 — Remarks Management
+ * SmartDev ERP V3 — Marks & Remarks (score entry grid + remarks)
  *
  * Three remark types:
  *   1. Subject Teacher Remarks — per student per subject per exam
@@ -34,18 +34,19 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
+import { MarksEntryPanel } from "@/components/academics/MarksEntryPanel";
 import {
   Loader2, Save, Sparkles, BookMarked, MessageSquarePlus, ChevronDown, Check,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_app/academics/remarks")({
+export const Route = createFileRoute("/_app/academics/entry")({
   beforeLoad: async () => {
     const { data, timedOut } = await getSessionSafe();
     if (timedOut) return; // defer to AppLayout's own client-side session check
     if (!data.session) throw redirect({ to: "/login" });
   },
   component: () => (
-    <FeatureGate feature="academics_remarks">
+    <FeatureGate feature="academics_marks">
       <RemarksPage />
     </FeatureGate>
   ),
@@ -66,29 +67,28 @@ function useDebounce<T>(value: T, delay = 1500): T {
 
 function RemarksPage() {
   const { isAdmin, hasRole } = useAuth();
-  const { isTeacherScoped, classIds, allSubjectIds } = useTeacherScope();
+  const { isTeacherScoped, classIds, subjectIdsByClass, allSubjectIds } = useTeacherScope();
 
   const isPrincipal = isAdmin || hasRole("principal") || hasRole("deputy_principal");
   const isClassTeacher = isAdmin || hasRole("class_teacher") || hasRole("teacher");
   const isSubjectTeacher = isAdmin || hasRole("teacher") || hasRole("subject_teacher") || hasRole("hod");
   const isExamsAdmin = isAdmin || hasRole("exams_admin") || hasRole("academic_master");
 
-  const defaultTab =
-    isExamsAdmin ? "subject" :
-    isPrincipal ? "principal" :
-    isClassTeacher ? "class" : "subject";
+  const canEnterMarks = isSubjectTeacher || isExamsAdmin || isPrincipal;
+  const defaultTab = canEnterMarks ? "marks" : isClassTeacher ? "class" : "subject";
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold">Remarks</h1>
+        <h1 className="text-3xl font-bold">Marks &amp; Remarks</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Write subject, class teacher, and principal remarks. These appear automatically on report cards.
+          Enter marks for a class and subject, then write remarks. Both appear on report cards.
         </p>
       </div>
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
+          {canEnterMarks && <TabsTrigger value="marks">Enter Marks</TabsTrigger>}
           {(isSubjectTeacher || isExamsAdmin) && (
             <TabsTrigger value="subject">Subject Teacher Remarks</TabsTrigger>
           )}
@@ -101,6 +101,11 @@ function RemarksPage() {
           <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
 
+        {canEnterMarks && (
+          <TabsContent value="marks" className="mt-4">
+            <MarksEntryPanel isTeacherScoped={isTeacherScoped} classIds={classIds} subjectIdsByClass={subjectIdsByClass} allSubjectIds={allSubjectIds} />
+          </TabsContent>
+        )}
         {(isSubjectTeacher || isExamsAdmin) && (
           <TabsContent value="subject" className="mt-4">
             <SubjectRemarksPanel isTeacherScoped={isTeacherScoped} classIds={classIds} allSubjectIds={allSubjectIds} />

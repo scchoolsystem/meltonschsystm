@@ -125,7 +125,7 @@ function Dashboard() {
         )}
         <QuickLinks links={[
           { label: "My Subjects", url: "/academics/subjects", icon: BookOpen },
-          { label: "Mark Entry", url: "/academics/marks", icon: ClipboardList },
+          { label: "Mark Entry", url: "/academics/entry", icon: ClipboardList },
           { label: "Exams", url: "/academics/exams", icon: Calendar },
           { label: "Results", url: "/academics/results", icon: TrendingUp },
           { label: "Timetable", url: "/timetable", icon: Calendar },
@@ -147,7 +147,7 @@ function Dashboard() {
         </div>
         <QuickLinks links={[
           { label: "Exams", url: "/academics/exams", icon: Calendar },
-          { label: "Mark Entry", url: "/academics/marks", icon: ClipboardList },
+          { label: "Mark Entry", url: "/academics/entry", icon: ClipboardList },
           { label: "Results", url: "/academics/results", icon: TrendingUp },
           { label: "Report Cards", url: "/academics/report-cards", icon: BookOpen },
           { label: "Grading Scale", url: "/admin/grading", icon: GraduationCap },
