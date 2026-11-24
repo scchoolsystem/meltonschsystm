@@ -61,3 +61,24 @@ export function resolveStudentSubjects(
   }
   return { compulsory, chosen, pending, all: [...compulsory, ...chosen.flatMap((c) => c.subjects)] };
 }
+
+/**
+ * Elective subjects this student does NOT take: for every group that applies to
+ * the class where the student has completed their choice (picked pick_count),
+ * the offered subjects they did not pick. While a choice is still pending nothing
+ * is hidden, so data entry and the timetable are never blocked by a missing choice.
+ */
+export function hiddenElectiveSubjectIds(
+  studentId: string, classId: string, d: OptionData, enrolments: Enrolment[],
+): Set<string> {
+  const hidden = new Set<string>();
+  const mine = enrolments.filter((e) => e.student_id === studentId);
+  for (const group of groupsForClass(classId, d)) {
+    const offered = subjectsOfGroup(group.id, d);
+    const picked = offered.filter((s) => mine.some((e) => e.subject_id === s.id));
+    if (picked.length >= group.pick_count) {
+      for (const s of offered) if (!picked.some((p) => p.id === s.id)) hidden.add(s.id);
+    }
+  }
+  return hidden;
+}

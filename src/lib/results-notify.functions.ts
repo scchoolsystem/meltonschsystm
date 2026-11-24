@@ -10,6 +10,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fallbackGrade, gradePoints, meanGrade } from "@/lib/grade-utils";
 import { resolveSmsSender, toE164Kenya } from "@/lib/sms.functions";
+import { hiddenElectiveSubjectIds, resolveStudentSubjects, type OptionData, type Enrolment } from "@/lib/subject-options";
 
 export const RESULTS_BATCH_SIZE = 20;
 
@@ -63,6 +64,10 @@ type Card = {
   position: number;
   classSize: number;
   allVerified: boolean;
+  /** chosen electives with no mark yet */
+  missing: string[];
+  /** option groups where the student still has to choose */
+  pendingChoices: number;
 };
 
 function skipRanks<T>(items: T[], valueOf: (t: T) => number): Map<T, number> {
@@ -76,6 +81,26 @@ function skipRanks<T>(items: T[], valueOf: (t: T) => number): Map<T, number> {
     ranks.set(item, lastRank);
   });
   return ranks;
+}
+
+// Elective setup for this school (empty if the option tables aren't there yet).
+async function loadOptions(schoolId: string, year: number): Promise<{ od: OptionData; enrol: Enrolment[] }> {
+  const empty = { od: { subjects: [], groups: [], groupClasses: [], groupSubjects: [] } as OptionData, enrol: [] as Enrolment[] };
+  try {
+    const [subj, g, gc, gs] = await Promise.all([
+      db().from("subjects").select("id,name,code").eq("school_id", schoolId).eq("is_examinable", true),
+      db().from("subject_option_groups").select("id,name,pathway,pick_count").eq("school_id", schoolId),
+      db().from("subject_option_group_classes").select("group_id,class_id").eq("school_id", schoolId),
+      db().from("subject_option_group_subjects").select("group_id,subject_id").eq("school_id", schoolId),
+    ]);
+    if (g.error || gc.error || gs.error || !(g.data ?? []).length) return empty;
+    const enrol = await fetchAll<Enrolment>((from, to) =>
+      db().from("student_subjects").select("student_id,subject_id,group_id")
+        .eq("school_id", schoolId).eq("academic_year", year).order("id").range(from, to));
+    return { od: { subjects: subj.data ?? [], groups: g.data ?? [], groupClasses: gc.data ?? [], groupSubjects: gs.data ?? [] }, enrol };
+  } catch {
+    return empty;
+  }
 }
 
 const studentName = (s: StudentRow) => `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || "your child";
@@ -111,11 +136,16 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
       .eq("exam_id", examId).order("student_id").order("subject_id").range(from, to),
   )).filter((r) => byId.has(r.student_id));
 
+  const { od, enrol } = await loadOptions(schoolId, Number(exam.year) || new Date().getFullYear());
+  const hiddenBy = new Map<string, Set<string>>();
+  for (const st of students) if (st.class_id) hiddenBy.set(st.id, hiddenElectiveSubjectIds(st.id, st.class_id, od, enrol));
+
   // group results by class → student → subject
   type Cell = { score: number; grade: string; name: string; code: string | null; verified: boolean };
   const classes = new Map<string, Map<string, Map<string, Cell>>>();
   for (const r of results) {
     const st = byId.get(r.student_id)!;
+    if (hiddenBy.get(st.id)?.has(r.subject_id)) continue; // elective this student does not take
     const cid = st.class_id as string;
     if (!classes.has(cid)) classes.set(cid, new Map());
     const cm = classes.get(cid)!;
@@ -153,7 +183,10 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
       });
       subjects.sort((a, b) => (a.code ?? a.name).localeCompare(b.code ?? b.name));
       const n = subjects.length;
-      return { studentId, subjects, total, mean: n ? total / n : 0, grade: n ? meanGrade(points / n) : "—", allVerified };
+      const st = byId.get(studentId)!;
+      const rs = resolveStudentSubjects(studentId, cid, od, enrol);
+      const missing = rs.chosen.flatMap((c) => c.subjects).filter((x) => !m.has(x.id)).map((x) => x.name);
+      return { studentId, subjects, total, mean: n ? total / n : 0, grade: n ? meanGrade(points / n) : "—", allVerified, missing, pendingChoices: rs.pending.length };
     });
     const ranks = skipRanks(prelim, (r) => r.mean); // same default basis as the Class Ranking page
     for (const r of prelim) {
@@ -161,6 +194,7 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
         student: byId.get(r.studentId)!, className: classLabel.get(cid) ?? "Class",
         subjects: r.subjects, total: r.total, mean: r.mean, grade: r.grade,
         position: ranks.get(r) ?? 0, classSize: prelim.length, allVerified: r.allVerified,
+        missing: r.missing, pendingChoices: r.pendingChoices,
       });
     }
   });
@@ -242,6 +276,8 @@ export const previewResultsSend = createServerFn({ method: "POST" })
       withPhone: cards.filter((c) => c.student.parent_phone && toE164Kenya(c.student.parent_phone)).length,
       withEmail: cards.filter((c) => c.student.parent_email?.trim()).length,
       unverified: cards.filter((c) => !c.allVerified).length,
+      missingElectives: cards.filter((c) => c.missing.length > 0).length,
+      pendingChoices: cards.filter((c) => c.pendingChoices > 0).length,
       alreadySent: cards.filter((c) => done.has(c.student.id)).length,
       batchSize: RESULTS_BATCH_SIZE,
       sampleSms: sample ? smsFor(sample, schoolName, exam.name, false) : null,
