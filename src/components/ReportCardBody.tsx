@@ -1,5 +1,6 @@
 import React from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { isCbcGrade, meanGradeOf, cbcTotalPoints, CBC_LEVELS } from "@/lib/grade-utils";
 
 // ── Grade helpers (kept in sync with the picker + single-card page) ────────
 export function fallbackGrade(s: number) {
@@ -10,6 +11,12 @@ export function fallbackGrade(s: number) {
 }
 
 export function gradeColor(grade: string) {
+  if (isCbcGrade(grade)) {
+    if (grade.startsWith("EE")) return "#16a34a";
+    if (grade.startsWith("ME")) return "#2563eb";
+    if (grade.startsWith("AE")) return "#d97706";
+    return "#dc2626";
+  }
   if (["A", "A-"].includes(grade)) return "#16a34a";
   if (["B+", "B", "B-"].includes(grade)) return "#2563eb";
   if (["C+", "C", "C-"].includes(grade)) return "#d97706";
@@ -61,9 +68,16 @@ export function ReportCardBody({
   const displayTotal  = totalMethod === "sum" ? totalScore : meanScore;
   const displayMax    = totalMethod === "sum" ? maxPerSubject * results.length : maxPerSubject;
 
-  const overallGrade   = summary?.overall_grade ?? fallbackGrade(meanScore);
+  // CBC classes: every subject carries a level (EE1…BE2), so the overall result is a CBC level
+  // from the mean of the points — not the KCSE grade the database summary would give.
+  const subjectGrades = (results as any[]).map((r) => r.grade ?? fallbackGrade(Number(r.score)));
+  const isCbc = subjectGrades.length > 0 && subjectGrades.every(isCbcGrade);
+  const overallGrade   = isCbc ? meanGradeOf(subjectGrades) : (summary?.overall_grade ?? fallbackGrade(meanScore));
+  const cbcPoints = isCbc ? cbcTotalPoints(subjectGrades) : null; // e.g. 54 of 72, as KNEC reports KJSEA
   const gradeColour     = gradeColor(overallGrade);
-  const overallRemarks  = summary?.overall_remarks ?? rcSettings?.grade_remarks?.[overallGrade] ?? "—";
+  const overallRemarks  = isCbc
+    ? (CBC_LEVELS.find((l) => l.label === overallGrade)?.name ?? "—")
+    : (summary?.overall_remarks ?? rcSettings?.grade_remarks?.[overallGrade] ?? "—");
   const position        = summary?.position;
 
   const principalTitle = rcSettings?.principal_title ?? "Principal";
@@ -246,11 +260,11 @@ export function ReportCardBody({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="border rounded-lg p-3 text-center bg-gray-50">
           <div className="text-[10px] uppercase tracking-wider text-gray-500">
-            {totalMethod === "sum" ? "Total Score" : "Mean Score"}
+            {cbcPoints ? "Total Points" : totalMethod === "sum" ? "Total Score" : "Mean Score"}
           </div>
           <div className="text-2xl font-extrabold mt-1">
-            {displayTotal.toFixed(totalMethod === "sum" ? 0 : 1)}
-            <span className="text-xs font-normal text-gray-400"> /{displayMax.toFixed(0)}</span>
+            {cbcPoints ? cbcPoints.total : displayTotal.toFixed(totalMethod === "sum" ? 0 : 1)}
+            <span className="text-xs font-normal text-gray-400"> /{cbcPoints ? cbcPoints.max : displayMax.toFixed(0)}</span>
           </div>
         </div>
         <div className="border rounded-lg p-3 text-center bg-gray-50">
@@ -258,7 +272,7 @@ export function ReportCardBody({
           <div className="text-2xl font-extrabold mt-1">{meanScore.toFixed(1)}%</div>
         </div>
         <div className="border-2 rounded-lg p-3 text-center" style={{ borderColor: gradeColour }}>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500">Overall Grade</div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">{isCbc ? "Overall Level" : "Overall Grade"}</div>
           <div className="text-3xl font-extrabold mt-1" style={{ color: gradeColour }}>{overallGrade}</div>
         </div>
         {rcSettings?.show_position && position != null ? (

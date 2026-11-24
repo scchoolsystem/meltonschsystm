@@ -1,4 +1,5 @@
 import React from "react";
+import { gradePoints, meanGradeOf, isCbcGrade } from "@/lib/grade-utils";
 
 // ── Grade helpers (kept in sync with results.tsx / ReportCardBody.tsx) ─────
 export function fallbackGrade(s: number): string {
@@ -8,30 +9,13 @@ export function fallbackGrade(s: number): string {
   if (s >= 35) return "D";  if (s >= 30) return "D-"; return "E";
 }
 
-function gradePoints(g: string): number {
-  const map: Record<string, number> = {
-    "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8,
-    "C+": 7, "C": 6, "C-": 5, "D+": 4, "D": 3, "D-": 2, "E": 1,
-  };
-  return map[g] ?? 0;
-}
-
-function meanGradeFromPoints(avgPoints: number): string {
-  if (avgPoints >= 11.5) return "A";
-  if (avgPoints >= 10.5) return "A-";
-  if (avgPoints >= 9.5)  return "B+";
-  if (avgPoints >= 8.5)  return "B";
-  if (avgPoints >= 7.5)  return "B-";
-  if (avgPoints >= 6.5)  return "C+";
-  if (avgPoints >= 5.5)  return "C";
-  if (avgPoints >= 4.5)  return "C-";
-  if (avgPoints >= 3.5)  return "D+";
-  if (avgPoints >= 2.5)  return "D";
-  if (avgPoints >= 1.5)  return "D-";
-  return "E";
-}
-
 export function gradeColor(grade: string): string {
+  if (isCbcGrade(grade)) {
+    if (grade.startsWith("EE")) return "#16a34a";
+    if (grade.startsWith("ME")) return "#2563eb";
+    if (grade.startsWith("AE")) return "#d97706";
+    return "#dc2626";
+  }
   if (["A", "A-"].includes(grade)) return "#16a34a";
   if (["B+", "B", "B-"].includes(grade)) return "#2563eb";
   if (["C+", "C", "C-"].includes(grade)) return "#d97706";
@@ -149,7 +133,7 @@ export function buildClassRanking(
       const subjMap = scoresByStudent.get(s.id)!;
       const scores: RankedStudent["scores"] = {};
       let total = 0;
-      let pointsTotal = 0;
+      const gradeList: string[] = [];
       subjMap.forEach((cell, subjectId) => {
         scores[subjectId] = {
           score: cell.score,
@@ -157,11 +141,11 @@ export function buildClassRanking(
           position: subjectPositions.get(subjectId)?.get(s.id) ?? null,
         };
         total += cell.score;
-        pointsTotal += gradePoints(cell.grade);
+        gradeList.push(cell.grade);
       });
       const subjectCount = subjMap.size;
       const mean = subjectCount ? total / subjectCount : 0;
-      const meanGrade = subjectCount ? meanGradeFromPoints(pointsTotal / subjectCount) : "—";
+      const meanGrade = subjectCount ? meanGradeOf(gradeList) : "—"; // KCSE or CBC, by the grades present
       return {
         studentId: s.id,
         name: nameOf(s) || "—",
