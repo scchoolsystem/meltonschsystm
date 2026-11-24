@@ -3,6 +3,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { gradeColor, gradePoints, meanGradeOf, isCbcGrade } from "@/lib/grade-utils";
 import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options-loaders";
 import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { useMemo, useState, useCallback } from "react";
@@ -86,36 +87,6 @@ function fallbackGrade(s: number) {
   if (s >= 35) return "D";  if (s >= 30) return "D-"; return "E";
 }
 
-function gradeColor(g: string) {
-  if (["A", "A-"].includes(g)) return "text-emerald-600";
-  if (["B+", "B", "B-"].includes(g)) return "text-blue-600";
-  if (["C+", "C", "C-"].includes(g)) return "text-amber-600";
-  return "text-red-600";
-}
-
-function gradePoints(g: string) {
-  const map: Record<string, number> = {
-    "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8,
-    "C+": 7, "C": 6, "C-": 5, "D+": 4, "D": 3, "D-": 2, "E": 1,
-  };
-  return map[g] ?? 0;
-}
-
-function meanGrade(avgPoints: number): string {
-  if (avgPoints >= 11.5) return "A";
-  if (avgPoints >= 10.5) return "A-";
-  if (avgPoints >= 9.5)  return "B+";
-  if (avgPoints >= 8.5)  return "B";
-  if (avgPoints >= 7.5)  return "B-";
-  if (avgPoints >= 6.5)  return "C+";
-  if (avgPoints >= 5.5)  return "C";
-  if (avgPoints >= 4.5)  return "C-";
-  if (avgPoints >= 3.5)  return "D+";
-  if (avgPoints >= 2.5)  return "D";
-  if (avgPoints >= 1.5)  return "D-";
-  return "E";
-}
-
 function classLabel(c?: { name?: string | null; stream?: string | null } | null) {
   if (!c) return "—";
   return `${c.name ?? ""}${c.stream ? " " + c.stream : ""}`.trim() || "—";
@@ -127,6 +98,8 @@ const GRADE_COLORS: Record<string, string> = {
   "C+": "#d97706", "C": "#f59e0b", "C-": "#fbbf24",
   "D+": "#dc2626", "D": "#ef4444", "D-": "#f87171",
   "E": "#7c3aed",
+  "EE1": "#16a34a", "EE2": "#22c55e", "ME1": "#2563eb", "ME2": "#60a5fa",
+  "AE1": "#d97706", "AE2": "#fbbf24", "BE1": "#dc2626", "BE2": "#f87171",
 };
 
 const CHART_COLORS = ["#6366f1", "#22c55e", "#f97316", "#06b6d4", "#ec4899", "#eab308", "#8b5cf6", "#14b8a6"];
@@ -473,11 +446,8 @@ function Page() {
 
   const schoolMeanGrade = useMemo(() => {
     if (!filtered.length) return "—";
-    const total = filtered.reduce((a, r) => {
-      const g = (r as any).grade ?? fallbackGrade(Number((r as any).score));
-      return a + gradePoints(g);
-    }, 0);
-    return meanGrade(total / filtered.length);
+    // KCSE letters or CBC levels, depending on the grades actually stored
+    return meanGradeOf(filtered.map((r) => (r as any).grade ?? fallbackGrade(Number((r as any).score))));
   }, [filtered]);
 
   const gradeDistribution = useMemo(() => {
@@ -492,13 +462,14 @@ function Page() {
   }, [filtered]);
 
   const subjectAnalytics = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; count: number; pass: number; dist: number; high: number; low: number }>();
+    const map = new Map<string, { name: string; total: number; count: number; pass: number; dist: number; high: number; low: number; grades: string[] }>();
     for (const r of filtered) {
       const id   = (r as any).subject_id;
       const name = (r as any).subjects?.name ?? id;
-      if (!map.has(id)) map.set(id, { name, total: 0, count: 0, pass: 0, dist: 0, high: 0, low: 100 });
+      if (!map.has(id)) map.set(id, { name, total: 0, count: 0, pass: 0, dist: 0, high: 0, low: 100, grades: [] });
       const e = map.get(id)!;
       const score = Number((r as any).score);
+      e.grades.push((r as any).grade ?? fallbackGrade(score));
       e.total += score;
       e.count++;
       if (score >= 40) e.pass++;
@@ -515,24 +486,30 @@ function Page() {
         count: s.count,
         high: s.high,
         low: s.low,
-        grade: fallbackGrade(Math.round(s.total / s.count)),
+        grade: s.grades.length && s.grades.every(isCbcGrade) ? meanGradeOf(s.grades) : fallbackGrade(Math.round(s.total / s.count)),
       }))
       .sort((a, b) => b.avg - a.avg);
   }, [filtered]);
 
   const classAnalytics = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; count: number; pass: number }>();
+    const map = new Map<string, { name: string; total: number; count: number; pass: number; grades: string[] }>();
     for (const r of filtered) {
       const label = classLabel((r as any).students?.classes);
-      if (!map.has(label)) map.set(label, { name: label, total: 0, count: 0, pass: 0 });
+      if (!map.has(label)) map.set(label, { name: label, total: 0, count: 0, pass: 0, grades: [] });
       const e = map.get(label)!;
       const score = Number((r as any).score);
+      e.grades.push((r as any).grade ?? fallbackGrade(score));
       e.total += score;
       e.count++;
       if (score >= 40) e.pass++;
     }
     return Array.from(map.values())
-      .map((s) => ({ ...s, avg: Math.round(s.total / s.count), passRate: Math.round((s.pass / s.count) * 100) }))
+      .map((s) => ({
+        ...s,
+        avg: Math.round(s.total / s.count),
+        passRate: Math.round((s.pass / s.count) * 100),
+        grade: s.grades.length && s.grades.every(isCbcGrade) ? meanGradeOf(s.grades) : fallbackGrade(Math.round(s.total / s.count)),
+      }))
       .filter((c) => c.name !== "—")
       .sort((a, b) => b.avg - a.avg);
   }, [filtered]);
@@ -1256,8 +1233,8 @@ function Page() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{c.count}</TableCell>
                       <TableCell>
-                        <span className={`font-bold text-sm ${gradeColor(fallbackGrade(c.avg))}`}>
-                          {fallbackGrade(c.avg)}
+                        <span className={`font-bold text-sm ${gradeColor(c.grade)}`}>
+                          {c.grade}
                         </span>
                       </TableCell>
                     </TableRow>
