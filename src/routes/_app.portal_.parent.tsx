@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
+import { fetchHiddenSubjectIds } from "@/lib/subject-options.client";
 import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -222,7 +223,7 @@ function ParentPortal() {
       const EMPTY = { data: [] as any[], error: null } as any;
       const EMPTY_SINGLE = { data: null, error: null } as any;
 
-      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals, ach, ins] = await Promise.all([
+      const [a, r, i, lu, la, dr, tr, cv, da, gp, cc, tt, loans, docs, meals, ach, ins, hid] = await Promise.all([
         withTimeout(supabase.from("attendance_records").select("*").eq("student_id", activeId).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
         withTimeout(supabase.from("exam_results").select("*, subjects(name), exams(name, term, year)").eq("student_id", activeId).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
         withTimeout(supabase.from("invoices").select("*").eq("student_id", activeId).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
@@ -244,6 +245,8 @@ function ParentPortal() {
         withTimeout(supabase.from("meal_plans").select("*").gte("meal_date", weekStart).lte("meal_date", weekEnd).order("meal_date").order("meal_type"), 8000, EMPTY, "weekMeals"),
         withTimeout(supabase.from("sports_achievements").select("id, description, award_level, achievement_date, co_curricular_activities(name)").eq("student_id", activeId).order("achievement_date", { ascending: false }).limit(20), 8000, EMPTY, "achievements"),
         withTimeout((supabase as any).from("student_insurance").select("enrolled_on, insurance_policies(policy_name, provider, cover_amount, starts_on, ends_on)").eq("student_id", activeId).order("enrolled_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "insurance"),
+        // electives this student does not take (empty set if none / not configured)
+        fetchHiddenSubjectIds(supabase, activeId, classId),
       ]);
 
       setData({
@@ -258,7 +261,7 @@ function ParentPortal() {
         dorm: (da as any).data ?? null,
         gatePasses: gp.data ?? [],
         coCurricular: (cc as any).data ?? [],
-        timetable: (tt as any).data ?? [],
+        timetable: ((tt as any).data ?? []).filter((x: any) => !hid.has(x.subject_id)),
         loans: loans.data ?? [],
         documents: docs.data ?? [],
         weekMeals: meals.data ?? [],

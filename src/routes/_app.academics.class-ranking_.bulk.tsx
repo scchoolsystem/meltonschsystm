@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useElectiveFilteredResults } from "@/hooks/use-elective-filter";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useTenant } from "@/hooks/use-tenant";
 import { useAuth } from "@/hooks/use-auth";
@@ -92,6 +93,9 @@ function BulkClassRankingPage() {
 
   const isLoading = classesLoading || studentsLoading || resultsLoading;
 
+  // Ignore marks for electives a student doesn't take (see Academics → Subject Options).
+  const shownResults = useElectiveFilteredResults(students as any[], results as any[], (exam as any)?.year);
+
   // Group students + results by class, then build one ranking per class —
   // same anti-N×M-loop shape as the bulk report-cards route: fetch once,
   // group in memory, never re-query per class.
@@ -105,7 +109,7 @@ function BulkClassRankingPage() {
     (students as any[]).forEach((s) => studentClassMap.set(s.id, s.class_id));
 
     const resultsByClass = new Map<string, any[]>();
-    (results as any[]).forEach((r) => {
+    (shownResults as any[]).forEach((r) => {
       const clsId = studentClassMap.get(r.student_id);
       if (!clsId) return;
       if (!resultsByClass.has(clsId)) resultsByClass.set(clsId, []);
@@ -122,7 +126,7 @@ function BulkClassRankingPage() {
         ),
       }))
       .filter((entry) => entry.ranking.rows.length > 0);
-  }, [classes, students, results, rankBasis]);
+  }, [classes, students, shownResults, rankBasis]);
 
   if (!can) {
     return (

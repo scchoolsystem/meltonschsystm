@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/hooks/use-tenant";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
 import { useQuery } from "@tanstack/react-query";
+import { useElectiveFilteredResults } from "@/hooks/use-elective-filter";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -108,9 +109,12 @@ function ClassRankingPage() {
 
   const isLoading = classesLoading || examsLoading || studentsLoading || resultsLoading;
 
+  // Ignore marks for electives a student doesn't take (see Academics → Subject Options).
+  const shownResults = useElectiveFilteredResults(students as any[], results as any[], exam?.year, classId);
+
   const ranking = useMemo(
-    () => buildClassRanking(students as any[], results as any[], rankBasis),
-    [students, results, rankBasis]
+    () => buildClassRanking(students as any[], shownResults as any[], rankBasis),
+    [students, shownResults, rankBasis]
   );
 
   // Default the subject-ranking picker to the first available subject.

@@ -3,6 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { fetchHiddenSubjectIds, fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { Button } from "@/components/ui/button";
 import { Loader2, Printer, ShieldCheck } from "lucide-react";
 import { useTenant } from "@/hooks/use-tenant";
@@ -110,12 +112,21 @@ function ReportCardContent({
 
   const { data: results = [], isLoading: resultsLoading } = useQuery({
     queryKey: ["rc-results", studentId, examId],
-    queryFn: async () => (await supabase
-      .from("exam_results")
-      .select("score,grade,remarks,verified,subject_id,promotion_decision,subjects(code,name,scale_id)")
-      .eq("student_id", studentId)
-      .eq("exam_id", examId)
-    ).data || [],
+    queryFn: async () => {
+      const rows = (await supabase
+        .from("exam_results")
+        .select("score,grade,remarks,verified,subject_id,promotion_decision,subjects(code,name,scale_id)")
+        .eq("student_id", studentId)
+        .eq("exam_id", examId)
+      ).data || [];
+      // Leave out electives this student does not take (Academics → Subject Options).
+      const [{ data: st }, { data: ex }] = await Promise.all([
+        supabase.from("students").select("class_id").eq("id", studentId).maybeSingle(),
+        supabase.from("exams").select("year").eq("id", examId).maybeSingle(),
+      ]);
+      const hidden = await fetchHiddenSubjectIds(supabase, studentId, (st as any)?.class_id, Number((ex as any)?.year) || undefined);
+      return hidden.size ? rows.filter((r: any) => !hidden.has(r.subject_id)) : rows;
+    },
   });
 
   // Exam remarks (subject teacher / class teacher / principal) — NEW V3

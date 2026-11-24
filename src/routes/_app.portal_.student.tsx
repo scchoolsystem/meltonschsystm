@@ -9,6 +9,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
+import { fetchHiddenSubjectIds } from "@/lib/subject-options.client";
 import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1136,7 +1137,7 @@ function StudentPortal() {
     setStudent(stu);
     const classId = stu?.classes?.id;
 
-    const [a, r, i, l, an, tt, dr, cv, da, gp] = await Promise.all([
+    const [a, r, i, l, an, tt, dr, cv, da, gp, hid] = await Promise.all([
       withTimeout(supabase.from("attendance_records").select("*").eq("student_id", sid).order("date", { ascending: false }).limit(90), 8000, EMPTY, "attendance"),
       withTimeout(supabase.from("exam_results").select("*, subjects(name, code), exams(name, term, year)").eq("student_id", sid).order("created_at", { ascending: false }).limit(100), 8000, EMPTY, "results"),
       withTimeout(supabase.from("invoices").select("*").eq("student_id", sid).order("created_at", { ascending: false }), 8000, EMPTY, "invoices"),
@@ -1149,6 +1150,8 @@ function StudentPortal() {
       withTimeout(supabase.from("clinic_visits").select("*").eq("student_id", sid).order("visit_date", { ascending: false }).limit(20), 8000, EMPTY, "clinic"),
       withTimeout(supabase.from("dorm_assignments").select("*, dormitories(name, gender)").eq("student_id", sid).order("assigned_on", { ascending: false }).limit(1).maybeSingle(), 8000, EMPTY_SINGLE, "dorm"),
       withTimeout(supabase.from("gate_passes").select("*").eq("student_id", sid).order("exit_time", { ascending: false }).limit(20), 8000, EMPTY, "gatePasses"),
+      // electives this student does not take (empty set if none / not configured)
+      fetchHiddenSubjectIds(supabase, sid, classId),
     ]);
 
     setAttendance(a.data ?? []);
@@ -1156,7 +1159,7 @@ function StudentPortal() {
     setInvoices(i.data ?? []);
     setLoans(l.data ?? []);
     setAnnouncements(an.data ?? []);
-    setTimetable((tt as any).data ?? []);
+    setTimetable(((tt as any).data ?? []).filter((x: any) => !hid.has(x.subject_id)));
     setDiscipline(dr.data ?? []);
     setClinic(cv.data ?? []);
     setDorm((da as any).data ?? null);

@@ -3,6 +3,8 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { fetchHiddenSubjectIds, fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { useTenant } from "@/hooks/use-tenant";
 import { useAuth } from "@/hooks/use-auth";
 import { useTeacherScope } from "@/hooks/use-teacher-scope";
@@ -104,8 +106,17 @@ function BulkReportCardsPage() {
           .in("student_id", studentIds).order("date", { ascending: false }),
       ]);
 
+      // Leave out electives each student does not take (Academics → Subject Options).
+      const [od, enrol] = await Promise.all([
+        fetchOptionData(supabase),
+        fetchEnrolments(supabase, studentIds, Number(exam?.year) || new Date().getFullYear()),
+      ]);
+      const hiddenBy = new Map<string, Set<string>>();
+      for (const sidKey of studentIds) hiddenBy.set(sidKey, hiddenElectiveSubjectIds(sidKey, classId!, od, enrol));
+      const keptResults = (resultsRes.data ?? []).filter((r: any) => !hiddenBy.get(r.student_id)?.has(r.subject_id));
+
       const resultsByStudent = new Map<string, any[]>();
-      (resultsRes.data ?? []).forEach((r: any) => {
+      keptResults.forEach((r: any) => {
         if (!resultsByStudent.has(r.student_id)) resultsByStudent.set(r.student_id, []);
         resultsByStudent.get(r.student_id)!.push(r);
       });

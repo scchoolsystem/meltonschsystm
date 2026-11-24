@@ -3,6 +3,8 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
+import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -629,13 +631,34 @@ function Page() {
   // student, mirroring the DB's teaches_subject_in_class() check exactly —
   // so the dropdown can never offer a combination the new RLS would reject.
   // Admins/exams_admin (not teacher-scoped) keep the full unfiltered list.
+  // Electives: once a student has made their choice in an option group, the
+  // subjects they did not pick are no longer offered for them (so no stray marks
+  // and no accidental zeros). While a choice is pending nothing is hidden.
+  const { data: optionData } = useQuery({
+    queryKey: ["so-data"],
+    queryFn: () => fetchOptionData(supabase),
+    staleTime: 60_000,
+  });
+  const formExamYear = (exams as any[]).find((e) => e.id === form.exam_id)?.year ?? new Date().getFullYear();
+  const { data: formEnrolments = [] } = useQuery({
+    queryKey: ["so-enrol-one", form.student_id, formExamYear],
+    enabled: !!form.student_id,
+    queryFn: () => fetchEnrolments(supabase, [form.student_id], formExamYear),
+  });
+  const hiddenForStudent = useMemo(() => {
+    const student = (students as any[]).find((s) => s.id === form.student_id);
+    if (!student?.class_id || !optionData) return new Set<string>();
+    return hiddenElectiveSubjectIds(student.id, student.class_id, optionData, formEnrolments);
+  }, [students, form.student_id, optionData, formEnrolments]);
+
   const subjectOptionsForForm = useMemo(() => {
-    if (!isTeacherScoped) return subjects;
+    const visible = (subjects as any[]).filter((s) => !hiddenForStudent.has(s.id));
+    if (!isTeacherScoped) return visible;
     const student = (students as any[]).find((s) => s.id === form.student_id);
     if (!student?.class_id) return []; // pick a student first
     const allowedIds = new Set(subjectIdsByClass[student.class_id] ?? []);
-    return (subjects as any[]).filter((s) => allowedIds.has(s.id));
-  }, [isTeacherScoped, subjects, students, form.student_id, subjectIdsByClass]);
+    return visible.filter((s) => allowedIds.has(s.id));
+  }, [isTeacherScoped, subjects, students, form.student_id, subjectIdsByClass, hiddenForStudent]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

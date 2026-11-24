@@ -196,6 +196,18 @@ function SendResultsPage() {
             </CardContent>
           </Card>
 
+          {(p.missingElectives > 0 || p.pendingChoices > 0) && (
+            <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+              <CardContent className="py-4 flex gap-2 text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
+                <div>
+                  {p.missingElectives > 0 && <div>{p.missingElectives} student(s) have a chosen elective with no mark yet. Their mean uses only the marks entered.</div>}
+                  {p.pendingChoices > 0 && <div>{p.pendingChoices} student(s) haven’t chosen an elective yet (Academics → Subject Options).</div>}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader><CardTitle className="text-base">Channels</CardTitle></CardHeader>
             <CardContent className="space-y-4">
