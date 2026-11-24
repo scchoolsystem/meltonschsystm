@@ -20,20 +20,13 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
 
   const { data: p } = await db
     .from("payments")
-    .select("*, invoices(invoice_no, amount, description, students(first_name, last_name, admission_no, parent_phone, parent_email, parent_name))")
+    .select("*, invoices(invoice_no, amount, description, student_id, students(first_name, last_name, admission_no, parent_phone, parent_email, parent_name))")
     .eq("id", paymentId)
     .maybeSingle();
   if (!p) return { sms: 0, email: 0, skipped: "payment not found" };
   if (p.receipt_notified_at && !opts.force) return { sms: 0, email: 0, skipped: "already sent" };
 
   const schoolId: string = p.school_id;
-
-  // Respect the school's Communications module switch.
-  const { data: enabled, error: featErr } = await db.rpc("school_feature_enabled", {
-    p_school_id: schoolId,
-    p_feature_key: "communications",
-  });
-  if (!featErr && enabled === false) return { sms: 0, email: 0, skipped: "communications module disabled" };
 
   const { data: school } = await db.from("schools").select("name, phone").eq("id", schoolId).maybeSingle();
   const schoolName: string = school?.name ?? "School";
@@ -51,6 +44,46 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
   const paidBefore = sorted.slice(0, Math.max(idx, 0)).reduce((s: number, x: any) => s + Number(x.amount), 0);
   const invoiceTotal = Number(inv?.amount ?? 0);
   const balance = Math.max(invoiceTotal - paidBefore - amount, 0);
+
+  // ── In-app (bell) notification for linked parents / student users ────────
+  // Independent of SMS/email success and of the Communications module, and
+  // idempotent (unique dedupe_key) so a resend never duplicates it.
+  try {
+    if (inv?.student_id) {
+      const [{ data: pl }, { data: sl }] = await Promise.all([
+        db.from("parent_student_links").select("parent_user_id").eq("student_id", inv.student_id),
+        db.from("student_user_links").select("user_id").eq("student_id", inv.student_id),
+      ]);
+      // Parents and students land in their own portal (they can't open /finance pages).
+      const targets = new Map<string, string>();
+      for (const r of sl ?? []) if (r.user_id) targets.set(r.user_id, "/portal/student");
+      for (const r of pl ?? []) if (r.parent_user_id) targets.set(r.parent_user_id, "/portal/parent");
+      const userIds: string[] = Array.from(targets.keys());
+      if (userIds.length) {
+        const title = balance > 0 ? "Payment received" : "Fees fully paid";
+        const body =
+          `${kes(amount)} received for ${studentName}${inv?.invoice_no ? ` (invoice ${inv.invoice_no})` : ""}. ` +
+          `Receipt ${p.receipt_no}. ${balance > 0 ? `Balance ${kes(balance)}.` : "Fully paid."}`;
+        const { error: nErr } = await db.from("user_notifications").upsert(
+          userIds.map((uid) => ({
+            user_id: uid, school_id: schoolId, title, body, kind: "payment",
+            link: targets.get(uid), dedupe_key: `payment-${p.id}`,
+          })),
+          { onConflict: "user_id,dedupe_key", ignoreDuplicates: true },
+        );
+        if (nErr) console.error("[notify] in-app insert", nErr.message);
+      }
+    }
+  } catch (e) {
+    console.error("[notify] in-app exception", e);
+  }
+
+  // Respect the school's Communications module switch.
+  const { data: enabled, error: featErr } = await db.rpc("school_feature_enabled", {
+    p_school_id: schoolId,
+    p_feature_key: "communications",
+  });
+  if (!featErr && enabled === false) return { sms: 0, email: 0, skipped: "communications module disabled" };
 
   const isMpesa = String(p.method).toLowerCase() === "mpesa";
   const refMatch = String(p.reference ?? "").match(/^(\S+)/);
