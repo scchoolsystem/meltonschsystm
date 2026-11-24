@@ -65,10 +65,15 @@ export async function sendPaymentConfirmation(paymentId: string, opts: { force?:
   const numbers = Array.from(
     new Set([st?.parent_phone, p.payer_phone].map((n) => (n ? toE164Kenya(String(n)) : null)).filter((n): n is string => !!n)),
   );
+  // Keep it compact: one SMS part is 160 chars; longer messages are split into
+  // several parts, cost more units and report delivery less reliably.
+  const shortWhen = new Date(p.transaction_at ?? p.created_at).toLocaleString("en-KE", {
+    timeZone: "Africa/Nairobi", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
   const smsText = (
-    `${schoolName}: Received ${kes(amount)} for ${studentName} (${st?.admission_no ?? ""}) via ${methodLabel}` +
-    `${code ? ` ref ${code}` : ""} on ${paidAt}. Receipt ${p.receipt_no}. ` +
-    `${balance > 0 ? `Balance ${kes(balance)}.` : "Fees fully paid."} Thank you.`
+    `${schoolName}: ${kes(amount)} received for ${studentName} (${st?.admission_no ?? ""}) via ${methodLabel}` +
+    `${code ? ` ${code}` : ""}, ${shortWhen}. Rcpt ${p.receipt_no}. ` +
+    `${balance > 0 ? `Bal ${kes(balance)}.` : "Fully paid."}`
   ).slice(0, 480);
 
   if (numbers.length) {
