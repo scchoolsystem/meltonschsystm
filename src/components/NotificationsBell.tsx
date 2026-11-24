@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 type Source = "announcement" | "notification";
 type Item = {
@@ -23,8 +24,14 @@ type Item = {
 };
 
 // ── Persistence keys ──────────────────────────────────────────────────────────
-const SEEN_KEY = "notifications.lastSeenAt";
-const READ_KEY = "notifications.readIds"; // comma-separated list of item IDs
+// Keys are scoped per user so shared devices don't leak read-state between accounts.
+let SEEN_KEY = "notifications.lastSeenAt";
+let READ_KEY = "notifications.readIds"; // comma-separated list of item IDs
+function scopeKeys(userId?: string) {
+  const u = userId ?? "anon";
+  SEEN_KEY = `notifications.lastSeenAt.${u}`;
+  READ_KEY = `notifications.readIds.${u}`;
+}
 
 function getReadIds(): Set<string> {
   try {
@@ -45,17 +52,21 @@ function markItemRead(id: string) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function NotificationsBell() {
+  const { user } = useAuth();
+  scopeKeys(user?.id);
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
 
   const load = async () => {
     const { data: schoolId } = await supabase.rpc("my_school_id");
+    if (!schoolId) { setItems([]); setUnread(0); return; }
 
     const [annRes, notifRes] = await Promise.all([
       supabase
         .from("announcements")
         .select("id,title,body,pinned,created_at,audience")
+        .eq("school_id", schoolId as any)
         .order("created_at", { ascending: false })
         .limit(20),
       schoolId
@@ -113,7 +124,7 @@ export function NotificationsBell() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications_log" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [user?.id]);
 
   function handleOpen(o: boolean) {
     setOpen(o);
