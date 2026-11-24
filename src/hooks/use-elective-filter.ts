@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options-loaders";
 import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 
 export function useElectiveFilteredResults<R extends { student_id: string; subject_id: string }>(
