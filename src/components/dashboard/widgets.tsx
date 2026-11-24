@@ -428,7 +428,7 @@ export function TeacherPendingMarksWidget() {
                 </li>
               ))}
             </ul>
-            <a href="/academics/marks" className="text-xs text-primary underline block mt-1">
+            <a href="/academics/entry" className="text-xs text-primary underline block mt-1">
               Open Mark Entry →
             </a>
           </div>
@@ -438,7 +438,7 @@ export function TeacherPendingMarksWidget() {
           </div>
         ) : (
           <EmptyState>
-            <a href="/academics/marks" className="text-primary underline">Open Marks</a> to enter scores.
+            <a href="/academics/entry" className="text-primary underline">Open Marks</a> to enter scores.
           </EmptyState>
         )}
       </CardContent>
