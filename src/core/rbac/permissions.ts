@@ -259,6 +259,8 @@ export function moduleForPath(pathname: string): string | null {
     // /academics/send-results — personalised results SMS/email/bell; same
     // audience as exam management (the server also enforces the role check).
     if (seg[1] === "send-results") return "exams";
+    // /academics/subject-options — compulsory/elective setup; same audience as exams.
+    if (seg[1] === "subject-options") return "exams";
     if (seg[1] === "marks") return "marks";
     // /academics/entry — unified score+grade+remark grid ("Marks & Remarks"
     // in nav). Same audience as the old markbook, so it shares the "marks"
