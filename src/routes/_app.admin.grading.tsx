@@ -12,6 +12,7 @@ import { Plus, Save, Trash2, Star, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { ClassScalesCard } from "@/components/ClassScalesCard";
 
 export const Route = createFileRoute("/_app/admin/grading")({ component: Page });
 
@@ -223,6 +224,8 @@ function Page() {
           </div>
         </div>
       )}
+
+      <ClassScalesCard scales={scales as any[]} />
 
       {(scales as any[]).length === 0 && (
         <Card>

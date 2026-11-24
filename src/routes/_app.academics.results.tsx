@@ -57,10 +57,17 @@ export const Route = createFileRoute("/_app/academics/results")({
 
 // ── Grade helpers ─────────────────────────────────────────────────────────────
 
-async function resolveGrade(score: number, subjectId: string): Promise<string> {
+async function resolveGrade(score: number, subjectId: string, classId?: string | null): Promise<string> {
   try {
     const { data: schoolId } = await supabase.rpc("current_user_school");
     if (!schoolId) return fallbackGrade(score);
+    // Class-aware lookup: subject scale → the class's scale (e.g. CBC for Grade 8) → school default.
+    if (classId) {
+      const { data: cg, error: cgErr } = await (supabase as any).rpc("grade_for_class", {
+        p_school_id: schoolId as string, p_score: score, p_subject_id: subjectId, p_class_id: classId,
+      });
+      if (!cgErr && cg?.[0]?.grade) return cg[0].grade as string;
+    }
     const { data } = await supabase.rpc("grade_for", {
       p_school_id: schoolId as string,
       p_score: score,
@@ -663,7 +670,7 @@ function Page() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const score = Number(form.score);
-      const grade = await resolveGrade(score, form.subject_id);
+      const grade = await resolveGrade(score, form.subject_id, (students as any[]).find((s) => s.id === form.student_id)?.class_id);
       const payload = {
         student_id: form.student_id,
         exam_id:    form.exam_id,
