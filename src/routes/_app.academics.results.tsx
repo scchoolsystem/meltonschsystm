@@ -325,24 +325,36 @@ function Page() {
   });
 
   // ── Results data ────────────────────────────────────────────────────────
+  // Exam / subject / class filters are applied on the SERVER. Previously every
+  // filter ran client-side on only the newest 1000 rows, so in a school with
+  // more than 1000 results older entries silently vanished from the page.
   const { data = [], isLoading, refetch } = useQuery({
-    queryKey: ["exam_results", isTeacherScoped, scopedStudentIds.length, allSubjectIds.join(",")],
+    queryKey: ["exam_results", isTeacherScoped, scopedStudentIds.length, allSubjectIds.join(","), filterExam, filterSubject, filterClass],
     queryFn: async () => {
+      const studentsEmbed = filterClass !== "all"
+        ? "students!inner(first_name,last_name,admission_no,gender,class_id,classes(id,name,stream))"
+        : "students(first_name,last_name,admission_no,gender,class_id,classes(id,name,stream))";
       let q = supabase
         .from("exam_results")
         .select(
           "id,score,grade,verified,remarks,exam_id,student_id,subject_id,created_at," +
-          "exams(name,term,year),students(first_name,last_name,admission_no,gender,classes(id,name,stream))," +
+          "exams(name,term,year)," + studentsEmbed + "," +
           "subjects(code,name)"
         )
         .order("created_at", { ascending: false })
-        .limit(1000);
+        .limit(5000);
+
+      if (filterExam !== "all") q = q.eq("exam_id", filterExam);
+      if (filterSubject !== "all") q = q.eq("subject_id", filterSubject);
+      if (filterClass !== "all") q = (q as any).eq("students.class_id", filterClass);
 
       if (isTeacherScoped) {
         if (scopedStudentIds.length === 0) return [];
         q = q.in("student_id", scopedStudentIds).in("subject_id", allSubjectIds);
       }
-      return (await q).data ?? [];
+      const { data, error } = await q;
+      if (error) { toast.error(`Could not load results: ${error.message}`); throw error; }
+      return data ?? [];
     },
   });
 
