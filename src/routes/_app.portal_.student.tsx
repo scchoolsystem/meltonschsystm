@@ -50,10 +50,11 @@ import {
 
 // ─── Route ────────────────────────────────────────────────────────────────
 export const Route = createFileRoute("/_app/portal_/student")({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const { data, timedOut } = await getSessionSafe();
     if (timedOut) return; // defer to AppLayout's own client-side session check
-    if (!data.session) throw redirect({ to: "/login" });
+    // Keep the destination (incl. ?tab=) so login brings the student back here.
+    if (!data.session) throw redirect({ to: "/login", search: { redirect: location.href } });
   },
   component: () => (
     <FeatureGate feature="portals">

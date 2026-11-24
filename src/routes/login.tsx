@@ -21,6 +21,15 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+
+// Go to a saved destination such as "/portal/student?tab=results": the router
+// needs the path and the query separately, so split them before navigating.
+function toDestination(dest: string): { to: string; search?: Record<string, string> } {
+  const [path, query] = dest.split("?");
+  const search = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
+  return { to: path, ...(search ? { search } : {}) };
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const { redirect: redirectTo } = useSearch({ from: "/login" });
@@ -48,7 +57,7 @@ function LoginPage() {
     if (!loading && session) {
       // Restore the page the user was on before being redirected to login
       const destination = redirectTo && redirectTo !== "/login" ? redirectTo : "/dashboard";
-      navigate({ to: destination });
+      navigate(toDestination(destination) as any);
     }
   }, [session, loading, navigate, isPlatformHost, isRootHost, tenantLoading, slug, redirectTo]);
 
@@ -116,7 +125,7 @@ function LoginPage() {
       toast.success("Welcome back");
       // Go back to where they were, or dashboard if no redirect saved
       const destination = redirectTo && redirectTo !== "/login" ? redirectTo : "/dashboard";
-      navigate({ to: destination });
+      navigate(toDestination(destination) as any);
     } catch (err: any) { toast.error(err.message ?? "Login failed"); } finally { setBusy(false); }
   }
 
