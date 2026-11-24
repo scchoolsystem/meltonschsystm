@@ -8,7 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { fallbackGrade, gradePoints, meanGrade } from "@/lib/grade-utils";
+import { fallbackGrade, meanGradeOf, isCbcGrade, cbcTotalPoints } from "@/lib/grade-utils";
 import { resolveSmsSender, toE164Kenya } from "@/lib/sms.functions";
 import { hiddenElectiveSubjectIds, resolveStudentSubjects, type OptionData, type Enrolment } from "@/lib/subject-options";
 
@@ -174,10 +174,11 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
     });
 
     const prelim = Array.from(studentMap.entries()).map(([studentId, m]) => {
-      let total = 0, points = 0, allVerified = true;
+      let total = 0, allVerified = true;
+      const gradeList: string[] = [];
       const subjects: Card["subjects"] = [];
       m.forEach((c, sid) => {
-        total += c.score; points += gradePoints(c.grade);
+        total += c.score; gradeList.push(c.grade);
         if (!c.verified) allVerified = false;
         subjects.push({ name: c.name, code: c.code, score: c.score, grade: c.grade, position: subjPos.get(sid)?.get(studentId) ?? null });
       });
@@ -186,7 +187,7 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
       const st = byId.get(studentId)!;
       const rs = resolveStudentSubjects(studentId, cid, od, enrol);
       const missing = rs.chosen.flatMap((c) => c.subjects).filter((x) => !m.has(x.id)).map((x) => x.name);
-      return { studentId, subjects, total, mean: n ? total / n : 0, grade: n ? meanGrade(points / n) : "—", allVerified, missing, pendingChoices: rs.pending.length };
+      return { studentId, subjects, total, mean: n ? total / n : 0, grade: n ? meanGradeOf(gradeList) : "—", allVerified, missing, pendingChoices: rs.pending.length };
     });
     const ranks = skipRanks(prelim, (r) => r.mean); // same default basis as the Class Ranking page
     for (const r of prelim) {
@@ -207,7 +208,7 @@ async function buildCards(schoolId: string, examId: string, classId?: string) {
 
 // ── message builders ──────────────────────────────────────────────────────────
 function smsFor(c: Card, schoolName: string, examName: string, withSubjects: boolean): string {
-  let t = `${schoolName}: ${studentName(c.student)}, ${examName} - Mean ${fmt(c.mean)}%, Grade ${c.grade}, Pos ${c.position}/${c.classSize}.`;
+  let t = `${schoolName}: ${studentName(c.student)}, ${examName} - Mean ${fmt(c.mean)}%, ${isCbcGrade(c.grade) ? "Level" : "Grade"} ${c.grade}, Pos ${c.position}/${c.classSize}.`;
   if (withSubjects) {
     for (const s of c.subjects) {
       const piece = ` ${(s.code || s.name).slice(0, 8)} ${fmt(s.score)}`;
@@ -239,9 +240,11 @@ function emailFor(c: Card, schoolName: string, exam: any) {
     ${rows}
   </table>
   <table style="width:100%;border-collapse:collapse;margin-top:12px;background:#f7f7f7;font-size:14px">
-    <tr><td style="padding:6px 8px">Total</td><td style="padding:6px 8px;text-align:right"><strong>${esc(fmt(c.total))}</strong></td></tr>
+    ${isCbcGrade(c.grade)
+      ? (() => { const t = cbcTotalPoints(c.subjects.map((x) => x.grade)); return `<tr><td style="padding:6px 8px">Total points</td><td style="padding:6px 8px;text-align:right"><strong>${t.total} / ${t.max}</strong></td></tr>`; })()
+      : `<tr><td style="padding:6px 8px">Total</td><td style="padding:6px 8px;text-align:right"><strong>${esc(fmt(c.total))}</strong></td></tr>`}
     <tr><td style="padding:6px 8px">Mean score</td><td style="padding:6px 8px;text-align:right"><strong>${esc(fmt(c.mean))}%</strong></td></tr>
-    <tr><td style="padding:6px 8px">Mean grade</td><td style="padding:6px 8px;text-align:right"><strong>${esc(c.grade)}</strong></td></tr>
+    <tr><td style="padding:6px 8px">${isCbcGrade(c.grade) ? "Overall level" : "Mean grade"}</td><td style="padding:6px 8px;text-align:right"><strong>${esc(c.grade)}</strong></td></tr>
     <tr><td style="padding:6px 8px">Class position</td><td style="padding:6px 8px;text-align:right"><strong>${c.position} of ${c.classSize}</strong></td></tr>
   </table>
   <p style="font-size:11px;color:#888;margin-top:20px">Automated message from ${esc(schoolName)}. Log in to the parent portal for the full report card.</p>
@@ -249,7 +252,7 @@ function emailFor(c: Card, schoolName: string, exam: any) {
   const text =
     `${schoolName} - Exam Results\n${name} (${c.className}) - ${exam.name}\n` +
     c.subjects.map((s) => `${s.name}: ${fmt(s.score)} (${s.grade})`).join("\n") +
-    `\nTotal ${fmt(c.total)} | Mean ${fmt(c.mean)}% | Grade ${c.grade} | Position ${c.position}/${c.classSize}`;
+    `\nTotal ${fmt(c.total)} | Mean ${fmt(c.mean)}% | ${isCbcGrade(c.grade) ? "Level" : "Grade"} ${c.grade} | Position ${c.position}/${c.classSize}`;
   return { html, text };
 }
 

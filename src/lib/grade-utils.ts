@@ -30,6 +30,12 @@ export function fallbackGrade(score: number): string {
 // ── CSS text colour for a grade ───────────────────────────────────────────────
 
 export function gradeColor(grade: string): string {
+  if (isCbcGrade(grade)) {
+    if (grade.startsWith("EE")) return "text-emerald-600";
+    if (grade.startsWith("ME")) return "text-blue-600";
+    if (grade.startsWith("AE")) return "text-amber-600";
+    return "text-red-600"; // BE
+  }
   if (["A", "A-"].includes(grade)) return "text-emerald-600";
   if (["B+", "B", "B-"].includes(grade)) return "text-blue-600";
   if (["C+", "C", "C-"].includes(grade)) return "text-amber-600";
@@ -52,6 +58,11 @@ export const GRADE_COLORS: Record<string, string> = {
   "D":  "#ef4444",
   "D-": "#f87171",
   "E":  "#7c3aed",
+  // CBC 8-level
+  "EE1": "#16a34a", "EE2": "#22c55e",
+  "ME1": "#2563eb", "ME2": "#60a5fa",
+  "AE1": "#d97706", "AE2": "#fbbf24",
+  "BE1": "#dc2626", "BE2": "#f87171",
 };
 
 export function gradeHex(grade: string): string {
@@ -61,6 +72,7 @@ export function gradeHex(grade: string): string {
 // ── Points (KCSE 12-point system) ─────────────────────────────────────────────
 
 export function gradePoints(grade: string): number {
+  if (isCbcGrade(grade)) return CBC_POINTS[grade];
   const map: Record<string, number> = {
     "A": 12, "A-": 11,
     "B+": 10, "B": 9, "B-": 8,
@@ -108,4 +120,49 @@ export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
+
+
+// ── CBC (competency-based) 8-level scale ──────────────────────────────────────
+// KNEC: four levels each split in two. Bands are contiguous so decimals never fall in a gap.
+export const CBC_LEVELS = [
+  { label: "EE1", min: 90, points: 8, name: "Exceptional" },
+  { label: "EE2", min: 75, points: 7, name: "Very Good" },
+  { label: "ME1", min: 58, points: 6, name: "Good" },
+  { label: "ME2", min: 41, points: 5, name: "Fair" },
+  { label: "AE1", min: 31, points: 4, name: "Needs Improvement" },
+  { label: "AE2", min: 21, points: 3, name: "Below Average" },
+  { label: "BE1", min: 11, points: 2, name: "Well Below Average" },
+  { label: "BE2", min: 0,  points: 1, name: "Minimal" },
+] as const;
+
+export const CBC_POINTS: Record<string, number> = Object.fromEntries(CBC_LEVELS.map((l) => [l.label, l.points]));
+
+export function isCbcGrade(grade: string | null | undefined): boolean {
+  return !!grade && Object.prototype.hasOwnProperty.call(CBC_POINTS, grade);
+}
+
+export function cbcGradeFromScore(score: number): string {
+  return (CBC_LEVELS.find((l) => score >= l.min) ?? CBC_LEVELS[CBC_LEVELS.length - 1]).label;
+}
+
+/** Overall CBC level from average points (rounded to the nearest level, .5 rounds up). */
+export function cbcMeanLevel(avgPoints: number): string {
+  const p = Math.min(8, Math.max(1, Math.round(avgPoints)));
+  return CBC_LEVELS.find((l) => l.points === p)!.label;
+}
+
+/**
+ * Overall (mean) grade for a set of subject grades. If every grade is a CBC
+ * level the CBC scale is used; otherwise the KCSE 12-point mean grade.
+ */
+export function meanGradeOf(grades: string[]): string {
+  if (grades.length === 0) return "—";
+  const avg = grades.reduce((t, g) => t + gradePoints(g), 0) / grades.length;
+  return grades.every(isCbcGrade) ? cbcMeanLevel(avg) : meanGrade(avg);
+}
+
+/** Total CBC points (e.g. 54 of 72 for nine learning areas) — KNEC reports KJSEA this way. */
+export function cbcTotalPoints(grades: string[]): { total: number; max: number } {
+  return { total: grades.reduce((t, g) => t + gradePoints(g), 0), max: grades.length * 8 };
 }
