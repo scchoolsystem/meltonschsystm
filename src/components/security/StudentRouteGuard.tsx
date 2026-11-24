@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 export const STUDENT_FORBIDDEN_PREFIXES = [
   "/admin",
   "/academics/marks",
+  "/academics/entry",           // mark entry grid
   "/academics/report-cards",    // admin list view
   "/academics/exams",           // exam administration
   "/analytics",                 // school-wide analytics
