@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { FeatureGate } from "@/components/FeatureGate";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
-import { fetchHiddenSubjectIds, fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { fetchHiddenSubjectIds, fetchOptionData, fetchEnrolments } from "@/lib/subject-options-loaders";
 import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { Button } from "@/components/ui/button";
 import { Loader2, Printer, ShieldCheck } from "lucide-react";

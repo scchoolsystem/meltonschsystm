@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
-import { fetchHiddenSubjectIds } from "@/lib/subject-options.client";
+import { fetchHiddenSubjectIds } from "@/lib/subject-options-loaders";
 import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

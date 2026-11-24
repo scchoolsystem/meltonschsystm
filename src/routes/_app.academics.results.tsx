@@ -3,7 +3,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
-import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options.client";
+import { fetchOptionData, fetchEnrolments } from "@/lib/subject-options-loaders";
 import { hiddenElectiveSubjectIds } from "@/lib/subject-options";
 import { useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";

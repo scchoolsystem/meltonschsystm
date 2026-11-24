@@ -9,7 +9,7 @@ import { FeatureGate } from "@/components/FeatureGate";
 import { useEffect, useMemo, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { supabase, getSessionSafe } from "@/integrations/supabase/client";
 import { withTimeout } from "@/lib/with-timeout";
-import { fetchHiddenSubjectIds } from "@/lib/subject-options.client";
+import { fetchHiddenSubjectIds } from "@/lib/subject-options-loaders";
 import { groupTimetableSlots, staffName } from "@/lib/timetable-display";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
