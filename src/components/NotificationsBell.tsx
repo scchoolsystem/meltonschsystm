@@ -59,6 +59,7 @@ export function NotificationsBell() {
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const load = async () => {
     const { data: schoolId } = await supabase.rpc("my_school_id");
@@ -174,7 +175,8 @@ export function NotificationsBell() {
     }
     setItems(next);
     computeUnread(next);
-    if (item.link) window.location.href = item.link;
+    const key = `${item.source}-${item.id}`;
+    setExpandedKey((cur) => (cur === key ? null : key));
   }
 
   function markAllRead() {
@@ -200,7 +202,7 @@ export function NotificationsBell() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" className="w-[22rem] max-w-[calc(100vw-1rem)] p-0">
         {/* Header */}
         <div className="px-3 py-2 border-b font-medium text-sm flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -230,14 +232,14 @@ export function NotificationsBell() {
             return (
               <div
                 key={`${n.source}-${n.id}`}
-                role={n.link ? "button" : undefined}
-                tabIndex={n.link ? 0 : undefined}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleItemClick(n)}
                 onKeyDown={(e) => e.key === "Enter" && handleItemClick(n)}
                 className={cn(
                   "px-3 py-2.5 border-b last:border-0 transition-colors",
                   isRead ? "opacity-60" : "bg-primary/5 hover:bg-muted/60",
-                  n.link && "cursor-pointer hover:bg-muted/60",
+                  "cursor-pointer hover:bg-muted/60",
                 )}
               >
                 <div className="flex items-center gap-1.5">
@@ -252,11 +254,23 @@ export function NotificationsBell() {
                         {n.channel}
                       </Badge>
                     )}
-                    {n.link && <ExternalLink className="w-3 h-3 text-muted-foreground" />}
                   </div>
                 </div>
                 {n.body && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 ml-4">{n.body}</p>
+                  <p className={cn("text-xs text-muted-foreground mt-0.5 ml-4 whitespace-pre-wrap break-words",
+                    expandedKey !== `${n.source}-${n.id}` && "line-clamp-2")}>{n.body}</p>
+                )}
+                {expandedKey === `${n.source}-${n.id}` && n.link && (
+                  <div className="ml-4 mt-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] gap-1"
+                      onClick={(e) => { e.stopPropagation(); window.location.href = n.link!; }}
+                    >
+                      <ExternalLink className="w-3 h-3" /> Open
+                    </Button>
+                  </div>
                 )}
                 <div className="text-[10px] text-muted-foreground mt-1 ml-4">
                   {n.audience ? `${n.audience} · ` : ""}
