@@ -29,6 +29,7 @@ const ADMIN_NAV: NavGroup[] = [
     { title: "Results", url: "/academics/results" },
     { title: "Class Ranking", url: "/academics/class-ranking" },
     { title: "Report Cards", url: "/academics/report-cards" },
+    { title: "Send Results", url: "/academics/send-results" },
     { title: "Remark Templates", url: "/academics/remarks" },
     // Setup
     { title: "Exams", url: "/academics/exams" },
@@ -221,6 +222,7 @@ const ROLE_NAV_CONTRIBUTIONS: Record<string, RoleNavContribution> = {
       { title: "Results", url: "/academics/results" },
       { title: "Class Ranking", url: "/academics/class-ranking" },
       { title: "Report Cards", url: "/academics/report-cards" },
+      { title: "Send Results", url: "/academics/send-results" },
       { title: "Exam Oversight", url: "/academics/oversight" },
       { title: "Remarks", url: "/academics/remarks" },
       { title: "Grading Scale", url: "/admin/grading" },
@@ -468,6 +470,7 @@ const NAV_FEATURE_BY_PREFIX: [prefix: string, feature: string][] = [
   ["/academics/remarks", "academics_remarks"],
   ["/academics/results", "academics_results"],
   ["/academics/class-ranking", "academics_results"],
+  ["/academics/send-results", "academics_results"],
   ["/academics/report-cards", "academics_report_cards"],
   ["/academics/report-card", "academics_report_cards"],
   ["/academics/oversight", "academics_oversight"],
