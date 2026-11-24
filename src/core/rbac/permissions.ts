@@ -256,6 +256,9 @@ export function moduleForPath(pathname: string): string | null {
   if (seg[0] === "portal" && seg[1]) return `portal.${seg[1]}`;
   if (seg[0] === "academics" && seg[1]) {
     if (seg[1] === "exams") return "exams";
+    // /academics/send-results — personalised results SMS/email/bell; same
+    // audience as exam management (the server also enforces the role check).
+    if (seg[1] === "send-results") return "exams";
     if (seg[1] === "marks") return "marks";
     // /academics/entry — unified score+grade+remark grid ("Marks & Remarks"
     // in nav). Same audience as the old markbook, so it shares the "marks"
