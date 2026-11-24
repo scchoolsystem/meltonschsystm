@@ -402,8 +402,8 @@ export const sendResultsBatch = createServerFn({ method: "POST" })
           const body = `${exam.name}: Mean ${fmt(c.mean)}%, Grade ${c.grade}, Position ${c.position}/${c.classSize}.`;
           const title = `Results: ${studentName(c.student)}`;
           const targets = new Map<string, string>();
-          for (const r of sl ?? []) if (r.student_id === sid && r.user_id) targets.set(r.user_id, "/portal/student");
-          for (const r of pl ?? []) if (r.student_id === sid && r.parent_user_id) targets.set(r.parent_user_id, "/portal/parent");
+          for (const r of sl ?? []) if (r.student_id === sid && r.user_id) targets.set(r.user_id, "/portal/student?tab=results");
+          for (const r of pl ?? []) if (r.student_id === sid && r.parent_user_id) targets.set(r.parent_user_id, "/portal/parent?tab=results");
           if (targets.size === 0) { st(sid).bell = "skipped"; continue; }
           targets.forEach((link, uid) => rows.push({
             user_id: uid, school_id: schoolId, title, body, kind: "results", link, dedupe_key: `results-${data.examId}-${sid}`,
